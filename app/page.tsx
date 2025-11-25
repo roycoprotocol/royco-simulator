@@ -9,7 +9,6 @@ export default function YieldSimulator() {
   const [seniorCapital, setSeniorCapital] = useState<string>('10,000,000');
   const [juniorCapital, setJuniorCapital] = useState<string>('1,111,111.11');
 
-  const [showRdmGraph, setShowRdmGraph] = useState<boolean>(false);
   const [showExplainer, setShowExplainer] = useState<boolean>(false);
 
   const [results, setResults] = useState<{
@@ -127,8 +126,8 @@ export default function YieldSimulator() {
     const seniorCapitalNum = parseNumber(seniorCapital);
     const juniorCapitalNum = parseNumber(juniorCapital);
 
-    for (let i = 0; i <= 100; i++) {
-      const utilization = i / 100;
+    for (let i = 0; i <= 1000; i++) {
+      const utilization = i / 1000;
       const rdm = calculateRdmAtUtilization(utilization);
       const juniorYield = rdm * (results?.totalYield || 0);
       const seniorYield = (results?.totalYield || 0) - juniorYield;
@@ -195,7 +194,7 @@ export default function YieldSimulator() {
                   What is Yield Tranching?
                 </h4>
                 <p className="text-sm text-[#666666] leading-relaxed ml-8">
-                  Yield tranching splits a single investment opportunity into two parts with different risk and return profiles. Think of it like slicing a cake into two layers - each layer has different characteristics but they work together as one system.
+                  Take one pool of capital earning yield. Split it into two tranches with different risk-return profiles. Senior gets downside protection. Junior gets higher returns.
                 </p>
               </div>
 
@@ -214,7 +213,7 @@ export default function YieldSimulator() {
                       <span className="text-sm font-semibold text-[#0a0a0a]">Protected Capital</span>
                     </div>
                     <p className="text-sm text-[#666666] leading-relaxed">
-                      Senior capital is <strong>protected first</strong> if anything goes wrong. In exchange for this safety, it receives a <strong>lower but more stable yield</strong>. Perfect for risk-averse investors who prioritize capital preservation.
+                      Gets paid first. Lower yield. Losses covered by junior capital.
                     </p>
                   </div>
                   <div className="bg-[#0a0a0a] rounded-lg p-4 border-2 border-[#0a0a0a]">
@@ -225,7 +224,7 @@ export default function YieldSimulator() {
                       <span className="text-sm font-semibold text-white">First Loss Capital</span>
                     </div>
                     <p className="text-sm text-[#cccccc] leading-relaxed">
-                      Junior capital takes <strong>losses first</strong> to protect the senior tranche. As compensation for this risk, it receives a <strong>higher yield</strong>. Ideal for investors seeking greater returns and comfortable with higher risk.
+                      Takes losses first. Higher yield. Protects senior capital.
                     </p>
                   </div>
                 </div>
@@ -235,18 +234,14 @@ export default function YieldSimulator() {
               <div>
                 <h4 className="text-base font-semibold mb-3 flex items-center gap-2">
                   <span className="bg-[#0a0a0a] text-white rounded-full w-6 h-6 flex items-center justify-center text-sm">3</span>
-                  How the Math Works
+                  How It Works
                 </h4>
-                <div className="ml-8 space-y-3">
-                  <p className="text-sm text-[#666666] leading-relaxed">
-                    When you invest in yield tranching, here's what happens:
-                  </p>
-                  <ol className="text-sm text-[#666666] space-y-2 list-decimal list-inside">
-                    <li><strong className="text-[#0a0a0a]">Combined capital</strong> is deployed to earn yield from an underlying source (like a lending protocol or staking)</li>
-                    <li><strong className="text-[#0a0a0a]">Target Coverage</strong> determines the minimum ratio of junior to senior capital required for safety</li>
-                    <li><strong className="text-[#0a0a0a]">The RDM (Risk Distribution Model)</strong> calculates what percentage of the total yield goes to each tranche</li>
-                    <li><strong className="text-[#0a0a0a]">Higher utilization</strong> (more senior capital per junior dollar) means junior earns a bigger share</li>
-                  </ol>
+                <div className="ml-8 space-y-2 text-sm text-[#666666]">
+                  <p>1. Deploy combined capital to earn yield</p>
+                  <p>2. Set target coverage ratio (min junior capital as % of senior)</p>
+                  <p>3. Calculate utilization: (Senior × Coverage) / Junior</p>
+                  <p>4. RDM determines yield split based on utilization</p>
+                  <p>5. Higher utilization = junior earns more of the total yield</p>
                 </div>
               </div>
 
@@ -254,36 +249,113 @@ export default function YieldSimulator() {
               <div>
                 <h4 className="text-base font-semibold mb-3 flex items-center gap-2">
                   <span className="bg-[#0a0a0a] text-white rounded-full w-6 h-6 flex items-center justify-center text-sm">4</span>
-                  Key Terms to Understand
+                  Key Terms
                 </h4>
                 <div className="ml-8 grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div className="bg-[#f8f9fa] rounded p-3 border border-[#e5e5e0]">
                     <p className="text-sm font-semibold text-[#0a0a0a] mb-1">Utilization</p>
-                    <p className="text-xs text-[#666666]">How much junior capital is being "used" to protect senior capital. Higher = junior earns more.</p>
+                    <p className="text-xs text-[#666666]">How efficiently junior capital covers senior. Higher = junior earns more.</p>
                   </div>
                   <div className="bg-[#f8f9fa] rounded p-3 border border-[#e5e5e0]">
                     <p className="text-sm font-semibold text-[#0a0a0a] mb-1">RDM Output</p>
-                    <p className="text-xs text-[#666666]">The percentage of total yield allocated to junior. Calculated based on utilization.</p>
+                    <p className="text-xs text-[#666666]">Percentage of total yield allocated to junior (not the yield itself).</p>
                   </div>
                   <div className="bg-[#f8f9fa] rounded p-3 border border-[#e5e5e0]">
                     <p className="text-sm font-semibold text-[#0a0a0a] mb-1">Target Coverage</p>
-                    <p className="text-xs text-[#666666]">Minimum junior capital required as % of senior (e.g., 10% = $1M junior for every $10M senior).</p>
+                    <p className="text-xs text-[#666666]">Minimum junior capital as % of senior. 10% = $1M junior per $10M senior.</p>
                   </div>
                   <div className="bg-[#f8f9fa] rounded p-3 border border-[#e5e5e0]">
                     <p className="text-sm font-semibold text-[#0a0a0a] mb-1">Underlying Yield</p>
-                    <p className="text-xs text-[#666666]">The base APY earned before splitting between tranches (from staking, lending, etc.).</p>
+                    <p className="text-xs text-[#666666]">Base APY before tranching (from staking, lending, etc.).</p>
                   </div>
                 </div>
               </div>
 
-              {/* Example */}
-              <div className="bg-[#f8f9fa] rounded-lg p-4 border border-[#e5e5e0]">
-                <h4 className="text-base font-semibold mb-3 text-[#0a0a0a]">
-                  💡 Simple Example
+              {/* Example with Visuals */}
+              <div className="bg-white rounded-lg p-6 border-2 border-[#0a0a0a]">
+                <h4 className="text-base font-semibold mb-4 text-[#0a0a0a]">
+                  Example Walkthrough
                 </h4>
-                <p className="text-sm text-[#666666] leading-relaxed">
-                  You have $10M earning 13% APY ($1.3M per year). With 10% target coverage, you need at least $1M in junior capital. At 90% utilization, the RDM says junior gets 22.5% of the yield ($292.5K) while senior gets the remaining 77.5% ($1.0075M). This means junior earns <strong className="text-[#0a0a0a]">29.25% APY</strong> on their $1M, while senior earns <strong className="text-[#0a0a0a]">10.08% APY</strong> on their $10M - but with downside protection.
-                </p>
+
+                {/* Capital Input */}
+                <div className="mb-6 pb-6 border-b border-[#e5e5e0]">
+                  <p className="text-xs font-semibold text-[#666666] mb-3">Starting Capital</p>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="bg-white border-2 border-[#0a0a0a] rounded-lg p-4">
+                      <div className="text-xs text-[#666666] mb-1">Senior Capital</div>
+                      <div className="text-2xl font-semibold text-[#0a0a0a]">$10M</div>
+                    </div>
+                    <div className="bg-[#0a0a0a] rounded-lg p-4">
+                      <div className="text-xs text-[#cccccc] mb-1">Junior Capital</div>
+                      <div className="text-2xl font-semibold text-white">$1.11M</div>
+                    </div>
+                  </div>
+                  <div className="mt-3 bg-[#f8f9fa] rounded p-3">
+                    <p className="text-xs text-[#666666]">
+                      <strong className="text-[#0a0a0a]">Setup:</strong> 10% target coverage. 13% underlying APY.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Step 1: Utilization */}
+                <div className="mb-6 pb-6 border-b border-[#e5e5e0]">
+                  <p className="text-xs font-semibold text-[#666666] mb-3">1. Calculate Utilization</p>
+                  <div className="bg-[#f8f9fa] rounded-lg p-4 border border-[#e5e5e0]">
+                    <div className="font-mono text-sm text-[#0a0a0a] mb-2">
+                      ($10M × 10%) / $1.11M = 90%
+                    </div>
+                    <p className="text-xs text-[#666666]">Junior is 90% utilized protecting senior</p>
+                  </div>
+                </div>
+
+                {/* Step 2: Total Yield */}
+                <div className="mb-6 pb-6 border-b border-[#e5e5e0]">
+                  <p className="text-xs font-semibold text-[#666666] mb-3">2. Total Yield Earned</p>
+                  <div className="bg-[#f8f9fa] rounded-lg p-4 border border-[#e5e5e0]">
+                    <div className="text-2xl font-semibold text-[#0a0a0a] mb-1">$1,300,000 / year</div>
+                    <p className="text-xs text-[#666666]">13% APY on $10M senior capital</p>
+                  </div>
+                </div>
+
+                {/* Step 3: RDM Split - THE KEY PART */}
+                <div className="mb-6 pb-6 border-b border-[#e5e5e0]">
+                  <p className="text-xs font-semibold text-[#666666] mb-3">3. RDM Splits the $1.3M Yield</p>
+                  <div className="bg-[#FFF9E6] rounded-lg p-4 border-2 border-[#FFC107] mb-4">
+                    <p className="text-sm font-semibold text-[#0a0a0a] mb-2">⚠️ RDM Output is a PERCENTAGE</p>
+                    <p className="text-xs text-[#666666]">At 90% utilization, RDM says: junior gets <strong className="text-[#0a0a0a]">22.5% of the total yield</strong>, senior gets the rest.</p>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="bg-[#0a0a0a] rounded-lg p-4">
+                      <div className="text-xs text-[#cccccc] mb-2">Junior Gets</div>
+                      <div className="text-xl font-semibold text-white mb-1">22.5%</div>
+                      <div className="text-xs text-[#cccccc] mb-3">of the $1.3M =</div>
+                      <div className="text-2xl font-semibold text-white">$292,500</div>
+                    </div>
+                    <div className="bg-white border-2 border-[#0a0a0a] rounded-lg p-4">
+                      <div className="text-xs text-[#666666] mb-2">Senior Gets</div>
+                      <div className="text-xl font-semibold text-[#0a0a0a] mb-1">77.5%</div>
+                      <div className="text-xs text-[#666666] mb-3">of the $1.3M =</div>
+                      <div className="text-2xl font-semibold text-[#0a0a0a]">$1,007,500</div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Step 4: Final APYs */}
+                <div>
+                  <p className="text-xs font-semibold text-[#666666] mb-3">4. Each Tranche's APY</p>
+                  <div className="grid grid-cols-2 gap-4">
+                    <div className="bg-[#0a0a0a] rounded-lg p-4">
+                      <div className="text-xs text-[#cccccc] mb-1">Junior APY</div>
+                      <div className="text-3xl font-semibold text-white">26.3%</div>
+                      <div className="text-xs text-[#cccccc] mt-2">$292K ÷ $1.11M</div>
+                    </div>
+                    <div className="bg-white border-2 border-[#0a0a0a] rounded-lg p-4">
+                      <div className="text-xs text-[#666666] mb-1">Senior APY</div>
+                      <div className="text-3xl font-semibold text-[#0a0a0a]">10.08%</div>
+                      <div className="text-xs text-[#666666] mt-2">$1.01M ÷ $10M</div>
+                    </div>
+                  </div>
+                </div>
               </div>
             </div>
           )}
@@ -440,25 +512,17 @@ export default function YieldSimulator() {
                 </div>
 
                 <div className="bg-[#f8f9fa] rounded-lg p-6 border border-[#e5e5e0]">
-                  <div className="flex items-center justify-between mb-2">
-                    <p className="text-sm font-medium text-[#666666]">
-                      RDM Output
-                    </p>
-                    <button
-                      onClick={() => setShowRdmGraph(!showRdmGraph)}
-                      className="text-[#0a0a0a] hover:text-[#666666] transition-colors"
-                      title="Toggle RDM curve visualization"
-                    >
-                      <svg className={`w-5 h-5 transition-transform ${showRdmGraph ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                      </svg>
-                    </button>
-                  </div>
+                  <p className="text-sm font-medium text-[#666666] mb-2">
+                    RDM Output (% of Yield)
+                  </p>
                   <p className="text-3xl font-semibold text-[#0a0a0a] mb-1">
                     {formatPercent(results.rdmOutput * 100)}
                   </p>
-                  <p className="text-xs text-[#666666] leading-relaxed mt-2">
-                    Percentage of total yield allocated to junior tranche. The remaining goes to senior.
+                  <p className="text-sm font-medium text-[#0a0a0a] mt-2 mb-1">
+                    = {formatCurrency(results.juniorYield)} to junior
+                  </p>
+                  <p className="text-xs text-[#666666] leading-relaxed">
+                    This % determines how the {formatCurrency(results.totalYield)} total yield is split.
                   </p>
                 </div>
 
@@ -475,92 +539,6 @@ export default function YieldSimulator() {
                 </div>
               </div>
 
-              {/* RDM Graph */}
-              {showRdmGraph && (
-                <div className="mt-8 bg-white rounded-lg p-8 border-2 border-[#0a0a0a]">
-                  <h3 className="text-xl font-semibold text-[#0a0a0a] mb-6">
-                    RDM Curve Visualization
-                  </h3>
-
-                  <div className="h-96">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <LineChart
-                        data={generateChartData()}
-                        margin={{ top: 30, right: 30, left: 60, bottom: 60 }}
-                      >
-                        <CartesianGrid strokeDasharray="3 3" stroke="#e5e5e0" />
-                        <XAxis
-                          dataKey="utilization"
-                          label={{ value: 'Utilization (%)', position: 'insideBottom', offset: -10, fill: '#0a0a0a' }}
-                          domain={[0, 100]}
-                          stroke="#666666"
-                        />
-                        <YAxis
-                          label={{ value: 'RDM Output (% to Junior)', angle: -90, position: 'center', offset: 10, fill: '#0a0a0a' }}
-                          domain={[0, 100]}
-                          stroke="#666666"
-                        />
-                        <Tooltip
-                          content={({ active, payload }) => {
-                            if (active && payload && payload.length) {
-                              const data = payload[0].payload;
-                              return (
-                                <div className="bg-white p-4 rounded-lg border-2 border-[#0a0a0a] shadow-lg">
-                                  <p className="text-sm font-semibold text-[#0a0a0a] mb-2">
-                                    At {data.utilization.toFixed(1)}% Utilization:
-                                  </p>
-                                  <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-                                    <div>
-                                      <p className="text-[#666666]">RDM Output:</p>
-                                      <p className="font-semibold text-[#0a0a0a]">{data.rdm.toFixed(2)}%</p>
-                                    </div>
-                                    <div>
-                                      <p className="text-[#666666]">Junior APY:</p>
-                                      <p className="font-semibold text-[#0a0a0a]">{data.juniorAPY.toFixed(2)}%</p>
-                                    </div>
-                                    <div>
-                                      <p className="text-[#666666]">Junior Yield:</p>
-                                      <p className="font-semibold text-[#0a0a0a]">{formatCurrency(data.juniorYield)}</p>
-                                    </div>
-                                    <div>
-                                      <p className="text-[#666666]">Senior APY:</p>
-                                      <p className="font-semibold text-[#0a0a0a]">{data.seniorAPY.toFixed(2)}%</p>
-                                    </div>
-                                  </div>
-                                </div>
-                              );
-                            }
-                            return null;
-                          }}
-                        />
-                        <ReferenceLine
-                          x={90}
-                          stroke="#0a0a0a"
-                          strokeDasharray="3 3"
-                          label={{ value: 'Kink (90%)', position: 'top', fill: '#0a0a0a' }}
-                        />
-                        <ReferenceDot
-                          x={results.utilization * 100}
-                          y={results.rdmOutput * 100}
-                          r={8}
-                          fill="#0a0a0a"
-                          stroke="#fff"
-                          strokeWidth={2}
-                          label={{ value: 'Current', position: 'top', fill: '#0a0a0a', fontWeight: 'bold' }}
-                        />
-                        <Line
-                          type="monotone"
-                          dataKey="rdm"
-                          stroke="#0a0a0a"
-                          strokeWidth={3}
-                          dot={false}
-                          activeDot={{ r: 6, fill: '#666666' }}
-                        />
-                      </LineChart>
-                    </ResponsiveContainer>
-                  </div>
-                </div>
-              )}
             </div>
 
             {/* Tranche Results */}
@@ -660,70 +638,126 @@ export default function YieldSimulator() {
               </div>
             </div>
 
-            {/* Explanation */}
-            <div className="bg-[#f8f9fa] rounded-lg p-8 border border-[#e5e5e0]">
-              <h3 className="text-lg font-semibold text-[#0a0a0a] mb-4">
-                📊 Understanding Your Results
-              </h3>
-              <div className="text-sm text-[#666666] space-y-4 leading-relaxed">
-                <div>
-                  <p className="font-semibold text-[#0a0a0a] mb-2">Step 1: Calculate Utilization</p>
-                  <p className="bg-white rounded p-3 border border-[#e5e5e0] font-mono text-xs">
-                    Utilization = (Senior Capital × Target Coverage) / Junior Capital
-                  </p>
-                  <p className="mt-2">
-                    Result: <strong className="text-[#0a0a0a]">{formatPercent(results.utilization * 100)}</strong> - This measures how much junior capital is backing each dollar of senior capital.
-                  </p>
-                </div>
+            {/* RDM Curve Visualization */}
+            <div className="bg-white rounded-lg p-8 md:p-10 border border-[#e5e5e0] shadow-sm">
+              <div className="mb-6">
+                <h2 className="text-2xl font-semibold text-[#0a0a0a] mb-2">
+                  RDM Curve Visualization
+                </h2>
+                <p className="text-sm text-[#666666]">
+                  See how RDM output changes with utilization. Your current position is marked on the curve.
+                </p>
+              </div>
 
-                <div>
-                  <p className="font-semibold text-[#0a0a0a] mb-2">Step 2: Apply the RDM Formula</p>
-                  {results.utilization < 0.9 ? (
-                    <>
-                      <p className="bg-white rounded p-3 border border-[#e5e5e0] font-mono text-xs">
-                        RDM = 0.25 × Utilization (because utilization &lt; 90%)
-                      </p>
-                      <p className="mt-2">
-                        Result: <strong className="text-[#0a0a0a]">0.25 × {results.utilization.toFixed(4)} = {formatPercent(results.rdmOutput * 100)}</strong>
-                      </p>
-                      <p className="mt-2 text-xs">
-                        💡 Below 90% utilization, junior's share grows linearly. There's plenty of junior capital to absorb risk.
-                      </p>
-                    </>
-                  ) : (
-                    <>
-                      <p className="bg-white rounded p-3 border border-[#e5e5e0] font-mono text-xs">
-                        RDM = 7.75 × (Utilization - 0.90) + 0.225 (because utilization ≥ 90%)
-                      </p>
-                      <p className="mt-2">
-                        Result: <strong className="text-[#0a0a0a]">7.75 × ({results.utilization.toFixed(4)} - 0.90) + 0.225 = {formatPercent(results.rdmOutput * 100)}</strong>
-                      </p>
-                      <p className="mt-2 text-xs">
-                        💡 Above 90% utilization (the "kink"), junior's share grows rapidly. Junior capital is working very hard to protect senior.
-                      </p>
-                    </>
-                  )}
-                </div>
+              <div className="h-96">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart
+                    data={generateChartData()}
+                    margin={{ top: 30, right: 30, left: 120, bottom: 60 }}
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e5e0" />
+                    <XAxis
+                      dataKey="utilization"
+                      label={{ value: 'Utilization (%)', position: 'insideBottom', offset: -10, fill: '#0a0a0a' }}
+                      domain={[0, 100]}
+                      ticks={[0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100]}
+                      stroke="#666666"
+                    />
+                    <YAxis
+                      label={{ value: 'RDM Output (% to Junior)', angle: -90, position: 'insideLeft', style: { textAnchor: 'middle' }, fill: '#0a0a0a' }}
+                      domain={[0, 100]}
+                      ticks={[0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100]}
+                      stroke="#666666"
+                    />
+                    <Tooltip
+                      content={({ active, payload }) => {
+                        if (active && payload && payload.length) {
+                          const data = payload[0].payload;
+                          return (
+                            <div className="bg-white p-4 rounded-lg border-2 border-[#0a0a0a] shadow-lg">
+                              <p className="text-sm font-semibold text-[#0a0a0a] mb-2">
+                                At {data.utilization.toFixed(1)}% Utilization:
+                              </p>
+                              <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                                <div>
+                                  <p className="text-[#666666]">RDM Output:</p>
+                                  <p className="font-semibold text-[#0a0a0a]">{data.rdm.toFixed(2)}%</p>
+                                </div>
+                                <div>
+                                  <p className="text-[#666666]">Junior APY:</p>
+                                  <p className="font-semibold text-[#0a0a0a]">{data.juniorAPY.toFixed(2)}%</p>
+                                </div>
+                                <div>
+                                  <p className="text-[#666666]">Junior Yield:</p>
+                                  <p className="font-semibold text-[#0a0a0a]">{formatCurrency(data.juniorYield)}</p>
+                                </div>
+                                <div>
+                                  <p className="text-[#666666]">Senior APY:</p>
+                                  <p className="font-semibold text-[#0a0a0a]">{data.seniorAPY.toFixed(2)}%</p>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        }
+                        return null;
+                      }}
+                    />
+                    <ReferenceLine
+                      x={results.utilization * 100}
+                      stroke="#0a0a0a"
+                      strokeWidth={2}
+                      strokeDasharray="5 5"
+                      label={{
+                        value: `Current: ${formatPercent(results.utilization * 100)}`,
+                        position: 'top',
+                        fill: '#0a0a0a',
+                        fontSize: 12,
+                        fontWeight: 600
+                      }}
+                    />
+                    <ReferenceDot
+                      x={results.utilization * 100}
+                      y={results.rdmOutput * 100}
+                      r={8}
+                      fill="#0a0a0a"
+                      stroke="#fff"
+                      strokeWidth={3}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="rdm"
+                      stroke="#0a0a0a"
+                      strokeWidth={3}
+                      dot={false}
+                      activeDot={{ r: 6, fill: '#666666' }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
 
-                <div>
-                  <p className="font-semibold text-[#0a0a0a] mb-2">Step 3: Split the Yield</p>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="bg-white rounded p-3 border border-[#e5e5e0]">
-                      <p className="text-xs text-[#666666] mb-1">Junior Gets</p>
-                      <p className="text-lg font-semibold text-[#0a0a0a]">{formatPercent(results.rdmOutput * 100)}</p>
-                      <p className="text-xs text-[#666666] mt-1">{formatCurrency(results.juniorYield)} total</p>
-                    </div>
-                    <div className="bg-white rounded p-3 border border-[#e5e5e0]">
-                      <p className="text-xs text-[#666666] mb-1">Senior Gets</p>
-                      <p className="text-lg font-semibold text-[#0a0a0a]">{formatPercent((1 - results.rdmOutput) * 100)}</p>
-                      <p className="text-xs text-[#666666] mt-1">{formatCurrency(results.seniorYield)} total</p>
-                    </div>
-                  </div>
+              <div className="mt-6 bg-[#f8f9fa] rounded-lg p-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-4 h-4 bg-[#0a0a0a] rounded-full border-2 border-white"></div>
+                  <p className="text-sm text-[#666666]">
+                    <strong className="text-[#0a0a0a]">Your Position:</strong> {formatPercent(results.utilization * 100)} utilization = {formatPercent(results.rdmOutput * 100)} RDM output
+                  </p>
                 </div>
               </div>
             </div>
           </div>
         )}
+
+        {/* Footer */}
+        <footer className="mt-16 py-8 border-t border-[#e5e5e0]">
+          <div className="max-w-6xl mx-auto px-4 text-center">
+            <p className="text-sm text-[#666666] mb-2">
+              Built by <a href="https://www.royco.org" target="_blank" rel="noopener noreferrer" className="text-[#0a0a0a] font-medium hover:underline">Royco</a>
+            </p>
+            <p className="text-xs text-[#999999]">
+              Royco Tranching Simulator • Understanding yield tranching through the RDM model
+            </p>
+          </div>
+        </footer>
       </div>
     </div>
   );
