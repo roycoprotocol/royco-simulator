@@ -113,6 +113,18 @@ export default function YieldSimulator() {
     return `${value.toFixed(2)}%`;
   };
 
+  const calculate90PercentUtilization = () => {
+    const seniorCapitalNum = parseNumber(seniorCapital);
+    const targetCoverageNum = parseNumber(targetCoverage) / 100;
+
+    if (isNaN(seniorCapitalNum) || isNaN(targetCoverageNum) || seniorCapitalNum <= 0 || targetCoverageNum <= 0) {
+      return;
+    }
+
+    const juniorCapitalFor90 = (seniorCapitalNum * targetCoverageNum) / 0.9;
+    setJuniorCapital(formatNumberWithCommas(juniorCapitalFor90.toFixed(2)));
+  };
+
   const calculateRdmAtUtilization = (utilization: number): number => {
     if (utilization < 0.9) {
       return 0.25 * utilization;
@@ -451,16 +463,29 @@ export default function YieldSimulator() {
               <label className="block text-sm font-medium text-[#0a0a0a] mb-3">
                 Junior Capital ($)
               </label>
-              <input
-                type="text"
-                value={juniorCapital}
-                onChange={(e) => {
-                  const value = e.target.value.replace(/[^0-9.]/g, '');
-                  setJuniorCapital(formatNumberWithCommas(value));
-                }}
-                className="w-full px-4 py-3 rounded-md border border-[#e5e5e0] bg-white text-[#0a0a0a] focus:outline-none focus:ring-2 focus:ring-[#0a0a0a] focus:border-transparent transition-all"
-                placeholder="1,111,111.11"
-              />
+              <div className="relative flex items-center">
+                <input
+                  type="text"
+                  value={juniorCapital}
+                  onChange={(e) => {
+                    const value = e.target.value.replace(/[^0-9.]/g, '');
+                    setJuniorCapital(formatNumberWithCommas(value));
+                  }}
+                  className="w-full px-4 py-3 pr-16 rounded-md border border-[#e5e5e0] bg-white text-[#0a0a0a] focus:outline-none focus:ring-2 focus:ring-[#0a0a0a] focus:border-transparent transition-all"
+                  placeholder="1,111,111.11"
+                />
+                <button
+                  onClick={calculate90PercentUtilization}
+                  type="button"
+                  className="absolute right-1.5 px-2.5 py-1.5 text-xs font-medium text-white bg-[#0a0a0a] rounded hover:bg-[#2a2a2a] focus:outline-none focus:ring-2 focus:ring-[#0a0a0a] transition-all group"
+                >
+                  90%
+                  <span className="absolute bottom-full right-0 mb-2 hidden group-hover:block w-64 p-3 text-xs font-normal text-white bg-[#0a0a0a] rounded-lg shadow-lg border border-[#333333] z-10 pointer-events-none">
+                    <strong className="block mb-1">Set: 90% Utilization</strong>
+                    Automatically calculates and sets the junior capital amount needed for exactly 90% utilization based on your current senior capital and target coverage.
+                  </span>
+                </button>
+              </div>
               <p className="mt-2 text-sm text-[#666666] leading-relaxed">
                 <strong className="text-[#0a0a0a]">What it means:</strong> The risk-taking capital that absorbs losses first to protect senior investors. Junior depositors receive higher returns as compensation for taking on more risk.
               </p>
