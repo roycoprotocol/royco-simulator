@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useMemo, useState } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, ReferenceDot } from 'recharts';
 
 export default function YieldSimulator() {
@@ -12,24 +12,6 @@ export default function YieldSimulator() {
   const [juniorCustomYield, setJuniorCustomYield] = useState<string>('13');
 
   const [showExplainer, setShowExplainer] = useState<boolean>(false);
-
-  const [results, setResults] = useState<{
-    isValid: boolean;
-    utilization: number;
-    rdmOutput: number;
-    totalYield: number;
-    juniorYield: number;
-    juniorOwnYield: number;
-    juniorTotalYield: number;
-    seniorYield: number;
-    juniorYieldPercent: number;
-    seniorYieldPercent: number;
-    errorMessage?: string;
-  } | null>(null);
-
-  useEffect(() => {
-    calculateYields();
-  }, [targetCoverage, underlyingYield, seniorCapital, juniorCapital, juniorDeploymentOption, juniorCustomYield]);
 
   const parseNumber = (value: string): number => {
     return parseFloat(value.replace(/,/g, ''));
@@ -43,7 +25,20 @@ export default function YieldSimulator() {
     return parts.join('.');
   };
 
-  const calculateYields = () => {
+  const results = useMemo<{
+    isValid: boolean;
+    utilization: number;
+    rdmOutput: number;
+    totalYield: number;
+    combinedTotalYield: number;
+    juniorYield: number;
+    juniorOwnYield: number;
+    juniorTotalYield: number;
+    seniorYield: number;
+    juniorYieldPercent: number;
+    seniorYieldPercent: number;
+    errorMessage?: string;
+  } | null>(() => {
     const targetCoverageNum = parseNumber(targetCoverage) / 100;
     const underlyingYieldNum = parseNumber(underlyingYield) / 100;
     const seniorCapitalNum = parseNumber(seniorCapital);
@@ -51,28 +46,26 @@ export default function YieldSimulator() {
     const juniorCustomYieldNum = parseNumber(juniorCustomYield) / 100;
 
     if (isNaN(targetCoverageNum) || isNaN(underlyingYieldNum) || isNaN(seniorCapitalNum) || isNaN(juniorCapitalNum)) {
-      setResults(null);
-      return;
+      return null;
     }
 
     if (juniorDeploymentOption === 'elsewhere' && isNaN(juniorCustomYieldNum)) {
-      setResults(null);
-      return;
+      return null;
     }
 
     if (seniorCapitalNum <= 0 || juniorCapitalNum <= 0) {
-      setResults(null);
-      return;
+      return null;
     }
 
     const requiredJuniorCapital = seniorCapitalNum * targetCoverageNum;
 
     if (juniorCapitalNum < requiredJuniorCapital) {
-      setResults({
+      return {
         isValid: false,
         utilization: 0,
         rdmOutput: 0,
         totalYield: 0,
+        combinedTotalYield: 0,
         juniorYield: 0,
         juniorOwnYield: 0,
         juniorTotalYield: 0,
@@ -80,8 +73,7 @@ export default function YieldSimulator() {
         juniorYieldPercent: 0,
         seniorYieldPercent: 0,
         errorMessage: `Junior capital ($${juniorCapitalNum.toLocaleString()}) is below target coverage requirement ($${requiredJuniorCapital.toLocaleString()}). Please increase junior capital or decrease target coverage.`
-      });
-      return;
+      };
     }
 
     const utilization = (seniorCapitalNum * targetCoverageNum) / juniorCapitalNum;
@@ -108,23 +100,25 @@ export default function YieldSimulator() {
 
     // Junior's total yield = RDM share + own deployment yield
     const juniorTotalYield = juniorYield + juniorOwnYield;
+    const combinedTotalYield = totalYield + juniorOwnYield;
 
     const juniorYieldPercent = (juniorTotalYield / juniorCapitalNum) * 100;
     const seniorYieldPercent = (seniorYield / seniorCapitalNum) * 100;
 
-    setResults({
+    return {
       isValid: true,
       utilization,
       rdmOutput,
       totalYield,
+      combinedTotalYield,
       juniorYield,
       juniorOwnYield,
       juniorTotalYield,
       seniorYield,
       juniorYieldPercent,
       seniorYieldPercent
-    });
-  };
+    };
+  }, [juniorCapital, juniorCustomYield, juniorDeploymentOption, seniorCapital, targetCoverage, underlyingYield]);
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -163,13 +157,20 @@ export default function YieldSimulator() {
     const data = [];
     const seniorCapitalNum = parseNumber(seniorCapital);
     const juniorCapitalNum = parseNumber(juniorCapital);
+    const underlyingYieldNum = parseNumber(underlyingYield) / 100;
+    const safeUnderlyingYield = isNaN(underlyingYieldNum) ? 0 : underlyingYieldNum;
+    const juniorCustomYieldNum = parseNumber(juniorCustomYield) / 100;
+    const juniorYieldRate = juniorDeploymentOption === 'underlying' ? safeUnderlyingYield : (isNaN(juniorCustomYieldNum) ? 0 : juniorCustomYieldNum);
+    const seniorYieldPool = safeUnderlyingYield * seniorCapitalNum;
+    const juniorOwnYield = juniorYieldRate * juniorCapitalNum;
 
     for (let i = 0; i <= 1000; i++) {
       const utilization = i / 1000;
       const rdm = calculateRdmAtUtilization(utilization);
-      const juniorYield = rdm * (results?.totalYield || 0);
-      const seniorYield = (results?.totalYield || 0) - juniorYield;
-      const juniorAPY = juniorCapitalNum > 0 ? (juniorYield / juniorCapitalNum) * 100 : 0;
+      const juniorYield = rdm * seniorYieldPool;
+      const seniorYield = seniorYieldPool - juniorYield;
+      const juniorTotalYield = juniorYield + juniorOwnYield;
+      const juniorAPY = juniorCapitalNum > 0 ? (juniorTotalYield / juniorCapitalNum) * 100 : 0;
       const seniorAPY = seniorCapitalNum > 0 ? (seniorYield / seniorCapitalNum) * 100 : 0;
 
       data.push({
@@ -178,6 +179,7 @@ export default function YieldSimulator() {
         juniorAPY,
         seniorAPY,
         juniorYield,
+        juniorTotalYield,
         seniorYield
       });
     }
@@ -380,7 +382,7 @@ export default function YieldSimulator() {
 
                 {/* Step 4: Final APYs */}
                 <div>
-                  <p className="text-xs font-semibold text-[#666666] mb-3">4. Each Tranche's APY</p>
+                  <p className="text-xs font-semibold text-[#666666] mb-3">4. Each Tranche&apos;s APY</p>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="bg-[#0a0a0a] rounded-lg p-4">
                       <div className="text-xs text-[#cccccc] mb-1">Junior APY</div>
@@ -462,7 +464,7 @@ export default function YieldSimulator() {
                 />
               </div>
               <p className="mt-2 text-sm text-[#666666] leading-relaxed">
-                <strong className="text-[#0a0a0a]">What it means:</strong> The annual percentage yield earned by the combined capital before it's split between tranches. This comes from sources like staking, lending protocols, or liquidity provision.
+                <strong className="text-[#0a0a0a]">What it means:</strong> The annual percentage yield earned by the combined capital before it&apos;s split between tranches. This comes from sources like staking, lending protocols, or liquidity provision.
               </p>
             </div>
 
@@ -569,7 +571,7 @@ export default function YieldSimulator() {
               </div>
 
               <p className="mt-3 text-sm text-[#666666] leading-relaxed">
-                <strong className="text-[#0a0a0a]">What it means:</strong> The risk-taking capital that absorbs losses first to protect senior investors. Junior gets <strong className="text-[#0a0a0a]">100% of yield from their own capital</strong> plus their RDM-allocated share of senior's yield, resulting in higher total returns.
+                <strong className="text-[#0a0a0a]">What it means:</strong> The risk-taking capital that absorbs losses first to protect senior investors. Junior gets <strong className="text-[#0a0a0a]">100% of yield from their own capital</strong> plus their RDM-allocated share of senior&apos;s yield, resulting in higher total returns.
               </p>
             </div>
           </div>
@@ -605,7 +607,7 @@ export default function YieldSimulator() {
                 Model Calculations
               </h2>
 
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
                 <div className="bg-[#f8f9fa] rounded-lg p-6 border border-[#e5e5e0]">
                   <p className="text-sm font-medium text-[#666666] mb-2">
                     Utilization
@@ -642,6 +644,18 @@ export default function YieldSimulator() {
                   </p>
                   <p className="text-xs text-[#666666] leading-relaxed mt-2">
                     Annual yield from senior capital deployment, split between tranches by RDM. Junior also earns separate yield on their own capital.
+                  </p>
+                </div>
+
+                <div className="bg-[#f0f4ff] rounded-lg p-6 border border-[#cbd5ff]">
+                  <p className="text-sm font-medium text-[#475569] mb-2">
+                    Combined Annual Yield
+                  </p>
+                  <p className="text-3xl font-semibold text-[#0f172a] mb-1">
+                    {formatCurrency(results.combinedTotalYield)}
+                  </p>
+                  <p className="text-xs text-[#475569] leading-relaxed mt-2">
+                    Includes senior pool yield ({formatCurrency(results.totalYield)}) plus junior&apos;s own deployment yield ({formatCurrency(results.juniorOwnYield)}). RDM split still applies only to senior yield.
                   </p>
                 </div>
               </div>
@@ -811,8 +825,12 @@ export default function YieldSimulator() {
                                   <p className="font-semibold text-[#0a0a0a]">{data.juniorAPY.toFixed(2)}%</p>
                                 </div>
                                 <div>
-                                  <p className="text-[#666666]">Junior Yield:</p>
+                                  <p className="text-[#666666]">Junior Yield (RDM):</p>
                                   <p className="font-semibold text-[#0a0a0a]">{formatCurrency(data.juniorYield)}</p>
+                                </div>
+                                <div>
+                                  <p className="text-[#666666]">Junior Yield (Total):</p>
+                                  <p className="font-semibold text-[#0a0a0a]">{formatCurrency(data.juniorTotalYield)}</p>
                                 </div>
                                 <div>
                                   <p className="text-[#666666]">Senior APY:</p>
