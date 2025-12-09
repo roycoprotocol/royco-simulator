@@ -10,6 +10,7 @@ export default function YieldSimulator() {
   const [juniorCapital, setJuniorCapital] = useState<string>('1,111,111.11');
   const [juniorDeploymentOption, setJuniorDeploymentOption] = useState<'underlying' | 'elsewhere'>('underlying');
   const [juniorCustomYield, setJuniorCustomYield] = useState<string>('13');
+  const [beta, setBeta] = useState<string>('0');
 
   const [showExplainer, setShowExplainer] = useState<boolean>(false);
 
@@ -37,6 +38,8 @@ export default function YieldSimulator() {
     seniorYield: number;
     juniorYieldPercent: number;
     seniorYieldPercent: number;
+    overUtilized: boolean;
+    requiredCoverage: number;
     errorMessage?: string;
   } | null>(() => {
     const targetCoverageNum = parseNumber(targetCoverage) / 100;
@@ -44,8 +47,15 @@ export default function YieldSimulator() {
     const seniorCapitalNum = parseNumber(seniorCapital);
     const juniorCapitalNum = parseNumber(juniorCapital);
     const juniorCustomYieldNum = parseNumber(juniorCustomYield) / 100;
+    const betaNum = parseNumber(beta) / 100;
 
-    if (isNaN(targetCoverageNum) || isNaN(underlyingYieldNum) || isNaN(seniorCapitalNum) || isNaN(juniorCapitalNum)) {
+    if (
+      isNaN(targetCoverageNum) ||
+      isNaN(underlyingYieldNum) ||
+      isNaN(seniorCapitalNum) ||
+      isNaN(juniorCapitalNum) ||
+      isNaN(betaNum)
+    ) {
       return null;
     }
 
@@ -57,26 +67,11 @@ export default function YieldSimulator() {
       return null;
     }
 
-    const requiredJuniorCapital = seniorCapitalNum * targetCoverageNum;
-
-    if (juniorCapitalNum < requiredJuniorCapital) {
-      return {
-        isValid: false,
-        utilization: 0,
-        rdmOutput: 0,
-        totalYield: 0,
-        combinedTotalYield: 0,
-        juniorYield: 0,
-        juniorOwnYield: 0,
-        juniorTotalYield: 0,
-        seniorYield: 0,
-        juniorYieldPercent: 0,
-        seniorYieldPercent: 0,
-        errorMessage: `Junior capital ($${juniorCapitalNum.toLocaleString()}) is below target coverage requirement ($${requiredJuniorCapital.toLocaleString()}). Please increase junior capital or decrease target coverage.`
-      };
-    }
-
-    const utilization = (seniorCapitalNum * targetCoverageNum) / juniorCapitalNum;
+    const seniorRawNAV = seniorCapitalNum;
+    const juniorRawNAV = juniorCapitalNum;
+    const juniorEffectiveNAV = juniorCapitalNum; // assumption: no prior gains/losses applied
+    const requiredCoverage = (seniorRawNAV + juniorRawNAV * betaNum) * targetCoverageNum;
+    const utilization = requiredCoverage / juniorEffectiveNAV;
 
     let rdmOutput: number;
     if (utilization < 0.9) {
@@ -116,9 +111,13 @@ export default function YieldSimulator() {
       juniorTotalYield,
       seniorYield,
       juniorYieldPercent,
-      seniorYieldPercent
+      seniorYieldPercent,
+      overUtilized: utilization > 1,
+      requiredCoverage
     };
-  }, [juniorCapital, juniorCustomYield, juniorDeploymentOption, seniorCapital, targetCoverage, underlyingYield]);
+  }, [beta, juniorCapital, juniorCustomYield, juniorDeploymentOption, seniorCapital, targetCoverage, underlyingYield]);
+
+  const chartMaxUtilization = Math.max(100, (results?.utilization ?? 1) * 100);
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -136,12 +135,27 @@ export default function YieldSimulator() {
   const calculate90PercentUtilization = () => {
     const seniorCapitalNum = parseNumber(seniorCapital);
     const targetCoverageNum = parseNumber(targetCoverage) / 100;
+    const betaNum = parseNumber(beta) / 100;
 
-    if (isNaN(seniorCapitalNum) || isNaN(targetCoverageNum) || seniorCapitalNum <= 0 || targetCoverageNum <= 0) {
+    if (
+      isNaN(seniorCapitalNum) ||
+      isNaN(targetCoverageNum) ||
+      isNaN(betaNum) ||
+      seniorCapitalNum <= 0 ||
+      targetCoverageNum <= 0
+    ) {
       return;
     }
 
-    const juniorCapitalFor90 = (seniorCapitalNum * targetCoverageNum) / 0.9;
+    const targetUtilization = 0.9;
+    const betaCoverage = betaNum * targetCoverageNum;
+    const denominator = targetUtilization - betaCoverage;
+
+    if (denominator <= 0) {
+      return;
+    }
+
+    const juniorCapitalFor90 = (seniorCapitalNum * targetCoverageNum) / denominator;
     setJuniorCapital(formatNumberWithCommas(juniorCapitalFor90.toFixed(2)));
   };
 
@@ -279,7 +293,7 @@ export default function YieldSimulator() {
                 <div className="ml-8 space-y-2 text-sm text-[#666666]">
                   <p>1. Deploy combined capital to earn yield</p>
                   <p>2. Set target coverage ratio (min junior capital as % of senior)</p>
-                  <p>3. Calculate utilization: (Senior × Coverage) / Junior</p>
+                  <p>3. Calculate utilization: ((Senior + (Junior × Beta)) × Coverage) / Junior Effective NAV</p>
                   <p>4. RDM determines yield split based on utilization</p>
                   <p>5. Higher utilization = junior earns more of the total yield</p>
                 </div>
@@ -294,7 +308,7 @@ export default function YieldSimulator() {
                 <div className="ml-8 grid grid-cols-1 md:grid-cols-2 gap-3">
                   <div className="bg-[#f8f9fa] rounded p-3 border border-[#e5e5e0]">
                     <p className="text-sm font-semibold text-[#0a0a0a] mb-1">Utilization</p>
-                    <p className="text-xs text-[#666666]">How efficiently junior capital covers senior. Higher = junior earns more.</p>
+                    <p className="text-xs text-[#666666]">((Senior + (Junior × Beta)) × Coverage) / Junior Effective NAV. Higher = junior earns more.</p>
                   </div>
                   <div className="bg-[#f8f9fa] rounded p-3 border border-[#e5e5e0]">
                     <p className="text-sm font-semibold text-[#0a0a0a] mb-1">RDM Output</p>
@@ -302,7 +316,11 @@ export default function YieldSimulator() {
                   </div>
                   <div className="bg-[#f8f9fa] rounded p-3 border border-[#e5e5e0]">
                     <p className="text-sm font-semibold text-[#0a0a0a] mb-1">Target Coverage</p>
-                    <p className="text-xs text-[#666666]">Minimum junior capital as % of senior. 10% = $1M junior per $10M senior.</p>
+                    <p className="text-xs text-[#666666]">Minimum junior capital as % of senior exposure. Higher coverage lowers utilization.</p>
+                  </div>
+                  <div className="bg-[#f8f9fa] rounded p-3 border border-[#e5e5e0]">
+                    <p className="text-sm font-semibold text-[#0a0a0a] mb-1">Beta</p>
+                    <p className="text-xs text-[#666666]">JT correlation to ST drawdowns. 0% = no shared loss, 100% = same loss path.</p>
                   </div>
                   <div className="bg-[#f8f9fa] rounded p-3 border border-[#e5e5e0]">
                     <p className="text-sm font-semibold text-[#0a0a0a] mb-1">Underlying Yield</p>
@@ -342,9 +360,9 @@ export default function YieldSimulator() {
                   <p className="text-xs font-semibold text-[#666666] mb-3">1. Calculate Utilization</p>
                   <div className="bg-[#f8f9fa] rounded-lg p-4 border border-[#e5e5e0]">
                     <div className="font-mono text-sm text-[#0a0a0a] mb-2">
-                      ($10M × 10%) / $1.11M = 90%
+                      (($10M + ($1.11M × 0%)) × 10%) / $1.11M = 90%
                     </div>
-                    <p className="text-xs text-[#666666]">Junior is 90% utilized protecting senior</p>
+                    <p className="text-xs text-[#666666]">Junior is 90% utilized protecting senior (assumes JT effective NAV = JT capital and beta = 0%)</p>
                   </div>
                 </div>
 
@@ -440,6 +458,36 @@ export default function YieldSimulator() {
 
             <div>
               <label className="block text-sm font-medium text-[#0a0a0a] mb-3">
+                JT Drawdown Correlation (Beta %)
+              </label>
+              <div className="space-y-3">
+                <input
+                  type="number"
+                  value={beta}
+                  onChange={(e) => setBeta(e.target.value)}
+                  className="w-full px-4 py-3 rounded-md border border-[#e5e5e0] bg-white text-[#0a0a0a] focus:outline-none focus:ring-2 focus:ring-[#0a0a0a] focus:border-transparent transition-all"
+                  placeholder="0"
+                  step="0.1"
+                  min="0"
+                  max="100"
+                />
+                <input
+                  type="range"
+                  value={beta}
+                  onChange={(e) => setBeta(e.target.value)}
+                  min="0"
+                  max="100"
+                  step="0.1"
+                  className="w-full h-2 bg-[#e5e5e0] rounded-lg appearance-none cursor-pointer accent-[#0a0a0a]"
+                />
+              </div>
+              <p className="mt-2 text-sm text-[#666666] leading-relaxed">
+                <strong className="text-[#0a0a0a]">What it means:</strong> How much JT is correlated to ST losses. 0% = JT in RFR (no shared drawdown). 100% = JT takes the same downside as ST.
+              </p>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium text-[#0a0a0a] mb-3">
                 Underlying Yield (%)
               </label>
               <div className="space-y-3">
@@ -510,7 +558,7 @@ export default function YieldSimulator() {
                   90%
                   <span className="absolute bottom-full right-0 mb-2 hidden group-hover:block w-64 p-3 text-xs font-normal text-white bg-[#0a0a0a] rounded-lg shadow-lg border border-[#333333] z-10 pointer-events-none">
                     <strong className="block mb-1">Set: 90% Utilization</strong>
-                    Automatically calculates and sets the junior capital amount needed for exactly 90% utilization based on your current senior capital and target coverage.
+                    Automatically calculates and sets the junior capital amount needed for exactly 90% utilization based on your current senior capital, target coverage, and beta.
                   </span>
                 </button>
               </div>
@@ -577,21 +625,21 @@ export default function YieldSimulator() {
           </div>
         </div>
 
-        {/* Error Message */}
-        {results && !results.isValid && (
-          <div className="bg-[#fef2f2] border border-[#fca5a5] rounded-lg p-6 mb-8">
-            <div className="flex items-start">
+        {/* Overutilization Banner */}
+        {results && results.isValid && results.overUtilized && (
+          <div className="bg-[#fff4e5] border-2 border-[#f59e0b] rounded-lg p-6 mb-8 shadow-sm">
+            <div className="flex items-start gap-3">
               <div className="flex-shrink-0">
-                <svg className="h-6 w-6 text-[#dc2626]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg className="h-6 w-6 text-[#b45309]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
                 </svg>
               </div>
-              <div className="ml-3">
-                <h3 className="text-sm font-semibold text-[#dc2626] mb-1">
-                  Coverage Requirement Not Met
+              <div>
+                <h3 className="text-sm font-semibold text-[#b45309] mb-1">
+                  Utilization Above 100% — New Senior Deposits Blocked
                 </h3>
-                <p className="text-sm text-[#991b1b]">
-                  {results.errorMessage}
+                <p className="text-sm text-[#92400e]">
+                  Required junior effective NAV (with beta-adjusted coverage): {formatCurrency(results.requiredCoverage)}. Current junior effective NAV: {formatCurrency(parseNumber(juniorCapital))}. Add junior capital, lower coverage, reduce beta, or withdraw senior capital to reopen deposits.
                 </p>
               </div>
             </div>
@@ -616,7 +664,7 @@ export default function YieldSimulator() {
                     {formatPercent(results.utilization * 100)}
                   </p>
                   <p className="text-xs text-[#666666] leading-relaxed mt-2">
-                    How efficiently junior capital is being used to cover senior capital. Higher utilization = junior earns more.
+                    ((ST + (JT × Beta)) × Coverage) / JT effective NAV (assumed equal to junior capital here). Higher utilization = junior earns more.
                   </p>
                 </div>
 
@@ -788,15 +836,15 @@ export default function YieldSimulator() {
 
               <div className="h-96">
                 <ResponsiveContainer width="100%" height="100%">
-                  <LineChart
-                    data={generateChartData()}
-                    margin={{ top: 30, right: 30, left: 120, bottom: 60 }}
-                  >
+                    <LineChart
+                      data={generateChartData()}
+                      margin={{ top: 30, right: 30, left: 120, bottom: 60 }}
+                    >
                     <CartesianGrid strokeDasharray="3 3" stroke="#e5e5e0" />
                     <XAxis
                       dataKey="utilization"
                       label={{ value: 'Utilization (%)', position: 'insideBottom', offset: -10, fill: '#0a0a0a' }}
-                      domain={[0, 100]}
+                      domain={[0, chartMaxUtilization]}
                       ticks={[0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100]}
                       stroke="#666666"
                     />
