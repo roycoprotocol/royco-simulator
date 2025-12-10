@@ -225,6 +225,14 @@ export default function YieldSimulator() {
           </p>
         </div>
 
+        {/* Section Label: Explainer */}
+        <div className="flex items-center gap-3 mb-4">
+          <span className="text-[11px] tracking-wide uppercase text-[#0a0a0a] bg-[#eef0f4] border border-[#e5e5e0] rounded-full px-3 py-1">
+            Explainer
+          </span>
+          <span className="flex-1 h-px bg-gradient-to-r from-[#d6d6d0] via-[#e5e5e0] to-transparent" />
+        </div>
+
         {/* Explainer Section */}
         <div className="bg-white rounded-lg border border-[#e5e5e0] p-6 mb-8 shadow-sm">
           <button
@@ -252,178 +260,73 @@ export default function YieldSimulator() {
           </button>
 
           {showExplainer && (
-            <div className="mt-6 space-y-6 text-[#0a0a0a] border-t border-[#e5e5e0] pt-6">
-              {/* What is Yield Tranching */}
-              <div>
-                <h4 className="text-base font-semibold mb-3 flex items-center gap-2">
-                  <span className="bg-[#0a0a0a] text-white rounded-full w-6 h-6 flex items-center justify-center text-sm">1</span>
-                  What is Yield Tranching?
-                </h4>
-                <p className="text-sm text-[#666666] leading-relaxed ml-8">
-                  Take one pool of capital earning yield. Split it into two tranches with different risk-return profiles. Senior gets downside protection. Junior gets higher returns.
-                </p>
-              </div>
+            <div className="mt-6 text-[#0a0a0a] border-t border-[#e5e5e0] pt-6">
+              <div className="bg-gradient-to-br from-[#fff7e8] via-[#f6fbff] to-[#eef4ff] border border-[#e7e2d8] rounded-xl p-6 md:p-8 shadow-sm space-y-6">
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="bg-[#0a0a0a] text-white text-xs font-semibold rounded-full px-3 py-1 tracking-wide">Key Takeaway</div>
+                    <p className="text-sm text-[#444444]">Junior protects senior, and the model shows how much yield junior earns for doing so.</p>
+                  </div>
+                  <a
+                    href="https://royco.gitbook.io/royco-dawn/"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-2 text-sm font-semibold text-white bg-[#0a0a0a] rounded-full px-4 py-2 shadow hover:opacity-90 transition"
+                  >
+                    <span>Open Royco Dawn Guide</span>
+                    <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 7l-9 9m0-6V7h3" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 17h10V7" />
+                    </svg>
+                  </a>
+                </div>
 
-              {/* The Two Tranches */}
-              <div>
-                <h4 className="text-base font-semibold mb-3 flex items-center gap-2">
-                  <span className="bg-[#0a0a0a] text-white rounded-full w-6 h-6 flex items-center justify-center text-sm">2</span>
-                  The Two Tranches
-                </h4>
-                <div className="ml-8 space-y-4">
-                  <div className="bg-[#f8f9fa] rounded-lg p-4 border border-[#e5e5e0]">
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className="bg-white border-2 border-[#0a0a0a] rounded px-3 py-1">
-                        <span className="text-xs font-medium text-[#0a0a0a]">Senior</span>
-                      </div>
-                      <span className="text-sm font-semibold text-[#0a0a0a]">Protected Capital</span>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="bg-white rounded-lg border border-[#e5e5e0] p-4 shadow-[0_8px_24px_rgba(0,0,0,0.04)]">
+                    <div className="flex items-center gap-2 mb-3">
+                      <span className="text-xs font-bold tracking-wide text-[#0a0a0a] bg-[#f1f3f5] px-2 py-1 rounded">1</span>
+                      <p className="text-sm font-semibold text-[#0a0a0a]">One pool, two slices</p>
                     </div>
-                    <p className="text-sm text-[#666666] leading-relaxed">
-                      Gets paid first. Lower yield. Losses covered by junior capital.
+                    <p className="text-sm text-[#555555] leading-relaxed">
+                      Senior = paid first, lower risk. Junior = first-loss buffer, higher upside.
                     </p>
                   </div>
-                  <div className="bg-[#0a0a0a] rounded-lg p-4 border-2 border-[#0a0a0a]">
-                    <div className="flex items-center gap-2 mb-2">
-                      <div className="bg-white rounded px-3 py-1">
-                        <span className="text-xs font-medium text-[#0a0a0a]">Junior</span>
-                      </div>
-                      <span className="text-sm font-semibold text-white">First Loss Capital</span>
+
+                  <div className="bg-white rounded-lg border border-[#e5e5e0] p-4 shadow-[0_8px_24px_rgba(0,0,0,0.04)]">
+                    <div className="flex items-center gap-2 mb-3">
+                      <span className="text-xs font-bold tracking-wide text-[#0a0a0a] bg-[#f1f3f5] px-2 py-1 rounded">2</span>
+                      <p className="text-sm font-semibold text-[#0a0a0a]">Utilization drives split</p>
                     </div>
-                    <p className="text-sm text-[#cccccc] leading-relaxed">
-                      Takes losses first. Higher yield. Protects senior capital.
+                    <p className="text-sm text-[#555555] leading-relaxed">
+                      Utilization ≈ how hard junior is working to cover senior. Higher utilization → junior takes more of the yield pie. The RDM turns this into one % for junior; senior gets the rest.
                     </p>
                   </div>
-                </div>
-              </div>
 
-              {/* How It Works */}
-              <div>
-                <h4 className="text-base font-semibold mb-3 flex items-center gap-2">
-                  <span className="bg-[#0a0a0a] text-white rounded-full w-6 h-6 flex items-center justify-center text-sm">3</span>
-                  How It Works
-                </h4>
-                <div className="ml-8 space-y-2 text-sm text-[#666666]">
-                  <p>1. Deploy combined capital to earn yield</p>
-                  <p>2. Set target coverage ratio (min junior capital as % of senior)</p>
-                  <p>3. Calculate utilization: ((Senior + (Junior × Beta)) × Coverage) / Junior Effective NAV</p>
-                  <p>4. RDM determines yield split based on utilization</p>
-                  <p>5. Higher utilization = junior earns more of the total yield</p>
-                </div>
-              </div>
-
-              {/* Key Terms */}
-              <div>
-                <h4 className="text-base font-semibold mb-3 flex items-center gap-2">
-                  <span className="bg-[#0a0a0a] text-white rounded-full w-6 h-6 flex items-center justify-center text-sm">4</span>
-                  Key Terms
-                </h4>
-                <div className="ml-8 grid grid-cols-1 md:grid-cols-2 gap-3">
-                  <div className="bg-[#f8f9fa] rounded p-3 border border-[#e5e5e0]">
-                    <p className="text-sm font-semibold text-[#0a0a0a] mb-1">Utilization</p>
-                    <p className="text-xs text-[#666666]">((Senior + (Junior × Beta)) × Coverage) / Junior Effective NAV. Higher = junior earns more.</p>
-                  </div>
-                  <div className="bg-[#f8f9fa] rounded p-3 border border-[#e5e5e0]">
-                    <p className="text-sm font-semibold text-[#0a0a0a] mb-1">RDM Output</p>
-                    <p className="text-xs text-[#666666]">Percentage of total yield allocated to junior (not the yield itself).</p>
-                  </div>
-                  <div className="bg-[#f8f9fa] rounded p-3 border border-[#e5e5e0]">
-                    <p className="text-sm font-semibold text-[#0a0a0a] mb-1">Target Coverage</p>
-                    <p className="text-xs text-[#666666]">Minimum junior capital as % of senior exposure. Higher coverage lowers utilization.</p>
-                  </div>
-                  <div className="bg-[#f8f9fa] rounded p-3 border border-[#e5e5e0]">
-                    <p className="text-sm font-semibold text-[#0a0a0a] mb-1">Beta</p>
-                    <p className="text-xs text-[#666666]">JT correlation to ST drawdowns. 0% = no shared loss, 100% = same loss path.</p>
-                  </div>
-                  <div className="bg-[#f8f9fa] rounded p-3 border border-[#e5e5e0]">
-                    <p className="text-sm font-semibold text-[#0a0a0a] mb-1">Underlying Yield</p>
-                    <p className="text-xs text-[#666666]">Base APY before tranching (from staking, lending, etc.).</p>
-                  </div>
-                </div>
-              </div>
-
-              {/* Example with Visuals */}
-              <div className="bg-white rounded-lg p-6 border-2 border-[#0a0a0a]">
-                <h4 className="text-base font-semibold mb-4 text-[#0a0a0a]">
-                  Example Walkthrough
-                </h4>
-
-                {/* Capital Input */}
-                <div className="mb-6 pb-6 border-b border-[#e5e5e0]">
-                  <p className="text-xs font-semibold text-[#666666] mb-3">Starting Capital</p>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="bg-white border-2 border-[#0a0a0a] rounded-lg p-4">
-                      <div className="text-xs text-[#666666] mb-1">Senior Capital</div>
-                      <div className="text-2xl font-semibold text-[#0a0a0a]">$10M</div>
+                  <div className="bg-white rounded-lg border border-[#e5e5e0] p-4 shadow-[0_8px_24px_rgba(0,0,0,0.04)]">
+                    <div className="flex items-center gap-2 mb-3">
+                      <span className="text-xs font-bold tracking-wide text-[#0a0a0a] bg-[#f1f3f5] px-2 py-1 rounded">3</span>
+                      <p className="text-sm font-semibold text-[#0a0a0a]">How to use this</p>
                     </div>
-                    <div className="bg-[#0a0a0a] rounded-lg p-4">
-                      <div className="text-xs text-[#cccccc] mb-1">Junior Capital</div>
-                      <div className="text-2xl font-semibold text-white">$1.11M</div>
-                    </div>
-                  </div>
-                  <div className="mt-3 bg-[#f8f9fa] rounded p-3">
-                    <p className="text-xs text-[#666666]">
-                      <strong className="text-[#0a0a0a]">Setup:</strong> 10% target coverage. 13% underlying APY.
+                    <p className="text-sm text-[#555555] leading-relaxed">
+                      Enter senior & junior amounts, pick coverage, and let the simulator show each side&apos;s APY based on the RDM output.
                     </p>
                   </div>
                 </div>
 
-                {/* Step 1: Utilization */}
-                <div className="mb-6 pb-6 border-b border-[#e5e5e0]">
-                  <p className="text-xs font-semibold text-[#666666] mb-3">1. Calculate Utilization</p>
-                  <div className="bg-[#f8f9fa] rounded-lg p-4 border border-[#e5e5e0]">
-                    <div className="font-mono text-sm text-[#0a0a0a] mb-2">
-                      (($10M + ($1.11M × 0%)) × 10%) / $1.11M = 90%
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="bg-[#0a0a0a] text-white rounded-lg p-4 flex items-center justify-between">
+                    <div>
+                      <p className="text-xs uppercase tracking-wide text-[#c7c7c7]">Senior slice</p>
+                      <p className="text-base font-semibold">Gets paid first</p>
                     </div>
-                    <p className="text-xs text-[#666666]">Junior is 90% utilized protecting senior (assumes JT effective NAV = JT capital and beta = 0%)</p>
+                    <span className="text-sm bg-white text-[#0a0a0a] px-3 py-1 rounded-full border border-white/40">Lower risk</span>
                   </div>
-                </div>
-
-                {/* Step 2: Total Yield */}
-                <div className="mb-6 pb-6 border-b border-[#e5e5e0]">
-                  <p className="text-xs font-semibold text-[#666666] mb-3">2. Total Yield Earned</p>
-                  <div className="bg-[#f8f9fa] rounded-lg p-4 border border-[#e5e5e0]">
-                    <div className="text-2xl font-semibold text-[#0a0a0a] mb-1">$1,300,000 / year</div>
-                    <p className="text-xs text-[#666666]">13% APY on $10M senior capital</p>
-                  </div>
-                </div>
-
-                {/* Step 3: RDM Split - THE KEY PART */}
-                <div className="mb-6 pb-6 border-b border-[#e5e5e0]">
-                  <p className="text-xs font-semibold text-[#666666] mb-3">3. RDM Splits the $1.3M Yield</p>
-                  <div className="bg-[#FFF9E6] rounded-lg p-4 border-2 border-[#FFC107] mb-4">
-                    <p className="text-sm font-semibold text-[#0a0a0a] mb-2">⚠️ RDM Output is a PERCENTAGE</p>
-                    <p className="text-xs text-[#666666]">At 90% utilization, RDM says: junior gets <strong className="text-[#0a0a0a]">22.5% of the total yield</strong>, senior gets the rest.</p>
-                  </div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="bg-[#0a0a0a] rounded-lg p-4">
-                      <div className="text-xs text-[#cccccc] mb-2">Junior Gets</div>
-                      <div className="text-xl font-semibold text-white mb-1">22.5%</div>
-                      <div className="text-xs text-[#cccccc] mb-3">of the $1.3M =</div>
-                      <div className="text-2xl font-semibold text-white">$292,500</div>
+                  <div className="bg-white rounded-lg border border-[#e5e5e0] p-4 flex items-center justify-between shadow-[0_8px_24px_rgba(0,0,0,0.04)]">
+                    <div>
+                      <p className="text-xs uppercase tracking-wide text-[#666666]">Junior slice</p>
+                      <p className="text-base font-semibold text-[#0a0a0a]">Takes first losses</p>
                     </div>
-                    <div className="bg-white border-2 border-[#0a0a0a] rounded-lg p-4">
-                      <div className="text-xs text-[#666666] mb-2">Senior Gets</div>
-                      <div className="text-xl font-semibold text-[#0a0a0a] mb-1">77.5%</div>
-                      <div className="text-xs text-[#666666] mb-3">of the $1.3M =</div>
-                      <div className="text-2xl font-semibold text-[#0a0a0a]">$1,007,500</div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Step 4: Final APYs */}
-                <div>
-                  <p className="text-xs font-semibold text-[#666666] mb-3">4. Each Tranche&apos;s APY</p>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="bg-[#0a0a0a] rounded-lg p-4">
-                      <div className="text-xs text-[#cccccc] mb-1">Junior APY</div>
-                      <div className="text-3xl font-semibold text-white">26.3%</div>
-                      <div className="text-xs text-[#cccccc] mt-2">$292K ÷ $1.11M</div>
-                    </div>
-                    <div className="bg-white border-2 border-[#0a0a0a] rounded-lg p-4">
-                      <div className="text-xs text-[#666666] mb-1">Senior APY</div>
-                      <div className="text-3xl font-semibold text-[#0a0a0a]">10.08%</div>
-                      <div className="text-xs text-[#666666] mt-2">$1.01M ÷ $10M</div>
-                    </div>
+                    <span className="text-sm bg-[#0a0a0a] text-white px-3 py-1 rounded-full border border-[#0a0a0a]">Higher upside</span>
                   </div>
                 </div>
               </div>
@@ -431,37 +334,13 @@ export default function YieldSimulator() {
           )}
         </div>
 
-        {/* Model Metrics */}
-        {results && results.isValid && (
-          <div className="bg-white rounded-lg border border-[#e5e5e0] p-6 md:p-8 mb-6 shadow-sm">
-            <h2 className="text-2xl font-semibold text-[#0a0a0a] mb-4">Model Metrics</h2>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div className={`rounded-lg border px-4 py-3 ${results.overUtilized ? 'border-[#f59e0b] bg-[#fff7ed]' : 'border-[#e5e5e0] bg-[#f8f9fa]'}`}>
-                <p className="text-xs text-[#666666]">Utilization</p>
-                <p className="text-lg font-semibold text-[#0a0a0a]">{formatPercent(results.utilization * 100)}</p>
-                {results.overUtilized ? (
-                  <p className="text-xs text-[#b45309]">Senior deposits blocked</p>
-                ) : (
-                  <p className="text-xs text-[#666666]">Within coverage bounds.</p>
-                )}
-              </div>
-              <div className="rounded-lg border border-[#e5e5e0] px-4 py-3 bg-[#f8f9fa] space-y-1">
-                <p className="text-xs text-[#666666]">RDM Output</p>
-                <p className="text-lg font-semibold text-[#0a0a0a]">{formatPercent(results.rdmOutput * 100)}</p>
-                <p className="text-xs text-[#666666]">Junior: {formatCurrency(results.juniorYield)}</p>
-              </div>
-              <div className="rounded-lg border border-[#e5e5e0] px-4 py-3 bg-[#f8f9fa] space-y-1">
-                <p className="text-xs text-[#666666]">Total Yield (Senior)</p>
-                <p className="text-lg font-semibold text-[#0a0a0a]">{formatCurrency(results.totalYield)}</p>
-                <p className="text-xs text-[#666666]">Combined: {formatCurrency(results.combinedTotalYield)}</p>
-              </div>
-              <div className="rounded-lg border border-[#e5e5e0] px-4 py-3 bg-[#f8f9fa] space-y-1">
-                <p className="text-xs text-[#666666]">Req. JT Eff. NAV</p>
-                <p className="text-lg font-semibold text-[#0a0a0a]">{formatCurrency(results.requiredCoverage)}</p>
-              </div>
-            </div>
-          </div>
-        )}
+        {/* Section Label: Inputs */}
+        <div className="flex items-center gap-3 mb-4 mt-10">
+          <span className="text-[11px] tracking-wide uppercase text-[#0a0a0a] bg-[#eef0f4] border border-[#e5e5e0] rounded-full px-3 py-1">
+            Simulator Inputs
+          </span>
+          <span className="flex-1 h-px bg-gradient-to-r from-[#d6d6d0] via-[#e5e5e0] to-transparent" />
+        </div>
 
         {/* Input Parameters Card */}
         <div className="bg-white rounded-lg border border-[#e5e5e0] p-6 md:p-8 mb-8 shadow-sm">
@@ -746,6 +625,45 @@ export default function YieldSimulator() {
             </div>
           </div>
         </div>
+
+        {/* Section Label: Outputs */}
+        <div className="flex items-center gap-3 mb-4 mt-10">
+          <span className="text-[11px] tracking-wide uppercase text-[#0a0a0a] bg-[#eef0f4] border border-[#e5e5e0] rounded-full px-3 py-1">
+            Tranche Outputs
+          </span>
+          <span className="flex-1 h-px bg-gradient-to-r from-[#d6d6d0] via-[#e5e5e0] to-transparent" />
+        </div>
+
+        {/* Tranche Outputs */}
+        {results && results.isValid && (
+          <div className="bg-white rounded-lg border border-[#e5e5e0] p-6 md:p-8 mb-8 shadow-sm">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+              <div className={`rounded-lg border px-4 py-3 ${results.overUtilized ? 'border-[#f59e0b] bg-[#fff7ed]' : 'border-[#e5e5e0] bg-[#f8f9fa]'}`}>
+                <p className="text-xs text-[#666666]">Utilization</p>
+                <p className="text-lg font-semibold text-[#0a0a0a]">{formatPercent(results.utilization * 100)}</p>
+                {results.overUtilized ? (
+                  <p className="text-xs text-[#b45309]">Senior deposits blocked</p>
+                ) : (
+                  <p className="text-xs text-[#666666]">Within coverage bounds.</p>
+                )}
+              </div>
+              <div className="rounded-lg border border-[#e5e5e0] px-4 py-3 bg-[#f8f9fa] space-y-1">
+                <p className="text-xs text-[#666666]">RDM Output</p>
+                <p className="text-lg font-semibold text-[#0a0a0a]">{formatPercent(results.rdmOutput * 100)}</p>
+                <p className="text-xs text-[#666666]">Junior: {formatCurrency(results.juniorYield)}</p>
+              </div>
+              <div className="rounded-lg border border-[#e5e5e0] px-4 py-3 bg-[#f8f9fa] space-y-1">
+                <p className="text-xs text-[#666666]">Total Yield (Senior)</p>
+                <p className="text-lg font-semibold text-[#0a0a0a]">{formatCurrency(results.totalYield)}</p>
+                <p className="text-xs text-[#666666]">Combined: {formatCurrency(results.combinedTotalYield)}</p>
+              </div>
+              <div className="rounded-lg border border-[#e5e5e0] px-4 py-3 bg-[#f8f9fa] space-y-1">
+                <p className="text-xs text-[#666666]">Req. JT Eff. NAV</p>
+                <p className="text-lg font-semibold text-[#0a0a0a]">{formatCurrency(results.requiredCoverage)}</p>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Overutilization Banner */}
         {results && results.isValid && results.overUtilized && (
