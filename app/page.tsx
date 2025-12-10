@@ -75,21 +75,23 @@ export default function YieldSimulator() {
     const requiredCoverage = (seniorRawNAV + juniorRawNAV * betaNum) * targetCoverageNum;
     const utilization = requiredCoverage / juniorEffectiveNAV;
 
+    // RDM curve with cap: junior gets 100% of senior yield when utilization >= 100%
     let rdmOutput: number;
     if (utilization < 0.9) {
       rdmOutput = 0.25 * utilization;
     } else {
       rdmOutput = 7.75 * (utilization - 0.9) + 0.225;
     }
+    rdmOutput = Math.min(1, Math.max(0, rdmOutput));
 
     // Total yield from senior capital deployment
     const totalYield = underlyingYieldNum * seniorCapitalNum;
 
     // Junior's share of senior's yield (via RDM)
-    const juniorYield = rdmOutput * totalYield;
+    const juniorYield = utilization >= 1 ? totalYield : rdmOutput * totalYield;
 
     // Senior's share of senior's yield
-    const seniorYield = totalYield - juniorYield;
+    const seniorYield = utilization >= 1 ? 0 : totalYield - juniorYield;
 
     // Junior's own yield from their capital deployment
     const juniorYieldRate = juniorDeploymentOption === 'underlying' ? underlyingYieldNum : juniorCustomYieldNum;
@@ -114,7 +116,7 @@ export default function YieldSimulator() {
       seniorYield,
       juniorYieldPercent,
       seniorYieldPercent,
-      overUtilized: utilization > 1,
+      overUtilized: utilization >= 1,
       requiredCoverage
     };
   }, [beta, juniorCapital, juniorCustomYield, juniorDeploymentOption, seniorCapital, targetCoverage, underlyingYield]);
@@ -172,11 +174,14 @@ export default function YieldSimulator() {
   };
 
   const calculateRdmAtUtilization = (utilization: number): number => {
+    let output;
     if (utilization < 0.9) {
-      return 0.25 * utilization;
+      output = 0.25 * utilization;
     } else {
-      return 7.75 * (utilization - 0.9) + 0.225;
+      output = 7.75 * (utilization - 0.9) + 0.225;
     }
+    // Cap between 0 and 1; beyond 100% utilization, junior takes all senior yield
+    return Math.min(1, Math.max(0, output));
   };
 
   const generateChartData = () => {
@@ -193,8 +198,8 @@ export default function YieldSimulator() {
     for (let i = 0; i <= 1000; i++) {
       const utilization = i / 1000;
       const rdm = calculateRdmAtUtilization(utilization);
-      const juniorYield = rdm * seniorYieldPool;
-      const seniorYield = seniorYieldPool - juniorYield;
+      const juniorYield = utilization >= 1 ? seniorYieldPool : rdm * seniorYieldPool;
+      const seniorYield = utilization >= 1 ? 0 : seniorYieldPool - juniorYield;
       const juniorTotalYield = juniorYield + juniorOwnYield;
       const juniorAPY = juniorCapitalNum > 0 ? (juniorTotalYield / juniorCapitalNum) * 100 : 0;
       const seniorAPY = seniorCapitalNum > 0 ? (seniorYield / seniorCapitalNum) * 100 : 0;
@@ -492,7 +497,7 @@ export default function YieldSimulator() {
                     </div>
                   </div>
                   <p className="text-xs text-[#666666]">First-loss tranche principal.</p>
-                  {juniorFor90Info && juniorMinToStayCovered && (
+                  {juniorFor90Info && juniorMinToStayCovered && betaNumInfo > 0 && (
                     <div className="mt-2 text-xs text-[#666666] flex items-center gap-2">
                       <div className="relative group">
                         <span className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-[#0a0a0a] text-white text-[10px] font-semibold cursor-default">?</span>
@@ -642,7 +647,7 @@ export default function YieldSimulator() {
                 <p className="text-xs text-[#666666]">Utilization</p>
                 <p className="text-lg font-semibold text-[#0a0a0a]">{formatPercent(results.utilization * 100)}</p>
                 {results.overUtilized ? (
-                  <p className="text-xs text-[#b45309]">Senior deposits blocked</p>
+                  <p className="text-xs text-[#b45309]">Over 100%: all pool yield goes to junior</p>
                 ) : (
                   <p className="text-xs text-[#666666]">Within coverage bounds.</p>
                 )}
