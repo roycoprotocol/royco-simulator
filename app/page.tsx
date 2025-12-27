@@ -3,14 +3,81 @@
 import { useMemo, useState } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, ReferenceDot } from 'recharts';
 
+type DeploymentOption = 'underlying' | 'elsewhere';
+
+type SimulatorInputs = {
+  targetCoverage: string;
+  underlyingYield: string;
+  seniorCapital: string;
+  juniorCapital: string;
+  juniorDeploymentOption: DeploymentOption;
+  juniorCustomYield: string;
+  beta: string;
+};
+
+const DEFAULT_INPUTS: SimulatorInputs = {
+  targetCoverage: '10',
+  underlyingYield: '13',
+  seniorCapital: '10,000,000',
+  juniorCapital: '1,250,000.00',
+  juniorDeploymentOption: 'underlying',
+  juniorCustomYield: '13',
+  beta: '100'
+};
+
+type ExamplePreset = {
+  id: string;
+  name: string;
+  description?: string;
+  overrides: Partial<SimulatorInputs>;
+};
+
+const CUSTOM_PRESET_ID = 'custom';
+const DEFAULT_SELECTED_EXAMPLE_ID = 'mf1';
+
+const EXAMPLE_PRESETS: ExamplePreset[] = [
+  {
+    id: 'mf1',
+    name: 'MF1',
+    description: 'Balanced, quick baseline',
+    overrides: { targetCoverage: '10', underlyingYield: '11' }
+  },
+  {
+    id: 'morpho-gauntlet-vault',
+    name: 'Morpho Gauntlet Vault',
+    description: 'Higher coverage, lower yield',
+    overrides: { targetCoverage: '20', underlyingYield: '8' }
+  },
+  {
+    id: 'hlp',
+    name: 'HLP',
+    description: 'High yield, high coverage',
+    overrides: { targetCoverage: '30', underlyingYield: '30' }
+  },
+  {
+    id: CUSTOM_PRESET_ID,
+    name: 'Custom',
+    description: 'Tune coverage + yield',
+    overrides: {}
+  }
+];
+
 export default function YieldSimulator() {
-  const [targetCoverage, setTargetCoverage] = useState<string>('10');
-  const [underlyingYield, setUnderlyingYield] = useState<string>('13');
-  const [seniorCapital, setSeniorCapital] = useState<string>('10,000,000');
-  const [juniorCapital, setJuniorCapital] = useState<string>('1,250,000.00');
-  const [juniorDeploymentOption, setJuniorDeploymentOption] = useState<'underlying' | 'elsewhere'>('underlying');
-  const [juniorCustomYield, setJuniorCustomYield] = useState<string>('13');
-  const [beta, setBeta] = useState<string>('100');
+  const defaultSelectedExample = EXAMPLE_PRESETS.find((preset) => preset.id === DEFAULT_SELECTED_EXAMPLE_ID) ?? EXAMPLE_PRESETS[0];
+  const defaultSelectedInputs =
+    defaultSelectedExample && defaultSelectedExample.id !== CUSTOM_PRESET_ID
+      ? { ...DEFAULT_INPUTS, ...defaultSelectedExample.overrides }
+      : DEFAULT_INPUTS;
+
+  const [targetCoverage, setTargetCoverage] = useState<string>(defaultSelectedInputs.targetCoverage);
+  const [underlyingYield, setUnderlyingYield] = useState<string>(defaultSelectedInputs.underlyingYield);
+  const [seniorCapital, setSeniorCapital] = useState<string>(defaultSelectedInputs.seniorCapital);
+  const [juniorCapital, setJuniorCapital] = useState<string>(defaultSelectedInputs.juniorCapital);
+  const [juniorDeploymentOption, setJuniorDeploymentOption] = useState<DeploymentOption>(defaultSelectedInputs.juniorDeploymentOption);
+  const [juniorCustomYield, setJuniorCustomYield] = useState<string>(defaultSelectedInputs.juniorCustomYield);
+  const [beta, setBeta] = useState<string>(defaultSelectedInputs.beta);
+
+  const [selectedExampleId, setSelectedExampleId] = useState<string>(defaultSelectedExample?.id ?? CUSTOM_PRESET_ID);
 
   const [showExplainer, setShowExplainer] = useState<boolean>(false);
   const [showAdvanced, setShowAdvanced] = useState<boolean>(false);
@@ -25,6 +92,86 @@ export default function YieldSimulator() {
     const parts = num.split('.');
     parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
     return parts.join('.');
+  };
+
+  const selectedExample = useMemo(
+    () => (selectedExampleId ? EXAMPLE_PRESETS.find((preset) => preset.id === selectedExampleId) ?? null : null),
+    [selectedExampleId]
+  );
+
+  const isCustomSelected = selectedExampleId === CUSTOM_PRESET_ID;
+
+  const selectedExampleInputs = useMemo(() => {
+    if (!selectedExample || selectedExample.id === CUSTOM_PRESET_ID) return null;
+    return { ...DEFAULT_INPUTS, ...selectedExample.overrides };
+  }, [selectedExample]);
+
+  const isSelectedExampleModified = useMemo(() => {
+    if (!selectedExampleInputs) return false;
+
+    const nearlyEqual = (a: number, b: number) => Math.abs(a - b) < 1e-9;
+    const compareAsNumber = (a: string, b: string) => {
+      const aNum = parseNumber(a);
+      const bNum = parseNumber(b);
+      if (Number.isNaN(aNum) || Number.isNaN(bNum)) return a.trim() === b.trim();
+      return nearlyEqual(aNum, bNum);
+    };
+
+    return !(
+      compareAsNumber(targetCoverage, selectedExampleInputs.targetCoverage) &&
+      compareAsNumber(underlyingYield, selectedExampleInputs.underlyingYield) &&
+      compareAsNumber(seniorCapital, selectedExampleInputs.seniorCapital) &&
+      compareAsNumber(juniorCapital, selectedExampleInputs.juniorCapital) &&
+      juniorDeploymentOption === selectedExampleInputs.juniorDeploymentOption &&
+      compareAsNumber(juniorCustomYield, selectedExampleInputs.juniorCustomYield) &&
+      compareAsNumber(beta, selectedExampleInputs.beta)
+    );
+  }, [
+    beta,
+    juniorCapital,
+    juniorCustomYield,
+    juniorDeploymentOption,
+    selectedExampleInputs,
+    seniorCapital,
+    targetCoverage,
+    underlyingYield
+  ]);
+
+  const isSelectedExampleCoverageRatesModified = useMemo(() => {
+    if (!selectedExampleInputs) return false;
+
+    const nearlyEqual = (a: number, b: number) => Math.abs(a - b) < 1e-9;
+    const compareAsNumber = (a: string, b: string) => {
+      const aNum = parseNumber(a);
+      const bNum = parseNumber(b);
+      if (Number.isNaN(aNum) || Number.isNaN(bNum)) return a.trim() === b.trim();
+      return nearlyEqual(aNum, bNum);
+    };
+
+    return !(
+      compareAsNumber(targetCoverage, selectedExampleInputs.targetCoverage) &&
+      compareAsNumber(underlyingYield, selectedExampleInputs.underlyingYield)
+    );
+  }, [selectedExampleInputs, targetCoverage, underlyingYield]);
+
+  const applyExample = (exampleId: string) => {
+    if (exampleId === CUSTOM_PRESET_ID) {
+      setSelectedExampleId(CUSTOM_PRESET_ID);
+      return;
+    }
+
+    const preset = EXAMPLE_PRESETS.find((p) => p.id === exampleId);
+    if (!preset) return;
+
+    const next = { ...DEFAULT_INPUTS, ...preset.overrides };
+    setSelectedExampleId(preset.id);
+    setTargetCoverage(next.targetCoverage);
+    setUnderlyingYield(next.underlyingYield);
+    setSeniorCapital(next.seniorCapital);
+    setJuniorCapital(next.juniorCapital);
+    setJuniorDeploymentOption(next.juniorDeploymentOption);
+    setJuniorCustomYield(next.juniorCustomYield);
+    setBeta(next.beta);
   };
 
 
@@ -363,142 +510,171 @@ export default function YieldSimulator() {
               {showAdvanced ? 'Hide Advanced' : 'Show Advanced'}
             </button>
           </div>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Scenario (Left) */}
             <div className="rounded-lg border border-[#e5e5e0] p-5 bg-[#fafaf7] space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-semibold text-[#0a0a0a]">Coverage & Rates</h3>
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-semibold text-[#0a0a0a]">Starting Scenario</h3>
+                  <p className="text-xs text-[#666666] mt-1">Pick a preset, then tweak inputs.</p>
+                </div>
+                {isCustomSelected ? (
+                  <span className="text-xs font-medium rounded-full px-2.5 py-1 border bg-white border-[#e5e5e0] text-[#0a0a0a]">
+                    Custom
+                  </span>
+                ) : (
+                  <span
+                    className={`text-xs font-medium rounded-full px-2.5 py-1 border ${
+                      isSelectedExampleModified
+                        ? 'bg-[#fff7e8] border-[#f1d9a8] text-[#8a5a00]'
+                        : 'bg-[#eefcf3] border-[#c7f1d4] text-[#135e2b]'
+                    }`}
+                  >
+                    {isSelectedExampleModified ? 'Modified' : 'Applied'}
+                  </span>
+                )}
               </div>
 
-              <div className="space-y-3">
-                <div>
-                  <div className="flex items-center justify-between gap-3 mb-2">
-                    <label className="text-sm font-medium text-[#0a0a0a]">Target Coverage (%)</label>
-                    <div className="relative w-24">
-                      <input
-                        type="number"
-                          value={targetCoverage}
-                          onChange={(e) => {
-                            setTargetCoverage(e.target.value);
-                          }}
-                        className="w-full h-11 pr-8 pl-3 rounded-md border border-[#e5e5e0] bg-white text-right text-base text-[#0a0a0a] focus:outline-none focus:ring-2 focus:ring-[#0a0a0a] focus:border-transparent transition-all"
-                        placeholder="10"
-                        step="0.1"
-                        min="0"
-                        max="100"
-                      />
-                      <span className="pointer-events-none absolute inset-y-0 right-2 flex items-center text-sm text-[#666666]">%</span>
-                    </div>
+              <div className="space-y-2">
+                <label className="text-xs font-semibold text-[#0a0a0a]">Example Scenario</label>
+                <select
+                  value={selectedExampleId}
+                  onChange={(e) => applyExample(e.target.value)}
+                  className="w-full h-11 rounded-md border border-[#e5e5e0] bg-white px-3 text-sm text-[#0a0a0a] focus:outline-none focus:ring-2 focus:ring-[#0a0a0a] focus:border-transparent"
+                >
+                  {EXAMPLE_PRESETS.map((preset) => (
+                    <option key={preset.id} value={preset.id}>
+                      {preset.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="rounded-lg border border-[#e5e5e0] bg-white px-4 py-3 shadow-[0_1px_0_rgba(0,0,0,0.02)]">
+                  <label className="block text-[11px] font-semibold tracking-wide uppercase text-[#666666]">
+                    Target Coverage
+                  </label>
+                  <p className="mt-1 text-xs text-[#666666]">Junior buffer vs senior exposure.</p>
+                  <div className="mt-2 relative">
+                    <input
+                      type="number"
+                      value={targetCoverage}
+                      onChange={(e) => {
+                        setTargetCoverage(e.target.value);
+                      }}
+                      className="w-full h-12 pr-10 pl-3 rounded-md border border-[#e5e5e0] bg-[#fafaf7] text-right text-lg font-semibold text-[#0a0a0a] focus:outline-none focus:ring-2 focus:ring-[#0a0a0a] focus:border-transparent transition-all"
+                      placeholder="10"
+                      step="0.1"
+                      min="0"
+                      max="100"
+                    />
+                    <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-[#666666]">%</span>
                   </div>
-                  <input
-                    type="range"
-                    value={targetCoverage}
-                    onChange={(e) => {
-                      setTargetCoverage(e.target.value);
-                    }}
-                    min="0"
-                    max="100"
-                    step="0.1"
-                    className="w-full h-2 bg-[#e9e9e3] rounded-full appearance-none cursor-pointer accent-[#0a0a0a]"
-                  />
-                  <p className="text-xs text-[#666666] mt-1">Junior buffer vs senior exposure.</p>
                 </div>
 
-                <div>
-                  <div className="flex items-center justify-between gap-3 mb-2">
-                    <label className="text-sm font-medium text-[#0a0a0a]">Underlying Yield (%)</label>
-                    <div className="relative w-24">
-                      <input
-                        type="number"
-                        value={underlyingYield}
-                        onChange={(e) => {
-                          setUnderlyingYield(e.target.value);
-                        }}
-                        className="w-full h-11 pr-8 pl-3 rounded-md border border-[#e5e5e0] bg-white text-right text-base text-[#0a0a0a] focus:outline-none focus:ring-2 focus:ring-[#0a0a0a] focus:border-transparent transition-all"
-                        placeholder="13"
-                        step="0.1"
-                        min="0"
-                        max="100"
-                      />
-                      <span className="pointer-events-none absolute inset-y-0 right-2 flex items-center text-sm text-[#666666]">%</span>
-                    </div>
+                <div className="rounded-lg border border-[#e5e5e0] bg-white px-4 py-3 shadow-[0_1px_0_rgba(0,0,0,0.02)]">
+                  <label className="block text-[11px] font-semibold tracking-wide uppercase text-[#666666]">
+                    Underlying Yield
+                  </label>
+                  <p className="mt-1 text-xs text-[#666666]">APY of the shared opportunity.</p>
+                  <div className="mt-2 relative">
+                    <input
+                      type="number"
+                      value={underlyingYield}
+                      onChange={(e) => {
+                        setUnderlyingYield(e.target.value);
+                      }}
+                      className="w-full h-12 pr-10 pl-3 rounded-md border border-[#e5e5e0] bg-[#fafaf7] text-right text-lg font-semibold text-[#0a0a0a] focus:outline-none focus:ring-2 focus:ring-[#0a0a0a] focus:border-transparent transition-all"
+                      placeholder="13"
+                      step="0.1"
+                      min="0"
+                      max="100"
+                    />
+                    <span className="pointer-events-none absolute inset-y-0 right-3 flex items-center text-sm text-[#666666]">%</span>
                   </div>
-                  <input
-                    type="range"
-                    value={underlyingYield}
-                    onChange={(e) => {
-                      setUnderlyingYield(e.target.value);
-                    }}
-                    min="0"
-                    max="100"
-                    step="0.1"
-                    className="w-full h-2 bg-[#e9e9e3] rounded-full appearance-none cursor-pointer accent-[#0a0a0a]"
-                  />
-                  <p className="text-xs text-[#666666] mt-1">APY of the shared opportunity.</p>
                 </div>
               </div>
+
+              {!isCustomSelected && selectedExample && isSelectedExampleCoverageRatesModified && (
+                <div className="flex items-center justify-end">
+                  <button
+                    type="button"
+                    onClick={() => applyExample(selectedExample.id)}
+                    className="text-xs font-medium text-[#0a0a0a] bg-white border border-[#e5e5e0] rounded-md px-2.5 py-1.5 hover:bg-[#f4f4f0] transition-colors"
+                  >
+                    Reset to preset
+                  </button>
+                </div>
+              )}
             </div>
 
-            <div className="rounded-lg border border-[#e5e5e0] p-5 bg-[#fafaf7] space-y-4">
+            {/* Capital (Right) */}
+            <div className="lg:col-span-2 rounded-lg border border-[#e5e5e0] p-5 bg-[#fafaf7] space-y-5">
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-semibold text-[#0a0a0a]">Capital</h3>
               </div>
 
-              <div className="space-y-3">
-                <div>
-                  <div className="flex items-center justify-between gap-3 mb-2">
+              <div className="space-y-6">
+                <div className="grid grid-cols-1 md:grid-cols-[1fr_16rem] items-start gap-x-10 gap-y-3">
+                  <div>
                     <label className="text-sm font-medium text-[#0a0a0a]">Senior Capital ($)</label>
-                      <div className="relative w-64">
-                        <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-[#666666]">$</span>
-                        <input
-                          type="text"
-                        value= {seniorCapital}
-                        onChange={(e) => {
-                          const value = e.target.value.replace(/[^0-9.]/g, '');
-                          setSeniorCapital(formatNumberWithCommas(value));
-                        }}
-                          className="w-full h-11 pr-3 pl-6 rounded-md border border-[#e5e5e0] bg-white text-right text-base text-[#0a0a0a] focus:outline-none focus:ring-2 focus:ring-[#0a0a0a] focus:border-transparent transition-all"
-                          placeholder="10,000,000"
-                        />
-                      </div>
+                    <p className="text-xs text-[#666666] mt-2">Protected tranche principal.</p>
                   </div>
-                  <p className="text-xs text-[#666666]">Protected tranche principal.</p>
+                  <div className="relative w-full md:w-64 md:justify-self-end">
+                    <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-[#666666]">$</span>
+                    <input
+                      type="text"
+                      value={seniorCapital}
+                      onChange={(e) => {
+                        const value = e.target.value.replace(/[^0-9.]/g, '');
+                        setSeniorCapital(formatNumberWithCommas(value));
+                      }}
+                      className="w-full h-11 pr-3 pl-6 rounded-md border border-[#e5e5e0] bg-white text-right text-base text-[#0a0a0a] focus:outline-none focus:ring-2 focus:ring-[#0a0a0a] focus:border-transparent transition-all"
+                      placeholder="10,000,000"
+                    />
+                  </div>
                 </div>
 
-                <div>
-                  <div className="flex items-center justify-between gap-3 mb-2">
+                <div className="grid grid-cols-1 md:grid-cols-[1fr_16rem] items-start gap-x-10 gap-y-3">
+                  <div>
                     <label className="text-sm font-medium text-[#0a0a0a]">Junior Capital ($)</label>
-                    <div className="relative w-64">
-                      <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-[#666666]">$</span>
-                      <input
-                        type="text"
-                        value={juniorCapital}
-                        onChange={(e) => {
-                          const value = e.target.value.replace(/[^0-9.]/g, '');
-                          setJuniorCapital(formatNumberWithCommas(value));
-                        }}
-                        className={`w-full h-11 pr-16 pl-6 rounded-md border ${results?.overUtilized ? 'border-[#f59e0b] ring-1 ring-[#f59e0b]' : 'border-[#e5e5e0]'} bg-white text-right text-base text-[#0a0a0a] focus:outline-none focus:ring-2 focus:ring-[#0a0a0a] focus:border-transparent transition-all`}
-                        placeholder="1,250,000.00"
-                      />
-                      <div className="absolute inset-y-0 right-1 flex items-center">
-                        <div className="relative">
-                          <button
-                            onClick={calculate90PercentUtilization}
-                            type="button"
-                            className="h-9 px-3 text-xs font-medium text-white bg-[#0a0a0a] rounded-md hover:bg-[#2a2a2a] focus:outline-none focus:ring-2 focus:ring-[#0a0a0a] transition-all group"
-                          >
-                            90%
-                          </button>
-                          <span className="absolute bottom-full right-0 mb-2 hidden group-hover:block w-64 p-3 text-xs font-normal text-white bg-[#0a0a0a] rounded-lg shadow-lg border border-[#333333] z-10 pointer-events-none">
-                            <strong className="block mb-1">Set: 90% Utilization</strong>
-                            Automatically sets junior capital for exactly 90% utilization using your senior capital, target coverage, and beta.
-                          </span>
-                        </div>
+                    <p className="text-xs text-[#666666] mt-2">First-loss tranche principal.</p>
+                  </div>
+                  <div className="relative w-full md:w-64 md:justify-self-end">
+                    <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-[#666666]">$</span>
+                    <input
+                      type="text"
+                      value={juniorCapital}
+                      onChange={(e) => {
+                        const value = e.target.value.replace(/[^0-9.]/g, '');
+                        setJuniorCapital(formatNumberWithCommas(value));
+                      }}
+                      className={`w-full h-11 pr-16 pl-6 rounded-md border ${
+                        results?.overUtilized ? 'border-[#f59e0b] ring-1 ring-[#f59e0b]' : 'border-[#e5e5e0]'
+                      } bg-white text-right text-base text-[#0a0a0a] focus:outline-none focus:ring-2 focus:ring-[#0a0a0a] focus:border-transparent transition-all`}
+                      placeholder="1,250,000.00"
+                    />
+                    <div className="absolute inset-y-0 right-1.5 flex items-center">
+                      <div className="relative group">
+                        <button
+                          onClick={calculate90PercentUtilization}
+                          type="button"
+                          className="h-9 px-3 text-xs font-medium text-white bg-[#0a0a0a] rounded-md hover:bg-[#2a2a2a] focus:outline-none focus:ring-2 focus:ring-[#0a0a0a] transition-all"
+                        >
+                          90%
+                        </button>
+                        <span className="absolute bottom-full right-0 mb-2 hidden group-hover:block w-64 p-3 text-xs font-normal text-white bg-[#0a0a0a] rounded-lg shadow-lg border border-[#333333] z-10 pointer-events-none">
+                          <strong className="block mb-1">Set: 90% Utilization</strong>
+                          Automatically sets junior capital for exactly 90% utilization using your senior capital, target coverage, and beta.
+                        </span>
                       </div>
                     </div>
                   </div>
-                  <p className="text-xs text-[#666666]">First-loss tranche principal.</p>
+
                   {juniorFor90Info && juniorMinToStayCovered && betaNumInfo > 0 && (
-                    <div className="mt-2 text-xs text-[#666666] flex items-center gap-2">
+                    <div className="md:col-span-2 mt-1 text-xs text-[#666666] flex items-center gap-2">
                       <div className="relative group">
                         <span className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-[#0a0a0a] text-white text-[10px] font-semibold cursor-default">?</span>
                         <div className="absolute left-0 mt-2 w-72 p-3 rounded-md border border-[#e5e5e0] bg-white shadow-lg text-xs text-[#666666] opacity-0 group-hover:opacity-100 transition-opacity z-10">
@@ -513,24 +689,17 @@ export default function YieldSimulator() {
                 </div>
               </div>
 
-              <div className="pt-3 border-t border-[#e5e5e0]">
-                <button
-                  type="button"
-                  onClick={() => setShowAdvanced(!showAdvanced)}
-                  className="flex items-center justify-between w-full text-sm font-medium text-[#0a0a0a]"
-                >
-                  <span>Advanced assumptions</span>
-                  <svg className={`w-5 h-5 text-[#666666] transition-transform ${showAdvanced ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </button>
+              {showAdvanced && (
+                <div className="pt-3 border-t border-[#e5e5e0]">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-semibold text-[#0a0a0a]">Assumptions</p>
+                  </div>
 
-                {showAdvanced && (
-                  <div className="mt-3 space-y-3 bg-[#fafaf7] border border-[#e5e5e0] rounded-md p-4">
+                  <div className="mt-3 space-y-3 bg-white border border-[#e5e5e0] rounded-md p-4">
                     <div>
-                    <div className="flex items-center justify-between gap-3 mb-2">
-                      <label className="text-sm font-medium text-[#0a0a0a]">JT Drawdown Correlation (Beta %)</label>
-                      <div className="relative w-24">
+                      <div className="flex items-center justify-between gap-3 mb-2">
+                        <label className="text-sm font-medium text-[#0a0a0a]">JT Drawdown Correlation (Beta %)</label>
+                        <div className="relative w-24">
                           <input
                             type="number"
                             value={beta}
@@ -542,21 +711,10 @@ export default function YieldSimulator() {
                             step="0.1"
                             min="0"
                             max="100"
-                        />
-                        <span className="pointer-events-none absolute inset-y-0 right-2 flex items-center text-sm text-[#666666]">%</span>
+                          />
+                          <span className="pointer-events-none absolute inset-y-0 right-2 flex items-center text-sm text-[#666666]">%</span>
+                        </div>
                       </div>
-                    </div>
-                    <input
-                      type="range"
-                      value={beta}
-                      onChange={(e) => {
-                        setBeta(e.target.value);
-                      }}
-                      min="0"
-                      max="100"
-                      step="0.1"
-                      className="w-full h-2 bg-[#e5e5e0] rounded-lg appearance-none cursor-pointer accent-[#0a0a0a]"
-                    />
                       <p className="text-xs text-[#666666] mt-1">0% = uncorrelated; 100% = same drawdown path as senior.</p>
                     </div>
 
@@ -600,9 +758,7 @@ export default function YieldSimulator() {
 
                     {juniorDeploymentOption === 'elsewhere' && (
                       <div>
-                        <label className="block text-sm font-medium text-[#0a0a0a] mb-2">
-                          Custom Yield Rate (%)
-                        </label>
+                        <label className="block text-sm font-medium text-[#0a0a0a] mb-2">Custom Yield Rate (%)</label>
                         <div className="relative w-full">
                           <input
                             type="number"
@@ -625,8 +781,8 @@ export default function YieldSimulator() {
                       Junior keeps 100% of their own deployment yield plus their RDM share of senior yield.
                     </p>
                   </div>
-                )}
-              </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
