@@ -13,6 +13,8 @@ type SimulatorInputs = {
   juniorDeploymentOption: DeploymentOption;
   juniorCustomYield: string;
   beta: string;
+  juniorSpreadCaptureBps: string;
+  seniorSpreadCaptureBps: string;
 };
 
 const DEFAULT_INPUTS: SimulatorInputs = {
@@ -22,7 +24,9 @@ const DEFAULT_INPUTS: SimulatorInputs = {
   juniorCapital: '1,250,000.00',
   juniorDeploymentOption: 'underlying',
   juniorCustomYield: '13',
-  beta: '100'
+  beta: '100',
+  juniorSpreadCaptureBps: '1000',
+  seniorSpreadCaptureBps: '1000'
 };
 
 type ExamplePreset = {
@@ -76,6 +80,9 @@ export default function YieldSimulator() {
   const [juniorDeploymentOption, setJuniorDeploymentOption] = useState<DeploymentOption>(defaultSelectedInputs.juniorDeploymentOption);
   const [juniorCustomYield, setJuniorCustomYield] = useState<string>(defaultSelectedInputs.juniorCustomYield);
   const [beta, setBeta] = useState<string>(defaultSelectedInputs.beta);
+  const [juniorSpreadCaptureBps, setJuniorSpreadCaptureBps] = useState<string>(defaultSelectedInputs.juniorSpreadCaptureBps);
+  const [seniorSpreadCaptureBps, setSeniorSpreadCaptureBps] = useState<string>(defaultSelectedInputs.seniorSpreadCaptureBps);
+  const [roycoSpreadEnabled, setRoycoSpreadEnabled] = useState<boolean>(false);
 
   const [selectedExampleId, setSelectedExampleId] = useState<string>(defaultSelectedExample?.id ?? CUSTOM_PRESET_ID);
 
@@ -92,6 +99,12 @@ export default function YieldSimulator() {
     const parts = num.split('.');
     parts[0] = parts[0].replace(/\B(?=(\d{3})+(?!\d))/g, ',');
     return parts.join('.');
+  };
+
+  const parseBpsRate = (value: string): number => {
+    const num = parseNumber(value);
+    if (Number.isNaN(num)) return 0;
+    return Math.max(0, num) / 10000;
   };
 
   const selectedExample = useMemo(
@@ -124,15 +137,19 @@ export default function YieldSimulator() {
       compareAsNumber(juniorCapital, selectedExampleInputs.juniorCapital) &&
       juniorDeploymentOption === selectedExampleInputs.juniorDeploymentOption &&
       compareAsNumber(juniorCustomYield, selectedExampleInputs.juniorCustomYield) &&
-      compareAsNumber(beta, selectedExampleInputs.beta)
+      compareAsNumber(beta, selectedExampleInputs.beta) &&
+      compareAsNumber(juniorSpreadCaptureBps, selectedExampleInputs.juniorSpreadCaptureBps) &&
+      compareAsNumber(seniorSpreadCaptureBps, selectedExampleInputs.seniorSpreadCaptureBps)
     );
   }, [
     beta,
     juniorCapital,
     juniorCustomYield,
     juniorDeploymentOption,
+    juniorSpreadCaptureBps,
     selectedExampleInputs,
     seniorCapital,
+    seniorSpreadCaptureBps,
     targetCoverage,
     underlyingYield
   ]);
@@ -172,6 +189,8 @@ export default function YieldSimulator() {
     setJuniorDeploymentOption(next.juniorDeploymentOption);
     setJuniorCustomYield(next.juniorCustomYield);
     setBeta(next.beta);
+    setJuniorSpreadCaptureBps(next.juniorSpreadCaptureBps);
+    setSeniorSpreadCaptureBps(next.seniorSpreadCaptureBps);
   };
 
 
@@ -184,9 +203,14 @@ export default function YieldSimulator() {
     juniorYield: number;
     juniorOwnYield: number;
     juniorTotalYield: number;
+    juniorSpreadCaptureAmount: number;
+    juniorNetYield: number;
     seniorYield: number;
+    seniorSpreadCaptureAmount: number;
+    seniorNetYield: number;
     juniorYieldPercent: number;
     seniorYieldPercent: number;
+    totalRoycoSpreadCapture: number;
     overUtilized: boolean;
     requiredCoverage: number;
     errorMessage?: string;
@@ -197,6 +221,8 @@ export default function YieldSimulator() {
     const juniorCapitalNum = parseNumber(juniorCapital);
     const juniorCustomYieldNum = parseNumber(juniorCustomYield) / 100;
     const betaNum = parseNumber(beta) / 100;
+    const juniorSpreadCaptureRate = roycoSpreadEnabled ? parseBpsRate(juniorSpreadCaptureBps) : 0;
+    const seniorSpreadCaptureRate = roycoSpreadEnabled ? parseBpsRate(seniorSpreadCaptureBps) : 0;
 
     if (
       isNaN(targetCoverageNum) ||
@@ -246,10 +272,15 @@ export default function YieldSimulator() {
 
     // Junior's total yield = RDM share + own deployment yield
     const juniorTotalYield = juniorYield + juniorOwnYield;
-    const combinedTotalYield = totalYield + juniorOwnYield;
+    const juniorSpreadCaptureAmount = juniorTotalYield * juniorSpreadCaptureRate;
+    const seniorSpreadCaptureAmount = seniorYield * seniorSpreadCaptureRate;
+    const juniorNetYield = juniorTotalYield - juniorSpreadCaptureAmount;
+    const seniorNetYield = seniorYield - seniorSpreadCaptureAmount;
+    const combinedTotalYield = juniorNetYield + seniorNetYield;
 
-    const juniorYieldPercent = (juniorTotalYield / juniorCapitalNum) * 100;
-    const seniorYieldPercent = (seniorYield / seniorCapitalNum) * 100;
+    const juniorYieldPercent = (juniorNetYield / juniorCapitalNum) * 100;
+    const seniorYieldPercent = (seniorNetYield / seniorCapitalNum) * 100;
+    const totalRoycoSpreadCapture = juniorSpreadCaptureAmount + seniorSpreadCaptureAmount;
 
     return {
       isValid: true,
@@ -260,13 +291,29 @@ export default function YieldSimulator() {
       juniorYield,
       juniorOwnYield,
       juniorTotalYield,
+      juniorSpreadCaptureAmount,
+      juniorNetYield,
       seniorYield,
+      seniorSpreadCaptureAmount,
+      seniorNetYield,
       juniorYieldPercent,
       seniorYieldPercent,
+      totalRoycoSpreadCapture,
       overUtilized: utilization >= 1,
       requiredCoverage
     };
-  }, [beta, juniorCapital, juniorCustomYield, juniorDeploymentOption, seniorCapital, targetCoverage, underlyingYield]);
+  }, [
+    beta,
+    juniorCapital,
+    juniorCustomYield,
+    juniorDeploymentOption,
+    juniorSpreadCaptureBps,
+    roycoSpreadEnabled,
+    seniorCapital,
+    seniorSpreadCaptureBps,
+    targetCoverage,
+    underlyingYield
+  ]);
 
   const chartMaxUtilization = Math.max(100, (results?.utilization ?? 1) * 100);
 
@@ -341,6 +388,8 @@ export default function YieldSimulator() {
     const juniorYieldRate = juniorDeploymentOption === 'underlying' ? safeUnderlyingYield : (isNaN(juniorCustomYieldNum) ? 0 : juniorCustomYieldNum);
     const seniorYieldPool = safeUnderlyingYield * seniorCapitalNum;
     const juniorOwnYield = juniorYieldRate * juniorCapitalNum;
+    const juniorSpreadCaptureRate = roycoSpreadEnabled ? parseBpsRate(juniorSpreadCaptureBps) : 0;
+    const seniorSpreadCaptureRate = roycoSpreadEnabled ? parseBpsRate(seniorSpreadCaptureBps) : 0;
 
     for (let i = 0; i <= 1000; i++) {
       const utilization = i / 1000;
@@ -348,8 +397,12 @@ export default function YieldSimulator() {
       const juniorYield = utilization >= 1 ? seniorYieldPool : rdm * seniorYieldPool;
       const seniorYield = utilization >= 1 ? 0 : seniorYieldPool - juniorYield;
       const juniorTotalYield = juniorYield + juniorOwnYield;
-      const juniorAPY = juniorCapitalNum > 0 ? (juniorTotalYield / juniorCapitalNum) * 100 : 0;
-      const seniorAPY = seniorCapitalNum > 0 ? (seniorYield / seniorCapitalNum) * 100 : 0;
+      const juniorSpreadCaptureAmount = juniorTotalYield * juniorSpreadCaptureRate;
+      const seniorSpreadCaptureAmount = seniorYield * seniorSpreadCaptureRate;
+      const juniorNetYield = juniorTotalYield - juniorSpreadCaptureAmount;
+      const seniorNetYield = seniorYield - seniorSpreadCaptureAmount;
+      const juniorAPY = juniorCapitalNum > 0 ? (juniorNetYield / juniorCapitalNum) * 100 : 0;
+      const seniorAPY = seniorCapitalNum > 0 ? (seniorNetYield / seniorCapitalNum) * 100 : 0;
 
       data.push({
         utilization: utilization * 100,
@@ -357,7 +410,7 @@ export default function YieldSimulator() {
         juniorAPY,
         seniorAPY,
         juniorYield,
-        juniorTotalYield,
+        juniorTotalYield: juniorNetYield,
         seniorYield
       });
     }
@@ -687,6 +740,7 @@ export default function YieldSimulator() {
                     </div>
                   )}
                 </div>
+
               </div>
 
               {showAdvanced && (
@@ -778,8 +832,28 @@ export default function YieldSimulator() {
                     )}
 
                     <p className="text-xs text-[#666666]">
-                      Junior keeps 100% of their own deployment yield plus their RDM share of senior yield.
+                      Junior keeps their own deployment yield plus their RDM share of senior yield{roycoSpreadEnabled ? ', net of Royco spread.' : '.'}
                     </p>
+
+                    <div className="flex items-center justify-between pt-2 border-t border-[#e5e5e0]">
+                      <div>
+                        <p className="text-[11px] uppercase tracking-wide text-[#888888]">Royco Spread</p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setRoycoSpreadEnabled((prev) => !prev)}
+                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${
+                          roycoSpreadEnabled ? 'bg-[#2a2a2a]' : 'bg-[#e2e2de]'
+                        }`}
+                        aria-pressed={roycoSpreadEnabled}
+                      >
+                        <span
+                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition ${
+                            roycoSpreadEnabled ? 'translate-x-4' : 'translate-x-1'
+                          }`}
+                        />
+                      </button>
+                    </div>
                   </div>
                 </div>
               )}
@@ -814,9 +888,13 @@ export default function YieldSimulator() {
                 <p className="text-xs text-[#666666]">Junior: {formatCurrency(results.juniorYield)}</p>
               </div>
               <div className="rounded-lg border border-[#e5e5e0] px-4 py-3 bg-[#f8f9fa] space-y-1">
-                <p className="text-xs text-[#666666]">Total Yield (Senior)</p>
+                <p className="text-xs text-[#666666]">
+                  {roycoSpreadEnabled ? 'Total Yield (Senior, gross)' : 'Total Yield (Senior)'}
+                </p>
                 <p className="text-lg font-semibold text-[#0a0a0a]">{formatCurrency(results.totalYield)}</p>
-                <p className="text-xs text-[#666666]">Combined: {formatCurrency(results.combinedTotalYield)}</p>
+                <p className="text-xs text-[#666666]">
+                  {roycoSpreadEnabled ? 'Combined (net)' : 'Combined'}: {formatCurrency(results.combinedTotalYield)}
+                </p>
               </div>
               <div className="rounded-lg border border-[#e5e5e0] px-4 py-3 bg-[#f8f9fa] space-y-1">
                 <p className="text-xs text-[#666666]">Req. JT Eff. NAV</p>
@@ -880,7 +958,7 @@ export default function YieldSimulator() {
                         Total Value
                       </p>
                       <p className="text-xl font-semibold text-[#0a0a0a]">
-                        {formatCurrency(parseNumber(seniorCapital) + results.seniorYield)}
+                        {formatCurrency(parseNumber(seniorCapital) + results.seniorNetYield)}
                       </p>
                     </div>
                   </div>
@@ -893,8 +971,25 @@ export default function YieldSimulator() {
                       {formatPercent(results.seniorYieldPercent)}
                     </p>
                     <p className="text-lg text-[#666666]">
-                      {formatCurrency(results.seniorYield)}
+                      {formatCurrency(results.seniorNetYield)}
                     </p>
+
+                    <div className="mt-4 bg-[#f8f9fa] rounded-lg p-4 space-y-2">
+                      <div className="flex justify-between items-center text-xs">
+                        <span className="text-[#666666]">Senior share (gross):</span>
+                        <span className="text-[#0a0a0a] font-medium">{formatCurrency(results.seniorYield)}</span>
+                      </div>
+                      {roycoSpreadEnabled && (
+                        <div className="flex justify-between items-center text-xs">
+                          <span className="text-[#666666]">Royco spread:</span>
+                          <span className="text-[#0a0a0a] font-medium">-{formatCurrency(results.seniorSpreadCaptureAmount)}</span>
+                        </div>
+                      )}
+                      <div className="border-t border-[#e5e5e0] pt-2 mt-2 flex justify-between items-center text-xs">
+                        <span className="text-[#0a0a0a] font-medium">{roycoSpreadEnabled ? 'Net total:' : 'Total:'}</span>
+                        <span className="text-[#0a0a0a] font-semibold">{formatCurrency(results.seniorNetYield)}</span>
+                      </div>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -927,7 +1022,7 @@ export default function YieldSimulator() {
                         Total Value
                       </p>
                       <p className="text-xl font-semibold text-white">
-                        {formatCurrency(parseNumber(juniorCapital) + results.juniorTotalYield)}
+                        {formatCurrency(parseNumber(juniorCapital) + results.juniorNetYield)}
                       </p>
                     </div>
                   </div>
@@ -940,7 +1035,7 @@ export default function YieldSimulator() {
                       {formatPercent(results.juniorYieldPercent)}
                     </p>
                     <p className="text-lg text-[#cccccc] mb-3">
-                      {formatCurrency(results.juniorTotalYield)}
+                      {formatCurrency(results.juniorNetYield)}
                     </p>
 
                     {/* Yield Breakdown */}
@@ -953,9 +1048,15 @@ export default function YieldSimulator() {
                         <span className="text-[#999999]">From Own Capital:</span>
                         <span className="text-white font-medium">{formatCurrency(results.juniorOwnYield)}</span>
                       </div>
+                      {roycoSpreadEnabled && (
+                        <div className="flex justify-between items-center text-xs">
+                          <span className="text-[#999999]">Royco spread:</span>
+                          <span className="text-white font-medium">-{formatCurrency(results.juniorSpreadCaptureAmount)}</span>
+                        </div>
+                      )}
                       <div className="border-t border-[#333333] pt-2 mt-2 flex justify-between items-center text-xs">
-                        <span className="text-[#cccccc] font-medium">Total:</span>
-                        <span className="text-white font-semibold">{formatCurrency(results.juniorTotalYield)}</span>
+                        <span className="text-[#cccccc] font-medium">{roycoSpreadEnabled ? 'Net total:' : 'Total:'}</span>
+                        <span className="text-white font-semibold">{formatCurrency(results.juniorNetYield)}</span>
                       </div>
                     </div>
                   </div>
@@ -992,7 +1093,9 @@ export default function YieldSimulator() {
                 <div className="rounded-lg border border-[#e5e5e0] bg-[#f8f9fa] px-4 py-3">
                   <p className="text-xs text-[#666666]">Junior APY</p>
                   <p className="text-lg font-semibold text-[#0a0a0a]">{formatPercent(results.juniorYieldPercent)}</p>
-                  <p className="text-xs text-[#666666]">Includes own yield + RDM split.</p>
+                  <p className="text-xs text-[#666666]">
+                    {roycoSpreadEnabled ? 'Net of Royco spread.' : 'Includes own yield + RDM split.'}
+                  </p>
                 </div>
               </div>
 
@@ -1039,7 +1142,7 @@ export default function YieldSimulator() {
                                   <p className="font-semibold text-[#0a0a0a]">{formatCurrency(data.juniorYield)}</p>
                                 </div>
                                 <div>
-                                  <p className="text-[#666666]">Junior Yield (Total):</p>
+                                  <p className="text-[#666666]">{roycoSpreadEnabled ? 'Junior Yield (Net):' : 'Junior Yield (Total):'}</p>
                                   <p className="font-semibold text-[#0a0a0a]">{formatCurrency(data.juniorTotalYield)}</p>
                                 </div>
                                 <div>
@@ -1095,6 +1198,54 @@ export default function YieldSimulator() {
                 </div>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* Royco Spread */}
+        {roycoSpreadEnabled && (
+          <div className="mt-10">
+            <details className="rounded-lg border border-[#e5e5e0] bg-[#fbfbf8] p-4">
+              <summary className="cursor-pointer text-xs uppercase tracking-wide text-[#777777]">
+                Royco Spread (bps)
+              </summary>
+              <div className="mt-4 space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <label className="flex flex-col gap-2 text-sm text-[#0a0a0a]">
+                    Junior Royco spread (bps)
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={juniorSpreadCaptureBps}
+                      onChange={(e) => setJuniorSpreadCaptureBps(e.target.value)}
+                      className="w-full rounded-md border border-[#e5e5e0] bg-white px-3 py-2 text-sm text-[#0a0a0a] focus:outline-none focus:ring-2 focus:ring-[#0a0a0a]/20"
+                      placeholder="0"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-2 text-sm text-[#0a0a0a]">
+                    Senior Royco spread (bps)
+                    <input
+                      type="text"
+                      inputMode="decimal"
+                      value={seniorSpreadCaptureBps}
+                      onChange={(e) => setSeniorSpreadCaptureBps(e.target.value)}
+                      className="w-full rounded-md border border-[#e5e5e0] bg-white px-3 py-2 text-sm text-[#0a0a0a] focus:outline-none focus:ring-2 focus:ring-[#0a0a0a]/20"
+                      placeholder="0"
+                    />
+                  </label>
+                </div>
+                <div className="rounded-lg border border-[#e5e5e0] bg-white p-4">
+                  <p className="text-xs uppercase tracking-wide text-[#777777] mb-2">Royco spread (annual)</p>
+                  <p className="text-2xl font-semibold text-[#0a0a0a]">
+                    {results ? formatCurrency(results.totalRoycoSpreadCapture) : formatCurrency(0)}
+                  </p>
+                  {results && (
+                    <p className="text-xs text-[#666666] mt-1">
+                      Junior spread: {formatCurrency(results.juniorSpreadCaptureAmount)} · Senior spread: {formatCurrency(results.seniorSpreadCaptureAmount)}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </details>
           </div>
         )}
 
