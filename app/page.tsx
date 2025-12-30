@@ -854,6 +854,33 @@ export default function YieldSimulator() {
                         />
                       </button>
                     </div>
+
+                    {roycoSpreadEnabled && (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-3">
+                        <label className="flex flex-col gap-2 text-sm text-[#0a0a0a]">
+                          Junior Royco spread (bps)
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            value={juniorSpreadCaptureBps}
+                            onChange={(e) => setJuniorSpreadCaptureBps(e.target.value)}
+                            className="w-full rounded-md border border-[#e5e5e0] bg-white px-3 py-2 text-sm text-[#0a0a0a] focus:outline-none focus:ring-2 focus:ring-[#0a0a0a]/20"
+                            placeholder="0"
+                          />
+                        </label>
+                        <label className="flex flex-col gap-2 text-sm text-[#0a0a0a]">
+                          Senior Royco spread (bps)
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            value={seniorSpreadCaptureBps}
+                            onChange={(e) => setSeniorSpreadCaptureBps(e.target.value)}
+                            className="w-full rounded-md border border-[#e5e5e0] bg-white px-3 py-2 text-sm text-[#0a0a0a] focus:outline-none focus:ring-2 focus:ring-[#0a0a0a]/20"
+                            placeholder="0"
+                          />
+                        </label>
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -1206,44 +1233,17 @@ export default function YieldSimulator() {
           <div className="mt-10">
             <details className="rounded-lg border border-[#e5e5e0] bg-[#fbfbf8] p-4">
               <summary className="cursor-pointer text-xs uppercase tracking-wide text-[#777777]">
-                Royco Spread (bps)
+                Royco spread (annual)
               </summary>
-              <div className="mt-4 space-y-4">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <label className="flex flex-col gap-2 text-sm text-[#0a0a0a]">
-                    Junior Royco spread (bps)
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      value={juniorSpreadCaptureBps}
-                      onChange={(e) => setJuniorSpreadCaptureBps(e.target.value)}
-                      className="w-full rounded-md border border-[#e5e5e0] bg-white px-3 py-2 text-sm text-[#0a0a0a] focus:outline-none focus:ring-2 focus:ring-[#0a0a0a]/20"
-                      placeholder="0"
-                    />
-                  </label>
-                  <label className="flex flex-col gap-2 text-sm text-[#0a0a0a]">
-                    Senior Royco spread (bps)
-                    <input
-                      type="text"
-                      inputMode="decimal"
-                      value={seniorSpreadCaptureBps}
-                      onChange={(e) => setSeniorSpreadCaptureBps(e.target.value)}
-                      className="w-full rounded-md border border-[#e5e5e0] bg-white px-3 py-2 text-sm text-[#0a0a0a] focus:outline-none focus:ring-2 focus:ring-[#0a0a0a]/20"
-                      placeholder="0"
-                    />
-                  </label>
-                </div>
-                <div className="rounded-lg border border-[#e5e5e0] bg-white p-4">
-                  <p className="text-xs uppercase tracking-wide text-[#777777] mb-2">Royco spread (annual)</p>
-                  <p className="text-2xl font-semibold text-[#0a0a0a]">
-                    {results ? formatCurrency(results.totalRoycoSpreadCapture) : formatCurrency(0)}
+              <div className="mt-4">
+                <p className="text-2xl font-semibold text-[#0a0a0a]">
+                  {results ? formatCurrency(results.totalRoycoSpreadCapture) : formatCurrency(0)}
+                </p>
+                {results && (
+                  <p className="text-xs text-[#666666] mt-1">
+                    Junior spread: {formatCurrency(results.juniorSpreadCaptureAmount)} · Senior spread: {formatCurrency(results.seniorSpreadCaptureAmount)}
                   </p>
-                  {results && (
-                    <p className="text-xs text-[#666666] mt-1">
-                      Junior spread: {formatCurrency(results.juniorSpreadCaptureAmount)} · Senior spread: {formatCurrency(results.seniorSpreadCaptureAmount)}
-                    </p>
-                  )}
-                </div>
+                )}
               </div>
             </details>
           </div>
