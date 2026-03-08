@@ -126,11 +126,6 @@ export default function YieldSimulator() {
     return parts.join('.');
   };
 
-  const parseBpsRate = (value: string): number => {
-    const num = parseNumber(value);
-    if (Number.isNaN(num)) return 0;
-    return Math.max(0, num) / 10000;
-  };
 
   const selectedExample = useMemo(
     () => (selectedExampleId ? EXAMPLE_PRESETS.find((preset) => preset.id === selectedExampleId) ?? null : null),
@@ -234,20 +229,18 @@ export default function YieldSimulator() {
   const results = useMemo<{
     isValid: boolean;
     utilization: number;
-    rdmOutput: number;
+    ydmOutput: number;
     totalYield: number;
     combinedTotalYield: number;
     juniorYield: number;
     juniorOwnYield: number;
     juniorTotalYield: number;
-    juniorSpreadCaptureAmount: number;
     juniorNetYield: number;
     seniorYield: number;
-    seniorSpreadCaptureAmount: number;
     seniorNetYield: number;
     juniorYieldPercent: number;
     seniorYieldPercent: number;
-    totalRoycoSpreadCapture: number;
+    totalFees: number;
     overUtilized: boolean;
     requiredCoverage: number;
     errorMessage?: string;
@@ -258,8 +251,6 @@ export default function YieldSimulator() {
     const juniorCapitalNum = parseNumber(juniorCapital);
     const juniorCustomYieldNum = parseNumber(juniorCustomYield) / 100;
     const betaNum = parseNumber(beta) / 100;
-    const juniorSpreadCaptureRate = roycoSpreadEnabled ? parseBpsRate(juniorSpreadCaptureBps) : 0;
-    const seniorSpreadCaptureRate = roycoSpreadEnabled ? parseBpsRate(seniorSpreadCaptureBps) : 0;
 
     if (
       isNaN(targetCoverageNum) ||
@@ -285,57 +276,68 @@ export default function YieldSimulator() {
     const requiredCoverage = (seniorRawNAV + juniorRawNAV * betaNum) * targetCoverageNum;
     const utilization = requiredCoverage / juniorEffectiveNAV;
 
-    // RDM curve with cap: junior gets 100% of senior yield when utilization >= 100%
-    let rdmOutput: number;
-    if (utilization < 0.9) {
-      rdmOutput = 0.25 * utilization;
+    // Parse new params
+    const y0 = parseNumber(ydmY0) / 100;
+    const yT = parseNumber(ydmYT) / 100;
+    const yFull = parseNumber(ydmYFull) / 100;
+    const jtFeeNum = parseNumber(jtFee) / 100;
+    const stFeeNum = parseNumber(stFee) / 100;
+    const ysFeeNum = parseNumber(ysFee) / 100;
+
+    const discount = yT - y0;
+    const premium = yFull - yT;
+
+    // YDM V2 curve
+    let ydmOutput: number;
+    if (utilization >= 1) {
+      ydmOutput = 1;
     } else {
-      rdmOutput = 7.75 * (utilization - 0.9) + 0.225;
+      const u = Math.min(utilization, 1);
+      if (u < 0.9) {
+        const normalizedDelta = (u - 0.9) / 0.9;
+        ydmOutput = yT + normalizedDelta * discount;
+      } else {
+        const normalizedDelta = (u - 0.9) / 0.1;
+        ydmOutput = yT + normalizedDelta * premium;
+      }
+      ydmOutput = Math.min(1, Math.max(0, ydmOutput));
     }
-    rdmOutput = Math.min(1, Math.max(0, rdmOutput));
 
-    // Total yield from senior capital deployment
+    // Yields
     const totalYield = underlyingYieldNum * seniorCapitalNum;
-
-    // Junior's share of senior's yield (via RDM)
-    const juniorYield = utilization >= 1 ? totalYield : rdmOutput * totalYield;
-
-    // Senior's share of senior's yield
+    const juniorYield = utilization >= 1 ? totalYield : ydmOutput * totalYield;
     const seniorYield = utilization >= 1 ? 0 : totalYield - juniorYield;
 
-    // Junior's own yield from their capital deployment
     const juniorYieldRate = juniorDeploymentOption === 'underlying' ? underlyingYieldNum : juniorCustomYieldNum;
     const juniorOwnYield = juniorCapitalNum * juniorYieldRate;
 
-    // Junior's total yield = RDM share + own deployment yield
-    const juniorTotalYield = juniorYield + juniorOwnYield;
-    const juniorSpreadCaptureAmount = juniorTotalYield * juniorSpreadCaptureRate;
-    const seniorSpreadCaptureAmount = seniorYield * seniorSpreadCaptureRate;
-    const juniorNetYield = juniorTotalYield - juniorSpreadCaptureAmount;
-    const seniorNetYield = seniorYield - seniorSpreadCaptureAmount;
-    const combinedTotalYield = juniorNetYield + seniorNetYield;
+    // Fee model: jtFee on own yield, ysFee on risk premium, stFee on ST yield
+    const juniorOwnYieldAfterFee = juniorOwnYield * (1 - jtFeeNum);
+    const juniorRiskPremiumAfterFee = juniorYield * (1 - ysFeeNum);
+    const juniorNetYield = juniorOwnYieldAfterFee + juniorRiskPremiumAfterFee;
+    const seniorNetYield = seniorYield * (1 - stFeeNum);
 
+    const juniorTotalYield = juniorOwnYield + juniorYield;
+    const combinedTotalYield = juniorNetYield + seniorNetYield;
     const juniorYieldPercent = (juniorNetYield / juniorCapitalNum) * 100;
     const seniorYieldPercent = (seniorNetYield / seniorCapitalNum) * 100;
-    const totalRoycoSpreadCapture = juniorSpreadCaptureAmount + seniorSpreadCaptureAmount;
+    const totalFees = (juniorOwnYield * jtFeeNum) + (juniorYield * ysFeeNum) + (seniorYield * stFeeNum);
 
     return {
       isValid: true,
       utilization,
-      rdmOutput,
+      ydmOutput,
       totalYield,
       combinedTotalYield,
       juniorYield,
       juniorOwnYield,
       juniorTotalYield,
-      juniorSpreadCaptureAmount,
       juniorNetYield,
       seniorYield,
-      seniorSpreadCaptureAmount,
       seniorNetYield,
       juniorYieldPercent,
       seniorYieldPercent,
-      totalRoycoSpreadCapture,
+      totalFees,
       overUtilized: utilization >= 1,
       requiredCoverage
     };
@@ -344,12 +346,15 @@ export default function YieldSimulator() {
     juniorCapital,
     juniorCustomYield,
     juniorDeploymentOption,
-    juniorSpreadCaptureBps,
-    roycoSpreadEnabled,
     seniorCapital,
-    seniorSpreadCaptureBps,
     targetCoverage,
-    underlyingYield
+    underlyingYield,
+    ydmY0,
+    ydmYT,
+    ydmYFull,
+    jtFee,
+    stFee,
+    ysFee
   ]);
 
   const chartMaxUtilization = Math.max(100, (results?.utilization ?? 1) * 100);
@@ -404,15 +409,26 @@ export default function YieldSimulator() {
     setJuniorCapital(formatNumberWithCommas(juniorCapitalFor90.toFixed(2)));
   };
 
-  const calculateRdmAtUtilization = (utilization: number): number => {
-    let output;
-    if (utilization < 0.9) {
-      output = 0.25 * utilization;
+  const calculateYdmYieldShare = (utilization: number): number => {
+    const y0 = parseNumber(ydmY0) / 100;
+    const yT = parseNumber(ydmYT) / 100;
+    const yFull = parseNumber(ydmYFull) / 100;
+    const discount = yT - y0;
+    const premium = yFull - yT;
+
+    const u = Math.min(Math.max(utilization, 0), 1);
+    let normalizedDelta: number;
+    let yieldShare: number;
+
+    if (u < 0.9) {
+      normalizedDelta = (u - 0.9) / 0.9;
+      yieldShare = yT + normalizedDelta * discount;
     } else {
-      output = 7.75 * (utilization - 0.9) + 0.225;
+      normalizedDelta = (u - 0.9) / 0.1;
+      yieldShare = yT + normalizedDelta * premium;
     }
-    // Cap between 0 and 1; beyond 100% utilization, junior takes all senior yield
-    return Math.min(1, Math.max(0, output));
+
+    return Math.min(1, Math.max(0, yieldShare));
   };
 
   const generateChartData = () => {
@@ -425,25 +441,27 @@ export default function YieldSimulator() {
     const juniorYieldRate = juniorDeploymentOption === 'underlying' ? safeUnderlyingYield : (isNaN(juniorCustomYieldNum) ? 0 : juniorCustomYieldNum);
     const seniorYieldPool = safeUnderlyingYield * seniorCapitalNum;
     const juniorOwnYield = juniorYieldRate * juniorCapitalNum;
-    const juniorSpreadCaptureRate = roycoSpreadEnabled ? parseBpsRate(juniorSpreadCaptureBps) : 0;
-    const seniorSpreadCaptureRate = roycoSpreadEnabled ? parseBpsRate(seniorSpreadCaptureBps) : 0;
+    const jtFeeNum = parseNumber(jtFee) / 100;
+    const stFeeNum = parseNumber(stFee) / 100;
+    const ysFeeNum = parseNumber(ysFee) / 100;
 
     for (let i = 0; i <= 1000; i++) {
       const utilization = i / 1000;
-      const rdm = calculateRdmAtUtilization(utilization);
-      const juniorYield = utilization >= 1 ? seniorYieldPool : rdm * seniorYieldPool;
+      const ydm = calculateYdmYieldShare(utilization);
+      const juniorYield = utilization >= 1 ? seniorYieldPool : ydm * seniorYieldPool;
       const seniorYield = utilization >= 1 ? 0 : seniorYieldPool - juniorYield;
-      const juniorTotalYield = juniorYield + juniorOwnYield;
-      const juniorSpreadCaptureAmount = juniorTotalYield * juniorSpreadCaptureRate;
-      const seniorSpreadCaptureAmount = seniorYield * seniorSpreadCaptureRate;
-      const juniorNetYield = juniorTotalYield - juniorSpreadCaptureAmount;
-      const seniorNetYield = seniorYield - seniorSpreadCaptureAmount;
+
+      const juniorOwnAfterFee = juniorOwnYield * (1 - jtFeeNum);
+      const juniorRiskPremiumAfterFee = juniorYield * (1 - ysFeeNum);
+      const juniorNetYield = juniorOwnAfterFee + juniorRiskPremiumAfterFee;
+      const seniorNetYield = seniorYield * (1 - stFeeNum);
+
       const juniorAPY = juniorCapitalNum > 0 ? (juniorNetYield / juniorCapitalNum) * 100 : 0;
       const seniorAPY = seniorCapitalNum > 0 ? (seniorNetYield / seniorCapitalNum) * 100 : 0;
 
       data.push({
         utilization: utilization * 100,
-        rdm: rdm * 100,
+        ydm: ydm * 100,
         juniorAPY,
         seniorAPY,
         juniorYield,
