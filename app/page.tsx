@@ -284,6 +284,13 @@ export default function YieldSimulator() {
     const stFeeNum = parseNumber(stFee) / 100;
     const ysFeeNum = parseNumber(ysFee) / 100;
 
+    if (
+      isNaN(y0) || isNaN(yT) || isNaN(yFull) ||
+      isNaN(jtFeeNum) || isNaN(stFeeNum) || isNaN(ysFeeNum)
+    ) {
+      return null;
+    }
+
     const discount = yT - y0;
     const premium = yFull - yT;
 
@@ -409,10 +416,10 @@ export default function YieldSimulator() {
     setJuniorCapital(formatNumberWithCommas(juniorCapitalFor90.toFixed(2)));
   };
 
-  const calculateYdmYieldShare = (utilization: number): number => {
-    const y0 = parseNumber(ydmY0) / 100;
-    const yT = parseNumber(ydmYT) / 100;
-    const yFull = parseNumber(ydmYFull) / 100;
+  const calculateYdmYieldShare = (utilization: number, y0Val?: number, yTVal?: number, yFullVal?: number): number => {
+    const y0 = y0Val ?? parseNumber(ydmY0) / 100;
+    const yT = yTVal ?? parseNumber(ydmYT) / 100;
+    const yFull = yFullVal ?? parseNumber(ydmYFull) / 100;
     const discount = yT - y0;
     const premium = yFull - yT;
 
@@ -444,10 +451,13 @@ export default function YieldSimulator() {
     const jtFeeNum = parseNumber(jtFee) / 100;
     const stFeeNum = parseNumber(stFee) / 100;
     const ysFeeNum = parseNumber(ysFee) / 100;
+    const y0Num = parseNumber(ydmY0) / 100;
+    const yTNum = parseNumber(ydmYT) / 100;
+    const yFullNum = parseNumber(ydmYFull) / 100;
 
     for (let i = 0; i <= 1000; i++) {
       const utilization = i / 1000;
-      const ydm = calculateYdmYieldShare(utilization);
+      const ydm = calculateYdmYieldShare(utilization, y0Num, yTNum, yFullNum);
       const juniorYield = utilization >= 1 ? seniorYieldPool : ydm * seniorYieldPool;
       const seniorYield = utilization >= 1 ? 0 : seniorYieldPool - juniorYield;
 
