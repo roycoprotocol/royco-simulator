@@ -13,8 +13,14 @@ type SimulatorInputs = {
   juniorDeploymentOption: DeploymentOption;
   juniorCustomYield: string;
   beta: string;
-  juniorSpreadCaptureBps: string;
-  seniorSpreadCaptureBps: string;
+  // YDM V2 curve parameters (as percentages, e.g. "10" = 10%)
+  ydmY0: string;       // JT yield share at 0% utilization
+  ydmYT: string;       // JT yield share at target (90%) utilization
+  ydmYFull: string;    // JT yield share at 100% utilization
+  // Fee model (as percentages, e.g. "20" = 20%)
+  jtFee: string;       // Fee on JT's own yield
+  stFee: string;       // Fee on ST yield
+  ysFee: string;       // Fee on JT's risk premium (yield share)
 };
 
 const DEFAULT_INPUTS: SimulatorInputs = {
@@ -25,8 +31,12 @@ const DEFAULT_INPUTS: SimulatorInputs = {
   juniorDeploymentOption: 'underlying',
   juniorCustomYield: '13',
   beta: '100',
-  juniorSpreadCaptureBps: '1000',
-  seniorSpreadCaptureBps: '1000'
+  ydmY0: '5',
+  ydmYT: '10',
+  ydmYFull: '50',
+  jtFee: '0',
+  stFee: '10',
+  ysFee: '45',
 };
 
 type ExamplePreset = {
@@ -37,31 +47,43 @@ type ExamplePreset = {
 };
 
 const CUSTOM_PRESET_ID = 'custom';
-const DEFAULT_SELECTED_EXAMPLE_ID = 'mf1';
+const DEFAULT_SELECTED_EXAMPLE_ID = 'snusd';
 
 const EXAMPLE_PRESETS: ExamplePreset[] = [
   {
-    id: 'mf1',
-    name: 'MF1',
-    description: 'Balanced, quick baseline',
-    overrides: { targetCoverage: '10', underlyingYield: '11' }
+    id: 'snusd',
+    name: 'snUSD',
+    description: 'Stablecoin with 10% coverage',
+    overrides: {
+      targetCoverage: '10', underlyingYield: '10.4',
+      ydmY0: '6', ydmYT: '6', ydmYFull: '40',
+      jtFee: '20', stFee: '10', ysFee: '0',
+    }
   },
   {
-    id: 'morpho-gauntlet-vault',
-    name: 'Morpho Gauntlet Vault',
-    description: 'Higher coverage, lower yield',
-    overrides: { targetCoverage: '20', underlyingYield: '8' }
+    id: 'savusd',
+    name: 'savUSD',
+    description: 'Stablecoin with 20% coverage',
+    overrides: {
+      targetCoverage: '20', underlyingYield: '7.9',
+      ydmY0: '10', ydmYT: '10', ydmYFull: '50',
+      jtFee: '20', stFee: '10', ysFee: '0',
+    }
   },
   {
-    id: 'hlp',
-    name: 'HLP',
-    description: 'High yield, high coverage',
-    overrides: { targetCoverage: '30', underlyingYield: '30' }
+    id: 'new-market',
+    name: 'New Market (V2 Fees)',
+    description: 'V2 fee model with yield-share fee',
+    overrides: {
+      targetCoverage: '10', underlyingYield: '5',
+      ydmY0: '5', ydmYT: '5', ydmYFull: '40',
+      jtFee: '0', stFee: '10', ysFee: '45',
+    }
   },
   {
     id: CUSTOM_PRESET_ID,
     name: 'Custom',
-    description: 'Tune coverage + yield',
+    description: 'Full control over all parameters',
     overrides: {}
   }
 ];
@@ -80,9 +102,12 @@ export default function YieldSimulator() {
   const [juniorDeploymentOption, setJuniorDeploymentOption] = useState<DeploymentOption>(defaultSelectedInputs.juniorDeploymentOption);
   const [juniorCustomYield, setJuniorCustomYield] = useState<string>(defaultSelectedInputs.juniorCustomYield);
   const [beta, setBeta] = useState<string>(defaultSelectedInputs.beta);
-  const [juniorSpreadCaptureBps, setJuniorSpreadCaptureBps] = useState<string>(defaultSelectedInputs.juniorSpreadCaptureBps);
-  const [seniorSpreadCaptureBps, setSeniorSpreadCaptureBps] = useState<string>(defaultSelectedInputs.seniorSpreadCaptureBps);
-  const [roycoSpreadEnabled, setRoycoSpreadEnabled] = useState<boolean>(false);
+  const [ydmY0, setYdmY0] = useState<string>(defaultSelectedInputs.ydmY0);
+  const [ydmYT, setYdmYT] = useState<string>(defaultSelectedInputs.ydmYT);
+  const [ydmYFull, setYdmYFull] = useState<string>(defaultSelectedInputs.ydmYFull);
+  const [jtFee, setJtFee] = useState<string>(defaultSelectedInputs.jtFee);
+  const [stFee, setStFee] = useState<string>(defaultSelectedInputs.stFee);
+  const [ysFee, setYsFee] = useState<string>(defaultSelectedInputs.ysFee);
 
   const [selectedExampleId, setSelectedExampleId] = useState<string>(defaultSelectedExample?.id ?? CUSTOM_PRESET_ID);
 
@@ -138,20 +163,28 @@ export default function YieldSimulator() {
       juniorDeploymentOption === selectedExampleInputs.juniorDeploymentOption &&
       compareAsNumber(juniorCustomYield, selectedExampleInputs.juniorCustomYield) &&
       compareAsNumber(beta, selectedExampleInputs.beta) &&
-      compareAsNumber(juniorSpreadCaptureBps, selectedExampleInputs.juniorSpreadCaptureBps) &&
-      compareAsNumber(seniorSpreadCaptureBps, selectedExampleInputs.seniorSpreadCaptureBps)
+      compareAsNumber(ydmY0, selectedExampleInputs.ydmY0) &&
+      compareAsNumber(ydmYT, selectedExampleInputs.ydmYT) &&
+      compareAsNumber(ydmYFull, selectedExampleInputs.ydmYFull) &&
+      compareAsNumber(jtFee, selectedExampleInputs.jtFee) &&
+      compareAsNumber(stFee, selectedExampleInputs.stFee) &&
+      compareAsNumber(ysFee, selectedExampleInputs.ysFee)
     );
   }, [
     beta,
+    jtFee,
     juniorCapital,
     juniorCustomYield,
     juniorDeploymentOption,
-    juniorSpreadCaptureBps,
     selectedExampleInputs,
     seniorCapital,
-    seniorSpreadCaptureBps,
+    stFee,
     targetCoverage,
-    underlyingYield
+    underlyingYield,
+    ydmY0,
+    ydmYFull,
+    ydmYT,
+    ysFee
   ]);
 
   const isSelectedExampleCoverageRatesModified = useMemo(() => {
@@ -189,8 +222,12 @@ export default function YieldSimulator() {
     setJuniorDeploymentOption(next.juniorDeploymentOption);
     setJuniorCustomYield(next.juniorCustomYield);
     setBeta(next.beta);
-    setJuniorSpreadCaptureBps(next.juniorSpreadCaptureBps);
-    setSeniorSpreadCaptureBps(next.seniorSpreadCaptureBps);
+    setYdmY0(next.ydmY0);
+    setYdmYT(next.ydmYT);
+    setYdmYFull(next.ydmYFull);
+    setJtFee(next.jtFee);
+    setStFee(next.stFee);
+    setYsFee(next.ysFee);
   };
 
 
