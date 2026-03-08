@@ -6,27 +6,37 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 type DeploymentOption = 'underlying' | 'elsewhere';
 
 type SimulatorInputs = {
-  targetCoverage: string;
+  minCoverage: string;
   underlyingYield: string;
   seniorCapital: string;
   juniorCapital: string;
   juniorDeploymentOption: DeploymentOption;
   juniorCustomYield: string;
   beta: string;
-  juniorSpreadCaptureBps: string;
-  seniorSpreadCaptureBps: string;
+  // YDM V2 curve parameters (as percentages, e.g. "10" = 10%)
+  ydmY0: string;       // JT yield share at 0% utilization
+  ydmYT: string;       // JT yield share at target (90%) utilization
+  ydmYFull: string;    // JT yield share at 100% utilization
+  // Fee model (as percentages, e.g. "20" = 20%)
+  jtFee: string;       // Fee on JT's own yield
+  stFee: string;       // Fee on ST yield
+  ysFee: string;       // Fee on JT's risk premium (yield share)
 };
 
 const DEFAULT_INPUTS: SimulatorInputs = {
-  targetCoverage: '10',
+  minCoverage: '10',
   underlyingYield: '13',
   seniorCapital: '10,000,000',
   juniorCapital: '1,250,000.00',
   juniorDeploymentOption: 'underlying',
   juniorCustomYield: '13',
   beta: '100',
-  juniorSpreadCaptureBps: '1000',
-  seniorSpreadCaptureBps: '1000'
+  ydmY0: '10',
+  ydmYT: '10',
+  ydmYFull: '50',
+  jtFee: '0',
+  stFee: '10',
+  ysFee: '45',
 };
 
 type ExamplePreset = {
@@ -44,19 +54,19 @@ const EXAMPLE_PRESETS: ExamplePreset[] = [
     id: 'mf1',
     name: 'MF1',
     description: 'Balanced, quick baseline',
-    overrides: { targetCoverage: '10', underlyingYield: '11' }
+    overrides: { minCoverage: '15', underlyingYield: '12', ydmY0: '17', ydmYT: '17', ydmYFull: '57', juniorCapital: '2,000,000.00' }
   },
   {
     id: 'morpho-gauntlet-vault',
     name: 'Morpho Gauntlet Vault',
     description: 'Higher coverage, lower yield',
-    overrides: { targetCoverage: '20', underlyingYield: '8' }
+    overrides: { minCoverage: '7', underlyingYield: '8', ydmY0: '15', ydmYT: '15', ydmYFull: '55', juniorCapital: '843,373.49' }
   },
   {
     id: 'hlp',
     name: 'HLP',
     description: 'High yield, high coverage',
-    overrides: { targetCoverage: '30', underlyingYield: '30' }
+    overrides: { minCoverage: '8', underlyingYield: '10', ydmY0: '9', ydmYT: '9', ydmYFull: '49', juniorCapital: '975,609.76' }
   },
   {
     id: CUSTOM_PRESET_ID,
@@ -73,21 +83,28 @@ export default function YieldSimulator() {
       ? { ...DEFAULT_INPUTS, ...defaultSelectedExample.overrides }
       : DEFAULT_INPUTS;
 
-  const [targetCoverage, setTargetCoverage] = useState<string>(defaultSelectedInputs.targetCoverage);
+  const [minCoverage, setMinCoverage] = useState<string>(defaultSelectedInputs.minCoverage);
   const [underlyingYield, setUnderlyingYield] = useState<string>(defaultSelectedInputs.underlyingYield);
   const [seniorCapital, setSeniorCapital] = useState<string>(defaultSelectedInputs.seniorCapital);
   const [juniorCapital, setJuniorCapital] = useState<string>(defaultSelectedInputs.juniorCapital);
   const [juniorDeploymentOption, setJuniorDeploymentOption] = useState<DeploymentOption>(defaultSelectedInputs.juniorDeploymentOption);
   const [juniorCustomYield, setJuniorCustomYield] = useState<string>(defaultSelectedInputs.juniorCustomYield);
   const [beta, setBeta] = useState<string>(defaultSelectedInputs.beta);
-  const [juniorSpreadCaptureBps, setJuniorSpreadCaptureBps] = useState<string>(defaultSelectedInputs.juniorSpreadCaptureBps);
-  const [seniorSpreadCaptureBps, setSeniorSpreadCaptureBps] = useState<string>(defaultSelectedInputs.seniorSpreadCaptureBps);
-  const [roycoSpreadEnabled, setRoycoSpreadEnabled] = useState<boolean>(false);
+  const [ydmY0, setYdmY0] = useState<string>(defaultSelectedInputs.ydmY0);
+  const [ydmYT, setYdmYT] = useState<string>(defaultSelectedInputs.ydmYT);
+  const [ydmYFull, setYdmYFull] = useState<string>(defaultSelectedInputs.ydmYFull);
+  const [jtFee, setJtFee] = useState<string>(defaultSelectedInputs.jtFee);
+  const [stFee, setStFee] = useState<string>(defaultSelectedInputs.stFee);
+  const [ysFee, setYsFee] = useState<string>(defaultSelectedInputs.ysFee);
 
   const [selectedExampleId, setSelectedExampleId] = useState<string>(defaultSelectedExample?.id ?? CUSTOM_PRESET_ID);
 
+  const defaultAdaptYdm = parseFloat(defaultSelectedInputs.ydmYT) || 10;
+  const [adaptYdm, setAdaptYdm] = useState<number>(defaultAdaptYdm); // effective Y_T as % (1-100)
+
   const [showExplainer, setShowExplainer] = useState<boolean>(false);
   const [showAdvanced, setShowAdvanced] = useState<boolean>(false);
+
 
   const parseNumber = (value: string): number => {
     return parseFloat(value.replace(/,/g, ''));
@@ -101,11 +118,6 @@ export default function YieldSimulator() {
     return parts.join('.');
   };
 
-  const parseBpsRate = (value: string): number => {
-    const num = parseNumber(value);
-    if (Number.isNaN(num)) return 0;
-    return Math.max(0, num) / 10000;
-  };
 
   const selectedExample = useMemo(
     () => (selectedExampleId ? EXAMPLE_PRESETS.find((preset) => preset.id === selectedExampleId) ?? null : null),
@@ -131,27 +143,35 @@ export default function YieldSimulator() {
     };
 
     return !(
-      compareAsNumber(targetCoverage, selectedExampleInputs.targetCoverage) &&
+      compareAsNumber(minCoverage, selectedExampleInputs.minCoverage) &&
       compareAsNumber(underlyingYield, selectedExampleInputs.underlyingYield) &&
       compareAsNumber(seniorCapital, selectedExampleInputs.seniorCapital) &&
       compareAsNumber(juniorCapital, selectedExampleInputs.juniorCapital) &&
       juniorDeploymentOption === selectedExampleInputs.juniorDeploymentOption &&
       compareAsNumber(juniorCustomYield, selectedExampleInputs.juniorCustomYield) &&
       compareAsNumber(beta, selectedExampleInputs.beta) &&
-      compareAsNumber(juniorSpreadCaptureBps, selectedExampleInputs.juniorSpreadCaptureBps) &&
-      compareAsNumber(seniorSpreadCaptureBps, selectedExampleInputs.seniorSpreadCaptureBps)
+      compareAsNumber(ydmY0, selectedExampleInputs.ydmY0) &&
+      compareAsNumber(ydmYT, selectedExampleInputs.ydmYT) &&
+      compareAsNumber(ydmYFull, selectedExampleInputs.ydmYFull) &&
+      compareAsNumber(jtFee, selectedExampleInputs.jtFee) &&
+      compareAsNumber(stFee, selectedExampleInputs.stFee) &&
+      compareAsNumber(ysFee, selectedExampleInputs.ysFee)
     );
   }, [
     beta,
+    jtFee,
     juniorCapital,
     juniorCustomYield,
     juniorDeploymentOption,
-    juniorSpreadCaptureBps,
     selectedExampleInputs,
     seniorCapital,
-    seniorSpreadCaptureBps,
-    targetCoverage,
-    underlyingYield
+    stFee,
+    minCoverage,
+    underlyingYield,
+    ydmY0,
+    ydmYFull,
+    ydmYT,
+    ysFee
   ]);
 
   const isSelectedExampleCoverageRatesModified = useMemo(() => {
@@ -166,10 +186,10 @@ export default function YieldSimulator() {
     };
 
     return !(
-      compareAsNumber(targetCoverage, selectedExampleInputs.targetCoverage) &&
+      compareAsNumber(minCoverage, selectedExampleInputs.minCoverage) &&
       compareAsNumber(underlyingYield, selectedExampleInputs.underlyingYield)
     );
-  }, [selectedExampleInputs, targetCoverage, underlyingYield]);
+  }, [selectedExampleInputs, minCoverage, underlyingYield]);
 
   const applyExample = (exampleId: string) => {
     if (exampleId === CUSTOM_PRESET_ID) {
@@ -182,50 +202,51 @@ export default function YieldSimulator() {
 
     const next = { ...DEFAULT_INPUTS, ...preset.overrides };
     setSelectedExampleId(preset.id);
-    setTargetCoverage(next.targetCoverage);
+    setMinCoverage(next.minCoverage);
     setUnderlyingYield(next.underlyingYield);
     setSeniorCapital(next.seniorCapital);
     setJuniorCapital(next.juniorCapital);
     setJuniorDeploymentOption(next.juniorDeploymentOption);
     setJuniorCustomYield(next.juniorCustomYield);
     setBeta(next.beta);
-    setJuniorSpreadCaptureBps(next.juniorSpreadCaptureBps);
-    setSeniorSpreadCaptureBps(next.seniorSpreadCaptureBps);
+    setYdmY0(next.ydmY0);
+    setYdmYT(next.ydmYT);
+    setYdmYFull(next.ydmYFull);
+    setJtFee(next.jtFee);
+    setStFee(next.stFee);
+    setYsFee(next.ysFee);
+    setAdaptYdm(parseFloat(next.ydmYT) || defaultAdaptYdm);
   };
 
 
   const results = useMemo<{
     isValid: boolean;
     utilization: number;
-    rdmOutput: number;
+    ydmOutput: number;
     totalYield: number;
     combinedTotalYield: number;
     juniorYield: number;
     juniorOwnYield: number;
     juniorTotalYield: number;
-    juniorSpreadCaptureAmount: number;
     juniorNetYield: number;
     seniorYield: number;
-    seniorSpreadCaptureAmount: number;
     seniorNetYield: number;
     juniorYieldPercent: number;
     seniorYieldPercent: number;
-    totalRoycoSpreadCapture: number;
+    totalFees: number;
     overUtilized: boolean;
     requiredCoverage: number;
     errorMessage?: string;
   } | null>(() => {
-    const targetCoverageNum = parseNumber(targetCoverage) / 100;
+    const minCoverageNum = parseNumber(minCoverage) / 100;
     const underlyingYieldNum = parseNumber(underlyingYield) / 100;
     const seniorCapitalNum = parseNumber(seniorCapital);
     const juniorCapitalNum = parseNumber(juniorCapital);
     const juniorCustomYieldNum = parseNumber(juniorCustomYield) / 100;
     const betaNum = parseNumber(beta) / 100;
-    const juniorSpreadCaptureRate = roycoSpreadEnabled ? parseBpsRate(juniorSpreadCaptureBps) : 0;
-    const seniorSpreadCaptureRate = roycoSpreadEnabled ? parseBpsRate(seniorSpreadCaptureBps) : 0;
 
     if (
-      isNaN(targetCoverageNum) ||
+      isNaN(minCoverageNum) ||
       isNaN(underlyingYieldNum) ||
       isNaN(seniorCapitalNum) ||
       isNaN(juniorCapitalNum) ||
@@ -245,87 +266,114 @@ export default function YieldSimulator() {
     const seniorRawNAV = seniorCapitalNum;
     const juniorRawNAV = juniorCapitalNum;
     const juniorEffectiveNAV = juniorCapitalNum; // assumption: no prior gains/losses applied
-    const requiredCoverage = (seniorRawNAV + juniorRawNAV * betaNum) * targetCoverageNum;
+    const requiredCoverage = (seniorRawNAV + juniorRawNAV * betaNum) * minCoverageNum;
     const utilization = requiredCoverage / juniorEffectiveNAV;
 
-    // RDM curve with cap: junior gets 100% of senior yield when utilization >= 100%
-    let rdmOutput: number;
-    if (utilization < 0.9) {
-      rdmOutput = 0.25 * utilization;
-    } else {
-      rdmOutput = 7.75 * (utilization - 0.9) + 0.225;
+    // Parse new params — apply adaptation offset (slopes fixed, all Y values shift equally)
+    const baseY0 = parseNumber(ydmY0) / 100;
+    const baseYT = parseNumber(ydmYT) / 100;
+    const baseYFull = parseNumber(ydmYFull) / 100;
+    const adaptedYT = adaptYdm / 100;
+    const adaptDelta = adaptedYT - baseYT;
+    const y0 = Math.max(0, Math.min(1, baseY0 + adaptDelta));
+    const yT = adaptedYT;
+    const yFull = Math.max(0, Math.min(1, baseYFull + adaptDelta));
+    const jtFeeNum = parseNumber(jtFee) / 100;
+    const stFeeNum = parseNumber(stFee) / 100;
+    const ysFeeNum = parseNumber(ysFee) / 100;
+
+    if (
+      isNaN(y0) || isNaN(yT) || isNaN(yFull) ||
+      isNaN(jtFeeNum) || isNaN(stFeeNum) || isNaN(ysFeeNum)
+    ) {
+      return null;
     }
-    rdmOutput = Math.min(1, Math.max(0, rdmOutput));
 
-    // Total yield from senior capital deployment
+    const discount = yT - y0;
+    const premium = yFull - yT;
+
+    // YDM V2 curve
+    let ydmOutput: number;
+    if (utilization >= 1) {
+      ydmOutput = 1;
+    } else {
+      const u = Math.min(utilization, 1);
+      if (u < 0.9) {
+        const normalizedDelta = (u - 0.9) / 0.9;
+        ydmOutput = yT + normalizedDelta * discount;
+      } else {
+        const normalizedDelta = (u - 0.9) / 0.1;
+        ydmOutput = yT + normalizedDelta * premium;
+      }
+      ydmOutput = Math.min(1, Math.max(0, ydmOutput));
+    }
+
+    // Yields
     const totalYield = underlyingYieldNum * seniorCapitalNum;
-
-    // Junior's share of senior's yield (via RDM)
-    const juniorYield = utilization >= 1 ? totalYield : rdmOutput * totalYield;
-
-    // Senior's share of senior's yield
+    const juniorYield = utilization >= 1 ? totalYield : ydmOutput * totalYield;
     const seniorYield = utilization >= 1 ? 0 : totalYield - juniorYield;
 
-    // Junior's own yield from their capital deployment
     const juniorYieldRate = juniorDeploymentOption === 'underlying' ? underlyingYieldNum : juniorCustomYieldNum;
     const juniorOwnYield = juniorCapitalNum * juniorYieldRate;
 
-    // Junior's total yield = RDM share + own deployment yield
-    const juniorTotalYield = juniorYield + juniorOwnYield;
-    const juniorSpreadCaptureAmount = juniorTotalYield * juniorSpreadCaptureRate;
-    const seniorSpreadCaptureAmount = seniorYield * seniorSpreadCaptureRate;
-    const juniorNetYield = juniorTotalYield - juniorSpreadCaptureAmount;
-    const seniorNetYield = seniorYield - seniorSpreadCaptureAmount;
-    const combinedTotalYield = juniorNetYield + seniorNetYield;
+    // Fee model: jtFee on own yield, ysFee on risk premium, stFee on ST yield
+    const juniorOwnYieldAfterFee = juniorOwnYield * (1 - jtFeeNum);
+    const juniorRiskPremiumAfterFee = juniorYield * (1 - ysFeeNum);
+    const juniorNetYield = juniorOwnYieldAfterFee + juniorRiskPremiumAfterFee;
+    const seniorNetYield = seniorYield * (1 - stFeeNum);
 
+    const juniorTotalYield = juniorOwnYield + juniorYield;
+    const combinedTotalYield = juniorNetYield + seniorNetYield;
     const juniorYieldPercent = (juniorNetYield / juniorCapitalNum) * 100;
     const seniorYieldPercent = (seniorNetYield / seniorCapitalNum) * 100;
-    const totalRoycoSpreadCapture = juniorSpreadCaptureAmount + seniorSpreadCaptureAmount;
+    const totalFees = (juniorOwnYield * jtFeeNum) + (juniorYield * ysFeeNum) + (seniorYield * stFeeNum);
 
     return {
       isValid: true,
       utilization,
-      rdmOutput,
+      ydmOutput,
       totalYield,
       combinedTotalYield,
       juniorYield,
       juniorOwnYield,
       juniorTotalYield,
-      juniorSpreadCaptureAmount,
       juniorNetYield,
       seniorYield,
-      seniorSpreadCaptureAmount,
       seniorNetYield,
       juniorYieldPercent,
       seniorYieldPercent,
-      totalRoycoSpreadCapture,
+      totalFees,
       overUtilized: utilization >= 1,
       requiredCoverage
     };
   }, [
+    adaptYdm,
     beta,
     juniorCapital,
     juniorCustomYield,
     juniorDeploymentOption,
-    juniorSpreadCaptureBps,
-    roycoSpreadEnabled,
     seniorCapital,
-    seniorSpreadCaptureBps,
-    targetCoverage,
-    underlyingYield
+    minCoverage,
+    underlyingYield,
+    ydmY0,
+    ydmYT,
+    ydmYFull,
+    jtFee,
+    stFee,
+    ysFee
   ]);
 
   const chartMaxUtilization = Math.max(100, (results?.utilization ?? 1) * 100);
 
   const seniorCapitalNumInfo = parseNumber(seniorCapital);
-  const targetCoverageNumInfo = parseNumber(targetCoverage) / 100;
+  const minCoverageNumInfo = parseNumber(minCoverage) / 100;
   const betaNumInfo = parseNumber(beta) / 100;
   const desiredUtilizationInfo = 0.9;
-  const betaCoverageInfo = targetCoverageNumInfo * betaNumInfo;
+  const betaCoverageInfo = minCoverageNumInfo * betaNumInfo;
   const denom90 = desiredUtilizationInfo - betaCoverageInfo;
   const denom100 = 1 - betaCoverageInfo;
-  const juniorFor90Info = denom90 > 0 ? (seniorCapitalNumInfo * targetCoverageNumInfo) / denom90 : undefined;
-  const juniorMinToStayCovered = denom100 > 0 ? (seniorCapitalNumInfo * targetCoverageNumInfo) / denom100 : undefined;
+  const juniorFor90Info = denom90 > 0 ? (seniorCapitalNumInfo * minCoverageNumInfo) / denom90 : undefined;
+  const juniorMinToStayCovered = denom100 > 0 ? (seniorCapitalNumInfo * minCoverageNumInfo) / denom100 : undefined;
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -342,43 +390,54 @@ export default function YieldSimulator() {
 
   const calculate90PercentUtilization = () => {
     const seniorCapitalNum = parseNumber(seniorCapital);
-    const targetCoverageNum = parseNumber(targetCoverage) / 100;
+    const minCoverageNum = parseNumber(minCoverage) / 100;
     const betaNum = parseNumber(beta) / 100;
 
     if (
       isNaN(seniorCapitalNum) ||
-      isNaN(targetCoverageNum) ||
+      isNaN(minCoverageNum) ||
       isNaN(betaNum) ||
       seniorCapitalNum <= 0 ||
-      targetCoverageNum <= 0
+      minCoverageNum <= 0
     ) {
       return;
     }
 
     const targetUtilization = 0.9;
-    const betaCoverage = betaNum * targetCoverageNum;
+    const betaCoverage = betaNum * minCoverageNum;
     const denominator = targetUtilization - betaCoverage;
 
     if (denominator <= 0) {
       return;
     }
 
-    const juniorCapitalFor90 = (seniorCapitalNum * targetCoverageNum) / denominator;
+    const juniorCapitalFor90 = (seniorCapitalNum * minCoverageNum) / denominator;
     setJuniorCapital(formatNumberWithCommas(juniorCapitalFor90.toFixed(2)));
   };
 
-  const calculateRdmAtUtilization = (utilization: number): number => {
-    let output;
-    if (utilization < 0.9) {
-      output = 0.25 * utilization;
+  const calculateYdmYieldShare = (utilization: number, y0Val?: number, yTVal?: number, yFullVal?: number): number => {
+    const y0 = y0Val ?? parseNumber(ydmY0) / 100;
+    const yT = yTVal ?? parseNumber(ydmYT) / 100;
+    const yFull = yFullVal ?? parseNumber(ydmYFull) / 100;
+    const discount = yT - y0;
+    const premium = yFull - yT;
+
+    const u = Math.min(Math.max(utilization, 0), 1);
+    let normalizedDelta: number;
+    let yieldShare: number;
+
+    if (u < 0.9) {
+      normalizedDelta = (u - 0.9) / 0.9;
+      yieldShare = yT + normalizedDelta * discount;
     } else {
-      output = 7.75 * (utilization - 0.9) + 0.225;
+      normalizedDelta = (u - 0.9) / 0.1;
+      yieldShare = yT + normalizedDelta * premium;
     }
-    // Cap between 0 and 1; beyond 100% utilization, junior takes all senior yield
-    return Math.min(1, Math.max(0, output));
+
+    return Math.min(1, Math.max(0, yieldShare));
   };
 
-  const generateChartData = () => {
+  const chartData = useMemo(() => {
     const data = [];
     const seniorCapitalNum = parseNumber(seniorCapital);
     const juniorCapitalNum = parseNumber(juniorCapital);
@@ -388,34 +447,52 @@ export default function YieldSimulator() {
     const juniorYieldRate = juniorDeploymentOption === 'underlying' ? safeUnderlyingYield : (isNaN(juniorCustomYieldNum) ? 0 : juniorCustomYieldNum);
     const seniorYieldPool = safeUnderlyingYield * seniorCapitalNum;
     const juniorOwnYield = juniorYieldRate * juniorCapitalNum;
-    const juniorSpreadCaptureRate = roycoSpreadEnabled ? parseBpsRate(juniorSpreadCaptureBps) : 0;
-    const seniorSpreadCaptureRate = roycoSpreadEnabled ? parseBpsRate(seniorSpreadCaptureBps) : 0;
+    const jtFeeNum = parseNumber(jtFee) / 100;
+    const stFeeNum = parseNumber(stFee) / 100;
+    const ysFeeNum = parseNumber(ysFee) / 100;
+    // Apply adaptation offset (slopes fixed, all Y values shift equally)
+    const baseY0 = parseNumber(ydmY0) / 100;
+    const baseYT = parseNumber(ydmYT) / 100;
+    const baseYFull = parseNumber(ydmYFull) / 100;
+    const adaptDelta = adaptYdm / 100 - baseYT;
+    const y0Num = Math.max(0, Math.min(1, baseY0 + adaptDelta));
+    const yTNum = adaptYdm / 100;
+    const yFullNum = Math.max(0, Math.min(1, baseYFull + adaptDelta));
+
+    const covDec = parseNumber(minCoverage) / 100;
+    const r = safeUnderlyingYield;
 
     for (let i = 0; i <= 1000; i++) {
       const utilization = i / 1000;
-      const rdm = calculateRdmAtUtilization(utilization);
-      const juniorYield = utilization >= 1 ? seniorYieldPool : rdm * seniorYieldPool;
-      const seniorYield = utilization >= 1 ? 0 : seniorYieldPool - juniorYield;
-      const juniorTotalYield = juniorYield + juniorOwnYield;
-      const juniorSpreadCaptureAmount = juniorTotalYield * juniorSpreadCaptureRate;
-      const seniorSpreadCaptureAmount = seniorYield * seniorSpreadCaptureRate;
-      const juniorNetYield = juniorTotalYield - juniorSpreadCaptureAmount;
-      const seniorNetYield = seniorYield - seniorSpreadCaptureAmount;
-      const juniorAPY = juniorCapitalNum > 0 ? (juniorNetYield / juniorCapitalNum) * 100 : 0;
-      const seniorAPY = seniorCapitalNum > 0 ? (seniorNetYield / seniorCapitalNum) * 100 : 0;
+      const ys = calculateYdmYieldShare(utilization, y0Num, yTNum, yFullNum);
+
+      // Leverage-based APY (from YdmSimulator reference):
+      //   k = u / cov - 1  (ST:JT capital ratio implied by utilization)
+      //   JT gross = r + ys * r * k  (own yield + risk premium)
+      //   ST gross = (1 - ys) * r
+      let juniorAPY: number;
+      let seniorAPY: number;
+
+      if (covDec <= 0) {
+        juniorAPY = r * 100 * (1 - jtFeeNum);
+        seniorAPY = 0;
+      } else {
+        const k = utilization / covDec - 1;
+        const ownYield = r * 100;
+        const riskPremium = ys * r * k * 100;
+        juniorAPY = ownYield * (1 - jtFeeNum) + riskPremium * (1 - ysFeeNum);
+        seniorAPY = (1 - ys) * r * 100 * (1 - stFeeNum);
+      }
 
       data.push({
         utilization: utilization * 100,
-        rdm: rdm * 100,
+        ydm: ys * 100,
         juniorAPY,
         seniorAPY,
-        juniorYield,
-        juniorTotalYield: juniorNetYield,
-        seniorYield
       });
     }
     return data;
-  };
+  }, [adaptYdm, minCoverage, underlyingYield, seniorCapital, juniorCapital, juniorCustomYield, juniorDeploymentOption, jtFee, stFee, ysFee, ydmY0, ydmYT, ydmYFull]);
 
   return (
     <div className="min-h-screen bg-[#FBFBF8] py-16 px-4 sm:px-6 lg:px-8">
@@ -426,7 +503,7 @@ export default function YieldSimulator() {
             Royco Tranching Simulator
           </h1>
           <p className="text-lg text-[#666666] max-w-2xl mx-auto">
-            Calculate senior and junior tranche yields using the RDM model
+            Calculate senior and junior tranche yields using the YDM model
           </p>
         </div>
 
@@ -503,7 +580,7 @@ export default function YieldSimulator() {
                       <p className="text-sm font-semibold text-[#0a0a0a]">Utilization drives split</p>
                     </div>
                     <p className="text-sm text-[#555555] leading-relaxed">
-                      Utilization ≈ how hard junior is working to cover senior. Higher utilization → junior takes more of the yield pie. The RDM turns this into one % for junior; senior gets the rest.
+                      Utilization ≈ how hard junior is working to cover senior. Higher utilization → junior takes more of the yield pie. The YDM turns this into one % for junior; senior gets the rest.
                     </p>
                   </div>
 
@@ -513,7 +590,7 @@ export default function YieldSimulator() {
                       <p className="text-sm font-semibold text-[#0a0a0a]">How to use this</p>
                     </div>
                     <p className="text-sm text-[#555555] leading-relaxed">
-                      Enter senior & junior amounts, pick coverage, and let the simulator show each side&apos;s APY based on the RDM output.
+                      Enter senior & junior amounts, pick coverage, and let the simulator show each side&apos;s APY based on the YDM output.
                     </p>
                   </div>
                 </div>
@@ -607,15 +684,15 @@ export default function YieldSimulator() {
               <div className="grid grid-cols-2 gap-3">
                 <div className="rounded-lg border border-[#e5e5e0] bg-white px-4 py-3 shadow-[0_1px_0_rgba(0,0,0,0.02)]">
                   <label className="block text-[11px] font-semibold tracking-wide uppercase text-[#666666]">
-                    Target Coverage
+                    Minimum Coverage
                   </label>
-                  <p className="mt-1 text-xs text-[#666666]">Junior buffer vs senior exposure.</p>
+                  <p className="mt-1 text-xs text-[#666666]">Coverage at 100% utilization.</p>
                   <div className="mt-2 relative">
                     <input
                       type="number"
-                      value={targetCoverage}
+                      value={minCoverage}
                       onChange={(e) => {
-                        setTargetCoverage(e.target.value);
+                        setMinCoverage(e.target.value);
                       }}
                       className="w-full h-12 pr-10 pl-3 rounded-md border border-[#e5e5e0] bg-[#fafaf7] text-right text-lg font-semibold text-[#0a0a0a] focus:outline-none focus:ring-2 focus:ring-[#0a0a0a] focus:border-transparent transition-all"
                       placeholder="10"
@@ -720,7 +797,7 @@ export default function YieldSimulator() {
                         </button>
                         <span className="absolute bottom-full right-0 mb-2 hidden group-hover:block w-64 p-3 text-xs font-normal text-white bg-[#0a0a0a] rounded-lg shadow-lg border border-[#333333] z-10 pointer-events-none">
                           <strong className="block mb-1">Set: 90% Utilization</strong>
-                          Automatically sets junior capital for exactly 90% utilization using your senior capital, target coverage, and beta.
+                          Automatically sets junior capital for exactly 90% utilization using your senior capital, minimum coverage, and beta.
                         </span>
                       </div>
                     </div>
@@ -732,7 +809,7 @@ export default function YieldSimulator() {
                         <span className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-[#0a0a0a] text-white text-[10px] font-semibold cursor-default">?</span>
                         <div className="absolute left-0 mt-2 w-72 p-3 rounded-md border border-[#e5e5e0] bg-white shadow-lg text-xs text-[#666666] opacity-0 group-hover:opacity-100 transition-opacity z-10">
                           <p className="text-[#0a0a0a] font-semibold mb-1">Why {formatCurrency(parseNumber(juniorCapital))}?</p>
-                          <p>With {targetCoverage}% coverage and beta {formatPercent(betaNumInfo * 100)}, 90% utilization needs about {formatCurrency(juniorFor90Info)} of junior.</p>
+                          <p>With {minCoverage}% coverage and beta {formatPercent(betaNumInfo * 100)}, 90% utilization needs about {formatCurrency(juniorFor90Info)} of junior.</p>
                           <p className="mt-1">The minimum to stay at or below 100% utilization is {formatCurrency(juniorMinToStayCovered)}.</p>
                         </div>
                       </div>
@@ -832,55 +909,83 @@ export default function YieldSimulator() {
                     )}
 
                     <p className="text-xs text-[#666666]">
-                      Junior keeps their own deployment yield plus their RDM share of senior yield{roycoSpreadEnabled ? ', net of Royco spread.' : '.'}
+                      Junior keeps their own deployment yield plus their YDM share of senior yield.
                     </p>
+                  </div>
 
-                    <div className="flex items-center justify-between pt-2 border-t border-[#e5e5e0]">
+                  {/* YDM Curve Parameters */}
+                  <div className="bg-white rounded-lg border border-[#e5e5e0] p-6 shadow-sm">
+                    <h3 className="text-sm font-semibold text-[#0a0a0a] mb-4 uppercase tracking-wide">
+                      YDM Curve Parameters
+                    </h3>
+                    <p className="text-xs text-[#666666] mb-4">
+                      Controls the piecewise linear yield share curve. Y_0 and Y_full set the endpoints; Y_T is the kink at 90% utilization.
+                    </p>
+                    <div className="grid grid-cols-3 gap-4">
                       <div>
-                        <p className="text-[11px] uppercase tracking-wide text-[#888888]">Royco Spread</p>
+                        <label className="block text-xs text-[#666666] mb-1">Y₀ (at 0% util)</label>
+                        <div className="flex items-center">
+                          <input type="text" value={ydmY0}
+                            onChange={(e) => { setYdmY0(e.target.value); if (!isCustomSelected) setSelectedExampleId(CUSTOM_PRESET_ID); }}
+                            className="w-full border border-[#e5e5e0] rounded-lg px-3 py-2 text-sm" />
+                          <span className="ml-1 text-sm text-[#666666]">%</span>
+                        </div>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => setRoycoSpreadEnabled((prev) => !prev)}
-                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${
-                          roycoSpreadEnabled ? 'bg-[#2a2a2a]' : 'bg-[#e2e2de]'
-                        }`}
-                        aria-pressed={roycoSpreadEnabled}
-                      >
-                        <span
-                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition ${
-                            roycoSpreadEnabled ? 'translate-x-4' : 'translate-x-1'
-                          }`}
-                        />
-                      </button>
+                      <div>
+                        <label className="block text-xs text-[#666666] mb-1">Y_T (at 90% util)</label>
+                        <div className="flex items-center">
+                          <input type="text" value={ydmYT}
+                            onChange={(e) => { setYdmYT(e.target.value); if (!isCustomSelected) setSelectedExampleId(CUSTOM_PRESET_ID); }}
+                            className="w-full border border-[#e5e5e0] rounded-lg px-3 py-2 text-sm" />
+                          <span className="ml-1 text-sm text-[#666666]">%</span>
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-xs text-[#666666] mb-1">Y_full (at 100% util)</label>
+                        <div className="flex items-center">
+                          <input type="text" value={ydmYFull}
+                            onChange={(e) => { setYdmYFull(e.target.value); if (!isCustomSelected) setSelectedExampleId(CUSTOM_PRESET_ID); }}
+                            className="w-full border border-[#e5e5e0] rounded-lg px-3 py-2 text-sm" />
+                          <span className="ml-1 text-sm text-[#666666]">%</span>
+                        </div>
+                      </div>
                     </div>
+                  </div>
 
-                    {roycoSpreadEnabled && (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-3">
-                        <label className="flex flex-col gap-2 text-sm text-[#0a0a0a]">
-                          Junior Royco spread (bps)
-                          <input
-                            type="text"
-                            inputMode="decimal"
-                            value={juniorSpreadCaptureBps}
-                            onChange={(e) => setJuniorSpreadCaptureBps(e.target.value)}
-                            className="w-full rounded-md border border-[#e5e5e0] bg-white px-3 py-2 text-sm text-[#0a0a0a] focus:outline-none focus:ring-2 focus:ring-[#0a0a0a]/20"
-                            placeholder="0"
-                          />
-                        </label>
-                        <label className="flex flex-col gap-2 text-sm text-[#0a0a0a]">
-                          Senior Royco spread (bps)
-                          <input
-                            type="text"
-                            inputMode="decimal"
-                            value={seniorSpreadCaptureBps}
-                            onChange={(e) => setSeniorSpreadCaptureBps(e.target.value)}
-                            className="w-full rounded-md border border-[#e5e5e0] bg-white px-3 py-2 text-sm text-[#0a0a0a] focus:outline-none focus:ring-2 focus:ring-[#0a0a0a]/20"
-                            placeholder="0"
-                          />
-                        </label>
+                  {/* Protocol Fees */}
+                  <div className="bg-white rounded-lg border border-[#e5e5e0] p-6 shadow-sm">
+                    <h3 className="text-sm font-semibold text-[#0a0a0a] mb-4 uppercase tracking-wide">
+                      Protocol Fees
+                    </h3>
+                    <div className="grid grid-cols-3 gap-4">
+                      <div>
+                        <label className="block text-xs text-[#666666] mb-1">JT Performance Fee</label>
+                        <div className="flex items-center">
+                          <input type="text" value={jtFee}
+                            onChange={(e) => { setJtFee(e.target.value); if (!isCustomSelected) setSelectedExampleId(CUSTOM_PRESET_ID); }}
+                            className="w-full border border-[#e5e5e0] rounded-lg px-3 py-2 text-sm" />
+                          <span className="ml-1 text-sm text-[#666666]">%</span>
+                        </div>
                       </div>
-                    )}
+                      <div>
+                        <label className="block text-xs text-[#666666] mb-1">ST Performance Fee</label>
+                        <div className="flex items-center">
+                          <input type="text" value={stFee}
+                            onChange={(e) => { setStFee(e.target.value); if (!isCustomSelected) setSelectedExampleId(CUSTOM_PRESET_ID); }}
+                            className="w-full border border-[#e5e5e0] rounded-lg px-3 py-2 text-sm" />
+                          <span className="ml-1 text-sm text-[#666666]">%</span>
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-xs text-[#666666] mb-1">Yield Share Fee (risk premium)</label>
+                        <div className="flex items-center">
+                          <input type="text" value={ysFee}
+                            onChange={(e) => { setYsFee(e.target.value); if (!isCustomSelected) setSelectedExampleId(CUSTOM_PRESET_ID); }}
+                            className="w-full border border-[#e5e5e0] rounded-lg px-3 py-2 text-sm" />
+                          <span className="ml-1 text-sm text-[#666666]">%</span>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}
@@ -910,17 +1015,15 @@ export default function YieldSimulator() {
                 )}
               </div>
               <div className="rounded-lg border border-[#e5e5e0] px-4 py-3 bg-[#f8f9fa] space-y-1">
-                <p className="text-xs text-[#666666]">RDM Output</p>
-                <p className="text-lg font-semibold text-[#0a0a0a]">{formatPercent(results.rdmOutput * 100)}</p>
+                <p className="text-xs text-[#666666]">YDM Yield Share</p>
+                <p className="text-lg font-semibold text-[#0a0a0a]">{formatPercent(results.ydmOutput * 100)}</p>
                 <p className="text-xs text-[#666666]">Junior: {formatCurrency(results.juniorYield)}</p>
               </div>
               <div className="rounded-lg border border-[#e5e5e0] px-4 py-3 bg-[#f8f9fa] space-y-1">
-                <p className="text-xs text-[#666666]">
-                  {roycoSpreadEnabled ? 'Total Yield (Senior, gross)' : 'Total Yield (Senior)'}
-                </p>
+                <p className="text-xs text-[#666666]">Total Yield (Senior)</p>
                 <p className="text-lg font-semibold text-[#0a0a0a]">{formatCurrency(results.totalYield)}</p>
                 <p className="text-xs text-[#666666]">
-                  {roycoSpreadEnabled ? 'Combined (net)' : 'Combined'}: {formatCurrency(results.combinedTotalYield)}
+                  Combined (net): {formatCurrency(results.combinedTotalYield)}
                 </p>
               </div>
               <div className="rounded-lg border border-[#e5e5e0] px-4 py-3 bg-[#f8f9fa] space-y-1">
@@ -1006,14 +1109,14 @@ export default function YieldSimulator() {
                         <span className="text-[#666666]">Senior share (gross):</span>
                         <span className="text-[#0a0a0a] font-medium">{formatCurrency(results.seniorYield)}</span>
                       </div>
-                      {roycoSpreadEnabled && (
+                      {results.totalFees > 0 && (
                         <div className="flex justify-between items-center text-xs">
-                          <span className="text-[#666666]">Royco spread:</span>
-                          <span className="text-[#0a0a0a] font-medium">-{formatCurrency(results.seniorSpreadCaptureAmount)}</span>
+                          <span className="text-[#666666]">Protocol fees:</span>
+                          <span className="text-[#0a0a0a] font-medium">-{formatCurrency(results.seniorYield - results.seniorNetYield)}</span>
                         </div>
                       )}
                       <div className="border-t border-[#e5e5e0] pt-2 mt-2 flex justify-between items-center text-xs">
-                        <span className="text-[#0a0a0a] font-medium">{roycoSpreadEnabled ? 'Net total:' : 'Total:'}</span>
+                        <span className="text-[#0a0a0a] font-medium">Net total:</span>
                         <span className="text-[#0a0a0a] font-semibold">{formatCurrency(results.seniorNetYield)}</span>
                       </div>
                     </div>
@@ -1068,21 +1171,21 @@ export default function YieldSimulator() {
                     {/* Yield Breakdown */}
                     <div className="bg-[#1a1a1a] rounded-lg p-4 space-y-2">
                       <div className="flex justify-between items-center text-xs">
-                        <span className="text-[#999999]">From RDM Share:</span>
+                        <span className="text-[#999999]">From YDM Share:</span>
                         <span className="text-white font-medium">{formatCurrency(results.juniorYield)}</span>
                       </div>
                       <div className="flex justify-between items-center text-xs">
                         <span className="text-[#999999]">From Own Capital:</span>
                         <span className="text-white font-medium">{formatCurrency(results.juniorOwnYield)}</span>
                       </div>
-                      {roycoSpreadEnabled && (
+                      {results.totalFees > 0 && (
                         <div className="flex justify-between items-center text-xs">
-                          <span className="text-[#999999]">Royco spread:</span>
-                          <span className="text-white font-medium">-{formatCurrency(results.juniorSpreadCaptureAmount)}</span>
+                          <span className="text-[#999999]">Protocol fees:</span>
+                          <span className="text-white font-medium">-{formatCurrency(results.juniorTotalYield - results.juniorNetYield)}</span>
                         </div>
                       )}
                       <div className="border-t border-[#333333] pt-2 mt-2 flex justify-between items-center text-xs">
-                        <span className="text-[#cccccc] font-medium">{roycoSpreadEnabled ? 'Net total:' : 'Total:'}</span>
+                        <span className="text-[#cccccc] font-medium">Net total:</span>
                         <span className="text-white font-semibold">{formatCurrency(results.juniorNetYield)}</span>
                       </div>
                     </div>
@@ -1091,14 +1194,35 @@ export default function YieldSimulator() {
               </div>
             </div>
 
-            {/* RDM Curve Visualization */}
+            {/* YDM Curve + Net APY */}
             <div className="bg-white rounded-lg p-8 md:p-10 border border-[#e5e5e0] shadow-sm">
               <div className="mb-6">
-                <h2 className="text-2xl font-semibold text-[#0a0a0a] mb-2">
-                  RDM Curve Visualization
-                </h2>
+                <div className="flex items-center justify-between mb-2">
+                  <h2 className="text-2xl font-semibold text-[#0a0a0a]">
+                    YDM Curve
+                  </h2>
+                  <div className="flex items-center gap-3">
+                    <label className="text-xs font-semibold uppercase tracking-wide text-[#666666]">Adapt YDM</label>
+                    <input
+                      type="range"
+                      min={1}
+                      max={100}
+                      value={adaptYdm}
+                      onChange={(e) => setAdaptYdm(Number(e.target.value))}
+                      className="w-32 accent-[#0a0a0a]"
+                    />
+                    <span className="text-sm font-semibold text-[#0a0a0a] w-10 text-right">{adaptYdm}%</span>
+                    <button
+                      onClick={() => setAdaptYdm(parseNumber(ydmYT) || defaultAdaptYdm)}
+                      className={`text-xs transition-colors ${adaptYdm !== (parseNumber(ydmYT) || defaultAdaptYdm) ? 'text-[#666666] hover:text-[#0a0a0a]' : 'invisible'}`}
+                      title="Reset to default"
+                    >
+                      Reset
+                    </button>
+                  </div>
+                </div>
                 <p className="text-sm text-[#666666]">
-                  See how RDM output changes with utilization. Your current position is marked on the curve.
+                  See how YDM yield share and net APYs change with utilization.
                 </p>
               </div>
 
@@ -1113,68 +1237,129 @@ export default function YieldSimulator() {
                   )}
                 </div>
                 <div className="rounded-lg border border-[#e5e5e0] bg-[#f8f9fa] px-4 py-3">
-                  <p className="text-xs text-[#666666]">RDM Output to Junior</p>
-                  <p className="text-lg font-semibold text-[#0a0a0a]">{formatPercent(results.rdmOutput * 100)}</p>
+                  <p className="text-xs text-[#666666]">JT Yield Share (YDM)</p>
+                  <p className="text-lg font-semibold text-[#0a0a0a]">{formatPercent(results.ydmOutput * 100)}</p>
                   <p className="text-xs text-[#666666]">Junior share: {formatCurrency(results.juniorYield)}</p>
                 </div>
                 <div className="rounded-lg border border-[#e5e5e0] bg-[#f8f9fa] px-4 py-3">
                   <p className="text-xs text-[#666666]">Junior APY</p>
                   <p className="text-lg font-semibold text-[#0a0a0a]">{formatPercent(results.juniorYieldPercent)}</p>
                   <p className="text-xs text-[#666666]">
-                    {roycoSpreadEnabled ? 'Net of Royco spread.' : 'Includes own yield + RDM split.'}
+                    Includes own yield + YDM split.
                   </p>
                 </div>
               </div>
 
-              <div className="h-96">
+              {/* YDM Yield Share chart */}
+              <div className="h-72">
                 <ResponsiveContainer width="100%" height="100%">
-                    <LineChart
-                      data={generateChartData()}
-                      margin={{ top: 30, right: 30, left: 120, bottom: 60 }}
-                    >
+                  <LineChart
+                    data={chartData}
+                    margin={{ top: 20, right: 30, left: 60, bottom: 5 }}
+                    syncId="utilization-sync"
+                  >
                     <CartesianGrid strokeDasharray="3 3" stroke="#e5e5e0" />
                     <XAxis
                       dataKey="utilization"
-                      label={{ value: 'Utilization (%)', position: 'insideBottom', offset: -10, fill: '#0a0a0a' }}
                       domain={[0, chartMaxUtilization]}
                       ticks={[0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100]}
                       stroke="#666666"
+                      tick={{ fontSize: 11 }}
+                      tickLine={false}
+                      hide
                     />
                     <YAxis
-                      label={{ value: 'RDM Output (% to Junior)', angle: -90, position: 'insideLeft', style: { textAnchor: 'middle' }, fill: '#0a0a0a' }}
+                      label={{ value: 'JT Yield Share (%)', angle: -90, position: 'insideLeft', style: { textAnchor: 'middle' }, fill: '#0a0a0a', fontSize: 12 }}
                       domain={[0, 100]}
-                      ticks={[0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100]}
+                      ticks={[0, 20, 40, 60, 80, 100]}
                       stroke="#666666"
+                      tick={{ fontSize: 11 }}
                     />
                     <Tooltip
                       content={({ active, payload }) => {
                         if (active && payload && payload.length) {
                           const data = payload[0].payload;
                           return (
-                            <div className="bg-white p-4 rounded-lg border-2 border-[#0a0a0a] shadow-lg">
-                              <p className="text-sm font-semibold text-[#0a0a0a] mb-2">
-                                At {data.utilization.toFixed(1)}% Utilization:
+                            <div className="bg-white p-3 rounded-lg border-2 border-[#0a0a0a] shadow-lg">
+                              <p className="text-xs font-semibold text-[#0a0a0a] mb-1">
+                                At {data.utilization.toFixed(1)}% Utilization
                               </p>
-                              <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-                                <div>
-                                  <p className="text-[#666666]">RDM Output:</p>
-                                  <p className="font-semibold text-[#0a0a0a]">{data.rdm.toFixed(2)}%</p>
+                              <div className="flex justify-between gap-4 text-sm">
+                                <span className="text-[#666666]">YDM Yield Share:</span>
+                                <span className="font-semibold text-[#0a0a0a]">{data.ydm.toFixed(2)}%</span>
+                              </div>
+                            </div>
+                          );
+                        }
+                        return null;
+                      }}
+                    />
+                    <ReferenceLine
+                      x={results.utilization * 100}
+                      stroke="#0a0a0a"
+                      strokeWidth={2}
+                      strokeDasharray="5 5"
+                    />
+                    <ReferenceDot
+                      x={results.utilization * 100}
+                      y={results.ydmOutput * 100}
+                      r={7}
+                      fill="#0a0a0a"
+                      stroke="#fff"
+                      strokeWidth={3}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="ydm"
+                      stroke="#0a0a0a"
+                      strokeWidth={3}
+                      dot={false}
+                      activeDot={{ r: 5, fill: '#666666' }}
+                      isAnimationActive={false}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+
+              {/* Net APY chart — tightly coupled */}
+              <div className="h-72 -mt-1">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart
+                    data={chartData}
+                    margin={{ top: 10, right: 30, left: 60, bottom: 30 }}
+                    syncId="utilization-sync"
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e5e0" />
+                    <XAxis
+                      dataKey="utilization"
+                      label={{ value: 'Utilization (%)', position: 'insideBottom', offset: -10, fill: '#0a0a0a', fontSize: 12 }}
+                      domain={[0, chartMaxUtilization]}
+                      ticks={[0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100]}
+                      stroke="#666666"
+                      tick={{ fontSize: 11 }}
+                    />
+                    <YAxis
+                      label={{ value: 'Net APY (%)', angle: -90, position: 'insideLeft', style: { textAnchor: 'middle' }, fill: '#0a0a0a', fontSize: 12 }}
+                      stroke="#666666"
+                      tick={{ fontSize: 11 }}
+                    />
+                    <Tooltip
+                      content={({ active, payload }) => {
+                        if (active && payload && payload.length) {
+                          const data = payload[0].payload;
+                          return (
+                            <div className="bg-white p-3 rounded-lg border-2 border-[#0a0a0a] shadow-lg">
+                              <p className="text-xs font-semibold text-[#0a0a0a] mb-1">
+                                At {data.utilization.toFixed(1)}% Utilization
+                              </p>
+                              <div className="space-y-0.5 text-sm">
+                                <div className="flex justify-between gap-4">
+                                  <span className="text-[#666666]">Junior Net APY:</span>
+                                  <span className="font-semibold text-[#16a34a]">{data.juniorAPY.toFixed(2)}%</span>
                                 </div>
-                                <div>
-                                  <p className="text-[#666666]">Junior APY:</p>
-                                  <p className="font-semibold text-[#0a0a0a]">{data.juniorAPY.toFixed(2)}%</p>
-                                </div>
-                                <div>
-                                  <p className="text-[#666666]">Junior Yield (RDM):</p>
-                                  <p className="font-semibold text-[#0a0a0a]">{formatCurrency(data.juniorYield)}</p>
-                                </div>
-                                <div>
-                                  <p className="text-[#666666]">{roycoSpreadEnabled ? 'Junior Yield (Net):' : 'Junior Yield (Total):'}</p>
-                                  <p className="font-semibold text-[#0a0a0a]">{formatCurrency(data.juniorTotalYield)}</p>
-                                </div>
-                                <div>
-                                  <p className="text-[#666666]">Senior APY:</p>
-                                  <p className="font-semibold text-[#0a0a0a]">{data.seniorAPY.toFixed(2)}%</p>
+                                <div className="flex justify-between gap-4">
+                                  <span className="text-[#666666]">Senior Net APY:</span>
+                                  <span className="font-semibold text-[#C8873E]">{data.seniorAPY.toFixed(2)}%</span>
                                 </div>
                               </div>
                             </div>
@@ -1188,64 +1373,62 @@ export default function YieldSimulator() {
                       stroke="#0a0a0a"
                       strokeWidth={2}
                       strokeDasharray="5 5"
-                      label={{
-                        value: `Current: ${formatPercent(results.utilization * 100)}`,
-                        position: 'top',
-                        fill: '#0a0a0a',
-                        fontSize: 12,
-                        fontWeight: 600
-                      }}
                     />
-                    <ReferenceDot
-                      x={results.utilization * 100}
-                      y={results.rdmOutput * 100}
-                      r={8}
-                      fill="#0a0a0a"
-                      stroke="#fff"
-                      strokeWidth={3}
+                    <ReferenceLine
+                      y={parseNumber(underlyingYield)}
+                      stroke="#999999"
+                      strokeWidth={1}
+                      strokeDasharray="4 4"
+                      label={{
+                        value: `r=${parseNumber(underlyingYield).toFixed(1)}%`,
+                        position: 'right',
+                        fill: '#999999',
+                        fontSize: 10,
+                      }}
                     />
                     <Line
                       type="monotone"
-                      dataKey="rdm"
-                      stroke="#0a0a0a"
+                      dataKey="juniorAPY"
+                      name="Junior Net APY"
+                      stroke="#16a34a"
                       strokeWidth={3}
                       dot={false}
-                      activeDot={{ r: 6, fill: '#666666' }}
+                      activeDot={{ r: 5, fill: '#16a34a' }}
+                      isAnimationActive={false}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="seniorAPY"
+                      name="Senior Net APY"
+                      stroke="#C8873E"
+                      strokeWidth={3}
+                      dot={false}
+                      activeDot={{ r: 5, fill: '#C8873E' }}
+                      isAnimationActive={false}
                     />
                   </LineChart>
                 </ResponsiveContainer>
               </div>
 
-              <div className="mt-6 bg-[#f8f9fa] rounded-lg p-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-4 h-4 bg-[#0a0a0a] rounded-full border-2 border-white"></div>
-                  <p className="text-sm text-[#666666]">
-                    <strong className="text-[#0a0a0a]">Your Position:</strong> {formatPercent(results.utilization * 100)} utilization = {formatPercent(results.rdmOutput * 100)} RDM output
-                  </p>
+              <div className="mt-2 flex items-center justify-center gap-6">
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-1 bg-[#0a0a0a] rounded"></div>
+                  <span className="text-xs text-[#666666]">YDM Yield Share</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-1 bg-[#C8873E] rounded"></div>
+                  <span className="text-xs text-[#666666]">Senior Net APY</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-1 bg-[#16a34a] rounded"></div>
+                  <span className="text-xs text-[#666666]">Junior Net APY</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-0 border-t border-dashed border-[#999999]" style={{ width: 16 }}></div>
+                  <span className="text-xs text-[#666666]">Underlying Yield</span>
                 </div>
               </div>
             </div>
-          </div>
-        )}
-
-        {/* Royco Spread */}
-        {roycoSpreadEnabled && (
-          <div className="mt-10">
-            <details className="rounded-lg border border-[#e5e5e0] bg-[#fbfbf8] p-4">
-              <summary className="cursor-pointer text-xs uppercase tracking-wide text-[#777777]">
-                Royco spread (annual)
-              </summary>
-              <div className="mt-4">
-                <p className="text-2xl font-semibold text-[#0a0a0a]">
-                  {results ? formatCurrency(results.totalRoycoSpreadCapture) : formatCurrency(0)}
-                </p>
-                {results && (
-                  <p className="text-xs text-[#666666] mt-1">
-                    Junior spread: {formatCurrency(results.juniorSpreadCaptureAmount)} · Senior spread: {formatCurrency(results.seniorSpreadCaptureAmount)}
-                  </p>
-                )}
-              </div>
-            </details>
           </div>
         )}
 
@@ -1256,7 +1439,7 @@ export default function YieldSimulator() {
               Built by <a href="https://www.royco.org" target="_blank" rel="noopener noreferrer" className="text-[#0a0a0a] font-medium hover:underline">Royco</a>
             </p>
             <p className="text-xs text-[#999999]">
-              Royco Tranching Simulator • Understanding yield tranching through the RDM model
+              Royco Tranching Simulator • Understanding yield tranching through the YDM model
             </p>
           </div>
         </footer>
