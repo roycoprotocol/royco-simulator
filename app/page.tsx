@@ -959,7 +959,7 @@ export default function YieldSimulator() {
                     </h3>
                     <div className="grid grid-cols-3 gap-4">
                       <div>
-                        <label className="block text-xs text-[#666666] mb-1">JT Fee (own yield)</label>
+                        <label className="block text-xs text-[#666666] mb-1">JT Performance Fee</label>
                         <div className="flex items-center">
                           <input type="text" value={jtFee}
                             onChange={(e) => { setJtFee(e.target.value); if (!isCustomSelected) setSelectedExampleId(CUSTOM_PRESET_ID); }}
@@ -968,7 +968,7 @@ export default function YieldSimulator() {
                         </div>
                       </div>
                       <div>
-                        <label className="block text-xs text-[#666666] mb-1">ST Fee</label>
+                        <label className="block text-xs text-[#666666] mb-1">ST Performance Fee</label>
                         <div className="flex items-center">
                           <input type="text" value={stFee}
                             onChange={(e) => { setStFee(e.target.value); if (!isCustomSelected) setSelectedExampleId(CUSTOM_PRESET_ID); }}
@@ -977,7 +977,7 @@ export default function YieldSimulator() {
                         </div>
                       </div>
                       <div>
-                        <label className="block text-xs text-[#666666] mb-1">YS Fee (risk premium)</label>
+                        <label className="block text-xs text-[#666666] mb-1">Yield Share Fee (risk premium)</label>
                         <div className="flex items-center">
                           <input type="text" value={ysFee}
                             onChange={(e) => { setYsFee(e.target.value); if (!isCustomSelected) setSelectedExampleId(CUSTOM_PRESET_ID); }}
