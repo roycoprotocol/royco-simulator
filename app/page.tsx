@@ -31,7 +31,7 @@ const DEFAULT_INPUTS: SimulatorInputs = {
   juniorDeploymentOption: 'underlying',
   juniorCustomYield: '13',
   beta: '100',
-  ydmY0: '5',
+  ydmY0: '10',
   ydmYT: '10',
   ydmYFull: '50',
   jtFee: '0',
@@ -47,43 +47,31 @@ type ExamplePreset = {
 };
 
 const CUSTOM_PRESET_ID = 'custom';
-const DEFAULT_SELECTED_EXAMPLE_ID = 'snusd';
+const DEFAULT_SELECTED_EXAMPLE_ID = 'mf1';
 
 const EXAMPLE_PRESETS: ExamplePreset[] = [
   {
-    id: 'snusd',
-    name: 'snUSD',
-    description: 'Stablecoin with 10% coverage',
-    overrides: {
-      targetCoverage: '10', underlyingYield: '10.4',
-      ydmY0: '6', ydmYT: '6', ydmYFull: '40',
-      jtFee: '20', stFee: '10', ysFee: '0',
-    }
+    id: 'mf1',
+    name: 'MF1',
+    description: 'Balanced, quick baseline',
+    overrides: { targetCoverage: '10', underlyingYield: '11' }
   },
   {
-    id: 'savusd',
-    name: 'savUSD',
-    description: 'Stablecoin with 20% coverage',
-    overrides: {
-      targetCoverage: '20', underlyingYield: '7.9',
-      ydmY0: '10', ydmYT: '10', ydmYFull: '50',
-      jtFee: '20', stFee: '10', ysFee: '0',
-    }
+    id: 'morpho-gauntlet-vault',
+    name: 'Morpho Gauntlet Vault',
+    description: 'Higher coverage, lower yield',
+    overrides: { targetCoverage: '20', underlyingYield: '8' }
   },
   {
-    id: 'new-market',
-    name: 'New Market (V2 Fees)',
-    description: 'V2 fee model with yield-share fee',
-    overrides: {
-      targetCoverage: '10', underlyingYield: '5',
-      ydmY0: '5', ydmYT: '5', ydmYFull: '40',
-      jtFee: '0', stFee: '10', ysFee: '45',
-    }
+    id: 'hlp',
+    name: 'HLP',
+    description: 'High yield, high coverage',
+    overrides: { targetCoverage: '30', underlyingYield: '30' }
   },
   {
     id: CUSTOM_PRESET_ID,
     name: 'Custom',
-    description: 'Full control over all parameters',
+    description: 'Tune coverage + yield',
     overrides: {}
   }
 ];
@@ -113,6 +101,7 @@ export default function YieldSimulator() {
 
   const [showExplainer, setShowExplainer] = useState<boolean>(false);
   const [showAdvanced, setShowAdvanced] = useState<boolean>(false);
+
 
   const parseNumber = (value: string): number => {
     return parseFloat(value.replace(/,/g, ''));
@@ -455,28 +444,36 @@ export default function YieldSimulator() {
     const yTNum = parseNumber(ydmYT) / 100;
     const yFullNum = parseNumber(ydmYFull) / 100;
 
+    const covDec = parseNumber(targetCoverage) / 100;
+    const r = safeUnderlyingYield;
+
     for (let i = 0; i <= 1000; i++) {
       const utilization = i / 1000;
-      const ydm = calculateYdmYieldShare(utilization, y0Num, yTNum, yFullNum);
-      const juniorYield = utilization >= 1 ? seniorYieldPool : ydm * seniorYieldPool;
-      const seniorYield = utilization >= 1 ? 0 : seniorYieldPool - juniorYield;
+      const ys = calculateYdmYieldShare(utilization, y0Num, yTNum, yFullNum);
 
-      const juniorOwnAfterFee = juniorOwnYield * (1 - jtFeeNum);
-      const juniorRiskPremiumAfterFee = juniorYield * (1 - ysFeeNum);
-      const juniorNetYield = juniorOwnAfterFee + juniorRiskPremiumAfterFee;
-      const seniorNetYield = seniorYield * (1 - stFeeNum);
+      // Leverage-based APY (from YdmSimulator reference):
+      //   k = u / cov - 1  (ST:JT capital ratio implied by utilization)
+      //   JT gross = r + ys * r * k  (own yield + risk premium)
+      //   ST gross = (1 - ys) * r
+      let juniorAPY: number;
+      let seniorAPY: number;
 
-      const juniorAPY = juniorCapitalNum > 0 ? (juniorNetYield / juniorCapitalNum) * 100 : 0;
-      const seniorAPY = seniorCapitalNum > 0 ? (seniorNetYield / seniorCapitalNum) * 100 : 0;
+      if (covDec <= 0) {
+        juniorAPY = r * 100 * (1 - jtFeeNum);
+        seniorAPY = 0;
+      } else {
+        const k = utilization / covDec - 1;
+        const ownYield = r * 100;
+        const riskPremium = ys * r * k * 100;
+        juniorAPY = ownYield * (1 - jtFeeNum) + riskPremium * (1 - ysFeeNum);
+        seniorAPY = (1 - ys) * r * 100 * (1 - stFeeNum);
+      }
 
       data.push({
         utilization: utilization * 100,
-        ydm: ydm * 100,
+        ydm: ys * 100,
         juniorAPY,
         seniorAPY,
-        juniorYield,
-        juniorTotalYield: juniorNetYield,
-        seniorYield
       });
     }
     return data;
@@ -1182,14 +1179,14 @@ export default function YieldSimulator() {
               </div>
             </div>
 
-            {/* YDM Curve */}
+            {/* YDM Curve + Net APY */}
             <div className="bg-white rounded-lg p-8 md:p-10 border border-[#e5e5e0] shadow-sm">
               <div className="mb-6">
                 <h2 className="text-2xl font-semibold text-[#0a0a0a] mb-2">
                   YDM Curve
                 </h2>
                 <p className="text-sm text-[#666666]">
-                  See how YDM yield share changes with utilization. Your current position is marked on the curve.
+                  See how YDM yield share and net APYs change with utilization.
                 </p>
               </div>
 
@@ -1217,55 +1214,115 @@ export default function YieldSimulator() {
                 </div>
               </div>
 
-              <div className="h-96">
+              {/* YDM Yield Share chart */}
+              <div className="h-72">
                 <ResponsiveContainer width="100%" height="100%">
-                    <LineChart
-                      data={generateChartData()}
-                      margin={{ top: 30, right: 30, left: 120, bottom: 60 }}
-                    >
+                  <LineChart
+                    data={generateChartData()}
+                    margin={{ top: 20, right: 30, left: 60, bottom: 5 }}
+                    syncId="utilization-sync"
+                  >
                     <CartesianGrid strokeDasharray="3 3" stroke="#e5e5e0" />
                     <XAxis
                       dataKey="utilization"
-                      label={{ value: 'Utilization (%)', position: 'insideBottom', offset: -10, fill: '#0a0a0a' }}
                       domain={[0, chartMaxUtilization]}
                       ticks={[0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100]}
                       stroke="#666666"
+                      tick={{ fontSize: 11 }}
+                      tickLine={false}
+                      hide
                     />
                     <YAxis
-                      label={{ value: 'JT Yield Share (%)', angle: -90, position: 'insideLeft', style: { textAnchor: 'middle' }, fill: '#0a0a0a' }}
+                      label={{ value: 'JT Yield Share (%)', angle: -90, position: 'insideLeft', style: { textAnchor: 'middle' }, fill: '#0a0a0a', fontSize: 12 }}
                       domain={[0, 100]}
-                      ticks={[0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100]}
+                      ticks={[0, 20, 40, 60, 80, 100]}
                       stroke="#666666"
+                      tick={{ fontSize: 11 }}
                     />
                     <Tooltip
                       content={({ active, payload }) => {
                         if (active && payload && payload.length) {
                           const data = payload[0].payload;
                           return (
-                            <div className="bg-white p-4 rounded-lg border-2 border-[#0a0a0a] shadow-lg">
-                              <p className="text-sm font-semibold text-[#0a0a0a] mb-2">
-                                At {data.utilization.toFixed(1)}% Utilization:
+                            <div className="bg-white p-3 rounded-lg border-2 border-[#0a0a0a] shadow-lg">
+                              <p className="text-xs font-semibold text-[#0a0a0a] mb-1">
+                                At {data.utilization.toFixed(1)}% Utilization
                               </p>
-                              <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
-                                <div>
-                                  <p className="text-[#666666]">YDM Yield Share:</p>
-                                  <p className="font-semibold text-[#0a0a0a]">{data.ydm.toFixed(2)}%</p>
+                              <div className="flex justify-between gap-4 text-sm">
+                                <span className="text-[#666666]">YDM Yield Share:</span>
+                                <span className="font-semibold text-[#0a0a0a]">{data.ydm.toFixed(2)}%</span>
+                              </div>
+                            </div>
+                          );
+                        }
+                        return null;
+                      }}
+                    />
+                    <ReferenceLine
+                      x={results.utilization * 100}
+                      stroke="#0a0a0a"
+                      strokeWidth={2}
+                      strokeDasharray="5 5"
+                    />
+                    <ReferenceDot
+                      x={results.utilization * 100}
+                      y={results.ydmOutput * 100}
+                      r={7}
+                      fill="#0a0a0a"
+                      stroke="#fff"
+                      strokeWidth={3}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="ydm"
+                      stroke="#0a0a0a"
+                      strokeWidth={3}
+                      dot={false}
+                      activeDot={{ r: 5, fill: '#666666' }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              </div>
+
+              {/* Net APY chart — tightly coupled */}
+              <div className="h-72 -mt-1">
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart
+                    data={generateChartData()}
+                    margin={{ top: 10, right: 30, left: 60, bottom: 30 }}
+                    syncId="utilization-sync"
+                  >
+                    <CartesianGrid strokeDasharray="3 3" stroke="#e5e5e0" />
+                    <XAxis
+                      dataKey="utilization"
+                      label={{ value: 'Utilization (%)', position: 'insideBottom', offset: -10, fill: '#0a0a0a', fontSize: 12 }}
+                      domain={[0, chartMaxUtilization]}
+                      ticks={[0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100]}
+                      stroke="#666666"
+                      tick={{ fontSize: 11 }}
+                    />
+                    <YAxis
+                      label={{ value: 'Net APY (%)', angle: -90, position: 'insideLeft', style: { textAnchor: 'middle' }, fill: '#0a0a0a', fontSize: 12 }}
+                      stroke="#666666"
+                      tick={{ fontSize: 11 }}
+                    />
+                    <Tooltip
+                      content={({ active, payload }) => {
+                        if (active && payload && payload.length) {
+                          const data = payload[0].payload;
+                          return (
+                            <div className="bg-white p-3 rounded-lg border-2 border-[#0a0a0a] shadow-lg">
+                              <p className="text-xs font-semibold text-[#0a0a0a] mb-1">
+                                At {data.utilization.toFixed(1)}% Utilization
+                              </p>
+                              <div className="space-y-0.5 text-sm">
+                                <div className="flex justify-between gap-4">
+                                  <span className="text-[#666666]">Junior Net APY:</span>
+                                  <span className="font-semibold text-[#16a34a]">{data.juniorAPY.toFixed(2)}%</span>
                                 </div>
-                                <div>
-                                  <p className="text-[#666666]">Junior APY:</p>
-                                  <p className="font-semibold text-[#0a0a0a]">{data.juniorAPY.toFixed(2)}%</p>
-                                </div>
-                                <div>
-                                  <p className="text-[#666666]">Junior Yield (YDM):</p>
-                                  <p className="font-semibold text-[#0a0a0a]">{formatCurrency(data.juniorYield)}</p>
-                                </div>
-                                <div>
-                                  <p className="text-[#666666]">Junior Yield (Net):</p>
-                                  <p className="font-semibold text-[#0a0a0a]">{formatCurrency(data.juniorTotalYield)}</p>
-                                </div>
-                                <div>
-                                  <p className="text-[#666666]">Senior APY:</p>
-                                  <p className="font-semibold text-[#0a0a0a]">{data.seniorAPY.toFixed(2)}%</p>
+                                <div className="flex justify-between gap-4">
+                                  <span className="text-[#666666]">Senior Net APY:</span>
+                                  <span className="font-semibold text-[#C8873E]">{data.seniorAPY.toFixed(2)}%</span>
                                 </div>
                               </div>
                             </div>
@@ -1279,40 +1336,57 @@ export default function YieldSimulator() {
                       stroke="#0a0a0a"
                       strokeWidth={2}
                       strokeDasharray="5 5"
-                      label={{
-                        value: `Current: ${formatPercent(results.utilization * 100)}`,
-                        position: 'top',
-                        fill: '#0a0a0a',
-                        fontSize: 12,
-                        fontWeight: 600
-                      }}
                     />
-                    <ReferenceDot
-                      x={results.utilization * 100}
-                      y={results.ydmOutput * 100}
-                      r={8}
-                      fill="#0a0a0a"
-                      stroke="#fff"
-                      strokeWidth={3}
+                    <ReferenceLine
+                      y={parseNumber(underlyingYield)}
+                      stroke="#999999"
+                      strokeWidth={1}
+                      strokeDasharray="4 4"
+                      label={{
+                        value: `r=${parseNumber(underlyingYield).toFixed(1)}%`,
+                        position: 'right',
+                        fill: '#999999',
+                        fontSize: 10,
+                      }}
                     />
                     <Line
                       type="monotone"
-                      dataKey="ydm"
-                      stroke="#0a0a0a"
+                      dataKey="juniorAPY"
+                      name="Junior Net APY"
+                      stroke="#16a34a"
                       strokeWidth={3}
                       dot={false}
-                      activeDot={{ r: 6, fill: '#666666' }}
+                      activeDot={{ r: 5, fill: '#16a34a' }}
+                    />
+                    <Line
+                      type="monotone"
+                      dataKey="seniorAPY"
+                      name="Senior Net APY"
+                      stroke="#C8873E"
+                      strokeWidth={3}
+                      dot={false}
+                      activeDot={{ r: 5, fill: '#C8873E' }}
                     />
                   </LineChart>
                 </ResponsiveContainer>
               </div>
 
-              <div className="mt-6 bg-[#f8f9fa] rounded-lg p-4">
-                <div className="flex items-center gap-3">
-                  <div className="w-4 h-4 bg-[#0a0a0a] rounded-full border-2 border-white"></div>
-                  <p className="text-sm text-[#666666]">
-                    <strong className="text-[#0a0a0a]">Your Position:</strong> {formatPercent(results.utilization * 100)} utilization = {formatPercent(results.ydmOutput * 100)} YDM yield share
-                  </p>
+              <div className="mt-2 flex items-center justify-center gap-6">
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-1 bg-[#0a0a0a] rounded"></div>
+                  <span className="text-xs text-[#666666]">YDM Yield Share</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-1 bg-[#C8873E] rounded"></div>
+                  <span className="text-xs text-[#666666]">Senior Net APY</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-1 bg-[#16a34a] rounded"></div>
+                  <span className="text-xs text-[#666666]">Junior Net APY</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-4 h-0 border-t border-dashed border-[#999999]" style={{ width: 16 }}></div>
+                  <span className="text-xs text-[#666666]">Underlying Yield</span>
                 </div>
               </div>
             </div>
