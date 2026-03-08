@@ -6,7 +6,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 type DeploymentOption = 'underlying' | 'elsewhere';
 
 type SimulatorInputs = {
-  targetCoverage: string;
+  minCoverage: string;
   underlyingYield: string;
   seniorCapital: string;
   juniorCapital: string;
@@ -24,7 +24,7 @@ type SimulatorInputs = {
 };
 
 const DEFAULT_INPUTS: SimulatorInputs = {
-  targetCoverage: '10',
+  minCoverage: '10',
   underlyingYield: '13',
   seniorCapital: '10,000,000',
   juniorCapital: '1,250,000.00',
@@ -54,19 +54,19 @@ const EXAMPLE_PRESETS: ExamplePreset[] = [
     id: 'mf1',
     name: 'MF1',
     description: 'Balanced, quick baseline',
-    overrides: { targetCoverage: '10', underlyingYield: '11' }
+    overrides: { minCoverage: '15', underlyingYield: '12', ydmY0: '17', ydmYT: '17', ydmYFull: '57', juniorCapital: '2,000,000.00' }
   },
   {
     id: 'morpho-gauntlet-vault',
     name: 'Morpho Gauntlet Vault',
     description: 'Higher coverage, lower yield',
-    overrides: { targetCoverage: '20', underlyingYield: '8' }
+    overrides: { minCoverage: '7', underlyingYield: '8', ydmY0: '15', ydmYT: '15', ydmYFull: '55', juniorCapital: '843,373.49' }
   },
   {
     id: 'hlp',
     name: 'HLP',
     description: 'High yield, high coverage',
-    overrides: { targetCoverage: '30', underlyingYield: '30' }
+    overrides: { minCoverage: '8', underlyingYield: '10', ydmY0: '9', ydmYT: '9', ydmYFull: '49', juniorCapital: '975,609.76' }
   },
   {
     id: CUSTOM_PRESET_ID,
@@ -83,7 +83,7 @@ export default function YieldSimulator() {
       ? { ...DEFAULT_INPUTS, ...defaultSelectedExample.overrides }
       : DEFAULT_INPUTS;
 
-  const [targetCoverage, setTargetCoverage] = useState<string>(defaultSelectedInputs.targetCoverage);
+  const [minCoverage, setMinCoverage] = useState<string>(defaultSelectedInputs.minCoverage);
   const [underlyingYield, setUnderlyingYield] = useState<string>(defaultSelectedInputs.underlyingYield);
   const [seniorCapital, setSeniorCapital] = useState<string>(defaultSelectedInputs.seniorCapital);
   const [juniorCapital, setJuniorCapital] = useState<string>(defaultSelectedInputs.juniorCapital);
@@ -98,6 +98,9 @@ export default function YieldSimulator() {
   const [ysFee, setYsFee] = useState<string>(defaultSelectedInputs.ysFee);
 
   const [selectedExampleId, setSelectedExampleId] = useState<string>(defaultSelectedExample?.id ?? CUSTOM_PRESET_ID);
+
+  const defaultAdaptYdm = parseFloat(defaultSelectedInputs.ydmYT) || 10;
+  const [adaptYdm, setAdaptYdm] = useState<number>(defaultAdaptYdm); // effective Y_T as % (1-100)
 
   const [showExplainer, setShowExplainer] = useState<boolean>(false);
   const [showAdvanced, setShowAdvanced] = useState<boolean>(false);
@@ -140,7 +143,7 @@ export default function YieldSimulator() {
     };
 
     return !(
-      compareAsNumber(targetCoverage, selectedExampleInputs.targetCoverage) &&
+      compareAsNumber(minCoverage, selectedExampleInputs.minCoverage) &&
       compareAsNumber(underlyingYield, selectedExampleInputs.underlyingYield) &&
       compareAsNumber(seniorCapital, selectedExampleInputs.seniorCapital) &&
       compareAsNumber(juniorCapital, selectedExampleInputs.juniorCapital) &&
@@ -163,7 +166,7 @@ export default function YieldSimulator() {
     selectedExampleInputs,
     seniorCapital,
     stFee,
-    targetCoverage,
+    minCoverage,
     underlyingYield,
     ydmY0,
     ydmYFull,
@@ -183,10 +186,10 @@ export default function YieldSimulator() {
     };
 
     return !(
-      compareAsNumber(targetCoverage, selectedExampleInputs.targetCoverage) &&
+      compareAsNumber(minCoverage, selectedExampleInputs.minCoverage) &&
       compareAsNumber(underlyingYield, selectedExampleInputs.underlyingYield)
     );
-  }, [selectedExampleInputs, targetCoverage, underlyingYield]);
+  }, [selectedExampleInputs, minCoverage, underlyingYield]);
 
   const applyExample = (exampleId: string) => {
     if (exampleId === CUSTOM_PRESET_ID) {
@@ -199,7 +202,7 @@ export default function YieldSimulator() {
 
     const next = { ...DEFAULT_INPUTS, ...preset.overrides };
     setSelectedExampleId(preset.id);
-    setTargetCoverage(next.targetCoverage);
+    setMinCoverage(next.minCoverage);
     setUnderlyingYield(next.underlyingYield);
     setSeniorCapital(next.seniorCapital);
     setJuniorCapital(next.juniorCapital);
@@ -212,6 +215,7 @@ export default function YieldSimulator() {
     setJtFee(next.jtFee);
     setStFee(next.stFee);
     setYsFee(next.ysFee);
+    setAdaptYdm(parseFloat(next.ydmYT) || defaultAdaptYdm);
   };
 
 
@@ -234,7 +238,7 @@ export default function YieldSimulator() {
     requiredCoverage: number;
     errorMessage?: string;
   } | null>(() => {
-    const targetCoverageNum = parseNumber(targetCoverage) / 100;
+    const minCoverageNum = parseNumber(minCoverage) / 100;
     const underlyingYieldNum = parseNumber(underlyingYield) / 100;
     const seniorCapitalNum = parseNumber(seniorCapital);
     const juniorCapitalNum = parseNumber(juniorCapital);
@@ -242,7 +246,7 @@ export default function YieldSimulator() {
     const betaNum = parseNumber(beta) / 100;
 
     if (
-      isNaN(targetCoverageNum) ||
+      isNaN(minCoverageNum) ||
       isNaN(underlyingYieldNum) ||
       isNaN(seniorCapitalNum) ||
       isNaN(juniorCapitalNum) ||
@@ -262,13 +266,18 @@ export default function YieldSimulator() {
     const seniorRawNAV = seniorCapitalNum;
     const juniorRawNAV = juniorCapitalNum;
     const juniorEffectiveNAV = juniorCapitalNum; // assumption: no prior gains/losses applied
-    const requiredCoverage = (seniorRawNAV + juniorRawNAV * betaNum) * targetCoverageNum;
+    const requiredCoverage = (seniorRawNAV + juniorRawNAV * betaNum) * minCoverageNum;
     const utilization = requiredCoverage / juniorEffectiveNAV;
 
-    // Parse new params
-    const y0 = parseNumber(ydmY0) / 100;
-    const yT = parseNumber(ydmYT) / 100;
-    const yFull = parseNumber(ydmYFull) / 100;
+    // Parse new params — apply adaptation offset (slopes fixed, all Y values shift equally)
+    const baseY0 = parseNumber(ydmY0) / 100;
+    const baseYT = parseNumber(ydmYT) / 100;
+    const baseYFull = parseNumber(ydmYFull) / 100;
+    const adaptedYT = adaptYdm / 100;
+    const adaptDelta = adaptedYT - baseYT;
+    const y0 = Math.max(0, Math.min(1, baseY0 + adaptDelta));
+    const yT = adaptedYT;
+    const yFull = Math.max(0, Math.min(1, baseYFull + adaptDelta));
     const jtFeeNum = parseNumber(jtFee) / 100;
     const stFeeNum = parseNumber(stFee) / 100;
     const ysFeeNum = parseNumber(ysFee) / 100;
@@ -338,12 +347,13 @@ export default function YieldSimulator() {
       requiredCoverage
     };
   }, [
+    adaptYdm,
     beta,
     juniorCapital,
     juniorCustomYield,
     juniorDeploymentOption,
     seniorCapital,
-    targetCoverage,
+    minCoverage,
     underlyingYield,
     ydmY0,
     ydmYT,
@@ -356,14 +366,14 @@ export default function YieldSimulator() {
   const chartMaxUtilization = Math.max(100, (results?.utilization ?? 1) * 100);
 
   const seniorCapitalNumInfo = parseNumber(seniorCapital);
-  const targetCoverageNumInfo = parseNumber(targetCoverage) / 100;
+  const minCoverageNumInfo = parseNumber(minCoverage) / 100;
   const betaNumInfo = parseNumber(beta) / 100;
   const desiredUtilizationInfo = 0.9;
-  const betaCoverageInfo = targetCoverageNumInfo * betaNumInfo;
+  const betaCoverageInfo = minCoverageNumInfo * betaNumInfo;
   const denom90 = desiredUtilizationInfo - betaCoverageInfo;
   const denom100 = 1 - betaCoverageInfo;
-  const juniorFor90Info = denom90 > 0 ? (seniorCapitalNumInfo * targetCoverageNumInfo) / denom90 : undefined;
-  const juniorMinToStayCovered = denom100 > 0 ? (seniorCapitalNumInfo * targetCoverageNumInfo) / denom100 : undefined;
+  const juniorFor90Info = denom90 > 0 ? (seniorCapitalNumInfo * minCoverageNumInfo) / denom90 : undefined;
+  const juniorMinToStayCovered = denom100 > 0 ? (seniorCapitalNumInfo * minCoverageNumInfo) / denom100 : undefined;
 
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -380,28 +390,28 @@ export default function YieldSimulator() {
 
   const calculate90PercentUtilization = () => {
     const seniorCapitalNum = parseNumber(seniorCapital);
-    const targetCoverageNum = parseNumber(targetCoverage) / 100;
+    const minCoverageNum = parseNumber(minCoverage) / 100;
     const betaNum = parseNumber(beta) / 100;
 
     if (
       isNaN(seniorCapitalNum) ||
-      isNaN(targetCoverageNum) ||
+      isNaN(minCoverageNum) ||
       isNaN(betaNum) ||
       seniorCapitalNum <= 0 ||
-      targetCoverageNum <= 0
+      minCoverageNum <= 0
     ) {
       return;
     }
 
     const targetUtilization = 0.9;
-    const betaCoverage = betaNum * targetCoverageNum;
+    const betaCoverage = betaNum * minCoverageNum;
     const denominator = targetUtilization - betaCoverage;
 
     if (denominator <= 0) {
       return;
     }
 
-    const juniorCapitalFor90 = (seniorCapitalNum * targetCoverageNum) / denominator;
+    const juniorCapitalFor90 = (seniorCapitalNum * minCoverageNum) / denominator;
     setJuniorCapital(formatNumberWithCommas(juniorCapitalFor90.toFixed(2)));
   };
 
@@ -427,7 +437,7 @@ export default function YieldSimulator() {
     return Math.min(1, Math.max(0, yieldShare));
   };
 
-  const generateChartData = () => {
+  const chartData = useMemo(() => {
     const data = [];
     const seniorCapitalNum = parseNumber(seniorCapital);
     const juniorCapitalNum = parseNumber(juniorCapital);
@@ -440,11 +450,16 @@ export default function YieldSimulator() {
     const jtFeeNum = parseNumber(jtFee) / 100;
     const stFeeNum = parseNumber(stFee) / 100;
     const ysFeeNum = parseNumber(ysFee) / 100;
-    const y0Num = parseNumber(ydmY0) / 100;
-    const yTNum = parseNumber(ydmYT) / 100;
-    const yFullNum = parseNumber(ydmYFull) / 100;
+    // Apply adaptation offset (slopes fixed, all Y values shift equally)
+    const baseY0 = parseNumber(ydmY0) / 100;
+    const baseYT = parseNumber(ydmYT) / 100;
+    const baseYFull = parseNumber(ydmYFull) / 100;
+    const adaptDelta = adaptYdm / 100 - baseYT;
+    const y0Num = Math.max(0, Math.min(1, baseY0 + adaptDelta));
+    const yTNum = adaptYdm / 100;
+    const yFullNum = Math.max(0, Math.min(1, baseYFull + adaptDelta));
 
-    const covDec = parseNumber(targetCoverage) / 100;
+    const covDec = parseNumber(minCoverage) / 100;
     const r = safeUnderlyingYield;
 
     for (let i = 0; i <= 1000; i++) {
@@ -477,7 +492,7 @@ export default function YieldSimulator() {
       });
     }
     return data;
-  };
+  }, [adaptYdm, minCoverage, underlyingYield, seniorCapital, juniorCapital, juniorCustomYield, juniorDeploymentOption, jtFee, stFee, ysFee, ydmY0, ydmYT, ydmYFull]);
 
   return (
     <div className="min-h-screen bg-[#FBFBF8] py-16 px-4 sm:px-6 lg:px-8">
@@ -669,15 +684,15 @@ export default function YieldSimulator() {
               <div className="grid grid-cols-2 gap-3">
                 <div className="rounded-lg border border-[#e5e5e0] bg-white px-4 py-3 shadow-[0_1px_0_rgba(0,0,0,0.02)]">
                   <label className="block text-[11px] font-semibold tracking-wide uppercase text-[#666666]">
-                    Target Coverage
+                    Minimum Coverage
                   </label>
-                  <p className="mt-1 text-xs text-[#666666]">Junior buffer vs senior exposure.</p>
+                  <p className="mt-1 text-xs text-[#666666]">Coverage at 100% utilization.</p>
                   <div className="mt-2 relative">
                     <input
                       type="number"
-                      value={targetCoverage}
+                      value={minCoverage}
                       onChange={(e) => {
-                        setTargetCoverage(e.target.value);
+                        setMinCoverage(e.target.value);
                       }}
                       className="w-full h-12 pr-10 pl-3 rounded-md border border-[#e5e5e0] bg-[#fafaf7] text-right text-lg font-semibold text-[#0a0a0a] focus:outline-none focus:ring-2 focus:ring-[#0a0a0a] focus:border-transparent transition-all"
                       placeholder="10"
@@ -782,7 +797,7 @@ export default function YieldSimulator() {
                         </button>
                         <span className="absolute bottom-full right-0 mb-2 hidden group-hover:block w-64 p-3 text-xs font-normal text-white bg-[#0a0a0a] rounded-lg shadow-lg border border-[#333333] z-10 pointer-events-none">
                           <strong className="block mb-1">Set: 90% Utilization</strong>
-                          Automatically sets junior capital for exactly 90% utilization using your senior capital, target coverage, and beta.
+                          Automatically sets junior capital for exactly 90% utilization using your senior capital, minimum coverage, and beta.
                         </span>
                       </div>
                     </div>
@@ -794,7 +809,7 @@ export default function YieldSimulator() {
                         <span className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-[#0a0a0a] text-white text-[10px] font-semibold cursor-default">?</span>
                         <div className="absolute left-0 mt-2 w-72 p-3 rounded-md border border-[#e5e5e0] bg-white shadow-lg text-xs text-[#666666] opacity-0 group-hover:opacity-100 transition-opacity z-10">
                           <p className="text-[#0a0a0a] font-semibold mb-1">Why {formatCurrency(parseNumber(juniorCapital))}?</p>
-                          <p>With {targetCoverage}% coverage and beta {formatPercent(betaNumInfo * 100)}, 90% utilization needs about {formatCurrency(juniorFor90Info)} of junior.</p>
+                          <p>With {minCoverage}% coverage and beta {formatPercent(betaNumInfo * 100)}, 90% utilization needs about {formatCurrency(juniorFor90Info)} of junior.</p>
                           <p className="mt-1">The minimum to stay at or below 100% utilization is {formatCurrency(juniorMinToStayCovered)}.</p>
                         </div>
                       </div>
@@ -1182,9 +1197,30 @@ export default function YieldSimulator() {
             {/* YDM Curve + Net APY */}
             <div className="bg-white rounded-lg p-8 md:p-10 border border-[#e5e5e0] shadow-sm">
               <div className="mb-6">
-                <h2 className="text-2xl font-semibold text-[#0a0a0a] mb-2">
-                  YDM Curve
-                </h2>
+                <div className="flex items-center justify-between mb-2">
+                  <h2 className="text-2xl font-semibold text-[#0a0a0a]">
+                    YDM Curve
+                  </h2>
+                  <div className="flex items-center gap-3">
+                    <label className="text-xs font-semibold uppercase tracking-wide text-[#666666]">Adapt YDM</label>
+                    <input
+                      type="range"
+                      min={1}
+                      max={100}
+                      value={adaptYdm}
+                      onChange={(e) => setAdaptYdm(Number(e.target.value))}
+                      className="w-32 accent-[#0a0a0a]"
+                    />
+                    <span className="text-sm font-semibold text-[#0a0a0a] w-10 text-right">{adaptYdm}%</span>
+                    <button
+                      onClick={() => setAdaptYdm(parseNumber(ydmYT) || defaultAdaptYdm)}
+                      className={`text-xs transition-colors ${adaptYdm !== (parseNumber(ydmYT) || defaultAdaptYdm) ? 'text-[#666666] hover:text-[#0a0a0a]' : 'invisible'}`}
+                      title="Reset to default"
+                    >
+                      Reset
+                    </button>
+                  </div>
+                </div>
                 <p className="text-sm text-[#666666]">
                   See how YDM yield share and net APYs change with utilization.
                 </p>
@@ -1218,7 +1254,7 @@ export default function YieldSimulator() {
               <div className="h-72">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart
-                    data={generateChartData()}
+                    data={chartData}
                     margin={{ top: 20, right: 30, left: 60, bottom: 5 }}
                     syncId="utilization-sync"
                   >
@@ -1279,6 +1315,7 @@ export default function YieldSimulator() {
                       strokeWidth={3}
                       dot={false}
                       activeDot={{ r: 5, fill: '#666666' }}
+                      isAnimationActive={false}
                     />
                   </LineChart>
                 </ResponsiveContainer>
@@ -1288,7 +1325,7 @@ export default function YieldSimulator() {
               <div className="h-72 -mt-1">
                 <ResponsiveContainer width="100%" height="100%">
                   <LineChart
-                    data={generateChartData()}
+                    data={chartData}
                     margin={{ top: 10, right: 30, left: 60, bottom: 30 }}
                     syncId="utilization-sync"
                   >
@@ -1357,6 +1394,7 @@ export default function YieldSimulator() {
                       strokeWidth={3}
                       dot={false}
                       activeDot={{ r: 5, fill: '#16a34a' }}
+                      isAnimationActive={false}
                     />
                     <Line
                       type="monotone"
@@ -1366,6 +1404,7 @@ export default function YieldSimulator() {
                       strokeWidth={3}
                       dot={false}
                       activeDot={{ r: 5, fill: '#C8873E' }}
+                      isAnimationActive={false}
                     />
                   </LineChart>
                 </ResponsiveContainer>
