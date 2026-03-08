@@ -481,7 +481,7 @@ export default function YieldSimulator() {
             Royco Tranching Simulator
           </h1>
           <p className="text-lg text-[#666666] max-w-2xl mx-auto">
-            Calculate senior and junior tranche yields using the RDM model
+            Calculate senior and junior tranche yields using the YDM model
           </p>
         </div>
 
@@ -558,7 +558,7 @@ export default function YieldSimulator() {
                       <p className="text-sm font-semibold text-[#0a0a0a]">Utilization drives split</p>
                     </div>
                     <p className="text-sm text-[#555555] leading-relaxed">
-                      Utilization ≈ how hard junior is working to cover senior. Higher utilization → junior takes more of the yield pie. The RDM turns this into one % for junior; senior gets the rest.
+                      Utilization ≈ how hard junior is working to cover senior. Higher utilization → junior takes more of the yield pie. The YDM turns this into one % for junior; senior gets the rest.
                     </p>
                   </div>
 
@@ -568,7 +568,7 @@ export default function YieldSimulator() {
                       <p className="text-sm font-semibold text-[#0a0a0a]">How to use this</p>
                     </div>
                     <p className="text-sm text-[#555555] leading-relaxed">
-                      Enter senior & junior amounts, pick coverage, and let the simulator show each side&apos;s APY based on the RDM output.
+                      Enter senior & junior amounts, pick coverage, and let the simulator show each side&apos;s APY based on the YDM output.
                     </p>
                   </div>
                 </div>
@@ -887,55 +887,83 @@ export default function YieldSimulator() {
                     )}
 
                     <p className="text-xs text-[#666666]">
-                      Junior keeps their own deployment yield plus their RDM share of senior yield{roycoSpreadEnabled ? ', net of Royco spread.' : '.'}
+                      Junior keeps their own deployment yield plus their YDM share of senior yield.
                     </p>
+                  </div>
 
-                    <div className="flex items-center justify-between pt-2 border-t border-[#e5e5e0]">
+                  {/* YDM Curve Parameters */}
+                  <div className="bg-white rounded-lg border border-[#e5e5e0] p-6 shadow-sm">
+                    <h3 className="text-sm font-semibold text-[#0a0a0a] mb-4 uppercase tracking-wide">
+                      YDM Curve Parameters
+                    </h3>
+                    <p className="text-xs text-[#666666] mb-4">
+                      Controls the piecewise linear yield share curve. Y_0 and Y_full set the endpoints; Y_T is the kink at 90% utilization.
+                    </p>
+                    <div className="grid grid-cols-3 gap-4">
                       <div>
-                        <p className="text-[11px] uppercase tracking-wide text-[#888888]">Royco Spread</p>
+                        <label className="block text-xs text-[#666666] mb-1">Y₀ (at 0% util)</label>
+                        <div className="flex items-center">
+                          <input type="text" value={ydmY0}
+                            onChange={(e) => { setYdmY0(e.target.value); if (!isCustomSelected) setSelectedExampleId(CUSTOM_PRESET_ID); }}
+                            className="w-full border border-[#e5e5e0] rounded-lg px-3 py-2 text-sm" />
+                          <span className="ml-1 text-sm text-[#666666]">%</span>
+                        </div>
                       </div>
-                      <button
-                        type="button"
-                        onClick={() => setRoycoSpreadEnabled((prev) => !prev)}
-                        className={`relative inline-flex h-5 w-9 items-center rounded-full transition ${
-                          roycoSpreadEnabled ? 'bg-[#2a2a2a]' : 'bg-[#e2e2de]'
-                        }`}
-                        aria-pressed={roycoSpreadEnabled}
-                      >
-                        <span
-                          className={`inline-block h-4 w-4 transform rounded-full bg-white transition ${
-                            roycoSpreadEnabled ? 'translate-x-4' : 'translate-x-1'
-                          }`}
-                        />
-                      </button>
+                      <div>
+                        <label className="block text-xs text-[#666666] mb-1">Y_T (at 90% util)</label>
+                        <div className="flex items-center">
+                          <input type="text" value={ydmYT}
+                            onChange={(e) => { setYdmYT(e.target.value); if (!isCustomSelected) setSelectedExampleId(CUSTOM_PRESET_ID); }}
+                            className="w-full border border-[#e5e5e0] rounded-lg px-3 py-2 text-sm" />
+                          <span className="ml-1 text-sm text-[#666666]">%</span>
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-xs text-[#666666] mb-1">Y_full (at 100% util)</label>
+                        <div className="flex items-center">
+                          <input type="text" value={ydmYFull}
+                            onChange={(e) => { setYdmYFull(e.target.value); if (!isCustomSelected) setSelectedExampleId(CUSTOM_PRESET_ID); }}
+                            className="w-full border border-[#e5e5e0] rounded-lg px-3 py-2 text-sm" />
+                          <span className="ml-1 text-sm text-[#666666]">%</span>
+                        </div>
+                      </div>
                     </div>
+                  </div>
 
-                    {roycoSpreadEnabled && (
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-3">
-                        <label className="flex flex-col gap-2 text-sm text-[#0a0a0a]">
-                          Junior Royco spread (bps)
-                          <input
-                            type="text"
-                            inputMode="decimal"
-                            value={juniorSpreadCaptureBps}
-                            onChange={(e) => setJuniorSpreadCaptureBps(e.target.value)}
-                            className="w-full rounded-md border border-[#e5e5e0] bg-white px-3 py-2 text-sm text-[#0a0a0a] focus:outline-none focus:ring-2 focus:ring-[#0a0a0a]/20"
-                            placeholder="0"
-                          />
-                        </label>
-                        <label className="flex flex-col gap-2 text-sm text-[#0a0a0a]">
-                          Senior Royco spread (bps)
-                          <input
-                            type="text"
-                            inputMode="decimal"
-                            value={seniorSpreadCaptureBps}
-                            onChange={(e) => setSeniorSpreadCaptureBps(e.target.value)}
-                            className="w-full rounded-md border border-[#e5e5e0] bg-white px-3 py-2 text-sm text-[#0a0a0a] focus:outline-none focus:ring-2 focus:ring-[#0a0a0a]/20"
-                            placeholder="0"
-                          />
-                        </label>
+                  {/* Protocol Fees */}
+                  <div className="bg-white rounded-lg border border-[#e5e5e0] p-6 shadow-sm">
+                    <h3 className="text-sm font-semibold text-[#0a0a0a] mb-4 uppercase tracking-wide">
+                      Protocol Fees
+                    </h3>
+                    <div className="grid grid-cols-3 gap-4">
+                      <div>
+                        <label className="block text-xs text-[#666666] mb-1">JT Fee (own yield)</label>
+                        <div className="flex items-center">
+                          <input type="text" value={jtFee}
+                            onChange={(e) => { setJtFee(e.target.value); if (!isCustomSelected) setSelectedExampleId(CUSTOM_PRESET_ID); }}
+                            className="w-full border border-[#e5e5e0] rounded-lg px-3 py-2 text-sm" />
+                          <span className="ml-1 text-sm text-[#666666]">%</span>
+                        </div>
                       </div>
-                    )}
+                      <div>
+                        <label className="block text-xs text-[#666666] mb-1">ST Fee</label>
+                        <div className="flex items-center">
+                          <input type="text" value={stFee}
+                            onChange={(e) => { setStFee(e.target.value); if (!isCustomSelected) setSelectedExampleId(CUSTOM_PRESET_ID); }}
+                            className="w-full border border-[#e5e5e0] rounded-lg px-3 py-2 text-sm" />
+                          <span className="ml-1 text-sm text-[#666666]">%</span>
+                        </div>
+                      </div>
+                      <div>
+                        <label className="block text-xs text-[#666666] mb-1">YS Fee (risk premium)</label>
+                        <div className="flex items-center">
+                          <input type="text" value={ysFee}
+                            onChange={(e) => { setYsFee(e.target.value); if (!isCustomSelected) setSelectedExampleId(CUSTOM_PRESET_ID); }}
+                            className="w-full border border-[#e5e5e0] rounded-lg px-3 py-2 text-sm" />
+                          <span className="ml-1 text-sm text-[#666666]">%</span>
+                        </div>
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}
@@ -965,17 +993,15 @@ export default function YieldSimulator() {
                 )}
               </div>
               <div className="rounded-lg border border-[#e5e5e0] px-4 py-3 bg-[#f8f9fa] space-y-1">
-                <p className="text-xs text-[#666666]">RDM Output</p>
-                <p className="text-lg font-semibold text-[#0a0a0a]">{formatPercent(results.rdmOutput * 100)}</p>
+                <p className="text-xs text-[#666666]">YDM Yield Share</p>
+                <p className="text-lg font-semibold text-[#0a0a0a]">{formatPercent(results.ydmOutput * 100)}</p>
                 <p className="text-xs text-[#666666]">Junior: {formatCurrency(results.juniorYield)}</p>
               </div>
               <div className="rounded-lg border border-[#e5e5e0] px-4 py-3 bg-[#f8f9fa] space-y-1">
-                <p className="text-xs text-[#666666]">
-                  {roycoSpreadEnabled ? 'Total Yield (Senior, gross)' : 'Total Yield (Senior)'}
-                </p>
+                <p className="text-xs text-[#666666]">Total Yield (Senior)</p>
                 <p className="text-lg font-semibold text-[#0a0a0a]">{formatCurrency(results.totalYield)}</p>
                 <p className="text-xs text-[#666666]">
-                  {roycoSpreadEnabled ? 'Combined (net)' : 'Combined'}: {formatCurrency(results.combinedTotalYield)}
+                  Combined (net): {formatCurrency(results.combinedTotalYield)}
                 </p>
               </div>
               <div className="rounded-lg border border-[#e5e5e0] px-4 py-3 bg-[#f8f9fa] space-y-1">
@@ -1061,14 +1087,14 @@ export default function YieldSimulator() {
                         <span className="text-[#666666]">Senior share (gross):</span>
                         <span className="text-[#0a0a0a] font-medium">{formatCurrency(results.seniorYield)}</span>
                       </div>
-                      {roycoSpreadEnabled && (
+                      {results.totalFees > 0 && (
                         <div className="flex justify-between items-center text-xs">
-                          <span className="text-[#666666]">Royco spread:</span>
-                          <span className="text-[#0a0a0a] font-medium">-{formatCurrency(results.seniorSpreadCaptureAmount)}</span>
+                          <span className="text-[#666666]">Protocol fees:</span>
+                          <span className="text-[#0a0a0a] font-medium">-{formatCurrency(results.seniorYield - results.seniorNetYield)}</span>
                         </div>
                       )}
                       <div className="border-t border-[#e5e5e0] pt-2 mt-2 flex justify-between items-center text-xs">
-                        <span className="text-[#0a0a0a] font-medium">{roycoSpreadEnabled ? 'Net total:' : 'Total:'}</span>
+                        <span className="text-[#0a0a0a] font-medium">Net total:</span>
                         <span className="text-[#0a0a0a] font-semibold">{formatCurrency(results.seniorNetYield)}</span>
                       </div>
                     </div>
@@ -1123,21 +1149,21 @@ export default function YieldSimulator() {
                     {/* Yield Breakdown */}
                     <div className="bg-[#1a1a1a] rounded-lg p-4 space-y-2">
                       <div className="flex justify-between items-center text-xs">
-                        <span className="text-[#999999]">From RDM Share:</span>
+                        <span className="text-[#999999]">From YDM Share:</span>
                         <span className="text-white font-medium">{formatCurrency(results.juniorYield)}</span>
                       </div>
                       <div className="flex justify-between items-center text-xs">
                         <span className="text-[#999999]">From Own Capital:</span>
                         <span className="text-white font-medium">{formatCurrency(results.juniorOwnYield)}</span>
                       </div>
-                      {roycoSpreadEnabled && (
+                      {results.totalFees > 0 && (
                         <div className="flex justify-between items-center text-xs">
-                          <span className="text-[#999999]">Royco spread:</span>
-                          <span className="text-white font-medium">-{formatCurrency(results.juniorSpreadCaptureAmount)}</span>
+                          <span className="text-[#999999]">Protocol fees:</span>
+                          <span className="text-white font-medium">-{formatCurrency(results.juniorTotalYield - results.juniorNetYield)}</span>
                         </div>
                       )}
                       <div className="border-t border-[#333333] pt-2 mt-2 flex justify-between items-center text-xs">
-                        <span className="text-[#cccccc] font-medium">{roycoSpreadEnabled ? 'Net total:' : 'Total:'}</span>
+                        <span className="text-[#cccccc] font-medium">Net total:</span>
                         <span className="text-white font-semibold">{formatCurrency(results.juniorNetYield)}</span>
                       </div>
                     </div>
@@ -1146,14 +1172,14 @@ export default function YieldSimulator() {
               </div>
             </div>
 
-            {/* RDM Curve Visualization */}
+            {/* YDM Curve */}
             <div className="bg-white rounded-lg p-8 md:p-10 border border-[#e5e5e0] shadow-sm">
               <div className="mb-6">
                 <h2 className="text-2xl font-semibold text-[#0a0a0a] mb-2">
-                  RDM Curve Visualization
+                  YDM Curve
                 </h2>
                 <p className="text-sm text-[#666666]">
-                  See how RDM output changes with utilization. Your current position is marked on the curve.
+                  See how YDM yield share changes with utilization. Your current position is marked on the curve.
                 </p>
               </div>
 
@@ -1168,15 +1194,15 @@ export default function YieldSimulator() {
                   )}
                 </div>
                 <div className="rounded-lg border border-[#e5e5e0] bg-[#f8f9fa] px-4 py-3">
-                  <p className="text-xs text-[#666666]">RDM Output to Junior</p>
-                  <p className="text-lg font-semibold text-[#0a0a0a]">{formatPercent(results.rdmOutput * 100)}</p>
+                  <p className="text-xs text-[#666666]">JT Yield Share (YDM)</p>
+                  <p className="text-lg font-semibold text-[#0a0a0a]">{formatPercent(results.ydmOutput * 100)}</p>
                   <p className="text-xs text-[#666666]">Junior share: {formatCurrency(results.juniorYield)}</p>
                 </div>
                 <div className="rounded-lg border border-[#e5e5e0] bg-[#f8f9fa] px-4 py-3">
                   <p className="text-xs text-[#666666]">Junior APY</p>
                   <p className="text-lg font-semibold text-[#0a0a0a]">{formatPercent(results.juniorYieldPercent)}</p>
                   <p className="text-xs text-[#666666]">
-                    {roycoSpreadEnabled ? 'Net of Royco spread.' : 'Includes own yield + RDM split.'}
+                    Includes own yield + YDM split.
                   </p>
                 </div>
               </div>
@@ -1196,7 +1222,7 @@ export default function YieldSimulator() {
                       stroke="#666666"
                     />
                     <YAxis
-                      label={{ value: 'RDM Output (% to Junior)', angle: -90, position: 'insideLeft', style: { textAnchor: 'middle' }, fill: '#0a0a0a' }}
+                      label={{ value: 'JT Yield Share (%)', angle: -90, position: 'insideLeft', style: { textAnchor: 'middle' }, fill: '#0a0a0a' }}
                       domain={[0, 100]}
                       ticks={[0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100]}
                       stroke="#666666"
@@ -1212,19 +1238,19 @@ export default function YieldSimulator() {
                               </p>
                               <div className="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
                                 <div>
-                                  <p className="text-[#666666]">RDM Output:</p>
-                                  <p className="font-semibold text-[#0a0a0a]">{data.rdm.toFixed(2)}%</p>
+                                  <p className="text-[#666666]">YDM Yield Share:</p>
+                                  <p className="font-semibold text-[#0a0a0a]">{data.ydm.toFixed(2)}%</p>
                                 </div>
                                 <div>
                                   <p className="text-[#666666]">Junior APY:</p>
                                   <p className="font-semibold text-[#0a0a0a]">{data.juniorAPY.toFixed(2)}%</p>
                                 </div>
                                 <div>
-                                  <p className="text-[#666666]">Junior Yield (RDM):</p>
+                                  <p className="text-[#666666]">Junior Yield (YDM):</p>
                                   <p className="font-semibold text-[#0a0a0a]">{formatCurrency(data.juniorYield)}</p>
                                 </div>
                                 <div>
-                                  <p className="text-[#666666]">{roycoSpreadEnabled ? 'Junior Yield (Net):' : 'Junior Yield (Total):'}</p>
+                                  <p className="text-[#666666]">Junior Yield (Net):</p>
                                   <p className="font-semibold text-[#0a0a0a]">{formatCurrency(data.juniorTotalYield)}</p>
                                 </div>
                                 <div>
@@ -1253,7 +1279,7 @@ export default function YieldSimulator() {
                     />
                     <ReferenceDot
                       x={results.utilization * 100}
-                      y={results.rdmOutput * 100}
+                      y={results.ydmOutput * 100}
                       r={8}
                       fill="#0a0a0a"
                       stroke="#fff"
@@ -1261,7 +1287,7 @@ export default function YieldSimulator() {
                     />
                     <Line
                       type="monotone"
-                      dataKey="rdm"
+                      dataKey="ydm"
                       stroke="#0a0a0a"
                       strokeWidth={3}
                       dot={false}
@@ -1275,32 +1301,11 @@ export default function YieldSimulator() {
                 <div className="flex items-center gap-3">
                   <div className="w-4 h-4 bg-[#0a0a0a] rounded-full border-2 border-white"></div>
                   <p className="text-sm text-[#666666]">
-                    <strong className="text-[#0a0a0a]">Your Position:</strong> {formatPercent(results.utilization * 100)} utilization = {formatPercent(results.rdmOutput * 100)} RDM output
+                    <strong className="text-[#0a0a0a]">Your Position:</strong> {formatPercent(results.utilization * 100)} utilization = {formatPercent(results.ydmOutput * 100)} YDM yield share
                   </p>
                 </div>
               </div>
             </div>
-          </div>
-        )}
-
-        {/* Royco Spread */}
-        {roycoSpreadEnabled && (
-          <div className="mt-10">
-            <details className="rounded-lg border border-[#e5e5e0] bg-[#fbfbf8] p-4">
-              <summary className="cursor-pointer text-xs uppercase tracking-wide text-[#777777]">
-                Royco spread (annual)
-              </summary>
-              <div className="mt-4">
-                <p className="text-2xl font-semibold text-[#0a0a0a]">
-                  {results ? formatCurrency(results.totalRoycoSpreadCapture) : formatCurrency(0)}
-                </p>
-                {results && (
-                  <p className="text-xs text-[#666666] mt-1">
-                    Junior spread: {formatCurrency(results.juniorSpreadCaptureAmount)} · Senior spread: {formatCurrency(results.seniorSpreadCaptureAmount)}
-                  </p>
-                )}
-              </div>
-            </details>
           </div>
         )}
 
@@ -1311,7 +1316,7 @@ export default function YieldSimulator() {
               Built by <a href="https://www.royco.org" target="_blank" rel="noopener noreferrer" className="text-[#0a0a0a] font-medium hover:underline">Royco</a>
             </p>
             <p className="text-xs text-[#999999]">
-              Royco Tranching Simulator • Understanding yield tranching through the RDM model
+              Royco Tranching Simulator • Understanding yield tranching through the YDM model
             </p>
           </div>
         </footer>
