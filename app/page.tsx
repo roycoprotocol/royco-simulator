@@ -926,7 +926,7 @@ export default function YieldSimulator() {
                         <label className="block text-xs text-[#666666] mb-1">Y₀ (at 0% util)</label>
                         <div className="flex items-center">
                           <input type="text" value={ydmY0}
-                            onChange={(e) => { setYdmY0(e.target.value); if (!isCustomSelected) setSelectedExampleId(CUSTOM_PRESET_ID); }}
+                            onChange={(e) => { setYdmY0(e.target.value); setAdaptYdm(parseNumber(ydmYT) || defaultAdaptYdm); if (!isCustomSelected) setSelectedExampleId(CUSTOM_PRESET_ID); }}
                             className="w-full border border-[#e5e5e0] rounded-lg px-3 py-2 text-sm" />
                           <span className="ml-1 text-sm text-[#666666]">%</span>
                         </div>
@@ -935,7 +935,7 @@ export default function YieldSimulator() {
                         <label className="block text-xs text-[#666666] mb-1">Y_T (at 90% util)</label>
                         <div className="flex items-center">
                           <input type="text" value={ydmYT}
-                            onChange={(e) => { setYdmYT(e.target.value); if (!isCustomSelected) setSelectedExampleId(CUSTOM_PRESET_ID); }}
+                            onChange={(e) => { setYdmYT(e.target.value); setAdaptYdm(parseFloat(e.target.value) || defaultAdaptYdm); if (!isCustomSelected) setSelectedExampleId(CUSTOM_PRESET_ID); }}
                             className="w-full border border-[#e5e5e0] rounded-lg px-3 py-2 text-sm" />
                           <span className="ml-1 text-sm text-[#666666]">%</span>
                         </div>
@@ -944,7 +944,7 @@ export default function YieldSimulator() {
                         <label className="block text-xs text-[#666666] mb-1">Y_full (at 100% util)</label>
                         <div className="flex items-center">
                           <input type="text" value={ydmYFull}
-                            onChange={(e) => { setYdmYFull(e.target.value); if (!isCustomSelected) setSelectedExampleId(CUSTOM_PRESET_ID); }}
+                            onChange={(e) => { setYdmYFull(e.target.value); setAdaptYdm(parseNumber(ydmYT) || defaultAdaptYdm); if (!isCustomSelected) setSelectedExampleId(CUSTOM_PRESET_ID); }}
                             className="w-full border border-[#e5e5e0] rounded-lg px-3 py-2 text-sm" />
                           <span className="ml-1 text-sm text-[#666666]">%</span>
                         </div>
