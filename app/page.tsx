@@ -445,16 +445,6 @@ export default function YieldSimulator() {
 
   const chartMaxUtilization = Math.max(100, (results?.utilization ?? 1) * 100);
 
-  const seniorCapitalNumInfo = parseNumber(seniorCapital);
-  const minCoverageNumInfo = parseNumber(minCoverage) / 100;
-  const betaNumInfo = parseNumber(beta) / 100;
-  const desiredUtilizationInfo = 0.9;
-  const betaCoverageInfo = minCoverageNumInfo * betaNumInfo;
-  const denom90 = desiredUtilizationInfo - betaCoverageInfo;
-  const denom100 = 1 - betaCoverageInfo;
-  const juniorFor90Info = denom90 > 0 ? (seniorCapitalNumInfo * minCoverageNumInfo) / denom90 : undefined;
-  const juniorMinToStayCovered = denom100 > 0 ? (seniorCapitalNumInfo * minCoverageNumInfo) / denom100 : undefined;
-
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -466,33 +456,6 @@ export default function YieldSimulator() {
 
   const formatPercent = (value: number) => {
     return `${value.toFixed(2)}%`;
-  };
-
-  const calculate90PercentUtilization = () => {
-    const seniorCapitalNum = parseNumber(seniorCapital);
-    const minCoverageNum = parseNumber(minCoverage) / 100;
-    const betaNum = parseNumber(beta) / 100;
-
-    if (
-      isNaN(seniorCapitalNum) ||
-      isNaN(minCoverageNum) ||
-      isNaN(betaNum) ||
-      seniorCapitalNum <= 0 ||
-      minCoverageNum <= 0
-    ) {
-      return;
-    }
-
-    const targetUtilization = 0.9;
-    const betaCoverage = betaNum * minCoverageNum;
-    const denominator = targetUtilization - betaCoverage;
-
-    if (denominator <= 0) {
-      return;
-    }
-
-    const juniorCapitalFor90 = (seniorCapitalNum * minCoverageNum) / denominator;
-    setJuniorCapital(formatNumberWithCommas(juniorCapitalFor90.toFixed(2)));
   };
 
   const calculateYdmYieldShare = (utilization: number, y0Val?: number, yTVal?: number, yFullVal?: number): number => {
@@ -822,11 +785,36 @@ export default function YieldSimulator() {
 
             {/* Capital (Right) */}
             <div className="lg:col-span-2 rounded-lg border border-[#e5e5e0] p-5 bg-[#fafaf7] space-y-5">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between mb-3">
                 <h3 className="text-sm font-semibold text-[#0a0a0a]">Capital</h3>
+                <div className="inline-flex rounded-md border border-[#e5e5e0] bg-white text-xs overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => setCapitalInputMode('senior-fixed')}
+                    className={`px-3 py-1.5 transition-colors ${
+                      capitalInputMode === 'senior-fixed'
+                        ? 'bg-[#0a0a0a] text-white'
+                        : 'text-[#666666] hover:bg-[#f4f4f0]'
+                    }`}
+                  >
+                    Senior fixed
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCapitalInputMode('junior-fixed')}
+                    className={`px-3 py-1.5 transition-colors ${
+                      capitalInputMode === 'junior-fixed'
+                        ? 'bg-[#0a0a0a] text-white'
+                        : 'text-[#666666] hover:bg-[#f4f4f0]'
+                    }`}
+                  >
+                    Junior fixed
+                  </button>
+                </div>
               </div>
 
               <div className="space-y-6">
+                {/* Senior Capital */}
                 <div className="grid grid-cols-1 md:grid-cols-[1fr_16rem] items-start gap-x-10 gap-y-3">
                   <div>
                     <label className="text-sm font-medium text-[#0a0a0a]">Senior Capital ($)</label>
@@ -834,19 +822,26 @@ export default function YieldSimulator() {
                   </div>
                   <div className="relative w-full md:w-64 md:justify-self-end">
                     <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-[#666666]">$</span>
-                    <input
-                      type="text"
-                      value={seniorCapital}
-                      onChange={(e) => {
-                        const value = e.target.value.replace(/[^0-9.]/g, '');
-                        setSeniorCapital(formatNumberWithCommas(value));
-                      }}
-                      className="w-full h-11 pr-3 pl-6 rounded-md border border-[#e5e5e0] bg-white text-right text-base text-[#0a0a0a] focus:outline-none focus:ring-2 focus:ring-[#0a0a0a] focus:border-transparent transition-all"
-                      placeholder="10,000,000"
-                    />
+                    {capitalInputMode === 'senior-fixed' ? (
+                      <input
+                        type="text"
+                        value={seniorCapital}
+                        onChange={(e) => {
+                          const value = e.target.value.replace(/[^0-9.]/g, '');
+                          setSeniorCapital(formatNumberWithCommas(value));
+                        }}
+                        className="w-full h-11 pr-3 pl-6 rounded-md border border-[#e5e5e0] bg-white text-right text-base text-[#0a0a0a] focus:outline-none focus:ring-2 focus:ring-[#0a0a0a] focus:border-transparent transition-all"
+                        placeholder="10,000,000"
+                      />
+                    ) : (
+                      <div className="w-full h-11 pr-3 pl-6 rounded-md border border-[#e5e5e0] bg-[#f4f4f0] text-right text-base text-[#666666] flex items-center justify-end">
+                        {seniorCapital || '—'}
+                      </div>
+                    )}
                   </div>
                 </div>
 
+                {/* Junior Capital */}
                 <div className="grid grid-cols-1 md:grid-cols-[1fr_16rem] items-start gap-x-10 gap-y-3">
                   <div>
                     <label className="text-sm font-medium text-[#0a0a0a]">Junior Capital ($)</label>
@@ -854,50 +849,47 @@ export default function YieldSimulator() {
                   </div>
                   <div className="relative w-full md:w-64 md:justify-self-end">
                     <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-[#666666]">$</span>
-                    <input
-                      type="text"
-                      value={juniorCapital}
-                      onChange={(e) => {
-                        const value = e.target.value.replace(/[^0-9.]/g, '');
-                        setJuniorCapital(formatNumberWithCommas(value));
-                      }}
-                      className={`w-full h-11 pr-16 pl-6 rounded-md border ${
+                    {capitalInputMode === 'junior-fixed' ? (
+                      <input
+                        type="text"
+                        value={juniorCapital}
+                        onChange={(e) => {
+                          const value = e.target.value.replace(/[^0-9.]/g, '');
+                          setJuniorCapital(formatNumberWithCommas(value));
+                        }}
+                        className={`w-full h-11 pr-3 pl-6 rounded-md border ${
+                          results?.overUtilized ? 'border-[#f59e0b] ring-1 ring-[#f59e0b]' : 'border-[#e5e5e0]'
+                        } bg-white text-right text-base text-[#0a0a0a] focus:outline-none focus:ring-2 focus:ring-[#0a0a0a] focus:border-transparent transition-all`}
+                        placeholder="1,250,000.00"
+                      />
+                    ) : (
+                      <div className={`w-full h-11 pr-3 pl-6 rounded-md border ${
                         results?.overUtilized ? 'border-[#f59e0b] ring-1 ring-[#f59e0b]' : 'border-[#e5e5e0]'
-                      } bg-white text-right text-base text-[#0a0a0a] focus:outline-none focus:ring-2 focus:ring-[#0a0a0a] focus:border-transparent transition-all`}
-                      placeholder="1,250,000.00"
-                    />
-                    <div className="absolute inset-y-0 right-1.5 flex items-center">
-                      <div className="relative group">
-                        <button
-                          onClick={calculate90PercentUtilization}
-                          type="button"
-                          className="h-9 px-3 text-xs font-medium text-white bg-[#0a0a0a] rounded-md hover:bg-[#2a2a2a] focus:outline-none focus:ring-2 focus:ring-[#0a0a0a] transition-all"
-                        >
-                          90%
-                        </button>
-                        <span className="absolute bottom-full right-0 mb-2 hidden group-hover:block w-64 p-3 text-xs font-normal text-white bg-[#0a0a0a] rounded-lg shadow-lg border border-[#333333] z-10 pointer-events-none">
-                          <strong className="block mb-1">Set: 90% Utilization</strong>
-                          Automatically sets junior capital for exactly 90% utilization using your senior capital, minimum coverage, and beta.
-                        </span>
+                      } bg-[#f4f4f0] text-right text-base text-[#666666] flex items-center justify-end`}>
+                        {juniorCapital || '—'}
                       </div>
-                    </div>
+                    )}
                   </div>
-
-                  {juniorFor90Info && juniorMinToStayCovered && betaNumInfo > 0 && (
-                    <div className="md:col-span-2 mt-1 text-xs text-[#666666] flex items-center gap-2">
-                      <div className="relative group">
-                        <span className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-[#0a0a0a] text-white text-[10px] font-semibold cursor-default">?</span>
-                        <div className="absolute left-0 mt-2 w-72 p-3 rounded-md border border-[#e5e5e0] bg-white shadow-lg text-xs text-[#666666] opacity-0 group-hover:opacity-100 transition-opacity z-10">
-                          <p className="text-[#0a0a0a] font-semibold mb-1">Why {formatCurrency(parseNumber(juniorCapital))}?</p>
-                          <p>With {minCoverage}% coverage and beta {formatPercent(betaNumInfo * 100)}, 90% utilization needs about {formatCurrency(juniorFor90Info)} of junior.</p>
-                          <p className="mt-1">The minimum to stay at or below 100% utilization is {formatCurrency(juniorMinToStayCovered)}.</p>
-                        </div>
-                      </div>
-                      <span className="text-[#666666]">Hover to see why this amount is above simple coverage.</span>
-                    </div>
-                  )}
                 </div>
 
+                {/* Utilization Slider — basic scaffolding (ticks/gradient/marker added in later tasks) */}
+                <div className="border-t border-[#e5e5e0] pt-5">
+                  <label className="text-sm font-medium text-[#0a0a0a]">Utilization</label>
+                  <div className="mt-3">
+                    <input
+                      type="range"
+                      min={0}
+                      max={1}
+                      step={0.001}
+                      value={utilizationPosition}
+                      onChange={(e) => setUtilizationPosition(parseFloat(e.target.value))}
+                      className="w-full"
+                    />
+                  </div>
+                  <p className="mt-2 text-xs text-[#666666]">
+                    Utilization: {(utilFromPosition(utilizationPosition) * 100).toFixed(1)}%
+                  </p>
+                </div>
               </div>
 
               {showAdvanced && (
