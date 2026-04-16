@@ -96,27 +96,9 @@ type ExamplePreset = {
 };
 
 const CUSTOM_PRESET_ID = 'custom';
-const DEFAULT_SELECTED_EXAMPLE_ID = 'mf1';
+const DEFAULT_SELECTED_EXAMPLE_ID = CUSTOM_PRESET_ID;
 
 const EXAMPLE_PRESETS: ExamplePreset[] = [
-  {
-    id: 'mf1',
-    name: 'MF1',
-    description: 'Balanced, quick baseline',
-    overrides: { minCoverage: '15', underlyingYield: '12', ydmY0: '17', ydmYT: '17', ydmYFull: '57', utilization: '90' }
-  },
-  {
-    id: 'morpho-gauntlet-vault',
-    name: 'Morpho Gauntlet Vault',
-    description: 'Higher coverage, lower yield',
-    overrides: { minCoverage: '7', underlyingYield: '8', ydmY0: '15', ydmYT: '15', ydmYFull: '55', utilization: '90' }
-  },
-  {
-    id: 'hlp',
-    name: 'HLP',
-    description: 'High yield, high coverage',
-    overrides: { minCoverage: '8', underlyingYield: '10', ydmY0: '9', ydmYT: '9', ydmYFull: '49', utilization: '90' }
-  },
   {
     id: CUSTOM_PRESET_ID,
     name: 'Custom',
