@@ -129,6 +129,7 @@ type SliderTick = {
   position: number;
   utilLabel: string;
   utilValue: number; // fraction; Infinity for the cap tick
+  isTarget?: boolean;
 };
 
 const SLIDER_TICKS: SliderTick[] = [
@@ -136,7 +137,7 @@ const SLIDER_TICKS: SliderTick[] = [
   { position: 0.125, utilLabel: '25%',    utilValue: 0.25 },
   { position: 0.250, utilLabel: '50%',    utilValue: 0.5 },
   { position: 0.375, utilLabel: '75%',    utilValue: 0.75 },
-  { position: 0.450, utilLabel: '90%',    utilValue: 0.9 },
+  { position: 0.450, utilLabel: '90%',    utilValue: 0.9, isTarget: true },
   { position: 0.500, utilLabel: '100%',   utilValue: 1.0 },
   { position: 0.575, utilLabel: '200%',   utilValue: 2.0 },
   { position: 0.675, utilLabel: '500%',   utilValue: 5.0 },
@@ -901,10 +902,26 @@ export default function YieldSimulator() {
                     {SLIDER_TICKS.map((t) => (
                       <div
                         key={`above-${t.position}`}
-                        className="absolute top-0 -translate-x-1/2 text-[10px] text-[#666666] tabular-nums"
+                        className="absolute top-0 -translate-x-1/2 text-[10px] tabular-nums"
                         style={{ left: `${t.position * 100}%` }}
                       >
-                        {t.utilLabel}
+                        {t.isTarget ? (
+                          <div className="relative group cursor-help">
+                            <div className="flex flex-col items-center">
+                              <span className="text-[#0a0a0a] font-semibold">★ {t.utilLabel}</span>
+                            </div>
+                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block w-72 p-3 text-xs font-normal text-white bg-[#0a0a0a] rounded-lg shadow-lg z-20 pointer-events-none">
+                              <p className="font-semibold mb-1">Why 90% target?</p>
+                              <p className="mb-2">The protocol operates around 90% utilization to keep both tranches liquid:</p>
+                              <ul className="list-disc pl-4 space-y-1">
+                                <li><strong>10% headroom above</strong> lets new Senior deposits enter without breaching coverage.</li>
+                                <li><strong>10% buffer below 100%</strong> lets Junior redeem without forcing the market under the minimum.</li>
+                              </ul>
+                            </div>
+                          </div>
+                        ) : (
+                          <span className="text-[#666666]">{t.utilLabel}</span>
+                        )}
                       </div>
                     ))}
                   </div>
