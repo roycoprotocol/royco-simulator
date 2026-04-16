@@ -539,6 +539,138 @@ export default function YieldSimulator() {
     return data;
   }, [adaptYdm, minCoverage, underlyingYield, seniorCapital, juniorCapital, juniorCustomYield, juniorDeploymentOption, jtFee, stFee, ysFee, ydmY0, ydmYT, ydmYFull]);
 
+  const renderUtilizationSlider = (idSuffix: string) => {
+    const inputId = `utilization-slider-${idSuffix}`;
+    return (
+      <div className="border-t border-[#e5e5e0] pt-5">
+        <div className="mb-3">
+          <span className="text-[11px] uppercase tracking-wide text-[#666666]">Utilization</span>
+          <p className="text-lg font-semibold text-[#0a0a0a] tabular-nums">
+            {(() => {
+              const u = utilFromPosition(utilizationPosition);
+              if (!Number.isFinite(u)) return '∞';
+              return `${(u * 100).toFixed(1)}%`;
+            })()}
+          </p>
+        </div>
+
+        <label htmlFor={inputId} className="sr-only">Utilization</label>
+
+        <div className="relative h-5">
+          {SLIDER_TICKS.map((t) => (
+            <div
+              key={`above-${t.position}`}
+              className="absolute top-0 -translate-x-1/2 text-[10px] tabular-nums"
+              style={{ left: `${t.position * 100}%` }}
+            >
+              {t.isTarget ? (
+                <div
+                  className="relative group cursor-pointer"
+                  onClick={() => setUtilizationPosition(TARGET_POSITION)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      setUtilizationPosition(TARGET_POSITION);
+                    }
+                  }}
+                >
+                  <div className="flex flex-col items-center">
+                    <span className="text-[#16a34a] font-semibold hover:underline">{t.utilLabel}</span>
+                  </div>
+                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block w-72 p-3 text-xs font-normal text-white bg-[#0a0a0a] rounded-lg shadow-lg z-20 pointer-events-none">
+                    <p className="font-semibold mb-1">Why 90% target?</p>
+                    <p className="mb-2">The protocol operates around 90% utilization to keep both tranches liquid:</p>
+                    <ul className="list-disc pl-4 space-y-1">
+                      <li><strong>Buffer for Senior deposits</strong> — new senior capital can enter while not breaching minimum coverage.</li>
+                      <li><strong>Buffer for Junior redemptions</strong> — junior can only exit if it does not breach minimum coverage.</li>
+                    </ul>
+                  </div>
+                </div>
+              ) : (
+                <span className="text-[#666666]">{t.utilLabel}</span>
+              )}
+            </div>
+          ))}
+        </div>
+
+        <div className="relative px-0">
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute top-1/2 -translate-y-1/2 -translate-x-1/2 h-8 border-l-2 border-dashed border-[#0a0a0a]/50"
+            style={{ left: `${TARGET_POSITION * 100}%` }}
+          />
+          <input
+            id={inputId}
+            type="range"
+            min={0}
+            max={1}
+            step={0.001}
+            value={utilizationPosition}
+            onChange={(e) => setUtilizationPosition(parseFloat(e.target.value))}
+            onPointerUp={() => {
+              if (Math.abs(utilizationPosition - TARGET_POSITION) <= SNAP_TOLERANCE) {
+                setUtilizationPosition(TARGET_POSITION);
+              }
+            }}
+            onMouseUp={() => {
+              if (Math.abs(utilizationPosition - TARGET_POSITION) <= SNAP_TOLERANCE) {
+                setUtilizationPosition(TARGET_POSITION);
+              }
+            }}
+            onTouchEnd={() => {
+              if (Math.abs(utilizationPosition - TARGET_POSITION) <= SNAP_TOLERANCE) {
+                setUtilizationPosition(TARGET_POSITION);
+              }
+            }}
+            aria-valuetext={`${(utilFromPosition(utilizationPosition) * 100).toFixed(1)}%`}
+            className="w-full utilization-slider"
+          />
+        </div>
+
+        <div className="relative h-5 mt-1">
+          {SLIDER_TICKS.map((t) => {
+            const cov = parseNumber(minCoverage) / 100;
+            let crLabel: string;
+            if (t.utilValue === 0) crLabel = '∞';
+            else if (!Number.isFinite(t.utilValue)) crLabel = '0%';
+            else {
+              const crPct = (cov / t.utilValue) * 100;
+              crLabel = crPct >= 20 ? `${crPct.toFixed(0)}%` : `${crPct.toFixed(1)}%`;
+            }
+            return (
+              <div
+                key={`below-${t.position}`}
+                className="absolute top-0 -translate-x-1/2 text-[10px] text-[#666666] tabular-nums"
+                style={{ left: `${t.position * 100}%` }}
+              >
+                {crLabel}
+              </div>
+            );
+          })}
+        </div>
+        <div className="mt-1">
+          <span className="text-[11px] uppercase tracking-wide text-[#666666]">Coverage</span>
+          <p className="text-lg font-semibold text-[#0a0a0a] tabular-nums">
+            {(() => {
+              const u = utilFromPosition(utilizationPosition);
+              const cov = parseNumber(minCoverage) / 100;
+              if (u <= 0) return '∞';
+              if (!Number.isFinite(u)) return '0%';
+              return `${(coverageRemainingFromUtil(u, cov) * 100).toFixed(1)}%`;
+            })()}
+          </p>
+        </div>
+        {utilizationPosition > 0.5 && (
+          <div className="mt-3 rounded-md border border-[#fde68a] bg-[#fffbeb] px-3 py-2 text-xs text-[#854d0e]">
+            Utilization above 100% implies a Junior drawdown has occurred. The protocol blocks new Senior deposits past 100%, so reaching this state requires Junior NAV losses.
+          </div>
+        )}
+      </div>
+    );
+  };
+
   return (
     <div className="min-h-screen bg-[#FBFBF8] py-16 px-4 sm:px-6 lg:px-8">
       <div className="max-w-6xl mx-auto">
@@ -875,137 +1007,7 @@ export default function YieldSimulator() {
                 </div>
 
                 {/* Utilization Slider (shown in Advanced) */}
-                {showAdvanced && (
-                <div className="border-t border-[#e5e5e0] pt-5">
-                  <div className="mb-3">
-                    <span className="text-[11px] uppercase tracking-wide text-[#666666]">Utilization</span>
-                    <p className="text-lg font-semibold text-[#0a0a0a] tabular-nums">
-                      {(() => {
-                        const u = utilFromPosition(utilizationPosition);
-                        if (!Number.isFinite(u)) return '∞';
-                        return `${(u * 100).toFixed(1)}%`;
-                      })()}
-                    </p>
-                  </div>
-
-                  <label htmlFor="utilization-slider" className="sr-only">Utilization</label>
-
-                  {/* Above-ticks (utilization) */}
-                  <div className="relative h-5">
-                    {SLIDER_TICKS.map((t) => (
-                      <div
-                        key={`above-${t.position}`}
-                        className="absolute top-0 -translate-x-1/2 text-[10px] tabular-nums"
-                        style={{ left: `${t.position * 100}%` }}
-                      >
-                        {t.isTarget ? (
-                          <div
-                            className="relative group cursor-pointer"
-                            onClick={() => setUtilizationPosition(TARGET_POSITION)}
-                            role="button"
-                            tabIndex={0}
-                            onKeyDown={(e) => {
-                              if (e.key === 'Enter' || e.key === ' ') {
-                                e.preventDefault();
-                                setUtilizationPosition(TARGET_POSITION);
-                              }
-                            }}
-                          >
-                            <div className="flex flex-col items-center">
-                              <span className="text-[#16a34a] font-semibold hover:underline">{t.utilLabel}</span>
-                            </div>
-                            <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block w-72 p-3 text-xs font-normal text-white bg-[#0a0a0a] rounded-lg shadow-lg z-20 pointer-events-none">
-                              <p className="font-semibold mb-1">Why 90% target?</p>
-                              <p className="mb-2">The protocol operates around 90% utilization to keep both tranches liquid:</p>
-                              <ul className="list-disc pl-4 space-y-1">
-                                <li><strong>Buffer for Senior deposits</strong> — new senior capital can enter while not breaching minimum coverage.</li>
-                                <li><strong>Buffer for Junior redemptions</strong> — junior can only exit if it does not breach minimum coverage.</li>
-                              </ul>
-                            </div>
-                          </div>
-                        ) : (
-                          <span className="text-[#666666]">{t.utilLabel}</span>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-
-                  {/* Slider */}
-                  <div className="relative px-0">
-                    <div
-                      aria-hidden="true"
-                      className="pointer-events-none absolute top-1/2 -translate-y-1/2 -translate-x-1/2 h-8 border-l-2 border-dashed border-[#0a0a0a]/50"
-                      style={{ left: `${TARGET_POSITION * 100}%` }}
-                    />
-                    <input
-                      id="utilization-slider"
-                      type="range"
-                      min={0}
-                      max={1}
-                      step={0.001}
-                      value={utilizationPosition}
-                      onChange={(e) => setUtilizationPosition(parseFloat(e.target.value))}
-                      onPointerUp={() => {
-                        if (Math.abs(utilizationPosition - TARGET_POSITION) <= SNAP_TOLERANCE) {
-                          setUtilizationPosition(TARGET_POSITION);
-                        }
-                      }}
-                      onMouseUp={() => {
-                        if (Math.abs(utilizationPosition - TARGET_POSITION) <= SNAP_TOLERANCE) {
-                          setUtilizationPosition(TARGET_POSITION);
-                        }
-                      }}
-                      onTouchEnd={() => {
-                        if (Math.abs(utilizationPosition - TARGET_POSITION) <= SNAP_TOLERANCE) {
-                          setUtilizationPosition(TARGET_POSITION);
-                        }
-                      }}
-                      aria-valuetext={`${(utilFromPosition(utilizationPosition) * 100).toFixed(1)}%`}
-                      className="w-full utilization-slider"
-                    />
-                  </div>
-
-                  {/* Below-ticks (coverage remaining) */}
-                  <div className="relative h-5 mt-1">
-                    {SLIDER_TICKS.map((t) => {
-                      const cov = parseNumber(minCoverage) / 100;
-                      let crLabel: string;
-                      if (t.utilValue === 0) crLabel = '∞';
-                      else if (!Number.isFinite(t.utilValue)) crLabel = '0%';
-                      else {
-                        const crPct = (cov / t.utilValue) * 100;
-                        crLabel = crPct >= 20 ? `${crPct.toFixed(0)}%` : `${crPct.toFixed(1)}%`;
-                      }
-                      return (
-                        <div
-                          key={`below-${t.position}`}
-                          className="absolute top-0 -translate-x-1/2 text-[10px] text-[#666666] tabular-nums"
-                          style={{ left: `${t.position * 100}%` }}
-                        >
-                          {crLabel}
-                        </div>
-                      );
-                    })}
-                  </div>
-                  <div className="mt-1">
-                    <span className="text-[11px] uppercase tracking-wide text-[#666666]">Coverage</span>
-                    <p className="text-lg font-semibold text-[#0a0a0a] tabular-nums">
-                      {(() => {
-                        const u = utilFromPosition(utilizationPosition);
-                        const cov = parseNumber(minCoverage) / 100;
-                        if (u <= 0) return '∞';
-                        if (!Number.isFinite(u)) return '0%';
-                        return `${(coverageRemainingFromUtil(u, cov) * 100).toFixed(1)}%`;
-                      })()}
-                    </p>
-                  </div>
-                  {utilizationPosition > 0.5 && (
-                    <div className="mt-3 rounded-md border border-[#fde68a] bg-[#fffbeb] px-3 py-2 text-xs text-[#854d0e]">
-                      Utilization above 100% implies a Junior drawdown has occurred. The protocol blocks new Senior deposits past 100%, so reaching this state requires Junior NAV losses.
-                    </div>
-                  )}
-                </div>
-                )}
+                {showAdvanced && renderUtilizationSlider('capital')}
               </div>
 
               {showAdvanced && (
@@ -1348,6 +1350,11 @@ export default function YieldSimulator() {
                   </div>
                 </div>
               </div>
+            </div>
+
+            {/* Utilization Slider (duplicate under tranche outputs) */}
+            <div className="bg-white rounded-lg border border-[#e5e5e0] p-6 md:p-8 shadow-sm">
+              {renderUtilizationSlider('outputs')}
             </div>
 
             {/* YDM Curve + Net APY */}
