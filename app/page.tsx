@@ -1,26 +1,26 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, ReferenceDot } from 'recharts';
 
 type DeploymentOption = 'underlying' | 'elsewhere';
+type CapitalInputMode = 'senior-fixed' | 'junior-fixed';
 
 type SimulatorInputs = {
   minCoverage: string;
   underlyingYield: string;
   seniorCapital: string;
-  juniorCapital: string;
+  utilization: string;       // replaces juniorCapital — percentage string e.g. "90"
+  capitalInputMode: CapitalInputMode;
   juniorDeploymentOption: DeploymentOption;
   juniorCustomYield: string;
   beta: string;
-  // YDM V2 curve parameters (as percentages, e.g. "10" = 10%)
-  ydmY0: string;       // JT yield share at 0% utilization
-  ydmYT: string;       // JT yield share at target (90%) utilization
-  ydmYFull: string;    // JT yield share at 100% utilization
-  // Fee model (as percentages, e.g. "20" = 20%)
-  jtFee: string;       // Fee on JT's own yield
-  stFee: string;       // Fee on ST yield
-  ysFee: string;       // Fee on JT's risk premium (yield share)
+  ydmY0: string;
+  ydmYT: string;
+  ydmYFull: string;
+  jtFee: string;
+  stFee: string;
+  ysFee: string;
 };
 
 // Slider position mapping:
@@ -75,7 +75,8 @@ const DEFAULT_INPUTS: SimulatorInputs = {
   minCoverage: '10',
   underlyingYield: '13',
   seniorCapital: '10,000,000',
-  juniorCapital: '1,250,000.00',
+  utilization: '90',
+  capitalInputMode: 'senior-fixed',
   juniorDeploymentOption: 'underlying',
   juniorCustomYield: '13',
   beta: '100',
@@ -102,19 +103,19 @@ const EXAMPLE_PRESETS: ExamplePreset[] = [
     id: 'mf1',
     name: 'MF1',
     description: 'Balanced, quick baseline',
-    overrides: { minCoverage: '15', underlyingYield: '12', ydmY0: '17', ydmYT: '17', ydmYFull: '57', juniorCapital: '2,000,000.00' }
+    overrides: { minCoverage: '15', underlyingYield: '12', ydmY0: '17', ydmYT: '17', ydmYFull: '57', utilization: '90' }
   },
   {
     id: 'morpho-gauntlet-vault',
     name: 'Morpho Gauntlet Vault',
     description: 'Higher coverage, lower yield',
-    overrides: { minCoverage: '7', underlyingYield: '8', ydmY0: '15', ydmYT: '15', ydmYFull: '55', juniorCapital: '843,373.49' }
+    overrides: { minCoverage: '7', underlyingYield: '8', ydmY0: '15', ydmYT: '15', ydmYFull: '55', utilization: '90' }
   },
   {
     id: 'hlp',
     name: 'HLP',
     description: 'High yield, high coverage',
-    overrides: { minCoverage: '8', underlyingYield: '10', ydmY0: '9', ydmYT: '9', ydmYFull: '49', juniorCapital: '975,609.76' }
+    overrides: { minCoverage: '8', underlyingYield: '10', ydmY0: '9', ydmYT: '9', ydmYFull: '49', utilization: '90' }
   },
   {
     id: CUSTOM_PRESET_ID,
@@ -134,7 +135,11 @@ export default function YieldSimulator() {
   const [minCoverage, setMinCoverage] = useState<string>(defaultSelectedInputs.minCoverage);
   const [underlyingYield, setUnderlyingYield] = useState<string>(defaultSelectedInputs.underlyingYield);
   const [seniorCapital, setSeniorCapital] = useState<string>(defaultSelectedInputs.seniorCapital);
-  const [juniorCapital, setJuniorCapital] = useState<string>(defaultSelectedInputs.juniorCapital);
+  const [capitalInputMode, setCapitalInputMode] = useState<CapitalInputMode>(defaultSelectedInputs.capitalInputMode);
+  const [utilizationPosition, setUtilizationPosition] = useState<number>(
+    positionFromUtil(parseFloat(defaultSelectedInputs.utilization) / 100)
+  );
+  const [juniorCapital, setJuniorCapital] = useState<string>(''); // seeded by derived effect below
   const [juniorDeploymentOption, setJuniorDeploymentOption] = useState<DeploymentOption>(defaultSelectedInputs.juniorDeploymentOption);
   const [juniorCustomYield, setJuniorCustomYield] = useState<string>(defaultSelectedInputs.juniorCustomYield);
   const [beta, setBeta] = useState<string>(defaultSelectedInputs.beta);
@@ -166,6 +171,27 @@ export default function YieldSimulator() {
     return parts.join('.');
   };
 
+  // Keep the derived capital field in sync with slider + canonical inputs.
+  useEffect(() => {
+    const util = utilFromPosition(utilizationPosition);
+    const cov = parseNumber(minCoverage) / 100;
+    const betaNum = parseNumber(beta) / 100;
+    if (isNaN(cov) || isNaN(betaNum)) return;
+
+    if (capitalInputMode === 'senior-fixed') {
+      const sNum = parseNumber(seniorCapital);
+      if (isNaN(sNum) || sNum <= 0) return;
+      const j = deriveJunior(sNum, util, betaNum, cov);
+      setJuniorCapital(j !== null && Number.isFinite(j) ? formatNumberWithCommas(j.toFixed(2)) : '');
+    } else {
+      const jNum = parseNumber(juniorCapital);
+      if (isNaN(jNum) || jNum <= 0) return;
+      const s = deriveSenior(jNum, util, betaNum, cov);
+      setSeniorCapital(s !== null && Number.isFinite(s) ? formatNumberWithCommas(s.toFixed(2)) : '');
+    }
+    // Intentionally do NOT include the derived-side capital in deps to avoid feedback loops.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [utilizationPosition, capitalInputMode, minCoverage, beta, seniorCapital, juniorCapital]);
 
   const selectedExample = useMemo(
     () => (selectedExampleId ? EXAMPLE_PRESETS.find((preset) => preset.id === selectedExampleId) ?? null : null),
@@ -190,11 +216,14 @@ export default function YieldSimulator() {
       return nearlyEqual(aNum, bNum);
     };
 
+    const currentUtilization = (utilFromPosition(utilizationPosition) * 100).toString();
+
     return !(
       compareAsNumber(minCoverage, selectedExampleInputs.minCoverage) &&
       compareAsNumber(underlyingYield, selectedExampleInputs.underlyingYield) &&
       compareAsNumber(seniorCapital, selectedExampleInputs.seniorCapital) &&
-      compareAsNumber(juniorCapital, selectedExampleInputs.juniorCapital) &&
+      compareAsNumber(currentUtilization, selectedExampleInputs.utilization) &&
+      capitalInputMode === selectedExampleInputs.capitalInputMode &&
       juniorDeploymentOption === selectedExampleInputs.juniorDeploymentOption &&
       compareAsNumber(juniorCustomYield, selectedExampleInputs.juniorCustomYield) &&
       compareAsNumber(beta, selectedExampleInputs.beta) &&
@@ -207,8 +236,8 @@ export default function YieldSimulator() {
     );
   }, [
     beta,
+    capitalInputMode,
     jtFee,
-    juniorCapital,
     juniorCustomYield,
     juniorDeploymentOption,
     selectedExampleInputs,
@@ -216,6 +245,7 @@ export default function YieldSimulator() {
     stFee,
     minCoverage,
     underlyingYield,
+    utilizationPosition,
     ydmY0,
     ydmYFull,
     ydmYT,
@@ -253,7 +283,8 @@ export default function YieldSimulator() {
     setMinCoverage(next.minCoverage);
     setUnderlyingYield(next.underlyingYield);
     setSeniorCapital(next.seniorCapital);
-    setJuniorCapital(next.juniorCapital);
+    setCapitalInputMode(next.capitalInputMode);
+    setUtilizationPosition(positionFromUtil(parseFloat(next.utilization) / 100));
     setJuniorDeploymentOption(next.juniorDeploymentOption);
     setJuniorCustomYield(next.juniorCustomYield);
     setBeta(next.beta);
