@@ -125,6 +125,25 @@ const EXAMPLE_PRESETS: ExamplePreset[] = [
   }
 ];
 
+type SliderTick = {
+  position: number;
+  utilLabel: string;
+  utilValue: number; // fraction; Infinity for the cap tick
+};
+
+const SLIDER_TICKS: SliderTick[] = [
+  { position: 0.000, utilLabel: '0%',     utilValue: 0 },
+  { position: 0.125, utilLabel: '25%',    utilValue: 0.25 },
+  { position: 0.250, utilLabel: '50%',    utilValue: 0.5 },
+  { position: 0.375, utilLabel: '75%',    utilValue: 0.75 },
+  { position: 0.450, utilLabel: '90%',    utilValue: 0.9 },
+  { position: 0.500, utilLabel: '100%',   utilValue: 1.0 },
+  { position: 0.575, utilLabel: '200%',   utilValue: 2.0 },
+  { position: 0.675, utilLabel: '500%',   utilValue: 5.0 },
+  { position: 0.750, utilLabel: '1000%',  utilValue: 10.0 },
+  { position: 1.000, utilLabel: '∞',      utilValue: Infinity },
+];
+
 export default function YieldSimulator() {
   const defaultSelectedExample = EXAMPLE_PRESETS.find((preset) => preset.id === DEFAULT_SELECTED_EXAMPLE_ID) ?? EXAMPLE_PRESETS[0];
   const defaultSelectedInputs =
@@ -873,10 +892,25 @@ export default function YieldSimulator() {
                   </div>
                 </div>
 
-                {/* Utilization Slider — basic scaffolding (ticks/gradient/marker added in later tasks) */}
+                {/* Utilization Slider */}
                 <div className="border-t border-[#e5e5e0] pt-5">
                   <label htmlFor="utilization-slider" className="text-sm font-medium text-[#0a0a0a]">Utilization</label>
-                  <div className="mt-3">
+
+                  {/* Above-ticks (utilization) */}
+                  <div className="relative h-5 mt-3">
+                    {SLIDER_TICKS.map((t) => (
+                      <div
+                        key={`above-${t.position}`}
+                        className="absolute top-0 -translate-x-1/2 text-[10px] text-[#666666] tabular-nums"
+                        style={{ left: `${t.position * 100}%` }}
+                      >
+                        {t.utilLabel}
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Slider */}
+                  <div className="px-0">
                     <input
                       id="utilization-slider"
                       type="range"
@@ -889,9 +923,32 @@ export default function YieldSimulator() {
                       className="w-full utilization-slider"
                     />
                   </div>
-                  <p className="mt-2 text-xs text-[#666666]">
-                    Utilization: {(utilFromPosition(utilizationPosition) * 100).toFixed(1)}%
-                  </p>
+
+                  {/* Below-ticks (coverage remaining) */}
+                  <div className="relative h-5 mt-1">
+                    {SLIDER_TICKS.map((t) => {
+                      const cov = parseNumber(minCoverage) / 100;
+                      let crLabel: string;
+                      if (t.utilValue === 0) crLabel = '∞';
+                      else if (!Number.isFinite(t.utilValue)) crLabel = '0%';
+                      else {
+                        const crPct = (cov / t.utilValue) * 100;
+                        crLabel = crPct >= 10 ? `${crPct.toFixed(0)}%` : `${crPct.toFixed(1)}%`;
+                      }
+                      return (
+                        <div
+                          key={`below-${t.position}`}
+                          className="absolute top-0 -translate-x-1/2 text-[10px] text-[#666666] tabular-nums"
+                          style={{ left: `${t.position * 100}%` }}
+                        >
+                          {crLabel}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div className="flex justify-between mt-1">
+                    <span className="text-[10px] text-[#999999] uppercase tracking-wide">Utilization (above) · Coverage Remaining (below)</span>
+                  </div>
                 </div>
               </div>
 
