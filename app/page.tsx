@@ -935,8 +935,8 @@ export default function YieldSimulator() {
                               <p className="font-semibold mb-1">Why 90% target?</p>
                               <p className="mb-2">The protocol operates around 90% utilization to keep both tranches liquid:</p>
                               <ul className="list-disc pl-4 space-y-1">
-                                <li><strong>Buffer for Senior deposits</strong> — new senior capital can enter without immediately breaching coverage.</li>
-                                <li><strong>Buffer for Junior redemptions</strong> — junior can exit without forcing the market under the minimum.</li>
+                                <li><strong>Buffer for Senior deposits</strong> — new senior capital can enter while not breaching minimum coverage.</li>
+                                <li><strong>Buffer for Junior redemptions</strong> — junior can only exit if it does not breach minimum coverage.</li>
                               </ul>
                             </div>
                           </div>
