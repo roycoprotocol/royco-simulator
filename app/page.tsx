@@ -1399,30 +1399,6 @@ export default function YieldSimulator() {
                 </p>
               </div>
 
-              <div className="mb-6 grid grid-cols-1 md:grid-cols-3 gap-3">
-                <div className={`rounded-lg border px-4 py-3 ${results.overUtilized ? 'border-[#f59e0b] bg-[#fff7ed]' : 'border-[#e5e5e0] bg-[#f8f9fa]'}`}>
-                  <p className="text-xs text-[#666666]">Current Utilization</p>
-                  <p className="text-lg font-semibold text-[#0a0a0a]">{formatPercent(results.utilization * 100)}</p>
-                  {results.overUtilized ? (
-                    <p className="text-xs text-[#b45309]">Deposits blocked until coverage is restored.</p>
-                  ) : (
-                    <p className="text-xs text-[#666666]">Within coverage bounds.</p>
-                  )}
-                </div>
-                <div className="rounded-lg border border-[#e5e5e0] bg-[#f8f9fa] px-4 py-3">
-                  <p className="text-xs text-[#666666]">JT Yield Share (YDM)</p>
-                  <p className="text-lg font-semibold text-[#0a0a0a]">{formatPercent(results.ydmOutput * 100)}</p>
-                  <p className="text-xs text-[#666666]">Junior share: {formatCurrency(results.juniorYield)}</p>
-                </div>
-                <div className="rounded-lg border border-[#e5e5e0] bg-[#f8f9fa] px-4 py-3">
-                  <p className="text-xs text-[#666666]">Junior APY</p>
-                  <p className="text-lg font-semibold text-[#0a0a0a]">{formatPercent(results.juniorYieldPercent)}</p>
-                  <p className="text-xs text-[#666666]">
-                    Includes own yield + YDM split.
-                  </p>
-                </div>
-              </div>
-
               {/* YDM Yield Share chart */}
               <div className="h-72">
                 <ResponsiveContainer width="100%" height="100%">
