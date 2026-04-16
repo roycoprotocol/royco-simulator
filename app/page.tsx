@@ -23,6 +23,54 @@ type SimulatorInputs = {
   ysFee: string;       // Fee on JT's risk premium (yield share)
 };
 
+// Slider position mapping:
+//   Left half  (p ∈ [0, 0.5]):  util = 2p              (linear, 0 → 1.0)
+//   Right half (p ∈ [0.5, 1]):  util = 100^(2p − 1)    (log, 1.0 → 100.0)
+// util is a fraction (1.0 = 100%). Right edge clamped to 100x for display "∞".
+const UTIL_RIGHT_CAP = 100; // display as "∞"
+const TARGET_UTIL = 0.9;
+const TARGET_POSITION = 0.45;
+const SNAP_TOLERANCE = 0.02;
+
+const utilFromPosition = (p: number): number => {
+  if (p <= 0.5) return 2 * p;
+  return Math.pow(100, 2 * p - 1);
+};
+
+const positionFromUtil = (util: number): number => {
+  if (!Number.isFinite(util) || util <= 0) return 0;
+  if (util <= 1) return util / 2;
+  return 0.5 + Math.log10(util) / 4;
+};
+
+const deriveJunior = (
+  seniorCapital: number,
+  util: number,
+  beta: number,
+  coverage: number
+): number | null => {
+  const denom = util - beta * coverage;
+  if (denom <= 0) return null;
+  return (seniorCapital * coverage) / denom;
+};
+
+const deriveSenior = (
+  juniorCapital: number,
+  util: number,
+  beta: number,
+  coverage: number
+): number | null => {
+  if (coverage <= 0) return null;
+  const factor = util / coverage - beta;
+  if (factor <= 0) return null;
+  return juniorCapital * factor;
+};
+
+const coverageRemainingFromUtil = (util: number, coverage: number): number => {
+  if (util <= 0) return Infinity;
+  return coverage / util;
+};
+
 const DEFAULT_INPUTS: SimulatorInputs = {
   minCoverage: '10',
   underlyingYield: '13',
