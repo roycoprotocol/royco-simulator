@@ -1342,8 +1342,28 @@ export default function YieldSimulator() {
               </div>
             </div>
 
-            {/* Utilization Slider (duplicate under tranche outputs) */}
-            <div className="bg-white rounded-lg border border-[#e5e5e0] p-6 md:p-8 shadow-sm">
+            {/* Scenario sliders under tranche outputs */}
+            <div className="bg-white rounded-lg border border-[#e5e5e0] p-6 md:p-8 shadow-sm space-y-8">
+              <div>
+                <div className="mb-3">
+                  <span className="text-[11px] uppercase tracking-wide text-[#666666]">Yield Share (at Target Utilization)</span>
+                  <p className="text-lg font-semibold text-[#0a0a0a] tabular-nums">
+                    {`${adaptYdm.toFixed(0)}%`}
+                  </p>
+                </div>
+                <label htmlFor="yield-share-slider" className="sr-only">Yield Share at Target Utilization</label>
+                <input
+                  id="yield-share-slider"
+                  type="range"
+                  min={1}
+                  max={100}
+                  step={1}
+                  value={adaptYdm}
+                  onChange={(e) => setAdaptYdm(Number(e.target.value))}
+                  aria-valuetext={`${adaptYdm.toFixed(0)}%`}
+                  className="w-full utilization-slider"
+                />
+              </div>
               {renderUtilizationSlider('simple', 'outputs')}
             </div>
 
