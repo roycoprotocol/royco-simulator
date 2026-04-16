@@ -23,24 +23,18 @@ type SimulatorInputs = {
   ysFee: string;
 };
 
-// Slider position mapping:
-//   Left half  (p ∈ [0, 0.5]):  util = 2p              (linear in util, 0 → 1.0)
-//   Right half (p ∈ [0.5, 1]):  util = 1 / (2(1 − p))  (linear in coverage: CR = cov·2(1−p))
-// util is a fraction (1.0 = 100%). util → ∞ as p → 1.
-const TARGET_POSITION = 0.45;
+// Slider position mapping (linear): p ∈ [0, 1] → util ∈ [0, 1.0].
+// Utilization above 100% is not representable; the protocol blocks new senior
+// deposits past 100%, so the slider operates strictly within the covered range.
+const TARGET_POSITION = 0.9;
 const SNAP_TOLERANCE = 0.02;
 
-const utilFromPosition = (p: number): number => {
-  if (p <= 0.5) return 2 * p;
-  if (p >= 1) return Infinity;
-  return 1 / (2 * (1 - p));
-};
+const utilFromPosition = (p: number): number => Math.max(0, Math.min(1, p));
 
 const positionFromUtil = (util: number): number => {
   if (util <= 0) return 0;
-  if (!Number.isFinite(util)) return 1;
-  if (util <= 1) return util / 2;
-  return 1 - 1 / (2 * util);
+  if (util >= 1) return 1;
+  return util;
 };
 
 const deriveJunior = (
@@ -115,15 +109,12 @@ type SliderTick = {
 };
 
 const SLIDER_TICKS: SliderTick[] = [
-  { position: 0.000, utilLabel: '0%',    utilValue: 0 },
-  { position: 0.125, utilLabel: '25%',   utilValue: 0.25 },
-  { position: 0.250, utilLabel: '50%',   utilValue: 0.5 },
-  { position: 0.375, utilLabel: '75%',   utilValue: 0.75 },
-  { position: 0.450, utilLabel: '90%',   utilValue: 0.9, isTarget: true },
-  { position: 0.500, utilLabel: '100%',  utilValue: 1.0 },
-  { position: 0.750, utilLabel: '200%',  utilValue: 2.0 },
-  { position: 0.900, utilLabel: '500%',  utilValue: 5.0 },
-  { position: 1.000, utilLabel: '∞',     utilValue: Infinity },
+  { position: 0.00, utilLabel: '0%',    utilValue: 0 },
+  { position: 0.25, utilLabel: '25%',   utilValue: 0.25 },
+  { position: 0.50, utilLabel: '50%',   utilValue: 0.5 },
+  { position: 0.75, utilLabel: '75%',   utilValue: 0.75 },
+  { position: 0.90, utilLabel: '90%',   utilValue: 0.9, isTarget: true },
+  { position: 1.00, utilLabel: '100%',  utilValue: 1.0 },
 ];
 
 export default function YieldSimulator() {
@@ -546,11 +537,7 @@ export default function YieldSimulator() {
         <div className="mb-3">
           <span className="text-[11px] uppercase tracking-wide text-[#666666]">Utilization</span>
           <p className="text-lg font-semibold text-[#0a0a0a] tabular-nums">
-            {(() => {
-              const u = utilFromPosition(utilizationPosition);
-              if (!Number.isFinite(u)) return '∞';
-              return `${(u * 100).toFixed(1)}%`;
-            })()}
+            {`${(utilFromPosition(utilizationPosition) * 100).toFixed(1)}%`}
           </p>
         </div>
 
@@ -657,16 +644,10 @@ export default function YieldSimulator() {
               const u = utilFromPosition(utilizationPosition);
               const cov = parseNumber(minCoverage) / 100;
               if (u <= 0) return '∞';
-              if (!Number.isFinite(u)) return '0%';
               return `${(coverageRemainingFromUtil(u, cov) * 100).toFixed(1)}%`;
             })()}
           </p>
         </div>
-        {utilizationPosition > 0.5 && (
-          <div className="mt-3 rounded-md border border-[#fde68a] bg-[#fffbeb] px-3 py-2 text-xs text-[#854d0e]">
-            Utilization above 100% implies a Junior drawdown has occurred. The protocol blocks new Senior deposits past 100%, so reaching this state requires Junior NAV losses.
-          </div>
-        )}
       </div>
     );
   };

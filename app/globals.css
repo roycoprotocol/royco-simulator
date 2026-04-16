@@ -32,7 +32,7 @@ body {
   appearance: none;
   height: 10px;
   border-radius: 9999px;
-  background: linear-gradient(to right, #86efac 0%, #86efac 50%, #fde68a 50%, #fde68a 100%);
+  background: #86efac;
   outline: none;
   cursor: pointer;
 }
@@ -66,5 +66,5 @@ body {
 .utilization-slider::-moz-range-track {
   height: 10px;
   border-radius: 9999px;
-  background: linear-gradient(to right, #86efac 0%, #86efac 50%, #fde68a 50%, #fde68a 100%);
+  background: #86efac;
 }
