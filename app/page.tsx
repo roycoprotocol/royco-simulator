@@ -1336,13 +1336,32 @@ export default function YieldSimulator() {
                   <h2 className="text-2xl font-semibold text-[#0a0a0a]">
                     YDM Curve
                   </h2>
-                  <button
-                    type="button"
-                    onClick={() => setShowYdmAdvanced(!showYdmAdvanced)}
-                    className="text-sm font-medium text-[#0a0a0a] bg-[#f4f4f0] border border-[#e5e5e0] rounded-md px-3 py-1.5 hover:bg-[#eaeae4] transition-colors"
-                  >
-                    {showYdmAdvanced ? 'Hide Advanced' : 'Show Advanced'}
-                  </button>
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <label className="text-xs font-semibold uppercase tracking-wide text-[#666666]">Adapt YDM</label>
+                    <input
+                      type="range"
+                      min={1}
+                      max={100}
+                      value={adaptYdm}
+                      onChange={(e) => setAdaptYdm(Number(e.target.value))}
+                      className="w-32 accent-[#0a0a0a]"
+                    />
+                    <span className="text-sm font-semibold text-[#0a0a0a] w-10 text-right">{adaptYdm}%</span>
+                    <button
+                      onClick={() => setAdaptYdm(parseNumber(ydmYT) || defaultAdaptYdm)}
+                      className={`text-xs transition-colors ${adaptYdm !== (parseNumber(ydmYT) || defaultAdaptYdm) ? 'text-[#666666] hover:text-[#0a0a0a]' : 'invisible'}`}
+                      title="Reset to default"
+                    >
+                      Reset
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowYdmAdvanced(!showYdmAdvanced)}
+                      className="text-sm font-medium text-[#0a0a0a] bg-[#f4f4f0] border border-[#e5e5e0] rounded-md px-3 py-1.5 hover:bg-[#eaeae4] transition-colors"
+                    >
+                      {showYdmAdvanced ? 'Hide Advanced' : 'Show Advanced'}
+                    </button>
+                  </div>
                 </div>
                 <p className="text-sm text-[#666666]">
                   See how YDM yield share and net APYs change with utilization.
