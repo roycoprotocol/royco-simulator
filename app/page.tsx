@@ -28,7 +28,6 @@ type SimulatorInputs = {
 //   Right half (p ∈ [0.5, 1]):  util = 100^(2p − 1)    (log, 1.0 → 100.0)
 // util is a fraction (1.0 = 100%). Right edge clamped to 100x for display "∞".
 const UTIL_RIGHT_CAP = 100; // display as "∞"
-const TARGET_UTIL = 0.9;
 const TARGET_POSITION = 0.45;
 const SNAP_TOLERANCE = 0.02;
 
