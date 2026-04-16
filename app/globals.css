@@ -37,6 +37,14 @@ body {
   cursor: pointer;
 }
 
+.utilization-slider--complex {
+  background: linear-gradient(to right, #86efac 0%, #86efac 50%, #fde68a 50%, #fde68a 100%);
+}
+
+.utilization-slider--complex::-moz-range-track {
+  background: linear-gradient(to right, #86efac 0%, #86efac 50%, #fde68a 50%, #fde68a 100%);
+}
+
 .utilization-slider::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;

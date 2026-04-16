@@ -23,18 +23,31 @@ type SimulatorInputs = {
   ysFee: string;
 };
 
-// Slider position mapping (linear): p ∈ [0, 1] → util ∈ [0, 1.0].
-// Utilization above 100% is not representable; the protocol blocks new senior
-// deposits past 100%, so the slider operates strictly within the covered range.
-const TARGET_POSITION = 0.9;
-const SNAP_TOLERANCE = 0.02;
+// Two slider variants share a single `utilization` state (fraction; 1.0 = 100%).
+//   Simple:  p = util,            p ∈ [0, 1] covering util ∈ [0, 1.0] only
+//   Complex: p ∈ [0, 0.5]:        util = 2p             (linear in util, 0 → 1.0)
+//            p ∈ [0.5, 1]:        util = 1 / (2(1 − p)) (linear in coverage: CR = cov·2(1−p))
+// In the simple slider, util > 1 is not representable — thumb pins at 100%.
+const TARGET_UTIL = 0.9;
+const SNAP_UTIL_TOLERANCE = 0.04; // ±4% util window for snap
 
-const utilFromPosition = (p: number): number => Math.max(0, Math.min(1, p));
-
-const positionFromUtil = (util: number): number => {
+const simplePositionFromUtil = (util: number): number => {
   if (util <= 0) return 0;
   if (util >= 1) return 1;
   return util;
+};
+const simpleUtilFromPosition = (p: number): number => Math.max(0, Math.min(1, p));
+
+const complexUtilFromPosition = (p: number): number => {
+  if (p <= 0.5) return 2 * p;
+  if (p >= 1) return Infinity;
+  return 1 / (2 * (1 - p));
+};
+const complexPositionFromUtil = (util: number): number => {
+  if (util <= 0) return 0;
+  if (!Number.isFinite(util)) return 1;
+  if (util <= 1) return util / 2;
+  return 1 - 1 / (2 * util);
 };
 
 const deriveJunior = (
@@ -108,13 +121,25 @@ type SliderTick = {
   isTarget?: boolean;
 };
 
-const SLIDER_TICKS: SliderTick[] = [
+const SIMPLE_SLIDER_TICKS: SliderTick[] = [
   { position: 0.00, utilLabel: '0%',    utilValue: 0 },
   { position: 0.25, utilLabel: '25%',   utilValue: 0.25 },
   { position: 0.50, utilLabel: '50%',   utilValue: 0.5 },
   { position: 0.75, utilLabel: '75%',   utilValue: 0.75 },
   { position: 0.90, utilLabel: '90%',   utilValue: 0.9, isTarget: true },
   { position: 1.00, utilLabel: '100%',  utilValue: 1.0 },
+];
+
+const COMPLEX_SLIDER_TICKS: SliderTick[] = [
+  { position: 0.000, utilLabel: '0%',    utilValue: 0 },
+  { position: 0.125, utilLabel: '25%',   utilValue: 0.25 },
+  { position: 0.250, utilLabel: '50%',   utilValue: 0.5 },
+  { position: 0.375, utilLabel: '75%',   utilValue: 0.75 },
+  { position: 0.450, utilLabel: '90%',   utilValue: 0.9, isTarget: true },
+  { position: 0.500, utilLabel: '100%',  utilValue: 1.0 },
+  { position: 0.750, utilLabel: '200%',  utilValue: 2.0 },
+  { position: 0.900, utilLabel: '500%',  utilValue: 5.0 },
+  { position: 1.000, utilLabel: '∞',     utilValue: Infinity },
 ];
 
 export default function YieldSimulator() {
@@ -128,8 +153,8 @@ export default function YieldSimulator() {
   const [underlyingYield, setUnderlyingYield] = useState<string>(defaultSelectedInputs.underlyingYield);
   const [seniorCapital, setSeniorCapital] = useState<string>(defaultSelectedInputs.seniorCapital);
   const [capitalInputMode, setCapitalInputMode] = useState<CapitalInputMode>(defaultSelectedInputs.capitalInputMode);
-  const [utilizationPosition, setUtilizationPosition] = useState<number>(
-    positionFromUtil(parseFloat(defaultSelectedInputs.utilization) / 100)
+  const [utilization, setUtilization] = useState<number>(
+    parseFloat(defaultSelectedInputs.utilization) / 100
   );
   const [juniorCapital, setJuniorCapital] = useState<string>(''); // seeded by derived effect below
   const [juniorDeploymentOption, setJuniorDeploymentOption] = useState<DeploymentOption>(defaultSelectedInputs.juniorDeploymentOption);
@@ -168,7 +193,7 @@ export default function YieldSimulator() {
   // setState bailout prevents a re-render — and even when it differs, the next
   // effect run computes the same value from the same inputs, so no infinite loop.
   useEffect(() => {
-    const util = utilFromPosition(utilizationPosition);
+    const util = utilization;
     const cov = parseNumber(minCoverage) / 100;
     const betaNum = parseNumber(beta) / 100;
     if (isNaN(cov) || isNaN(betaNum)) return;
@@ -185,7 +210,7 @@ export default function YieldSimulator() {
       const s = deriveSenior(jNum, util, betaNum, cov);
       setSeniorCapital(s !== null && Number.isFinite(s) ? formatNumberWithCommas(s.toFixed(2)) : '');
     }
-  }, [utilizationPosition, capitalInputMode, minCoverage, beta, seniorCapital, juniorCapital]);
+  }, [utilization, capitalInputMode, minCoverage, beta, seniorCapital, juniorCapital]);
 
   const selectedExample = useMemo(
     () => (selectedExampleId ? EXAMPLE_PRESETS.find((preset) => preset.id === selectedExampleId) ?? null : null),
@@ -210,7 +235,7 @@ export default function YieldSimulator() {
       return nearlyEqual(aNum, bNum);
     };
 
-    const currentUtilization = (utilFromPosition(utilizationPosition) * 100).toString();
+    const currentUtilization = (utilization * 100).toString();
 
     return !(
       compareAsNumber(minCoverage, selectedExampleInputs.minCoverage) &&
@@ -239,7 +264,7 @@ export default function YieldSimulator() {
     stFee,
     minCoverage,
     underlyingYield,
-    utilizationPosition,
+    utilization,
     ydmY0,
     ydmYFull,
     ydmYT,
@@ -278,7 +303,7 @@ export default function YieldSimulator() {
     setUnderlyingYield(next.underlyingYield);
     setSeniorCapital(next.seniorCapital);
     setCapitalInputMode(next.capitalInputMode);
-    setUtilizationPosition(positionFromUtil(parseFloat(next.utilization) / 100));
+    setUtilization(parseFloat(next.utilization) / 100);
     setJuniorDeploymentOption(next.juniorDeploymentOption);
     setJuniorCustomYield(next.juniorCustomYield);
     setBeta(next.beta);
@@ -530,21 +555,34 @@ export default function YieldSimulator() {
     return data;
   }, [adaptYdm, minCoverage, underlyingYield, seniorCapital, juniorCapital, juniorCustomYield, juniorDeploymentOption, jtFee, stFee, ysFee, ydmY0, ydmYT, ydmYFull]);
 
-  const renderUtilizationSlider = (idSuffix: string) => {
+  const renderUtilizationSlider = (variant: 'simple' | 'complex', idSuffix: string) => {
     const inputId = `utilization-slider-${idSuffix}`;
+    const ticks = variant === 'simple' ? SIMPLE_SLIDER_TICKS : COMPLEX_SLIDER_TICKS;
+    const sliderPosition = variant === 'simple'
+      ? simplePositionFromUtil(utilization)
+      : complexPositionFromUtil(utilization);
+    const targetPosition = variant === 'simple'
+      ? simplePositionFromUtil(TARGET_UTIL)
+      : complexPositionFromUtil(TARGET_UTIL);
+    const utilFromPos = variant === 'simple' ? simpleUtilFromPosition : complexUtilFromPosition;
+    const trySnap = (pos: number) => {
+      const u = utilFromPos(pos);
+      if (Math.abs(u - TARGET_UTIL) <= SNAP_UTIL_TOLERANCE) setUtilization(TARGET_UTIL);
+    };
+
     return (
       <div className="border-t border-[#e5e5e0] pt-5">
         <div className="mb-3">
           <span className="text-[11px] uppercase tracking-wide text-[#666666]">Utilization</span>
           <p className="text-lg font-semibold text-[#0a0a0a] tabular-nums">
-            {`${(utilFromPosition(utilizationPosition) * 100).toFixed(1)}%`}
+            {Number.isFinite(utilization) ? `${(utilization * 100).toFixed(1)}%` : '∞'}
           </p>
         </div>
 
         <label htmlFor={inputId} className="sr-only">Utilization</label>
 
         <div className="relative h-5">
-          {SLIDER_TICKS.map((t) => (
+          {ticks.map((t) => (
             <div
               key={`above-${t.position}`}
               className="absolute top-0 -translate-x-1/2 text-[10px] tabular-nums"
@@ -553,13 +591,13 @@ export default function YieldSimulator() {
               {t.isTarget ? (
                 <div
                   className="relative group cursor-pointer"
-                  onClick={() => setUtilizationPosition(TARGET_POSITION)}
+                  onClick={() => setUtilization(TARGET_UTIL)}
                   role="button"
                   tabIndex={0}
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' || e.key === ' ') {
                       e.preventDefault();
-                      setUtilizationPosition(TARGET_POSITION);
+                      setUtilization(TARGET_UTIL);
                     }
                   }}
                 >
@@ -586,7 +624,7 @@ export default function YieldSimulator() {
           <div
             aria-hidden="true"
             className="pointer-events-none absolute top-1/2 -translate-y-1/2 -translate-x-1/2 h-8 border-l-2 border-dashed border-[#0a0a0a]/50"
-            style={{ left: `${TARGET_POSITION * 100}%` }}
+            style={{ left: `${targetPosition * 100}%` }}
           />
           <input
             id={inputId}
@@ -594,30 +632,18 @@ export default function YieldSimulator() {
             min={0}
             max={1}
             step={0.001}
-            value={utilizationPosition}
-            onChange={(e) => setUtilizationPosition(parseFloat(e.target.value))}
-            onPointerUp={() => {
-              if (Math.abs(utilizationPosition - TARGET_POSITION) <= SNAP_TOLERANCE) {
-                setUtilizationPosition(TARGET_POSITION);
-              }
-            }}
-            onMouseUp={() => {
-              if (Math.abs(utilizationPosition - TARGET_POSITION) <= SNAP_TOLERANCE) {
-                setUtilizationPosition(TARGET_POSITION);
-              }
-            }}
-            onTouchEnd={() => {
-              if (Math.abs(utilizationPosition - TARGET_POSITION) <= SNAP_TOLERANCE) {
-                setUtilizationPosition(TARGET_POSITION);
-              }
-            }}
-            aria-valuetext={`${(utilFromPosition(utilizationPosition) * 100).toFixed(1)}%`}
-            className="w-full utilization-slider"
+            value={sliderPosition}
+            onChange={(e) => setUtilization(utilFromPos(parseFloat(e.target.value)))}
+            onPointerUp={(e) => trySnap(parseFloat((e.target as HTMLInputElement).value))}
+            onMouseUp={(e) => trySnap(parseFloat((e.target as HTMLInputElement).value))}
+            onTouchEnd={(e) => trySnap(parseFloat((e.target as HTMLInputElement).value))}
+            aria-valuetext={Number.isFinite(utilization) ? `${(utilization * 100).toFixed(1)}%` : '∞'}
+            className={`w-full utilization-slider ${variant === 'complex' ? 'utilization-slider--complex' : ''}`}
           />
         </div>
 
         <div className="relative h-5 mt-1">
-          {SLIDER_TICKS.map((t) => {
+          {ticks.map((t) => {
             const cov = parseNumber(minCoverage) / 100;
             let crLabel: string;
             if (t.utilValue === 0) crLabel = '∞';
@@ -641,13 +667,19 @@ export default function YieldSimulator() {
           <span className="text-[11px] uppercase tracking-wide text-[#666666]">Coverage</span>
           <p className="text-lg font-semibold text-[#0a0a0a] tabular-nums">
             {(() => {
-              const u = utilFromPosition(utilizationPosition);
+              const u = utilization;
               const cov = parseNumber(minCoverage) / 100;
               if (u <= 0) return '∞';
+              if (!Number.isFinite(u)) return '0%';
               return `${(coverageRemainingFromUtil(u, cov) * 100).toFixed(1)}%`;
             })()}
           </p>
         </div>
+        {variant === 'complex' && utilization > 1 && (
+          <div className="mt-3 rounded-md border border-[#fde68a] bg-[#fffbeb] px-3 py-2 text-xs text-[#854d0e]">
+            Utilization above 100% implies a Junior drawdown has occurred. The protocol blocks new Senior deposits past 100%, so reaching this state requires Junior NAV losses.
+          </div>
+        )}
       </div>
     );
   };
@@ -988,7 +1020,7 @@ export default function YieldSimulator() {
                 </div>
 
                 {/* Utilization Slider (shown in Advanced) */}
-                {showAdvanced && renderUtilizationSlider('capital')}
+                {showAdvanced && renderUtilizationSlider('complex', 'capital')}
               </div>
 
               {showAdvanced && (
@@ -1315,7 +1347,7 @@ export default function YieldSimulator() {
 
             {/* Utilization Slider (duplicate under tranche outputs) */}
             <div className="bg-white rounded-lg border border-[#e5e5e0] p-6 md:p-8 shadow-sm">
-              {renderUtilizationSlider('outputs')}
+              {renderUtilizationSlider('simple', 'outputs')}
             </div>
 
             {/* YDM Curve + Net APY */}
