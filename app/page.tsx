@@ -390,26 +390,23 @@ export default function YieldSimulator() {
     const discount = yT - y0;
     const premium = yFull - yT;
 
-    // YDM V2 curve
+    // YDM V2 curve — piecewise linear; clamp util to [0, 1] so values above 100%
+    // stabilize at yFull (senior keeps (1 − yFull) of the pool).
+    const uClamped = Math.min(Math.max(utilization, 0), 1);
     let ydmOutput: number;
-    if (utilization >= 1) {
-      ydmOutput = 1;
+    if (uClamped < 0.9) {
+      const normalizedDelta = (uClamped - 0.9) / 0.9;
+      ydmOutput = yT + normalizedDelta * discount;
     } else {
-      const u = Math.min(utilization, 1);
-      if (u < 0.9) {
-        const normalizedDelta = (u - 0.9) / 0.9;
-        ydmOutput = yT + normalizedDelta * discount;
-      } else {
-        const normalizedDelta = (u - 0.9) / 0.1;
-        ydmOutput = yT + normalizedDelta * premium;
-      }
-      ydmOutput = Math.min(1, Math.max(0, ydmOutput));
+      const normalizedDelta = (uClamped - 0.9) / 0.1;
+      ydmOutput = yT + normalizedDelta * premium;
     }
+    ydmOutput = Math.min(1, Math.max(0, ydmOutput));
 
     // Yields
     const totalYield = underlyingYieldNum * seniorCapitalNum;
-    const juniorYield = utilization >= 1 ? totalYield : ydmOutput * totalYield;
-    const seniorYield = utilization >= 1 ? 0 : totalYield - juniorYield;
+    const juniorYield = ydmOutput * totalYield;
+    const seniorYield = totalYield - juniorYield;
 
     const juniorYieldRate = juniorDeploymentOption === 'underlying' ? underlyingYieldNum : juniorCustomYieldNum;
     const juniorOwnYield = juniorCapitalNum * juniorYieldRate;
@@ -441,7 +438,7 @@ export default function YieldSimulator() {
       juniorYieldPercent,
       seniorYieldPercent,
       totalFees,
-      overUtilized: utilization >= 1,
+      overUtilized: utilization > 1,
       requiredCoverage
     };
   }, [
