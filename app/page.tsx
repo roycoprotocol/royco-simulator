@@ -568,7 +568,7 @@ export default function YieldSimulator() {
     };
 
     return (
-      <div className="border-t border-[#e5e5e0] pt-5">
+      <div className={variant === 'complex' ? 'border-t border-[#e5e5e0] pt-5' : ''}>
         <div className="mb-3">
           <span className="text-[11px] uppercase tracking-wide text-[#666666]">Utilization</span>
           <p className="text-lg font-semibold text-[#0a0a0a] tabular-nums">
