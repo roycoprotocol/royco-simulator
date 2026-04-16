@@ -24,22 +24,23 @@ type SimulatorInputs = {
 };
 
 // Slider position mapping:
-//   Left half  (p ∈ [0, 0.5]):  util = 2p              (linear, 0 → 1.0)
-//   Right half (p ∈ [0.5, 1]):  util = 100^(2p − 1)    (log, 1.0 → 100.0)
-// util is a fraction (1.0 = 100%). Right edge clamped to 100x for display "∞".
-const UTIL_RIGHT_CAP = 100; // display as "∞"
+//   Left half  (p ∈ [0, 0.5]):  util = 2p              (linear in util, 0 → 1.0)
+//   Right half (p ∈ [0.5, 1]):  util = 1 / (2(1 − p))  (linear in coverage: CR = cov·2(1−p))
+// util is a fraction (1.0 = 100%). util → ∞ as p → 1.
 const TARGET_POSITION = 0.45;
 const SNAP_TOLERANCE = 0.02;
 
 const utilFromPosition = (p: number): number => {
   if (p <= 0.5) return 2 * p;
-  return Math.pow(100, 2 * p - 1);
+  if (p >= 1) return Infinity;
+  return 1 / (2 * (1 - p));
 };
 
 const positionFromUtil = (util: number): number => {
-  if (!Number.isFinite(util) || util <= 0) return 0;
+  if (util <= 0) return 0;
+  if (!Number.isFinite(util)) return 1;
   if (util <= 1) return util / 2;
-  return 0.5 + Math.log10(util) / 4;
+  return 1 - 1 / (2 * util);
 };
 
 const deriveJunior = (
@@ -132,16 +133,15 @@ type SliderTick = {
 };
 
 const SLIDER_TICKS: SliderTick[] = [
-  { position: 0.000, utilLabel: '0%',     utilValue: 0 },
-  { position: 0.125, utilLabel: '25%',    utilValue: 0.25 },
-  { position: 0.250, utilLabel: '50%',    utilValue: 0.5 },
-  { position: 0.375, utilLabel: '75%',    utilValue: 0.75 },
-  { position: 0.450, utilLabel: '90%',    utilValue: 0.9, isTarget: true },
-  { position: 0.500, utilLabel: '100%',   utilValue: 1.0 },
-  { position: 0.575, utilLabel: '200%',   utilValue: 2.0 },
-  { position: 0.675, utilLabel: '500%',   utilValue: 5.0 },
-  { position: 0.750, utilLabel: '1000%',  utilValue: 10.0 },
-  { position: 1.000, utilLabel: '∞',      utilValue: Infinity },
+  { position: 0.000, utilLabel: '0%',    utilValue: 0 },
+  { position: 0.125, utilLabel: '25%',   utilValue: 0.25 },
+  { position: 0.250, utilLabel: '50%',   utilValue: 0.5 },
+  { position: 0.375, utilLabel: '75%',   utilValue: 0.75 },
+  { position: 0.450, utilLabel: '90%',   utilValue: 0.9, isTarget: true },
+  { position: 0.500, utilLabel: '100%',  utilValue: 1.0 },
+  { position: 0.750, utilLabel: '200%',  utilValue: 2.0 },
+  { position: 0.900, utilLabel: '500%',  utilValue: 5.0 },
+  { position: 1.000, utilLabel: '∞',     utilValue: Infinity },
 ];
 
 export default function YieldSimulator() {
@@ -899,7 +899,7 @@ export default function YieldSimulator() {
                     <p className="text-lg font-semibold text-[#0a0a0a] tabular-nums">
                       {(() => {
                         const u = utilFromPosition(utilizationPosition);
-                        if (u >= UTIL_RIGHT_CAP) return '∞';
+                        if (!Number.isFinite(u)) return '∞';
                         return `${(u * 100).toFixed(1)}%`;
                       })()}
                     </p>
@@ -1011,7 +1011,7 @@ export default function YieldSimulator() {
                         const u = utilFromPosition(utilizationPosition);
                         const cov = parseNumber(minCoverage) / 100;
                         if (u <= 0) return '∞';
-                        if (u >= UTIL_RIGHT_CAP) return '0%';
+                        if (!Number.isFinite(u)) return '0%';
                         return `${(coverageRemainingFromUtil(u, cov) * 100).toFixed(1)}%`;
                       })()}
                     </p>
