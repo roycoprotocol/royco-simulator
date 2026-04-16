@@ -175,6 +175,7 @@ export default function YieldSimulator() {
   // side. When that write produces a string equal to the current state, React's
   // setState bailout prevents a re-render — and even when it differs, the next
   // effect run computes the same value from the same inputs, so no infinite loop.
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => {
     const util = utilFromPosition(utilizationPosition);
     const cov = parseNumber(minCoverage) / 100;
@@ -874,15 +875,17 @@ export default function YieldSimulator() {
 
                 {/* Utilization Slider — basic scaffolding (ticks/gradient/marker added in later tasks) */}
                 <div className="border-t border-[#e5e5e0] pt-5">
-                  <label className="text-sm font-medium text-[#0a0a0a]">Utilization</label>
+                  <label htmlFor="utilization-slider" className="text-sm font-medium text-[#0a0a0a]">Utilization</label>
                   <div className="mt-3">
                     <input
+                      id="utilization-slider"
                       type="range"
                       min={0}
                       max={1}
                       step={0.001}
                       value={utilizationPosition}
                       onChange={(e) => setUtilizationPosition(parseFloat(e.target.value))}
+                      aria-valuetext={`${(utilFromPosition(utilizationPosition) * 100).toFixed(1)}%`}
                       className="w-full"
                     />
                   </div>
