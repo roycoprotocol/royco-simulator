@@ -937,7 +937,12 @@ export default function YieldSimulator() {
                   </div>
 
                   {/* Slider */}
-                  <div className="px-0">
+                  <div className="relative px-0">
+                    <div
+                      aria-hidden="true"
+                      className="pointer-events-none absolute top-1/2 -translate-y-1/2 -translate-x-1/2 h-8 border-l-2 border-dashed border-[#0a0a0a]/50"
+                      style={{ left: `${TARGET_POSITION * 100}%` }}
+                    />
                     <input
                       id="utilization-slider"
                       type="range"
