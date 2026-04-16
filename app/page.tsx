@@ -171,7 +171,10 @@ export default function YieldSimulator() {
     return parts.join('.');
   };
 
-  // Keep the derived capital field in sync with slider + canonical inputs.
+  // Both capitals are in the deps array; the effect writes only the non-canonical
+  // side. When that write produces a string equal to the current state, React's
+  // setState bailout prevents a re-render — and even when it differs, the next
+  // effect run computes the same value from the same inputs, so no infinite loop.
   useEffect(() => {
     const util = utilFromPosition(utilizationPosition);
     const cov = parseNumber(minCoverage) / 100;
@@ -189,8 +192,6 @@ export default function YieldSimulator() {
       const s = deriveSenior(jNum, util, betaNum, cov);
       setSeniorCapital(s !== null && Number.isFinite(s) ? formatNumberWithCommas(s.toFixed(2)) : '');
     }
-    // Intentionally do NOT include the derived-side capital in deps to avoid feedback loops.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [utilizationPosition, capitalInputMode, minCoverage, beta, seniorCapital, juniorCapital]);
 
   const selectedExample = useMemo(
