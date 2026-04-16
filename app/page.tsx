@@ -936,6 +936,16 @@ export default function YieldSimulator() {
                       step={0.001}
                       value={utilizationPosition}
                       onChange={(e) => setUtilizationPosition(parseFloat(e.target.value))}
+                      onPointerUp={() => {
+                        if (Math.abs(utilizationPosition - TARGET_POSITION) <= SNAP_TOLERANCE) {
+                          setUtilizationPosition(TARGET_POSITION);
+                        }
+                      }}
+                      onTouchEnd={() => {
+                        if (Math.abs(utilizationPosition - TARGET_POSITION) <= SNAP_TOLERANCE) {
+                          setUtilizationPosition(TARGET_POSITION);
+                        }
+                      }}
                       aria-valuetext={`${(utilFromPosition(utilizationPosition) * 100).toFixed(1)}%`}
                       className="w-full utilization-slider"
                     />
