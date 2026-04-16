@@ -194,7 +194,6 @@ export default function YieldSimulator() {
   // side. When that write produces a string equal to the current state, React's
   // setState bailout prevents a re-render — and even when it differs, the next
   // effect run computes the same value from the same inputs, so no infinite loop.
-  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => {
     const util = utilFromPosition(utilizationPosition);
     const cov = parseNumber(minCoverage) / 100;
@@ -205,6 +204,7 @@ export default function YieldSimulator() {
       const sNum = parseNumber(seniorCapital);
       if (isNaN(sNum) || sNum <= 0) return;
       const j = deriveJunior(sNum, util, betaNum, cov);
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setJuniorCapital(j !== null && Number.isFinite(j) ? formatNumberWithCommas(j.toFixed(2)) : '');
     } else {
       const jNum = parseNumber(juniorCapital);
