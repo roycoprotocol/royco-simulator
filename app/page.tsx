@@ -897,6 +897,31 @@ export default function YieldSimulator() {
                 <div className="border-t border-[#e5e5e0] pt-5">
                   <label htmlFor="utilization-slider" className="text-sm font-medium text-[#0a0a0a]">Utilization</label>
 
+                  <div className="flex items-center justify-between mt-2 mb-3">
+                    <div>
+                      <span className="text-[11px] uppercase tracking-wide text-[#666666]">Utilization</span>
+                      <p className="text-lg font-semibold text-[#0a0a0a] tabular-nums">
+                        {(() => {
+                          const u = utilFromPosition(utilizationPosition);
+                          if (u >= UTIL_RIGHT_CAP) return '∞';
+                          return `${(u * 100).toFixed(1)}%`;
+                        })()}
+                      </p>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-[11px] uppercase tracking-wide text-[#666666]">Coverage Remaining</span>
+                      <p className="text-lg font-semibold text-[#0a0a0a] tabular-nums">
+                        {(() => {
+                          const u = utilFromPosition(utilizationPosition);
+                          const cov = parseNumber(minCoverage) / 100;
+                          if (u <= 0) return '∞';
+                          if (u >= UTIL_RIGHT_CAP) return '0%';
+                          return `${(coverageRemainingFromUtil(u, cov) * 100).toFixed(1)}%`;
+                        })()}
+                      </p>
+                    </div>
+                  </div>
+
                   {/* Above-ticks (utilization) */}
                   <div className="relative h-5 mt-3">
                     {SLIDER_TICKS.map((t) => (
