@@ -1010,19 +1010,6 @@ export default function YieldSimulator() {
                       Utilization above 100% implies a Junior drawdown has occurred. The protocol blocks new Senior deposits past 100%, so reaching this state requires Junior NAV losses.
                     </div>
                   )}
-                  <div className="mt-3 text-xs text-[#666666]">
-                    {capitalInputMode === 'senior-fixed' ? (
-                      <>
-                        <span className="font-semibold text-[#0a0a0a]">Junior Capital: </span>
-                        {juniorCapital ? `$${juniorCapital}` : '— (utilization below β · coverage; raise utilization)'}
-                      </>
-                    ) : (
-                      <>
-                        <span className="font-semibold text-[#0a0a0a]">Senior Capital: </span>
-                        {seniorCapital ? `$${seniorCapital}` : '— (utilization below β · coverage; raise utilization)'}
-                      </>
-                    )}
-                  </div>
                 </div>
               </div>
 
