@@ -1192,26 +1192,6 @@ export default function YieldSimulator() {
         </div>
 
 
-        {/* Overutilization Banner */}
-        {results && results.isValid && results.overUtilized && (
-          <div className="bg-[#fff4e5] border-2 border-[#f59e0b] rounded-lg p-6 mb-8 shadow-sm">
-            <div className="flex items-start gap-3">
-              <div className="flex-shrink-0">
-                <svg className="h-6 w-6 text-[#b45309]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
-              </div>
-              <div>
-                <h3 className="text-sm font-semibold text-[#b45309] mb-1">
-                  Utilization Above 100% — New Senior Deposits Blocked
-                </h3>
-                <p className="text-sm text-[#92400e]">
-                  Required junior effective NAV (with beta-adjusted coverage): {formatCurrency(results.requiredCoverage)}. Current junior effective NAV: {formatCurrency(parseNumber(juniorCapital))}. Add junior capital, lower coverage, reduce beta, or withdraw senior capital to reopen deposits.
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* Results */}
         {results && results.isValid && (
