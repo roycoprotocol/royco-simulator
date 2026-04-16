@@ -1189,38 +1189,6 @@ export default function YieldSimulator() {
           <span className="flex-1 h-px bg-gradient-to-r from-[#d6d6d0] via-[#e5e5e0] to-transparent" />
         </div>
 
-        {/* Tranche Outputs */}
-        {results && results.isValid && (
-          <div className="bg-white rounded-lg border border-[#e5e5e0] p-6 md:p-8 mb-8 shadow-sm">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div className={`rounded-lg border px-4 py-3 ${results.overUtilized ? 'border-[#f59e0b] bg-[#fff7ed]' : 'border-[#e5e5e0] bg-[#f8f9fa]'}`}>
-                <p className="text-xs text-[#666666]">Utilization</p>
-                <p className="text-lg font-semibold text-[#0a0a0a]">{formatPercent(results.utilization * 100)}</p>
-                {results.overUtilized ? (
-                  <p className="text-xs text-[#b45309]">Over 100%: all pool yield goes to junior</p>
-                ) : (
-                  <p className="text-xs text-[#666666]">Within coverage bounds.</p>
-                )}
-              </div>
-              <div className="rounded-lg border border-[#e5e5e0] px-4 py-3 bg-[#f8f9fa] space-y-1">
-                <p className="text-xs text-[#666666]">YDM Yield Share</p>
-                <p className="text-lg font-semibold text-[#0a0a0a]">{formatPercent(results.ydmOutput * 100)}</p>
-                <p className="text-xs text-[#666666]">Junior: {formatCurrency(results.juniorYield)}</p>
-              </div>
-              <div className="rounded-lg border border-[#e5e5e0] px-4 py-3 bg-[#f8f9fa] space-y-1">
-                <p className="text-xs text-[#666666]">Total Yield (Senior)</p>
-                <p className="text-lg font-semibold text-[#0a0a0a]">{formatCurrency(results.totalYield)}</p>
-                <p className="text-xs text-[#666666]">
-                  Combined (net): {formatCurrency(results.combinedTotalYield)}
-                </p>
-              </div>
-              <div className="rounded-lg border border-[#e5e5e0] px-4 py-3 bg-[#f8f9fa] space-y-1">
-                <p className="text-xs text-[#666666]">Req. JT Eff. NAV</p>
-                <p className="text-lg font-semibold text-[#0a0a0a]">{formatCurrency(results.requiredCoverage)}</p>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* Overutilization Banner */}
         {results && results.isValid && results.overUtilized && (
