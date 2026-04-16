@@ -905,7 +905,7 @@ export default function YieldSimulator() {
                     </p>
                   </div>
 
-                  <label htmlFor="utilization-slider" className="block text-[10px] uppercase tracking-wide text-[#999999] mb-1">Utilization</label>
+                  <label htmlFor="utilization-slider" className="sr-only">Utilization</label>
 
                   {/* Above-ticks (utilization) */}
                   <div className="relative h-5">
