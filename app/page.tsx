@@ -73,7 +73,7 @@ const coverageRemainingFromUtil = (util: number, coverage: number): number => {
 
 const DEFAULT_INPUTS: SimulatorInputs = {
   minCoverage: '10',
-  underlyingYield: '13',
+  underlyingYield: '9',
   seniorCapital: '10,000,000',
   utilization: '90',
   capitalInputMode: 'senior-fixed',
@@ -874,7 +874,8 @@ export default function YieldSimulator() {
                   </div>
                 </div>
 
-                {/* Utilization Slider */}
+                {/* Utilization Slider (shown in Advanced) */}
+                {showAdvanced && (
                 <div className="border-t border-[#e5e5e0] pt-5">
                   <div className="mb-3">
                     <span className="text-[11px] uppercase tracking-wide text-[#666666]">Utilization</span>
@@ -1004,6 +1005,7 @@ export default function YieldSimulator() {
                     </div>
                   )}
                 </div>
+                )}
               </div>
 
               {showAdvanced && (
