@@ -26,3 +26,45 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
+
+.utilization-slider {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 10px;
+  border-radius: 9999px;
+  background: linear-gradient(to right, #86efac 0%, #86efac 50%, #fde68a 50%, #fde68a 100%);
+  outline: none;
+  cursor: pointer;
+}
+
+.utilization-slider::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 9999px;
+  background: #0a0a0a;
+  border: 2px solid white;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  cursor: grab;
+}
+
+.utilization-slider::-webkit-slider-thumb:active {
+  cursor: grabbing;
+}
+
+.utilization-slider::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 9999px;
+  background: #0a0a0a;
+  border: 2px solid white;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+  cursor: grab;
+}
+
+.utilization-slider::-moz-range-track {
+  height: 10px;
+  border-radius: 9999px;
+  background: linear-gradient(to right, #86efac 0%, #86efac 50%, #fde68a 50%, #fde68a 100%);
+}

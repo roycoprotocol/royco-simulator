@@ -886,7 +886,7 @@ export default function YieldSimulator() {
                       value={utilizationPosition}
                       onChange={(e) => setUtilizationPosition(parseFloat(e.target.value))}
                       aria-valuetext={`${(utilFromPosition(utilizationPosition) * 100).toFixed(1)}%`}
-                      className="w-full"
+                      className="w-full utilization-slider"
                     />
                   </div>
                   <p className="mt-2 text-xs text-[#666666]">
