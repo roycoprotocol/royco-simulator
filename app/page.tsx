@@ -916,9 +916,20 @@ export default function YieldSimulator() {
                         style={{ left: `${t.position * 100}%` }}
                       >
                         {t.isTarget ? (
-                          <div className="relative group cursor-help">
+                          <div
+                            className="relative group cursor-pointer"
+                            onClick={() => setUtilizationPosition(TARGET_POSITION)}
+                            role="button"
+                            tabIndex={0}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                setUtilizationPosition(TARGET_POSITION);
+                              }
+                            }}
+                          >
                             <div className="flex flex-col items-center">
-                              <span className="text-[#16a34a] font-semibold">{t.utilLabel}</span>
+                              <span className="text-[#16a34a] font-semibold hover:underline">{t.utilLabel}</span>
                             </div>
                             <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block w-72 p-3 text-xs font-normal text-white bg-[#0a0a0a] rounded-lg shadow-lg z-20 pointer-events-none">
                               <p className="font-semibold mb-1">Why 90% target?</p>
