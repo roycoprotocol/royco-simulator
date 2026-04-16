@@ -174,6 +174,7 @@ export default function YieldSimulator() {
 
   const [showExplainer, setShowExplainer] = useState<boolean>(false);
   const [showAdvanced, setShowAdvanced] = useState<boolean>(false);
+  const [showYdmAdvanced, setShowYdmAdvanced] = useState<boolean>(false);
 
 
   const parseNumber = (value: string): number => {
@@ -1113,45 +1114,6 @@ export default function YieldSimulator() {
                     </p>
                   </div>
 
-                  {/* YDM Curve Parameters */}
-                  <div className="bg-white rounded-lg border border-[#e5e5e0] p-6 shadow-sm">
-                    <h3 className="text-sm font-semibold text-[#0a0a0a] mb-4 uppercase tracking-wide">
-                      YDM Curve Parameters
-                    </h3>
-                    <p className="text-xs text-[#666666] mb-4">
-                      Controls the piecewise linear yield share curve. Y_0 and Y_full set the endpoints; Y_T is the kink at 90% utilization.
-                    </p>
-                    <div className="grid grid-cols-3 gap-4">
-                      <div>
-                        <label className="block text-xs text-[#666666] mb-1">Y₀ (at 0% util)</label>
-                        <div className="flex items-center">
-                          <input type="text" value={ydmY0}
-                            onChange={(e) => { setYdmY0(e.target.value); setAdaptYdm(parseNumber(ydmYT) || defaultAdaptYdm); if (!isCustomSelected) setSelectedExampleId(CUSTOM_PRESET_ID); }}
-                            className="w-full border border-[#e5e5e0] rounded-lg px-3 py-2 text-sm" />
-                          <span className="ml-1 text-sm text-[#666666]">%</span>
-                        </div>
-                      </div>
-                      <div>
-                        <label className="block text-xs text-[#666666] mb-1">Y_T (at 90% util)</label>
-                        <div className="flex items-center">
-                          <input type="text" value={ydmYT}
-                            onChange={(e) => { setYdmYT(e.target.value); setAdaptYdm(parseFloat(e.target.value) || defaultAdaptYdm); if (!isCustomSelected) setSelectedExampleId(CUSTOM_PRESET_ID); }}
-                            className="w-full border border-[#e5e5e0] rounded-lg px-3 py-2 text-sm" />
-                          <span className="ml-1 text-sm text-[#666666]">%</span>
-                        </div>
-                      </div>
-                      <div>
-                        <label className="block text-xs text-[#666666] mb-1">Y_full (at 100% util)</label>
-                        <div className="flex items-center">
-                          <input type="text" value={ydmYFull}
-                            onChange={(e) => { setYdmYFull(e.target.value); setAdaptYdm(parseNumber(ydmYT) || defaultAdaptYdm); if (!isCustomSelected) setSelectedExampleId(CUSTOM_PRESET_ID); }}
-                            className="w-full border border-[#e5e5e0] rounded-lg px-3 py-2 text-sm" />
-                          <span className="ml-1 text-sm text-[#666666]">%</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
                   {/* Protocol Fees */}
                   <div className="bg-white rounded-lg border border-[#e5e5e0] p-6 shadow-sm">
                     <h3 className="text-sm font-semibold text-[#0a0a0a] mb-4 uppercase tracking-wide">
@@ -1370,34 +1332,62 @@ export default function YieldSimulator() {
             {/* YDM Curve + Net APY */}
             <div className="bg-white rounded-lg p-8 md:p-10 border border-[#e5e5e0] shadow-sm">
               <div className="mb-6">
-                <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center justify-between flex-wrap gap-3 mb-2">
                   <h2 className="text-2xl font-semibold text-[#0a0a0a]">
                     YDM Curve
                   </h2>
-                  <div className="flex items-center gap-3">
-                    <label className="text-xs font-semibold uppercase tracking-wide text-[#666666]">Adapt YDM</label>
-                    <input
-                      type="range"
-                      min={1}
-                      max={100}
-                      value={adaptYdm}
-                      onChange={(e) => setAdaptYdm(Number(e.target.value))}
-                      className="w-32 accent-[#0a0a0a]"
-                    />
-                    <span className="text-sm font-semibold text-[#0a0a0a] w-10 text-right">{adaptYdm}%</span>
-                    <button
-                      onClick={() => setAdaptYdm(parseNumber(ydmYT) || defaultAdaptYdm)}
-                      className={`text-xs transition-colors ${adaptYdm !== (parseNumber(ydmYT) || defaultAdaptYdm) ? 'text-[#666666] hover:text-[#0a0a0a]' : 'invisible'}`}
-                      title="Reset to default"
-                    >
-                      Reset
-                    </button>
-                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowYdmAdvanced(!showYdmAdvanced)}
+                    className="text-sm font-medium text-[#0a0a0a] bg-[#f4f4f0] border border-[#e5e5e0] rounded-md px-3 py-1.5 hover:bg-[#eaeae4] transition-colors"
+                  >
+                    {showYdmAdvanced ? 'Hide Advanced' : 'Show Advanced'}
+                  </button>
                 </div>
                 <p className="text-sm text-[#666666]">
                   See how YDM yield share and net APYs change with utilization.
                 </p>
               </div>
+
+              {showYdmAdvanced && (
+                <div className="mb-6 rounded-lg border border-[#e5e5e0] bg-[#fafaf7] p-5">
+                  <h3 className="text-sm font-semibold text-[#0a0a0a] mb-1 uppercase tracking-wide">
+                    YDM Curve Parameters
+                  </h3>
+                  <p className="text-xs text-[#666666] mb-4">
+                    Controls the piecewise linear yield share curve. Y₀ and Y_full set the endpoints; Y_T is the kink at 90% utilization.
+                  </p>
+                  <div className="grid grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-xs text-[#666666] mb-1">Y₀ (at 0% util)</label>
+                      <div className="flex items-center">
+                        <input type="text" value={ydmY0}
+                          onChange={(e) => { setYdmY0(e.target.value); setAdaptYdm(parseNumber(ydmYT) || defaultAdaptYdm); if (!isCustomSelected) setSelectedExampleId(CUSTOM_PRESET_ID); }}
+                          className="w-full border border-[#e5e5e0] rounded-lg px-3 py-2 text-sm bg-white" />
+                        <span className="ml-1 text-sm text-[#666666]">%</span>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs text-[#666666] mb-1">Y_T (at 90% util)</label>
+                      <div className="flex items-center">
+                        <input type="text" value={ydmYT}
+                          onChange={(e) => { setYdmYT(e.target.value); setAdaptYdm(parseFloat(e.target.value) || defaultAdaptYdm); if (!isCustomSelected) setSelectedExampleId(CUSTOM_PRESET_ID); }}
+                          className="w-full border border-[#e5e5e0] rounded-lg px-3 py-2 text-sm bg-white" />
+                        <span className="ml-1 text-sm text-[#666666]">%</span>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs text-[#666666] mb-1">Y_full (at 100% util)</label>
+                      <div className="flex items-center">
+                        <input type="text" value={ydmYFull}
+                          onChange={(e) => { setYdmYFull(e.target.value); setAdaptYdm(parseNumber(ydmYT) || defaultAdaptYdm); if (!isCustomSelected) setSelectedExampleId(CUSTOM_PRESET_ID); }}
+                          className="w-full border border-[#e5e5e0] rounded-lg px-3 py-2 text-sm bg-white" />
+                        <span className="ml-1 text-sm text-[#666666]">%</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* YDM Yield Share chart */}
               <div className="h-72">
