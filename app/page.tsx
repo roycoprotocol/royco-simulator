@@ -894,9 +894,7 @@ export default function YieldSimulator() {
 
                 {/* Utilization Slider */}
                 <div className="border-t border-[#e5e5e0] pt-5">
-                  <label htmlFor="utilization-slider" className="text-sm font-medium text-[#0a0a0a]">Utilization</label>
-
-                  <div className="flex items-center justify-between mt-2 mb-3">
+                  <div className="flex items-center justify-between mb-3">
                     <div>
                       <span className="text-[11px] uppercase tracking-wide text-[#666666]">Utilization</span>
                       <p className="text-lg font-semibold text-[#0a0a0a] tabular-nums">
@@ -908,7 +906,7 @@ export default function YieldSimulator() {
                       </p>
                     </div>
                     <div className="text-right">
-                      <span className="text-[11px] uppercase tracking-wide text-[#666666]">Coverage Remaining</span>
+                      <span className="text-[11px] uppercase tracking-wide text-[#666666]">Coverage</span>
                       <p className="text-lg font-semibold text-[#0a0a0a] tabular-nums">
                         {(() => {
                           const u = utilFromPosition(utilizationPosition);
@@ -921,8 +919,10 @@ export default function YieldSimulator() {
                     </div>
                   </div>
 
+                  <label htmlFor="utilization-slider" className="block text-[10px] uppercase tracking-wide text-[#999999] mb-1">Utilization</label>
+
                   {/* Above-ticks (utilization) */}
-                  <div className="relative h-5 mt-3">
+                  <div className="relative h-5">
                     {SLIDER_TICKS.map((t) => (
                       <div
                         key={`above-${t.position}`}
@@ -1002,9 +1002,7 @@ export default function YieldSimulator() {
                       );
                     })}
                   </div>
-                  <div className="flex justify-between mt-1">
-                    <span className="text-[10px] text-[#999999] uppercase tracking-wide">Utilization (above) · Coverage Remaining (below)</span>
-                  </div>
+                  <div className="text-[10px] uppercase tracking-wide text-[#999999] mt-1">Coverage</div>
                   {utilizationPosition > 0.5 && (
                     <div className="mt-3 rounded-md border border-[#fde68a] bg-[#fffbeb] px-3 py-2 text-xs text-[#854d0e]">
                       Utilization above 100% implies a Junior drawdown has occurred. The protocol blocks new Senior deposits past 100%, so reaching this state requires Junior NAV losses.
