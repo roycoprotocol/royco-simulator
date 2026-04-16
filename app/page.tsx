@@ -965,6 +965,11 @@ export default function YieldSimulator() {
                           setUtilizationPosition(TARGET_POSITION);
                         }
                       }}
+                      onMouseUp={() => {
+                        if (Math.abs(utilizationPosition - TARGET_POSITION) <= SNAP_TOLERANCE) {
+                          setUtilizationPosition(TARGET_POSITION);
+                        }
+                      }}
                       onTouchEnd={() => {
                         if (Math.abs(utilizationPosition - TARGET_POSITION) <= SNAP_TOLERANCE) {
                           setUtilizationPosition(TARGET_POSITION);
@@ -984,7 +989,7 @@ export default function YieldSimulator() {
                       else if (!Number.isFinite(t.utilValue)) crLabel = '0%';
                       else {
                         const crPct = (cov / t.utilValue) * 100;
-                        crLabel = crPct >= 10 ? `${crPct.toFixed(0)}%` : `${crPct.toFixed(1)}%`;
+                        crLabel = crPct >= 20 ? `${crPct.toFixed(0)}%` : `${crPct.toFixed(1)}%`;
                       }
                       return (
                         <div
