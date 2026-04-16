@@ -602,7 +602,7 @@ export default function YieldSimulator() {
                   <div className="flex flex-col items-center">
                     <span className="text-[#16a34a] font-semibold hover:underline">{t.utilLabel}</span>
                   </div>
-                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block w-72 p-3 text-xs font-normal text-white bg-[#0a0a0a] rounded-lg shadow-lg z-20 pointer-events-none">
+                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block w-72 p-3 text-xs font-normal text-white bg-[#0a0a0a] rounded-lg shadow-lg z-50 pointer-events-none">
                     <p className="font-semibold mb-1">Why 90% target?</p>
                     <p className="mb-2">The protocol operates around 90% utilization to keep both tranches liquid:</p>
                     <ul className="list-disc pl-4 space-y-1">
