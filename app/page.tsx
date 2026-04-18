@@ -220,7 +220,8 @@ export default function YieldSimulator() {
     const cov = parseNumber(minCoverage) / 100;
     const betaNumLocal = parseNumber(beta) / 100;
     if (!Number.isFinite(cov) || !Number.isFinite(betaNumLocal)) return;
-    const floor = Math.min(1, Math.max(0, cov * betaNumLocal));
+    // One slider step above β·COV to avoid the degenerate util == β·COV case.
+    const floor = Math.min(1, Math.max(0, cov * betaNumLocal) + 0.001);
     if (utilization < floor) {
       // eslint-disable-next-line react-hooks/set-state-in-effect
       setUtilization(floor);
@@ -577,13 +578,15 @@ export default function YieldSimulator() {
       ? simplePositionFromUtil(TARGET_UTIL)
       : complexPositionFromUtil(TARGET_UTIL);
     const utilFromPos = variant === 'simple' ? simpleUtilFromPosition : complexUtilFromPosition;
-    // Mathematical floor: util > β·COV is required for a positive junior capital.
-    // For the simple slider we clamp the thumb; for complex we allow the full range.
+    // Mathematical floor: util > β·COV is required for a positive junior capital
+    // (at util == β·COV exactly, denom is 0 and J → ∞). Bump by one slider step
+    // so the simple thumb can't land on the degenerate value.
     const covNum = parseNumber(minCoverage) / 100;
     const betaNumLocal = parseNumber(beta) / 100;
+    const SLIDER_STEP = 0.001;
     const minUtil = Number.isFinite(covNum) && Number.isFinite(betaNumLocal)
-      ? Math.min(1, Math.max(0, covNum * betaNumLocal))
-      : 0;
+      ? Math.min(1, Math.max(0, covNum * betaNumLocal) + SLIDER_STEP)
+      : SLIDER_STEP;
     const sliderMin = variant === 'simple' ? minUtil : 0;
     const trySnap = (pos: number) => {
       const u = utilFromPos(pos);
