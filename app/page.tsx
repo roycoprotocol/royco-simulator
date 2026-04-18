@@ -1,39 +1,95 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, ReferenceDot } from 'recharts';
 
 type DeploymentOption = 'underlying' | 'elsewhere';
+type CapitalInputMode = 'senior-fixed' | 'junior-fixed';
 
 type SimulatorInputs = {
   minCoverage: string;
   underlyingYield: string;
   seniorCapital: string;
-  juniorCapital: string;
+  utilization: string;       // replaces juniorCapital — percentage string e.g. "90"
+  capitalInputMode: CapitalInputMode;
   juniorDeploymentOption: DeploymentOption;
   juniorCustomYield: string;
   beta: string;
-  // YDM V2 curve parameters (as percentages, e.g. "10" = 10%)
-  ydmY0: string;       // JT yield share at 0% utilization
-  ydmYT: string;       // JT yield share at target (90%) utilization
-  ydmYFull: string;    // JT yield share at 100% utilization
-  // Fee model (as percentages, e.g. "20" = 20%)
-  jtFee: string;       // Fee on JT's own yield
-  stFee: string;       // Fee on ST yield
-  ysFee: string;       // Fee on JT's risk premium (yield share)
+  ydmY0: string;
+  ydmYT: string;
+  ydmYFull: string;
+  jtFee: string;
+  stFee: string;
+  ysFee: string;
+};
+
+// Two slider variants share a single `utilization` state (fraction; 1.0 = 100%).
+//   Simple:  p = util,            p ∈ [0, 1] covering util ∈ [0, 1.0] only
+//   Complex: p ∈ [0, 0.5]:        util = 2p             (linear in util, 0 → 1.0)
+//            p ∈ [0.5, 1]:        util = 1 / (2(1 − p)) (linear in coverage: CR = cov·2(1−p))
+// In the simple slider, util > 1 is not representable — thumb pins at 100%.
+const TARGET_UTIL = 0.9;
+const SNAP_UTIL_TOLERANCE = 0.04; // ±4% util window for snap
+
+const simplePositionFromUtil = (util: number): number => {
+  if (util <= 0) return 0;
+  if (util >= 1) return 1;
+  return util;
+};
+const simpleUtilFromPosition = (p: number): number => Math.max(0, Math.min(1, p));
+
+const complexUtilFromPosition = (p: number): number => {
+  if (p <= 0.5) return 2 * p;
+  if (p >= 1) return Infinity;
+  return 1 / (2 * (1 - p));
+};
+const complexPositionFromUtil = (util: number): number => {
+  if (util <= 0) return 0;
+  if (!Number.isFinite(util)) return 1;
+  if (util <= 1) return util / 2;
+  return 1 - 1 / (2 * util);
+};
+
+const deriveJunior = (
+  seniorCapital: number,
+  util: number,
+  beta: number,
+  coverage: number
+): number | null => {
+  const denom = util - beta * coverage;
+  if (denom <= 0) return null;
+  return (seniorCapital * coverage) / denom;
+};
+
+const deriveSenior = (
+  juniorCapital: number,
+  util: number,
+  beta: number,
+  coverage: number
+): number | null => {
+  if (coverage <= 0) return null;
+  const factor = util / coverage - beta;
+  if (factor <= 0) return null;
+  return juniorCapital * factor;
+};
+
+const coverageRemainingFromUtil = (util: number, coverage: number): number => {
+  if (util <= 0) return Infinity;
+  return coverage / util;
 };
 
 const DEFAULT_INPUTS: SimulatorInputs = {
   minCoverage: '10',
-  underlyingYield: '13',
+  underlyingYield: '9',
   seniorCapital: '10,000,000',
-  juniorCapital: '1,250,000.00',
+  utilization: '90',
+  capitalInputMode: 'senior-fixed',
   juniorDeploymentOption: 'underlying',
   juniorCustomYield: '13',
   beta: '100',
-  ydmY0: '10',
-  ydmYT: '10',
-  ydmYFull: '50',
+  ydmY0: '15',
+  ydmYT: '15',
+  ydmYFull: '40',
   jtFee: '0',
   stFee: '10',
   ysFee: '45',
@@ -47,33 +103,43 @@ type ExamplePreset = {
 };
 
 const CUSTOM_PRESET_ID = 'custom';
-const DEFAULT_SELECTED_EXAMPLE_ID = 'mf1';
+const DEFAULT_SELECTED_EXAMPLE_ID = CUSTOM_PRESET_ID;
 
 const EXAMPLE_PRESETS: ExamplePreset[] = [
-  {
-    id: 'mf1',
-    name: 'MF1',
-    description: 'Balanced, quick baseline',
-    overrides: { minCoverage: '15', underlyingYield: '12', ydmY0: '17', ydmYT: '17', ydmYFull: '57', juniorCapital: '2,000,000.00' }
-  },
-  {
-    id: 'morpho-gauntlet-vault',
-    name: 'Morpho Gauntlet Vault',
-    description: 'Higher coverage, lower yield',
-    overrides: { minCoverage: '7', underlyingYield: '8', ydmY0: '15', ydmYT: '15', ydmYFull: '55', juniorCapital: '843,373.49' }
-  },
-  {
-    id: 'hlp',
-    name: 'HLP',
-    description: 'High yield, high coverage',
-    overrides: { minCoverage: '8', underlyingYield: '10', ydmY0: '9', ydmYT: '9', ydmYFull: '49', juniorCapital: '975,609.76' }
-  },
   {
     id: CUSTOM_PRESET_ID,
     name: 'Custom',
     description: 'Tune coverage + yield',
     overrides: {}
   }
+];
+
+type SliderTick = {
+  position: number;
+  utilLabel: string;
+  utilValue: number; // fraction; Infinity for the cap tick
+  isTarget?: boolean;
+};
+
+const SIMPLE_SLIDER_TICKS: SliderTick[] = [
+  { position: 0.00, utilLabel: '0%',    utilValue: 0 },
+  { position: 0.25, utilLabel: '25%',   utilValue: 0.25 },
+  { position: 0.50, utilLabel: '50%',   utilValue: 0.5 },
+  { position: 0.75, utilLabel: '75%',   utilValue: 0.75 },
+  { position: 0.90, utilLabel: '90%',   utilValue: 0.9, isTarget: true },
+  { position: 1.00, utilLabel: '100%',  utilValue: 1.0 },
+];
+
+const COMPLEX_SLIDER_TICKS: SliderTick[] = [
+  { position: 0.000, utilLabel: '0%',    utilValue: 0 },
+  { position: 0.125, utilLabel: '25%',   utilValue: 0.25 },
+  { position: 0.250, utilLabel: '50%',   utilValue: 0.5 },
+  { position: 0.375, utilLabel: '75%',   utilValue: 0.75 },
+  { position: 0.450, utilLabel: '90%',   utilValue: 0.9, isTarget: true },
+  { position: 0.500, utilLabel: '100%',  utilValue: 1.0 },
+  { position: 0.750, utilLabel: '200%',  utilValue: 2.0 },
+  { position: 0.900, utilLabel: '500%',  utilValue: 5.0 },
+  { position: 1.000, utilLabel: '∞',     utilValue: Infinity },
 ];
 
 export default function YieldSimulator() {
@@ -86,7 +152,11 @@ export default function YieldSimulator() {
   const [minCoverage, setMinCoverage] = useState<string>(defaultSelectedInputs.minCoverage);
   const [underlyingYield, setUnderlyingYield] = useState<string>(defaultSelectedInputs.underlyingYield);
   const [seniorCapital, setSeniorCapital] = useState<string>(defaultSelectedInputs.seniorCapital);
-  const [juniorCapital, setJuniorCapital] = useState<string>(defaultSelectedInputs.juniorCapital);
+  const [capitalInputMode, setCapitalInputMode] = useState<CapitalInputMode>(defaultSelectedInputs.capitalInputMode);
+  const [utilization, setUtilization] = useState<number>(
+    parseFloat(defaultSelectedInputs.utilization) / 100
+  );
+  const [juniorCapital, setJuniorCapital] = useState<string>(''); // seeded by derived effect below
   const [juniorDeploymentOption, setJuniorDeploymentOption] = useState<DeploymentOption>(defaultSelectedInputs.juniorDeploymentOption);
   const [juniorCustomYield, setJuniorCustomYield] = useState<string>(defaultSelectedInputs.juniorCustomYield);
   const [beta, setBeta] = useState<string>(defaultSelectedInputs.beta);
@@ -104,6 +174,7 @@ export default function YieldSimulator() {
 
   const [showExplainer, setShowExplainer] = useState<boolean>(false);
   const [showAdvanced, setShowAdvanced] = useState<boolean>(false);
+  const [showYdmAdvanced, setShowYdmAdvanced] = useState<boolean>(false);
 
 
   const parseNumber = (value: string): number => {
@@ -118,6 +189,44 @@ export default function YieldSimulator() {
     return parts.join('.');
   };
 
+  // Both capitals are in the deps array; the effect writes only the non-canonical
+  // side. When that write produces a string equal to the current state, React's
+  // setState bailout prevents a re-render — and even when it differs, the next
+  // effect run computes the same value from the same inputs, so no infinite loop.
+  useEffect(() => {
+    const util = utilization;
+    const cov = parseNumber(minCoverage) / 100;
+    const betaNum = parseNumber(beta) / 100;
+    if (isNaN(cov) || isNaN(betaNum)) return;
+
+    if (capitalInputMode === 'senior-fixed') {
+      const sNum = parseNumber(seniorCapital);
+      if (isNaN(sNum) || sNum <= 0) return;
+      const j = deriveJunior(sNum, util, betaNum, cov);
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setJuniorCapital(j !== null && Number.isFinite(j) ? formatNumberWithCommas(j.toFixed(2)) : '');
+    } else {
+      const jNum = parseNumber(juniorCapital);
+      if (isNaN(jNum) || jNum <= 0) return;
+      const s = deriveSenior(jNum, util, betaNum, cov);
+      setSeniorCapital(s !== null && Number.isFinite(s) ? formatNumberWithCommas(s.toFixed(2)) : '');
+    }
+  }, [utilization, capitalInputMode, minCoverage, beta, seniorCapital, juniorCapital]);
+
+  // If β or COV change such that the current utilization falls below the new
+  // β·COV floor, nudge utilization up to the floor so the simple slider's
+  // constraint is respected and results stay well-defined.
+  useEffect(() => {
+    const cov = parseNumber(minCoverage) / 100;
+    const betaNumLocal = parseNumber(beta) / 100;
+    if (!Number.isFinite(cov) || !Number.isFinite(betaNumLocal)) return;
+    // One slider step above β·COV to avoid the degenerate util == β·COV case.
+    const floor = Math.min(1, Math.max(0, cov * betaNumLocal) + 0.001);
+    if (utilization < floor) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setUtilization(floor);
+    }
+  }, [minCoverage, beta, utilization]);
 
   const selectedExample = useMemo(
     () => (selectedExampleId ? EXAMPLE_PRESETS.find((preset) => preset.id === selectedExampleId) ?? null : null),
@@ -142,11 +251,14 @@ export default function YieldSimulator() {
       return nearlyEqual(aNum, bNum);
     };
 
+    const currentUtilization = (utilization * 100).toString();
+
     return !(
       compareAsNumber(minCoverage, selectedExampleInputs.minCoverage) &&
       compareAsNumber(underlyingYield, selectedExampleInputs.underlyingYield) &&
       compareAsNumber(seniorCapital, selectedExampleInputs.seniorCapital) &&
-      compareAsNumber(juniorCapital, selectedExampleInputs.juniorCapital) &&
+      compareAsNumber(currentUtilization, selectedExampleInputs.utilization) &&
+      capitalInputMode === selectedExampleInputs.capitalInputMode &&
       juniorDeploymentOption === selectedExampleInputs.juniorDeploymentOption &&
       compareAsNumber(juniorCustomYield, selectedExampleInputs.juniorCustomYield) &&
       compareAsNumber(beta, selectedExampleInputs.beta) &&
@@ -159,8 +271,8 @@ export default function YieldSimulator() {
     );
   }, [
     beta,
+    capitalInputMode,
     jtFee,
-    juniorCapital,
     juniorCustomYield,
     juniorDeploymentOption,
     selectedExampleInputs,
@@ -168,6 +280,7 @@ export default function YieldSimulator() {
     stFee,
     minCoverage,
     underlyingYield,
+    utilization,
     ydmY0,
     ydmYFull,
     ydmYT,
@@ -205,7 +318,8 @@ export default function YieldSimulator() {
     setMinCoverage(next.minCoverage);
     setUnderlyingYield(next.underlyingYield);
     setSeniorCapital(next.seniorCapital);
-    setJuniorCapital(next.juniorCapital);
+    setCapitalInputMode(next.capitalInputMode);
+    setUtilization(parseFloat(next.utilization) / 100);
     setJuniorDeploymentOption(next.juniorDeploymentOption);
     setJuniorCustomYield(next.juniorCustomYield);
     setBeta(next.beta);
@@ -269,49 +383,44 @@ export default function YieldSimulator() {
     const requiredCoverage = (seniorRawNAV + juniorRawNAV * betaNum) * minCoverageNum;
     const utilization = requiredCoverage / juniorEffectiveNAV;
 
-    // Parse new params — apply adaptation offset (slopes fixed, all Y values shift equally)
-    const baseY0 = parseNumber(ydmY0) / 100;
-    const baseYT = parseNumber(ydmYT) / 100;
-    const baseYFull = parseNumber(ydmYFull) / 100;
+    // Parse new params — apply adaptation offset (slopes fixed, all Y values shift equally).
+    // Empty/invalid curve or fee fields fall back to 0 so mid-edit typing doesn't collapse the UI.
+    const safePct = (v: string) => {
+      const n = parseNumber(v) / 100;
+      return Number.isFinite(n) ? n : 0;
+    };
+    const baseY0 = safePct(ydmY0);
+    const baseYT = safePct(ydmYT);
+    const baseYFull = safePct(ydmYFull);
     const adaptedYT = adaptYdm / 100;
     const adaptDelta = adaptedYT - baseYT;
     const y0 = Math.max(0, Math.min(1, baseY0 + adaptDelta));
     const yT = adaptedYT;
     const yFull = Math.max(0, Math.min(1, baseYFull + adaptDelta));
-    const jtFeeNum = parseNumber(jtFee) / 100;
-    const stFeeNum = parseNumber(stFee) / 100;
-    const ysFeeNum = parseNumber(ysFee) / 100;
-
-    if (
-      isNaN(y0) || isNaN(yT) || isNaN(yFull) ||
-      isNaN(jtFeeNum) || isNaN(stFeeNum) || isNaN(ysFeeNum)
-    ) {
-      return null;
-    }
+    const jtFeeNum = safePct(jtFee);
+    const stFeeNum = safePct(stFee);
+    const ysFeeNum = safePct(ysFee);
 
     const discount = yT - y0;
     const premium = yFull - yT;
 
-    // YDM V2 curve
+    // YDM V2 curve — piecewise linear; clamp util to [0, 1] so values above 100%
+    // stabilize at yFull (senior keeps (1 − yFull) of the pool).
+    const uClamped = Math.min(Math.max(utilization, 0), 1);
     let ydmOutput: number;
-    if (utilization >= 1) {
-      ydmOutput = 1;
+    if (uClamped < 0.9) {
+      const normalizedDelta = (uClamped - 0.9) / 0.9;
+      ydmOutput = yT + normalizedDelta * discount;
     } else {
-      const u = Math.min(utilization, 1);
-      if (u < 0.9) {
-        const normalizedDelta = (u - 0.9) / 0.9;
-        ydmOutput = yT + normalizedDelta * discount;
-      } else {
-        const normalizedDelta = (u - 0.9) / 0.1;
-        ydmOutput = yT + normalizedDelta * premium;
-      }
-      ydmOutput = Math.min(1, Math.max(0, ydmOutput));
+      const normalizedDelta = (uClamped - 0.9) / 0.1;
+      ydmOutput = yT + normalizedDelta * premium;
     }
+    ydmOutput = Math.min(1, Math.max(0, ydmOutput));
 
     // Yields
     const totalYield = underlyingYieldNum * seniorCapitalNum;
-    const juniorYield = utilization >= 1 ? totalYield : ydmOutput * totalYield;
-    const seniorYield = utilization >= 1 ? 0 : totalYield - juniorYield;
+    const juniorYield = ydmOutput * totalYield;
+    const seniorYield = totalYield - juniorYield;
 
     const juniorYieldRate = juniorDeploymentOption === 'underlying' ? underlyingYieldNum : juniorCustomYieldNum;
     const juniorOwnYield = juniorCapitalNum * juniorYieldRate;
@@ -343,7 +452,7 @@ export default function YieldSimulator() {
       juniorYieldPercent,
       seniorYieldPercent,
       totalFees,
-      overUtilized: utilization >= 1,
+      overUtilized: utilization > 1,
       requiredCoverage
     };
   }, [
@@ -365,16 +474,6 @@ export default function YieldSimulator() {
 
   const chartMaxUtilization = Math.max(100, (results?.utilization ?? 1) * 100);
 
-  const seniorCapitalNumInfo = parseNumber(seniorCapital);
-  const minCoverageNumInfo = parseNumber(minCoverage) / 100;
-  const betaNumInfo = parseNumber(beta) / 100;
-  const desiredUtilizationInfo = 0.9;
-  const betaCoverageInfo = minCoverageNumInfo * betaNumInfo;
-  const denom90 = desiredUtilizationInfo - betaCoverageInfo;
-  const denom100 = 1 - betaCoverageInfo;
-  const juniorFor90Info = denom90 > 0 ? (seniorCapitalNumInfo * minCoverageNumInfo) / denom90 : undefined;
-  const juniorMinToStayCovered = denom100 > 0 ? (seniorCapitalNumInfo * minCoverageNumInfo) / denom100 : undefined;
-
   const formatCurrency = (value: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -386,33 +485,6 @@ export default function YieldSimulator() {
 
   const formatPercent = (value: number) => {
     return `${value.toFixed(2)}%`;
-  };
-
-  const calculate90PercentUtilization = () => {
-    const seniorCapitalNum = parseNumber(seniorCapital);
-    const minCoverageNum = parseNumber(minCoverage) / 100;
-    const betaNum = parseNumber(beta) / 100;
-
-    if (
-      isNaN(seniorCapitalNum) ||
-      isNaN(minCoverageNum) ||
-      isNaN(betaNum) ||
-      seniorCapitalNum <= 0 ||
-      minCoverageNum <= 0
-    ) {
-      return;
-    }
-
-    const targetUtilization = 0.9;
-    const betaCoverage = betaNum * minCoverageNum;
-    const denominator = targetUtilization - betaCoverage;
-
-    if (denominator <= 0) {
-      return;
-    }
-
-    const juniorCapitalFor90 = (seniorCapitalNum * minCoverageNum) / denominator;
-    setJuniorCapital(formatNumberWithCommas(juniorCapitalFor90.toFixed(2)));
   };
 
   const calculateYdmYieldShare = (utilization: number, y0Val?: number, yTVal?: number, yFullVal?: number): number => {
@@ -447,13 +519,17 @@ export default function YieldSimulator() {
     const juniorYieldRate = juniorDeploymentOption === 'underlying' ? safeUnderlyingYield : (isNaN(juniorCustomYieldNum) ? 0 : juniorCustomYieldNum);
     const seniorYieldPool = safeUnderlyingYield * seniorCapitalNum;
     const juniorOwnYield = juniorYieldRate * juniorCapitalNum;
-    const jtFeeNum = parseNumber(jtFee) / 100;
-    const stFeeNum = parseNumber(stFee) / 100;
-    const ysFeeNum = parseNumber(ysFee) / 100;
+    const safePctChart = (v: string) => {
+      const n = parseNumber(v) / 100;
+      return Number.isFinite(n) ? n : 0;
+    };
+    const jtFeeNum = safePctChart(jtFee);
+    const stFeeNum = safePctChart(stFee);
+    const ysFeeNum = safePctChart(ysFee);
     // Apply adaptation offset (slopes fixed, all Y values shift equally)
-    const baseY0 = parseNumber(ydmY0) / 100;
-    const baseYT = parseNumber(ydmYT) / 100;
-    const baseYFull = parseNumber(ydmYFull) / 100;
+    const baseY0 = safePctChart(ydmY0);
+    const baseYT = safePctChart(ydmYT);
+    const baseYFull = safePctChart(ydmYFull);
     const adaptDelta = adaptYdm / 100 - baseYT;
     const y0Num = Math.max(0, Math.min(1, baseY0 + adaptDelta));
     const yTNum = adaptYdm / 100;
@@ -493,6 +569,177 @@ export default function YieldSimulator() {
     }
     return data;
   }, [adaptYdm, minCoverage, underlyingYield, seniorCapital, juniorCapital, juniorCustomYield, juniorDeploymentOption, jtFee, stFee, ysFee, ydmY0, ydmYT, ydmYFull]);
+
+  const renderUtilizationSlider = (variant: 'simple' | 'complex', idSuffix: string) => {
+    const inputId = `utilization-slider-${idSuffix}`;
+    const ticks = variant === 'simple' ? SIMPLE_SLIDER_TICKS : COMPLEX_SLIDER_TICKS;
+    const sliderPosition = variant === 'simple'
+      ? simplePositionFromUtil(utilization)
+      : complexPositionFromUtil(utilization);
+    const targetPosition = variant === 'simple'
+      ? simplePositionFromUtil(TARGET_UTIL)
+      : complexPositionFromUtil(TARGET_UTIL);
+    const utilFromPos = variant === 'simple' ? simpleUtilFromPosition : complexUtilFromPosition;
+    // Mathematical floor: util > β·COV is required for a positive junior capital
+    // (at util == β·COV exactly, denom is 0 and J → ∞). Bump by one slider step
+    // so the simple thumb can't land on the degenerate value.
+    const covNum = parseNumber(minCoverage) / 100;
+    const betaNumLocal = parseNumber(beta) / 100;
+    const SLIDER_STEP = 0.001;
+    const minUtil = Number.isFinite(covNum) && Number.isFinite(betaNumLocal)
+      ? Math.min(1, Math.max(0, covNum * betaNumLocal) + SLIDER_STEP)
+      : SLIDER_STEP;
+    const sliderMin = variant === 'simple' ? minUtil : 0;
+    // Map a utilization value to its visual position on the rendered track.
+    // For simple: track spans [minUtil, 1] so ticks must be scaled accordingly.
+    // For complex: use the piecewise position mapping unchanged.
+    const toTrackPosition = (utilValue: number): number | null => {
+      if (variant === 'simple') {
+        if (utilValue < minUtil) return null;
+        if (utilValue >= 1) return 1;
+        const denom = 1 - minUtil;
+        if (denom <= 0) return 0;
+        return (utilValue - minUtil) / denom;
+      }
+      if (!Number.isFinite(utilValue)) return 1;
+      return complexPositionFromUtil(utilValue);
+    };
+    const renderedTargetPosition = toTrackPosition(TARGET_UTIL) ?? targetPosition;
+    // Native range thumb has a width (THUMB_WIDTH_PX) — its CENTER sweeps from
+    // (thumb/2) at value=min to (trackWidth − thumb/2) at value=max. Tick marks
+    // rendered at plain `left: X%` align with the track edge, not the thumb
+    // center. This helper returns a CSS `left` value that aligns with the
+    // thumb's center for a given normalized track position p ∈ [0, 1].
+    const THUMB_WIDTH_PX = 20;
+    const THUMB_HALF_PX = THUMB_WIDTH_PX / 2;
+    const tickLeftCss = (p: number) =>
+      `calc(${p * 100}% + ${THUMB_HALF_PX - p * THUMB_WIDTH_PX}px)`;
+
+    return (
+      <div className={variant === 'complex' ? 'border-t border-[#e5e5e0] pt-5' : ''}>
+        <div className="mb-3">
+          <span className="text-[11px] uppercase tracking-wide text-[#666666]">Utilization</span>
+          <p className="text-lg font-semibold text-[#0a0a0a] tabular-nums">
+            {Number.isFinite(utilization) ? `${(utilization * 100).toFixed(1)}%` : '∞'}
+          </p>
+        </div>
+
+        <label htmlFor={inputId} className="sr-only">Utilization</label>
+
+        <div className="relative h-5">
+          {ticks.map((t) => {
+            const pos = toTrackPosition(t.utilValue);
+            if (pos === null) return null;
+            return (
+            <div
+              key={`above-${t.position}`}
+              className="absolute top-0 -translate-x-1/2 text-[10px] tabular-nums"
+              style={{ left: tickLeftCss(pos) }}
+            >
+              {t.isTarget ? (
+                <div
+                  className="relative group cursor-pointer select-none px-2 py-1 -mx-2 -my-1 rounded hover:bg-[#16a34a]/10 transition-colors"
+                  onClick={() => setUtilization(TARGET_UTIL)}
+                  role="button"
+                  tabIndex={0}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') {
+                      e.preventDefault();
+                      setUtilization(TARGET_UTIL);
+                    }
+                  }}
+                >
+                  <div className="relative flex flex-col items-center">
+                    <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-0.5 text-[9px] uppercase tracking-wide text-[#16a34a]/80 whitespace-nowrap">Target</span>
+                    <span className="text-[#16a34a] font-semibold hover:underline">{t.utilLabel}</span>
+                  </div>
+                  <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block w-72 p-3 text-xs font-normal text-white bg-[#0a0a0a] rounded-lg shadow-lg z-50 pointer-events-none">
+                    <p className="font-semibold mb-1">Why 90% target?</p>
+                    <p className="mb-2">The protocol operates around 90% utilization to keep both tranches liquid:</p>
+                    <ul className="list-disc pl-4 space-y-1">
+                      <li><strong>Buffer for Senior deposits</strong> — new senior capital can enter while not breaching minimum coverage.</li>
+                      <li><strong>Buffer for Junior redemptions</strong> — junior can only exit if it does not breach minimum coverage.</li>
+                    </ul>
+                  </div>
+                </div>
+              ) : (
+                <span className="text-[#666666]">{t.utilLabel}</span>
+              )}
+            </div>
+            );
+          })}
+        </div>
+
+        <div className="relative px-0">
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute top-1/2 -translate-y-1/2 -translate-x-1/2 h-8 border-l-2 border-dashed border-[#0a0a0a]/50"
+            style={{ left: tickLeftCss(renderedTargetPosition) }}
+          />
+          <input
+            id={inputId}
+            type="range"
+            min={sliderMin}
+            max={1}
+            step={0.001}
+            value={Math.max(sliderPosition, sliderMin)}
+            onChange={(e) => {
+              const u = utilFromPos(parseFloat(e.target.value));
+              setUtilization(variant === 'simple' ? Math.max(u, minUtil) : u);
+            }}
+            aria-valuetext={Number.isFinite(utilization) ? `${(utilization * 100).toFixed(1)}%` : '∞'}
+            className={`w-full utilization-slider ${variant === 'complex' ? 'utilization-slider--complex' : ''}`}
+          />
+        </div>
+
+        <div className="relative h-5 mt-1">
+          {ticks.map((t) => {
+            const pos = toTrackPosition(t.utilValue);
+            if (pos === null) return null;
+            const cov = parseNumber(minCoverage) / 100;
+            let crLabel: string;
+            if (t.utilValue === 0) crLabel = '∞';
+            else if (!Number.isFinite(t.utilValue)) crLabel = '0%';
+            else {
+              const crPct = (cov / t.utilValue) * 100;
+              crLabel = crPct >= 20 ? `${crPct.toFixed(0)}%` : `${crPct.toFixed(1)}%`;
+            }
+            return (
+              <div
+                key={`below-${t.position}`}
+                className="absolute top-0 -translate-x-1/2 text-[10px] text-[#666666] tabular-nums"
+                style={{ left: tickLeftCss(pos) }}
+              >
+                {crLabel}
+              </div>
+            );
+          })}
+        </div>
+        <div className="mt-1">
+          <span className="text-[11px] uppercase tracking-wide text-[#666666]">Coverage</span>
+          <p className="text-lg font-semibold text-[#0a0a0a] tabular-nums">
+            {(() => {
+              const u = utilization;
+              const cov = parseNumber(minCoverage) / 100;
+              if (u <= 0) return '∞';
+              if (!Number.isFinite(u)) return '0%';
+              return `${(coverageRemainingFromUtil(u, cov) * 100).toFixed(1)}%`;
+            })()}
+          </p>
+        </div>
+        {variant === 'simple' && minUtil > 0 && (
+          <p className="mt-2 text-[10px] text-[#999999]">
+            Minimum utilization {`${(minUtil * 100).toFixed(1)}%`} at current coverage.
+          </p>
+        )}
+        {variant === 'complex' && utilization > 1 && (
+          <div className="mt-3 rounded-md border border-[#fde68a] bg-[#fffbeb] px-3 py-2 text-xs text-[#854d0e]">
+            Utilization above 100% implies a Junior drawdown has occurred. The protocol blocks new Senior deposits past 100%, so reaching this state requires Junior NAV losses.
+          </div>
+        )}
+      </div>
+    );
+  };
 
   return (
     <div className="min-h-screen bg-[#FBFBF8] py-16 px-4 sm:px-6 lg:px-8">
@@ -686,7 +933,7 @@ export default function YieldSimulator() {
                   <label className="block text-[11px] font-semibold tracking-wide uppercase text-[#666666]">
                     Minimum Coverage
                   </label>
-                  <p className="mt-1 text-xs text-[#666666]">Coverage at 100% utilization.</p>
+                  <p className="mt-1 text-xs text-[#666666]">Coverage that Seniors require.</p>
                   <div className="mt-2 relative">
                     <input
                       type="number"
@@ -742,11 +989,36 @@ export default function YieldSimulator() {
 
             {/* Capital (Right) */}
             <div className="lg:col-span-2 rounded-lg border border-[#e5e5e0] p-5 bg-[#fafaf7] space-y-5">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between mb-3">
                 <h3 className="text-sm font-semibold text-[#0a0a0a]">Capital</h3>
+                <div className="inline-flex rounded-md border border-[#e5e5e0] bg-white text-xs overflow-hidden">
+                  <button
+                    type="button"
+                    onClick={() => setCapitalInputMode('senior-fixed')}
+                    className={`px-3 py-1.5 transition-colors ${
+                      capitalInputMode === 'senior-fixed'
+                        ? 'bg-[#0a0a0a] text-white'
+                        : 'text-[#666666] hover:bg-[#f4f4f0]'
+                    }`}
+                  >
+                    Senior fixed
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCapitalInputMode('junior-fixed')}
+                    className={`px-3 py-1.5 transition-colors ${
+                      capitalInputMode === 'junior-fixed'
+                        ? 'bg-[#0a0a0a] text-white'
+                        : 'text-[#666666] hover:bg-[#f4f4f0]'
+                    }`}
+                  >
+                    Junior fixed
+                  </button>
+                </div>
               </div>
 
               <div className="space-y-6">
+                {/* Senior Capital */}
                 <div className="grid grid-cols-1 md:grid-cols-[1fr_16rem] items-start gap-x-10 gap-y-3">
                   <div>
                     <label className="text-sm font-medium text-[#0a0a0a]">Senior Capital ($)</label>
@@ -754,19 +1026,26 @@ export default function YieldSimulator() {
                   </div>
                   <div className="relative w-full md:w-64 md:justify-self-end">
                     <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-[#666666]">$</span>
-                    <input
-                      type="text"
-                      value={seniorCapital}
-                      onChange={(e) => {
-                        const value = e.target.value.replace(/[^0-9.]/g, '');
-                        setSeniorCapital(formatNumberWithCommas(value));
-                      }}
-                      className="w-full h-11 pr-3 pl-6 rounded-md border border-[#e5e5e0] bg-white text-right text-base text-[#0a0a0a] focus:outline-none focus:ring-2 focus:ring-[#0a0a0a] focus:border-transparent transition-all"
-                      placeholder="10,000,000"
-                    />
+                    {capitalInputMode === 'senior-fixed' ? (
+                      <input
+                        type="text"
+                        value={seniorCapital}
+                        onChange={(e) => {
+                          const value = e.target.value.replace(/[^0-9.]/g, '');
+                          setSeniorCapital(formatNumberWithCommas(value));
+                        }}
+                        className="w-full h-11 pr-3 pl-6 rounded-md border border-[#e5e5e0] bg-white text-right text-base text-[#0a0a0a] focus:outline-none focus:ring-2 focus:ring-[#0a0a0a] focus:border-transparent transition-all"
+                        placeholder="10,000,000"
+                      />
+                    ) : (
+                      <div className="w-full h-11 pr-3 pl-6 rounded-md border border-[#e5e5e0] bg-[#f4f4f0] text-right text-base text-[#666666] flex items-center justify-end">
+                        {seniorCapital || '—'}
+                      </div>
+                    )}
                   </div>
                 </div>
 
+                {/* Junior Capital */}
                 <div className="grid grid-cols-1 md:grid-cols-[1fr_16rem] items-start gap-x-10 gap-y-3">
                   <div>
                     <label className="text-sm font-medium text-[#0a0a0a]">Junior Capital ($)</label>
@@ -774,50 +1053,31 @@ export default function YieldSimulator() {
                   </div>
                   <div className="relative w-full md:w-64 md:justify-self-end">
                     <span className="pointer-events-none absolute inset-y-0 left-3 flex items-center text-sm text-[#666666]">$</span>
-                    <input
-                      type="text"
-                      value={juniorCapital}
-                      onChange={(e) => {
-                        const value = e.target.value.replace(/[^0-9.]/g, '');
-                        setJuniorCapital(formatNumberWithCommas(value));
-                      }}
-                      className={`w-full h-11 pr-16 pl-6 rounded-md border ${
+                    {capitalInputMode === 'junior-fixed' ? (
+                      <input
+                        type="text"
+                        value={juniorCapital}
+                        onChange={(e) => {
+                          const value = e.target.value.replace(/[^0-9.]/g, '');
+                          setJuniorCapital(formatNumberWithCommas(value));
+                        }}
+                        className={`w-full h-11 pr-3 pl-6 rounded-md border ${
+                          results?.overUtilized ? 'border-[#f59e0b] ring-1 ring-[#f59e0b]' : 'border-[#e5e5e0]'
+                        } bg-white text-right text-base text-[#0a0a0a] focus:outline-none focus:ring-2 focus:ring-[#0a0a0a] focus:border-transparent transition-all`}
+                        placeholder="1,250,000.00"
+                      />
+                    ) : (
+                      <div className={`w-full h-11 pr-3 pl-6 rounded-md border ${
                         results?.overUtilized ? 'border-[#f59e0b] ring-1 ring-[#f59e0b]' : 'border-[#e5e5e0]'
-                      } bg-white text-right text-base text-[#0a0a0a] focus:outline-none focus:ring-2 focus:ring-[#0a0a0a] focus:border-transparent transition-all`}
-                      placeholder="1,250,000.00"
-                    />
-                    <div className="absolute inset-y-0 right-1.5 flex items-center">
-                      <div className="relative group">
-                        <button
-                          onClick={calculate90PercentUtilization}
-                          type="button"
-                          className="h-9 px-3 text-xs font-medium text-white bg-[#0a0a0a] rounded-md hover:bg-[#2a2a2a] focus:outline-none focus:ring-2 focus:ring-[#0a0a0a] transition-all"
-                        >
-                          90%
-                        </button>
-                        <span className="absolute bottom-full right-0 mb-2 hidden group-hover:block w-64 p-3 text-xs font-normal text-white bg-[#0a0a0a] rounded-lg shadow-lg border border-[#333333] z-10 pointer-events-none">
-                          <strong className="block mb-1">Set: 90% Utilization</strong>
-                          Automatically sets junior capital for exactly 90% utilization using your senior capital, minimum coverage, and beta.
-                        </span>
+                      } bg-[#f4f4f0] text-right text-base text-[#666666] flex items-center justify-end`}>
+                        {juniorCapital || '—'}
                       </div>
-                    </div>
+                    )}
                   </div>
-
-                  {juniorFor90Info && juniorMinToStayCovered && betaNumInfo > 0 && (
-                    <div className="md:col-span-2 mt-1 text-xs text-[#666666] flex items-center gap-2">
-                      <div className="relative group">
-                        <span className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-[#0a0a0a] text-white text-[10px] font-semibold cursor-default">?</span>
-                        <div className="absolute left-0 mt-2 w-72 p-3 rounded-md border border-[#e5e5e0] bg-white shadow-lg text-xs text-[#666666] opacity-0 group-hover:opacity-100 transition-opacity z-10">
-                          <p className="text-[#0a0a0a] font-semibold mb-1">Why {formatCurrency(parseNumber(juniorCapital))}?</p>
-                          <p>With {minCoverage}% coverage and beta {formatPercent(betaNumInfo * 100)}, 90% utilization needs about {formatCurrency(juniorFor90Info)} of junior.</p>
-                          <p className="mt-1">The minimum to stay at or below 100% utilization is {formatCurrency(juniorMinToStayCovered)}.</p>
-                        </div>
-                      </div>
-                      <span className="text-[#666666]">Hover to see why this amount is above simple coverage.</span>
-                    </div>
-                  )}
                 </div>
 
+                {/* Utilization Slider (shown in Advanced) */}
+                {showAdvanced && renderUtilizationSlider('complex', 'capital')}
               </div>
 
               {showAdvanced && (
@@ -913,45 +1173,6 @@ export default function YieldSimulator() {
                     </p>
                   </div>
 
-                  {/* YDM Curve Parameters */}
-                  <div className="bg-white rounded-lg border border-[#e5e5e0] p-6 shadow-sm">
-                    <h3 className="text-sm font-semibold text-[#0a0a0a] mb-4 uppercase tracking-wide">
-                      YDM Curve Parameters
-                    </h3>
-                    <p className="text-xs text-[#666666] mb-4">
-                      Controls the piecewise linear yield share curve. Y_0 and Y_full set the endpoints; Y_T is the kink at 90% utilization.
-                    </p>
-                    <div className="grid grid-cols-3 gap-4">
-                      <div>
-                        <label className="block text-xs text-[#666666] mb-1">Y₀ (at 0% util)</label>
-                        <div className="flex items-center">
-                          <input type="text" value={ydmY0}
-                            onChange={(e) => { setYdmY0(e.target.value); setAdaptYdm(parseNumber(ydmYT) || defaultAdaptYdm); if (!isCustomSelected) setSelectedExampleId(CUSTOM_PRESET_ID); }}
-                            className="w-full border border-[#e5e5e0] rounded-lg px-3 py-2 text-sm" />
-                          <span className="ml-1 text-sm text-[#666666]">%</span>
-                        </div>
-                      </div>
-                      <div>
-                        <label className="block text-xs text-[#666666] mb-1">Y_T (at 90% util)</label>
-                        <div className="flex items-center">
-                          <input type="text" value={ydmYT}
-                            onChange={(e) => { setYdmYT(e.target.value); setAdaptYdm(parseFloat(e.target.value) || defaultAdaptYdm); if (!isCustomSelected) setSelectedExampleId(CUSTOM_PRESET_ID); }}
-                            className="w-full border border-[#e5e5e0] rounded-lg px-3 py-2 text-sm" />
-                          <span className="ml-1 text-sm text-[#666666]">%</span>
-                        </div>
-                      </div>
-                      <div>
-                        <label className="block text-xs text-[#666666] mb-1">Y_full (at 100% util)</label>
-                        <div className="flex items-center">
-                          <input type="text" value={ydmYFull}
-                            onChange={(e) => { setYdmYFull(e.target.value); setAdaptYdm(parseNumber(ydmYT) || defaultAdaptYdm); if (!isCustomSelected) setSelectedExampleId(CUSTOM_PRESET_ID); }}
-                            className="w-full border border-[#e5e5e0] rounded-lg px-3 py-2 text-sm" />
-                          <span className="ml-1 text-sm text-[#666666]">%</span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-
                   {/* Protocol Fees */}
                   <div className="bg-white rounded-lg border border-[#e5e5e0] p-6 shadow-sm">
                     <h3 className="text-sm font-semibold text-[#0a0a0a] mb-4 uppercase tracking-wide">
@@ -1001,59 +1222,7 @@ export default function YieldSimulator() {
           <span className="flex-1 h-px bg-gradient-to-r from-[#d6d6d0] via-[#e5e5e0] to-transparent" />
         </div>
 
-        {/* Tranche Outputs */}
-        {results && results.isValid && (
-          <div className="bg-white rounded-lg border border-[#e5e5e0] p-6 md:p-8 mb-8 shadow-sm">
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-              <div className={`rounded-lg border px-4 py-3 ${results.overUtilized ? 'border-[#f59e0b] bg-[#fff7ed]' : 'border-[#e5e5e0] bg-[#f8f9fa]'}`}>
-                <p className="text-xs text-[#666666]">Utilization</p>
-                <p className="text-lg font-semibold text-[#0a0a0a]">{formatPercent(results.utilization * 100)}</p>
-                {results.overUtilized ? (
-                  <p className="text-xs text-[#b45309]">Over 100%: all pool yield goes to junior</p>
-                ) : (
-                  <p className="text-xs text-[#666666]">Within coverage bounds.</p>
-                )}
-              </div>
-              <div className="rounded-lg border border-[#e5e5e0] px-4 py-3 bg-[#f8f9fa] space-y-1">
-                <p className="text-xs text-[#666666]">YDM Yield Share</p>
-                <p className="text-lg font-semibold text-[#0a0a0a]">{formatPercent(results.ydmOutput * 100)}</p>
-                <p className="text-xs text-[#666666]">Junior: {formatCurrency(results.juniorYield)}</p>
-              </div>
-              <div className="rounded-lg border border-[#e5e5e0] px-4 py-3 bg-[#f8f9fa] space-y-1">
-                <p className="text-xs text-[#666666]">Total Yield (Senior)</p>
-                <p className="text-lg font-semibold text-[#0a0a0a]">{formatCurrency(results.totalYield)}</p>
-                <p className="text-xs text-[#666666]">
-                  Combined (net): {formatCurrency(results.combinedTotalYield)}
-                </p>
-              </div>
-              <div className="rounded-lg border border-[#e5e5e0] px-4 py-3 bg-[#f8f9fa] space-y-1">
-                <p className="text-xs text-[#666666]">Req. JT Eff. NAV</p>
-                <p className="text-lg font-semibold text-[#0a0a0a]">{formatCurrency(results.requiredCoverage)}</p>
-              </div>
-            </div>
-          </div>
-        )}
 
-        {/* Overutilization Banner */}
-        {results && results.isValid && results.overUtilized && (
-          <div className="bg-[#fff4e5] border-2 border-[#f59e0b] rounded-lg p-6 mb-8 shadow-sm">
-            <div className="flex items-start gap-3">
-              <div className="flex-shrink-0">
-                <svg className="h-6 w-6 text-[#b45309]" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-                </svg>
-              </div>
-              <div>
-                <h3 className="text-sm font-semibold text-[#b45309] mb-1">
-                  Utilization Above 100% — New Senior Deposits Blocked
-                </h3>
-                <p className="text-sm text-[#92400e]">
-                  Required junior effective NAV (with beta-adjusted coverage): {formatCurrency(results.requiredCoverage)}. Current junior effective NAV: {formatCurrency(parseNumber(juniorCapital))}. Add junior capital, lower coverage, reduce beta, or withdraw senior capital to reopen deposits.
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* Results */}
         {results && results.isValid && (
@@ -1194,15 +1363,45 @@ export default function YieldSimulator() {
               </div>
             </div>
 
+            {/* Scenario sliders under tranche outputs */}
+            <div className="bg-white rounded-lg border border-[#e5e5e0] p-6 md:p-8 shadow-sm space-y-8">
+              <div>
+                <div className="mb-3">
+                  <span className="text-[11px] uppercase tracking-wide text-[#666666]">Yield Share (at Target Utilization)</span>
+                  <p className="text-lg font-semibold text-[#0a0a0a] tabular-nums">
+                    {`${adaptYdm.toFixed(0)}%`}
+                  </p>
+                </div>
+                <label htmlFor="yield-share-slider" className="sr-only">Yield Share at Target Utilization</label>
+                <input
+                  id="yield-share-slider"
+                  type="range"
+                  min={1}
+                  max={100}
+                  step={1}
+                  value={adaptYdm}
+                  onChange={(e) => setAdaptYdm(Number(e.target.value))}
+                  aria-valuetext={`${adaptYdm.toFixed(0)}%`}
+                  className="w-full utilization-slider"
+                />
+              </div>
+              {renderUtilizationSlider('simple', 'outputs')}
+            </div>
+
             {/* YDM Curve + Net APY */}
             <div className="bg-white rounded-lg p-8 md:p-10 border border-[#e5e5e0] shadow-sm">
               <div className="mb-6">
-                <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center justify-between flex-wrap gap-3 mb-2">
                   <h2 className="text-2xl font-semibold text-[#0a0a0a]">
                     YDM Curve
                   </h2>
-                  <div className="flex items-center gap-3">
-                    <label className="text-xs font-semibold uppercase tracking-wide text-[#666666]">Adapt YDM</label>
+                  <div className="flex items-center gap-3 flex-wrap">
+                    <div className="relative group cursor-help">
+                      <label className="text-xs font-semibold uppercase tracking-wide text-[#666666]">Adapt YDM</label>
+                      <div className="absolute bottom-full left-0 mb-2 hidden group-hover:block w-72 p-3 text-xs font-normal text-white bg-[#0a0a0a] rounded-lg shadow-lg z-50 pointer-events-none">
+                        Over time, the yield-share curve adapts to incentivize juniors and seniors to rebalance the market toward 90% utilization. You can use this slider to see how yields change as the curve adapts up or down.
+                      </div>
+                    </div>
                     <input
                       type="range"
                       min={1}
@@ -1219,6 +1418,13 @@ export default function YieldSimulator() {
                     >
                       Reset
                     </button>
+                    <button
+                      type="button"
+                      onClick={() => setShowYdmAdvanced(!showYdmAdvanced)}
+                      className="text-sm font-medium text-[#0a0a0a] bg-[#f4f4f0] border border-[#e5e5e0] rounded-md px-3 py-1.5 hover:bg-[#eaeae4] transition-colors"
+                    >
+                      {showYdmAdvanced ? 'Hide Advanced' : 'Show Advanced'}
+                    </button>
                   </div>
                 </div>
                 <p className="text-sm text-[#666666]">
@@ -1226,29 +1432,45 @@ export default function YieldSimulator() {
                 </p>
               </div>
 
-              <div className="mb-6 grid grid-cols-1 md:grid-cols-3 gap-3">
-                <div className={`rounded-lg border px-4 py-3 ${results.overUtilized ? 'border-[#f59e0b] bg-[#fff7ed]' : 'border-[#e5e5e0] bg-[#f8f9fa]'}`}>
-                  <p className="text-xs text-[#666666]">Current Utilization</p>
-                  <p className="text-lg font-semibold text-[#0a0a0a]">{formatPercent(results.utilization * 100)}</p>
-                  {results.overUtilized ? (
-                    <p className="text-xs text-[#b45309]">Deposits blocked until coverage is restored.</p>
-                  ) : (
-                    <p className="text-xs text-[#666666]">Within coverage bounds.</p>
-                  )}
-                </div>
-                <div className="rounded-lg border border-[#e5e5e0] bg-[#f8f9fa] px-4 py-3">
-                  <p className="text-xs text-[#666666]">JT Yield Share (YDM)</p>
-                  <p className="text-lg font-semibold text-[#0a0a0a]">{formatPercent(results.ydmOutput * 100)}</p>
-                  <p className="text-xs text-[#666666]">Junior share: {formatCurrency(results.juniorYield)}</p>
-                </div>
-                <div className="rounded-lg border border-[#e5e5e0] bg-[#f8f9fa] px-4 py-3">
-                  <p className="text-xs text-[#666666]">Junior APY</p>
-                  <p className="text-lg font-semibold text-[#0a0a0a]">{formatPercent(results.juniorYieldPercent)}</p>
-                  <p className="text-xs text-[#666666]">
-                    Includes own yield + YDM split.
+              {showYdmAdvanced && (
+                <div className="mb-6 rounded-lg border border-[#e5e5e0] bg-[#fafaf7] p-5">
+                  <h3 className="text-sm font-semibold text-[#0a0a0a] mb-1 uppercase tracking-wide">
+                    YDM Curve Parameters
+                  </h3>
+                  <p className="text-xs text-[#666666] mb-4">
+                    Controls the piecewise linear yield share curve. Y₀ and Y_full set the endpoints; Y_T is the kink at 90% utilization. Change these parameters to change the initial shape of the curve.
                   </p>
+                  <div className="grid grid-cols-3 gap-4">
+                    <div>
+                      <label className="block text-xs text-[#666666] mb-1">Y₀ (at 0% util)</label>
+                      <div className="flex items-center">
+                        <input type="text" value={ydmY0}
+                          onChange={(e) => { setYdmY0(e.target.value); setAdaptYdm(parseNumber(ydmYT) || defaultAdaptYdm); if (!isCustomSelected) setSelectedExampleId(CUSTOM_PRESET_ID); }}
+                          className="w-full border border-[#e5e5e0] rounded-lg px-3 py-2 text-sm bg-white" />
+                        <span className="ml-1 text-sm text-[#666666]">%</span>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs text-[#666666] mb-1">Y_T (at 90% util)</label>
+                      <div className="flex items-center">
+                        <input type="text" value={ydmYT}
+                          onChange={(e) => { setYdmYT(e.target.value); setAdaptYdm(parseFloat(e.target.value) || defaultAdaptYdm); if (!isCustomSelected) setSelectedExampleId(CUSTOM_PRESET_ID); }}
+                          className="w-full border border-[#e5e5e0] rounded-lg px-3 py-2 text-sm bg-white" />
+                        <span className="ml-1 text-sm text-[#666666]">%</span>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs text-[#666666] mb-1">Y_full (at 100% util)</label>
+                      <div className="flex items-center">
+                        <input type="text" value={ydmYFull}
+                          onChange={(e) => { setYdmYFull(e.target.value); setAdaptYdm(parseNumber(ydmYT) || defaultAdaptYdm); if (!isCustomSelected) setSelectedExampleId(CUSTOM_PRESET_ID); }}
+                          className="w-full border border-[#e5e5e0] rounded-lg px-3 py-2 text-sm bg-white" />
+                        <span className="ml-1 text-sm text-[#666666]">%</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* YDM Yield Share chart */}
               <div className="h-72">
@@ -1260,6 +1482,7 @@ export default function YieldSimulator() {
                   >
                     <CartesianGrid strokeDasharray="3 3" stroke="#e5e5e0" />
                     <XAxis
+                      type="number"
                       dataKey="utilization"
                       domain={[0, chartMaxUtilization]}
                       ticks={[0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100]}
@@ -1331,6 +1554,7 @@ export default function YieldSimulator() {
                   >
                     <CartesianGrid strokeDasharray="3 3" stroke="#e5e5e0" />
                     <XAxis
+                      type="number"
                       dataKey="utilization"
                       label={{ value: 'Utilization (%)', position: 'insideBottom', offset: -10, fill: '#0a0a0a', fontSize: 12 }}
                       domain={[0, chartMaxUtilization]}
