@@ -933,7 +933,7 @@ export default function YieldSimulator() {
                   <label className="block text-[11px] font-semibold tracking-wide uppercase text-[#666666]">
                     Minimum Coverage
                   </label>
-                  <p className="mt-1 text-xs text-[#666666]">Coverage at 100% utilization.</p>
+                  <p className="mt-1 text-xs text-[#666666]">Coverage that Seniors require.</p>
                   <div className="mt-2 relative">
                     <input
                       type="number"
