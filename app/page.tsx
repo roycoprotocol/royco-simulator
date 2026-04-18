@@ -588,6 +588,21 @@ export default function YieldSimulator() {
       ? Math.min(1, Math.max(0, covNum * betaNumLocal) + SLIDER_STEP)
       : SLIDER_STEP;
     const sliderMin = variant === 'simple' ? minUtil : 0;
+    // Map a utilization value to its visual position on the rendered track.
+    // For simple: track spans [minUtil, 1] so ticks must be scaled accordingly.
+    // For complex: use the piecewise position mapping unchanged.
+    const toTrackPosition = (utilValue: number): number | null => {
+      if (variant === 'simple') {
+        if (utilValue < minUtil) return null;
+        if (utilValue >= 1) return 1;
+        const denom = 1 - minUtil;
+        if (denom <= 0) return 0;
+        return (utilValue - minUtil) / denom;
+      }
+      if (!Number.isFinite(utilValue)) return 1;
+      return complexPositionFromUtil(utilValue);
+    };
+    const renderedTargetPosition = toTrackPosition(TARGET_UTIL) ?? targetPosition;
     const trySnap = (pos: number) => {
       const u = utilFromPos(pos);
       if (Math.abs(u - TARGET_UTIL) <= SNAP_UTIL_TOLERANCE) setUtilization(TARGET_UTIL);
@@ -605,11 +620,14 @@ export default function YieldSimulator() {
         <label htmlFor={inputId} className="sr-only">Utilization</label>
 
         <div className="relative h-5">
-          {ticks.map((t) => (
+          {ticks.map((t) => {
+            const pos = toTrackPosition(t.utilValue);
+            if (pos === null) return null;
+            return (
             <div
               key={`above-${t.position}`}
               className="absolute top-0 -translate-x-1/2 text-[10px] tabular-nums"
-              style={{ left: `${t.position * 100}%` }}
+              style={{ left: `${pos * 100}%` }}
             >
               {t.isTarget ? (
                 <div
@@ -640,14 +658,15 @@ export default function YieldSimulator() {
                 <span className="text-[#666666]">{t.utilLabel}</span>
               )}
             </div>
-          ))}
+            );
+          })}
         </div>
 
         <div className="relative px-0">
           <div
             aria-hidden="true"
             className="pointer-events-none absolute top-1/2 -translate-y-1/2 -translate-x-1/2 h-8 border-l-2 border-dashed border-[#0a0a0a]/50"
-            style={{ left: `${targetPosition * 100}%` }}
+            style={{ left: `${renderedTargetPosition * 100}%` }}
           />
           <input
             id={inputId}
@@ -670,6 +689,8 @@ export default function YieldSimulator() {
 
         <div className="relative h-5 mt-1">
           {ticks.map((t) => {
+            const pos = toTrackPosition(t.utilValue);
+            if (pos === null) return null;
             const cov = parseNumber(minCoverage) / 100;
             let crLabel: string;
             if (t.utilValue === 0) crLabel = '∞';
@@ -682,7 +703,7 @@ export default function YieldSimulator() {
               <div
                 key={`below-${t.position}`}
                 className="absolute top-0 -translate-x-1/2 text-[10px] text-[#666666] tabular-nums"
-                style={{ left: `${t.position * 100}%` }}
+                style={{ left: `${pos * 100}%` }}
               >
                 {crLabel}
               </div>
