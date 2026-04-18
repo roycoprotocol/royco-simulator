@@ -734,7 +734,7 @@ export default function YieldSimulator() {
         </div>
         {variant === 'simple' && minUtil > 0 && (
           <p className="mt-2 text-[10px] text-[#999999]">
-            Minimum utilization {`${(minUtil * 100).toFixed(1)}%`} at current β · coverage.
+            Minimum utilization {`${(minUtil * 100).toFixed(1)}%`} at current coverage.
           </p>
         )}
         {variant === 'complex' && utilization > 1 && (
