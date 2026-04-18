@@ -640,7 +640,7 @@ export default function YieldSimulator() {
             >
               {t.isTarget ? (
                 <div
-                  className="relative group cursor-pointer"
+                  className="relative group cursor-pointer select-none px-2 py-1 -mx-2 -my-1 rounded hover:bg-[#16a34a]/10 transition-colors"
                   onClick={() => setUtilization(TARGET_UTIL)}
                   role="button"
                   tabIndex={0}
