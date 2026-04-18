@@ -1438,7 +1438,7 @@ export default function YieldSimulator() {
                     YDM Curve Parameters
                   </h3>
                   <p className="text-xs text-[#666666] mb-4">
-                    Controls the piecewise linear yield share curve. Y₀ and Y_full set the endpoints; Y_T is the kink at 90% utilization.
+                    Controls the piecewise linear yield share curve. Y₀ and Y_full set the endpoints; Y_T is the kink at 90% utilization. Change these parameters to change the initial shape of the curve.
                   </p>
                   <div className="grid grid-cols-3 gap-4">
                     <div>
