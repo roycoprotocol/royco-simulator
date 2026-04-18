@@ -1396,7 +1396,12 @@ export default function YieldSimulator() {
                     YDM Curve
                   </h2>
                   <div className="flex items-center gap-3 flex-wrap">
-                    <label className="text-xs font-semibold uppercase tracking-wide text-[#666666]">Adapt YDM</label>
+                    <div className="relative group cursor-help">
+                      <label className="text-xs font-semibold uppercase tracking-wide text-[#666666]">Adapt YDM</label>
+                      <div className="absolute bottom-full left-0 mb-2 hidden group-hover:block w-72 p-3 text-xs font-normal text-white bg-[#0a0a0a] rounded-lg shadow-lg z-50 pointer-events-none">
+                        Over time, the yield-share curve adapts to incentivize juniors and seniors to rebalance the market toward 90% utilization.
+                      </div>
+                    </div>
                     <input
                       type="range"
                       min={1}
