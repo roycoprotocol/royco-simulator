@@ -651,7 +651,8 @@ export default function YieldSimulator() {
                     }
                   }}
                 >
-                  <div className="flex flex-col items-center">
+                  <div className="relative flex flex-col items-center">
+                    <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-0.5 text-[9px] uppercase tracking-wide text-[#16a34a]/80 whitespace-nowrap">Target</span>
                     <span className="text-[#16a34a] font-semibold hover:underline">{t.utilLabel}</span>
                   </div>
                   <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 hidden group-hover:block w-72 p-3 text-xs font-normal text-white bg-[#0a0a0a] rounded-lg shadow-lg z-50 pointer-events-none">
