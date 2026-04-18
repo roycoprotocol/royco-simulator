@@ -603,6 +603,15 @@ export default function YieldSimulator() {
       return complexPositionFromUtil(utilValue);
     };
     const renderedTargetPosition = toTrackPosition(TARGET_UTIL) ?? targetPosition;
+    // Native range thumb has a width (THUMB_WIDTH_PX) — its CENTER sweeps from
+    // (thumb/2) at value=min to (trackWidth − thumb/2) at value=max. Tick marks
+    // rendered at plain `left: X%` align with the track edge, not the thumb
+    // center. This helper returns a CSS `left` value that aligns with the
+    // thumb's center for a given normalized track position p ∈ [0, 1].
+    const THUMB_WIDTH_PX = 20;
+    const THUMB_HALF_PX = THUMB_WIDTH_PX / 2;
+    const tickLeftCss = (p: number) =>
+      `calc(${p * 100}% + ${THUMB_HALF_PX - p * THUMB_WIDTH_PX}px)`;
     const trySnap = (pos: number) => {
       const u = utilFromPos(pos);
       if (Math.abs(u - TARGET_UTIL) <= SNAP_UTIL_TOLERANCE) setUtilization(TARGET_UTIL);
@@ -627,7 +636,7 @@ export default function YieldSimulator() {
             <div
               key={`above-${t.position}`}
               className="absolute top-0 -translate-x-1/2 text-[10px] tabular-nums"
-              style={{ left: `${pos * 100}%` }}
+              style={{ left: tickLeftCss(pos) }}
             >
               {t.isTarget ? (
                 <div
@@ -666,7 +675,7 @@ export default function YieldSimulator() {
           <div
             aria-hidden="true"
             className="pointer-events-none absolute top-1/2 -translate-y-1/2 -translate-x-1/2 h-8 border-l-2 border-dashed border-[#0a0a0a]/50"
-            style={{ left: `${renderedTargetPosition * 100}%` }}
+            style={{ left: tickLeftCss(renderedTargetPosition) }}
           />
           <input
             id={inputId}
@@ -703,7 +712,7 @@ export default function YieldSimulator() {
               <div
                 key={`below-${t.position}`}
                 className="absolute top-0 -translate-x-1/2 text-[10px] text-[#666666] tabular-nums"
-                style={{ left: `${pos * 100}%` }}
+                style={{ left: tickLeftCss(pos) }}
               >
                 {crLabel}
               </div>
