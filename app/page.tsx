@@ -383,25 +383,23 @@ export default function YieldSimulator() {
     const requiredCoverage = (seniorRawNAV + juniorRawNAV * betaNum) * minCoverageNum;
     const utilization = requiredCoverage / juniorEffectiveNAV;
 
-    // Parse new params — apply adaptation offset (slopes fixed, all Y values shift equally)
-    const baseY0 = parseNumber(ydmY0) / 100;
-    const baseYT = parseNumber(ydmYT) / 100;
-    const baseYFull = parseNumber(ydmYFull) / 100;
+    // Parse new params — apply adaptation offset (slopes fixed, all Y values shift equally).
+    // Empty/invalid curve or fee fields fall back to 0 so mid-edit typing doesn't collapse the UI.
+    const safePct = (v: string) => {
+      const n = parseNumber(v) / 100;
+      return Number.isFinite(n) ? n : 0;
+    };
+    const baseY0 = safePct(ydmY0);
+    const baseYT = safePct(ydmYT);
+    const baseYFull = safePct(ydmYFull);
     const adaptedYT = adaptYdm / 100;
     const adaptDelta = adaptedYT - baseYT;
     const y0 = Math.max(0, Math.min(1, baseY0 + adaptDelta));
     const yT = adaptedYT;
     const yFull = Math.max(0, Math.min(1, baseYFull + adaptDelta));
-    const jtFeeNum = parseNumber(jtFee) / 100;
-    const stFeeNum = parseNumber(stFee) / 100;
-    const ysFeeNum = parseNumber(ysFee) / 100;
-
-    if (
-      isNaN(y0) || isNaN(yT) || isNaN(yFull) ||
-      isNaN(jtFeeNum) || isNaN(stFeeNum) || isNaN(ysFeeNum)
-    ) {
-      return null;
-    }
+    const jtFeeNum = safePct(jtFee);
+    const stFeeNum = safePct(stFee);
+    const ysFeeNum = safePct(ysFee);
 
     const discount = yT - y0;
     const premium = yFull - yT;
@@ -521,13 +519,17 @@ export default function YieldSimulator() {
     const juniorYieldRate = juniorDeploymentOption === 'underlying' ? safeUnderlyingYield : (isNaN(juniorCustomYieldNum) ? 0 : juniorCustomYieldNum);
     const seniorYieldPool = safeUnderlyingYield * seniorCapitalNum;
     const juniorOwnYield = juniorYieldRate * juniorCapitalNum;
-    const jtFeeNum = parseNumber(jtFee) / 100;
-    const stFeeNum = parseNumber(stFee) / 100;
-    const ysFeeNum = parseNumber(ysFee) / 100;
+    const safePctChart = (v: string) => {
+      const n = parseNumber(v) / 100;
+      return Number.isFinite(n) ? n : 0;
+    };
+    const jtFeeNum = safePctChart(jtFee);
+    const stFeeNum = safePctChart(stFee);
+    const ysFeeNum = safePctChart(ysFee);
     // Apply adaptation offset (slopes fixed, all Y values shift equally)
-    const baseY0 = parseNumber(ydmY0) / 100;
-    const baseYT = parseNumber(ydmYT) / 100;
-    const baseYFull = parseNumber(ydmYFull) / 100;
+    const baseY0 = safePctChart(ydmY0);
+    const baseYT = safePctChart(ydmYT);
+    const baseYFull = safePctChart(ydmYFull);
     const adaptDelta = adaptYdm / 100 - baseYT;
     const y0Num = Math.max(0, Math.min(1, baseY0 + adaptDelta));
     const yTNum = adaptYdm / 100;
