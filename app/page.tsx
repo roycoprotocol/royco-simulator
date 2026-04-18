@@ -614,10 +614,6 @@ export default function YieldSimulator() {
     const THUMB_HALF_PX = THUMB_WIDTH_PX / 2;
     const tickLeftCss = (p: number) =>
       `calc(${p * 100}% + ${THUMB_HALF_PX - p * THUMB_WIDTH_PX}px)`;
-    const trySnap = (pos: number) => {
-      const u = utilFromPos(pos);
-      if (Math.abs(u - TARGET_UTIL) <= SNAP_UTIL_TOLERANCE) setUtilization(TARGET_UTIL);
-    };
 
     return (
       <div className={variant === 'complex' ? 'border-t border-[#e5e5e0] pt-5' : ''}>
@@ -691,9 +687,6 @@ export default function YieldSimulator() {
               const u = utilFromPos(parseFloat(e.target.value));
               setUtilization(variant === 'simple' ? Math.max(u, minUtil) : u);
             }}
-            onPointerUp={(e) => trySnap(parseFloat((e.target as HTMLInputElement).value))}
-            onMouseUp={(e) => trySnap(parseFloat((e.target as HTMLInputElement).value))}
-            onTouchEnd={(e) => trySnap(parseFloat((e.target as HTMLInputElement).value))}
             aria-valuetext={Number.isFinite(utilization) ? `${(utilization * 100).toFixed(1)}%` : '∞'}
             className={`w-full utilization-slider ${variant === 'complex' ? 'utilization-slider--complex' : ''}`}
           />
@@ -1484,6 +1477,7 @@ export default function YieldSimulator() {
                   >
                     <CartesianGrid strokeDasharray="3 3" stroke="#e5e5e0" />
                     <XAxis
+                      type="number"
                       dataKey="utilization"
                       domain={[0, chartMaxUtilization]}
                       ticks={[0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100]}
@@ -1555,6 +1549,7 @@ export default function YieldSimulator() {
                   >
                     <CartesianGrid strokeDasharray="3 3" stroke="#e5e5e0" />
                     <XAxis
+                      type="number"
                       dataKey="utilization"
                       label={{ value: 'Utilization (%)', position: 'insideBottom', offset: -10, fill: '#0a0a0a', fontSize: 12 }}
                       domain={[0, chartMaxUtilization]}
