@@ -213,6 +213,20 @@ export default function YieldSimulator() {
     }
   }, [utilization, capitalInputMode, minCoverage, beta, seniorCapital, juniorCapital]);
 
+  // If β or COV change such that the current utilization falls below the new
+  // β·COV floor, nudge utilization up to the floor so the simple slider's
+  // constraint is respected and results stay well-defined.
+  useEffect(() => {
+    const cov = parseNumber(minCoverage) / 100;
+    const betaNumLocal = parseNumber(beta) / 100;
+    if (!Number.isFinite(cov) || !Number.isFinite(betaNumLocal)) return;
+    const floor = Math.min(1, Math.max(0, cov * betaNumLocal));
+    if (utilization < floor) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setUtilization(floor);
+    }
+  }, [minCoverage, beta, utilization]);
+
   const selectedExample = useMemo(
     () => (selectedExampleId ? EXAMPLE_PRESETS.find((preset) => preset.id === selectedExampleId) ?? null : null),
     [selectedExampleId]
@@ -563,6 +577,14 @@ export default function YieldSimulator() {
       ? simplePositionFromUtil(TARGET_UTIL)
       : complexPositionFromUtil(TARGET_UTIL);
     const utilFromPos = variant === 'simple' ? simpleUtilFromPosition : complexUtilFromPosition;
+    // Mathematical floor: util > β·COV is required for a positive junior capital.
+    // For the simple slider we clamp the thumb; for complex we allow the full range.
+    const covNum = parseNumber(minCoverage) / 100;
+    const betaNumLocal = parseNumber(beta) / 100;
+    const minUtil = Number.isFinite(covNum) && Number.isFinite(betaNumLocal)
+      ? Math.min(1, Math.max(0, covNum * betaNumLocal))
+      : 0;
+    const sliderMin = variant === 'simple' ? minUtil : 0;
     const trySnap = (pos: number) => {
       const u = utilFromPos(pos);
       if (Math.abs(u - TARGET_UTIL) <= SNAP_UTIL_TOLERANCE) setUtilization(TARGET_UTIL);
@@ -627,11 +649,14 @@ export default function YieldSimulator() {
           <input
             id={inputId}
             type="range"
-            min={0}
+            min={sliderMin}
             max={1}
             step={0.001}
-            value={sliderPosition}
-            onChange={(e) => setUtilization(utilFromPos(parseFloat(e.target.value)))}
+            value={Math.max(sliderPosition, sliderMin)}
+            onChange={(e) => {
+              const u = utilFromPos(parseFloat(e.target.value));
+              setUtilization(variant === 'simple' ? Math.max(u, minUtil) : u);
+            }}
             onPointerUp={(e) => trySnap(parseFloat((e.target as HTMLInputElement).value))}
             onMouseUp={(e) => trySnap(parseFloat((e.target as HTMLInputElement).value))}
             onTouchEnd={(e) => trySnap(parseFloat((e.target as HTMLInputElement).value))}
@@ -673,6 +698,11 @@ export default function YieldSimulator() {
             })()}
           </p>
         </div>
+        {variant === 'simple' && minUtil > 0 && (
+          <p className="mt-2 text-[10px] text-[#999999]">
+            Minimum utilization {`${(minUtil * 100).toFixed(1)}%`} at current β · coverage.
+          </p>
+        )}
         {variant === 'complex' && utilization > 1 && (
           <div className="mt-3 rounded-md border border-[#fde68a] bg-[#fffbeb] px-3 py-2 text-xs text-[#854d0e]">
             Utilization above 100% implies a Junior drawdown has occurred. The protocol blocks new Senior deposits past 100%, so reaching this state requires Junior NAV losses.
