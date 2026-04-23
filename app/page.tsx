@@ -1005,7 +1005,7 @@ export default function YieldSimulator() {
                         : 'text-[#666666] hover:bg-[#f4f4f0]'
                     }`}
                   >
-                    Senior fixed
+                    Senior input
                   </button>
                   <button
                     type="button"
@@ -1016,7 +1016,7 @@ export default function YieldSimulator() {
                         : 'text-[#666666] hover:bg-[#f4f4f0]'
                     }`}
                   >
-                    Junior fixed
+                    Junior input
                   </button>
                 </div>
               </div>
