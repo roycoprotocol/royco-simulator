@@ -425,9 +425,11 @@ export default function YieldSimulator() {
     const juniorYieldRate = juniorDeploymentOption === 'underlying' ? underlyingYieldNum : juniorCustomYieldNum;
     const juniorOwnYield = juniorCapitalNum * juniorYieldRate;
 
-    // Fee model: jtFee on own yield, ysFee on risk premium, stFee on ST yield
+    // Fee model: ysFee applied first to risk premium, then jtFee on both own yield
+    // and the post-ysFee risk premium. stFee on ST yield.
     const juniorOwnYieldAfterFee = juniorOwnYield * (1 - jtFeeNum);
-    const juniorRiskPremiumAfterFee = juniorYield * (1 - ysFeeNum);
+    const juniorRiskPremiumAfterYsFee = juniorYield * (1 - ysFeeNum);
+    const juniorRiskPremiumAfterFee = juniorRiskPremiumAfterYsFee * (1 - jtFeeNum);
     const juniorNetYield = juniorOwnYieldAfterFee + juniorRiskPremiumAfterFee;
     const seniorNetYield = seniorYield * (1 - stFeeNum);
 
@@ -435,7 +437,9 @@ export default function YieldSimulator() {
     const combinedTotalYield = juniorNetYield + seniorNetYield;
     const juniorYieldPercent = (juniorNetYield / juniorCapitalNum) * 100;
     const seniorYieldPercent = (seniorNetYield / seniorCapitalNum) * 100;
-    const totalFees = (juniorOwnYield * jtFeeNum) + (juniorYield * ysFeeNum) + (seniorYield * stFeeNum);
+    const ysFeeTake = juniorYield * ysFeeNum;
+    const jtFeeTake = juniorOwnYield * jtFeeNum + juniorRiskPremiumAfterYsFee * jtFeeNum;
+    const totalFees = ysFeeTake + jtFeeTake + seniorYield * stFeeNum;
 
     return {
       isValid: true,
@@ -556,7 +560,7 @@ export default function YieldSimulator() {
         const k = utilization / covDec - 1;
         const ownYield = r * 100;
         const riskPremium = ys * r * k * 100;
-        juniorAPY = ownYield * (1 - jtFeeNum) + riskPremium * (1 - ysFeeNum);
+        juniorAPY = ownYield * (1 - jtFeeNum) + riskPremium * (1 - ysFeeNum) * (1 - jtFeeNum);
         seniorAPY = (1 - ys) * r * 100 * (1 - stFeeNum);
       }
 
