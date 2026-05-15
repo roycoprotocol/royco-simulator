@@ -91,8 +91,8 @@ const DEFAULT_INPUTS: SimulatorInputs = {
   ydmYT: '15',
   ydmYFull: '40',
   jtFee: '0',
-  stFee: '10',
-  ysFee: '45',
+  stFee: '0',
+  ysFee: '0',
 };
 
 type ExamplePreset = {
