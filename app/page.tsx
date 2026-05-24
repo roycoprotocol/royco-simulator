@@ -750,6 +750,17 @@ export default function YieldSimulator() {
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="text-center mb-12">
+          <div className="flex items-center justify-center gap-3 mb-3">
+            <span className="text-[10px] tracking-wide uppercase text-[#0a0a0a] bg-[#eef0f4] border border-[#e5e5e0] rounded-full px-2.5 py-1">
+              v1 · Dawn
+            </span>
+            <a
+              href="/v2"
+              className="text-[10px] tracking-wide uppercase text-[#C8873E] bg-[#fff7e8] border border-[#f1d9a8] rounded-full px-2.5 py-1 hover:opacity-80"
+            >
+              v2 · Dusk →
+            </a>
+          </div>
           <h1 className="text-5xl md:text-6xl font-semibold text-[#0a0a0a] mb-4 tracking-tight">
             Royco Tranching Simulator
           </h1>

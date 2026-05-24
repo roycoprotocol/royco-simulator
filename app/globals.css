@@ -76,3 +76,33 @@ body {
   border-radius: 9999px;
   background: #86efac;
 }
+
+/* === Dashboard animation helpers === */
+@keyframes pulse-marker {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.5; transform: scale(1.15); }
+}
+
+.pulse-dot {
+  animation: pulse-marker 1.8s ease-in-out infinite;
+  transform-origin: center;
+}
+
+@keyframes kpi-flash {
+  0% { background-color: rgba(251, 191, 36, 0.18); }
+  100% { background-color: transparent; }
+}
+
+.kpi-flash {
+  animation: kpi-flash 0.6s ease-out;
+}
+
+/* Smooth slider track gradient feedback */
+.utilization-slider {
+  transition: background 0.15s ease-out;
+}
+
+/* All number cells settle smoothly when value changes */
+.tabular-nums {
+  transition: color 0.2s ease-out;
+}
