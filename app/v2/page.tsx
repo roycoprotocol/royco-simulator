@@ -1083,7 +1083,8 @@ export default function DuskV2Simulator() {
               <KpiTile label="JUNIOR APY" value={fmtPct(yields.juniorAPY)} accent="amber" />
               <KpiTile label="UTIL" value={fmtPct(derived.utilization)} accent={derived.utilization > 1 ? 'red' : undefined} />
               <KpiTile label="β" value={fmtPct(derived.beta)} accent={derived.beta > 1 ? 'red' : undefined} />
-              <KpiTile label="POOL TVL" value={`$${fmtCompact(derived.poolSizeNav)}`} />
+              <KpiTile label="MARKET TVL" value={`$${fmtCompact(yields.seniorCapital + yields.juniorCapital)}`} />
+              <KpiTile label="E-CLP TVL" value={`$${fmtCompact(derived.poolSizeNav)}`} />
               <KpiTile label="ST TVL" value={`$${fmtCompact(yields.seniorCapital)}`} />
               <KpiTile label="JT TVL" value={`$${fmtCompact(yields.juniorCapital)}`} />
               {cumVolume > 0 && (
