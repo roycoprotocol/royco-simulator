@@ -1,7 +1,13 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine, ReferenceDot } from 'recharts';
+import dynamic from 'next/dynamic';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ReferenceDot } from 'recharts';
+
+const ResponsiveContainerNoSSR = dynamic(
+  () => import('recharts').then((mod) => mod.ResponsiveContainer),
+  { ssr: false },
+);
 
 type DeploymentOption = 'underlying' | 'elsewhere';
 type CapitalInputMode = 'senior-fixed' | 'junior-fixed';
@@ -29,7 +35,6 @@ type SimulatorInputs = {
 //            p ∈ [0.5, 1]:        util = 1 / (2(1 − p)) (linear in coverage: CR = cov·2(1−p))
 // In the simple slider, util > 1 is not representable — thumb pins at 100%.
 const TARGET_UTIL = 0.9;
-const SNAP_UTIL_TOLERANCE = 0.04; // ±4% util window for snap
 
 const simplePositionFromUtil = (util: number): number => {
   if (util <= 0) return 0;
@@ -491,38 +496,10 @@ export default function YieldSimulator() {
     return `${value.toFixed(2)}%`;
   };
 
-  const calculateYdmYieldShare = (utilization: number, y0Val?: number, yTVal?: number, yFullVal?: number): number => {
-    const y0 = y0Val ?? parseNumber(ydmY0) / 100;
-    const yT = yTVal ?? parseNumber(ydmYT) / 100;
-    const yFull = yFullVal ?? parseNumber(ydmYFull) / 100;
-    const discount = yT - y0;
-    const premium = yFull - yT;
-
-    const u = Math.min(Math.max(utilization, 0), 1);
-    let normalizedDelta: number;
-    let yieldShare: number;
-
-    if (u < 0.9) {
-      normalizedDelta = (u - 0.9) / 0.9;
-      yieldShare = yT + normalizedDelta * discount;
-    } else {
-      normalizedDelta = (u - 0.9) / 0.1;
-      yieldShare = yT + normalizedDelta * premium;
-    }
-
-    return Math.min(1, Math.max(0, yieldShare));
-  };
-
   const chartData = useMemo(() => {
     const data = [];
-    const seniorCapitalNum = parseNumber(seniorCapital);
-    const juniorCapitalNum = parseNumber(juniorCapital);
     const underlyingYieldNum = parseNumber(underlyingYield) / 100;
     const safeUnderlyingYield = isNaN(underlyingYieldNum) ? 0 : underlyingYieldNum;
-    const juniorCustomYieldNum = parseNumber(juniorCustomYield) / 100;
-    const juniorYieldRate = juniorDeploymentOption === 'underlying' ? safeUnderlyingYield : (isNaN(juniorCustomYieldNum) ? 0 : juniorCustomYieldNum);
-    const seniorYieldPool = safeUnderlyingYield * seniorCapitalNum;
-    const juniorOwnYield = juniorYieldRate * juniorCapitalNum;
     const safePctChart = (v: string) => {
       const n = parseNumber(v) / 100;
       return Number.isFinite(n) ? n : 0;
@@ -544,7 +521,13 @@ export default function YieldSimulator() {
 
     for (let i = 0; i <= 1000; i++) {
       const utilization = i / 1000;
-      const ys = calculateYdmYieldShare(utilization, y0Num, yTNum, yFullNum);
+      const u = Math.min(Math.max(utilization, 0), 1);
+      const discount = yTNum - y0Num;
+      const premium = yFullNum - yTNum;
+      const ysUnclamped = u < 0.9
+        ? yTNum + ((u - 0.9) / 0.9) * discount
+        : yTNum + ((u - 0.9) / 0.1) * premium;
+      const ys = Math.min(1, Math.max(0, ysUnclamped));
 
       // Leverage-based APY (from YdmSimulator reference):
       //   k = u / cov - 1  (ST:JT capital ratio implied by utilization)
@@ -572,7 +555,7 @@ export default function YieldSimulator() {
       });
     }
     return data;
-  }, [adaptYdm, minCoverage, underlyingYield, seniorCapital, juniorCapital, juniorCustomYield, juniorDeploymentOption, jtFee, stFee, ysFee, ydmY0, ydmYT, ydmYFull]);
+  }, [adaptYdm, minCoverage, underlyingYield, jtFee, stFee, ysFee, ydmY0, ydmYT, ydmYFull]);
 
   const renderUtilizationSlider = (variant: 'simple' | 'complex', idSuffix: string) => {
     const inputId = `utilization-slider-${idSuffix}`;
@@ -1489,7 +1472,7 @@ export default function YieldSimulator() {
 
               {/* YDM Yield Share chart */}
               <div className="h-72">
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainerNoSSR width="100%" height="100%" minWidth={0} minHeight={320}>
                   <LineChart
                     data={chartData}
                     margin={{ top: 20, right: 30, left: 60, bottom: 5 }}
@@ -1556,12 +1539,12 @@ export default function YieldSimulator() {
                       isAnimationActive={false}
                     />
                   </LineChart>
-                </ResponsiveContainer>
+                </ResponsiveContainerNoSSR>
               </div>
 
               {/* Net APY chart — tightly coupled */}
               <div className="h-72 -mt-1">
-                <ResponsiveContainer width="100%" height="100%">
+                <ResponsiveContainerNoSSR width="100%" height="100%" minWidth={0} minHeight={320}>
                   <LineChart
                     data={chartData}
                     margin={{ top: 10, right: 30, left: 60, bottom: 30 }}
@@ -1646,7 +1629,7 @@ export default function YieldSimulator() {
                       isAnimationActive={false}
                     />
                   </LineChart>
-                </ResponsiveContainer>
+                </ResponsiveContainerNoSSR>
               </div>
 
               <div className="mt-2 flex items-center justify-center gap-6">

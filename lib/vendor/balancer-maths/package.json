@@ -1,0 +1,52 @@
+{
+  "name": "@balancer-labs/balancer-maths",
+  "description": "Balancer V3 Maths",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/balancer/balancer-maths"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
+  "version": "0.0.40",
+  "main": "dist/index.js",
+  "module": "dist/index.mjs",
+  "types": "dist/index.d.ts",
+  "typings": "dist/index.d.ts",
+  "files": [
+    "dist/"
+  ],
+  "devDependencies": {
+    "@changesets/cli": "^2.28.1",
+    "@types/node": "^22.13.4",
+    "@typescript-eslint/eslint-plugin": "^8.24.1",
+    "@typescript-eslint/parser": "^8.24.1",
+    "dotenv": "^16.4.7",
+    "dpdm": "^3.14.0",
+    "eslint": "^8.56.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-prettier": "^5.2.1",
+    "prettier": "^3.3.3",
+    "ts-node": "^10.9.2",
+    "tsup": "^8.3.6",
+    "typescript": "^5.7.3",
+    "vite": "^6.1.1",
+    "vitest": "^3.0.6"
+  },
+  "packageManager": "pnpm@8.6.0",
+  "engines": {
+    "node": ">=18.x"
+  },
+  "scripts": {
+    "build": "tsup",
+    "build:test": "npx tsup ./test",
+    "format": "prettier --config .prettierrc 'src/**/*.ts' --write",
+    "lint": "dpdm -T ./src && eslint ./src --ext .ts",
+    "lint:fix": "eslint ./src --ext .ts --fix",
+    "test": "vitest dev",
+    "test:ci": "vitest run",
+    "changeset": "changeset",
+    "changeset:release": "pnpm build && changeset publish"
+  }
+}

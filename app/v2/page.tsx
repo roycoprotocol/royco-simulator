@@ -1,8 +1,10 @@
 'use client';
+/* eslint-disable react-hooks/set-state-in-effect */
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
 import {
   LineChart,
   Line,
@@ -10,14 +12,31 @@ import {
   YAxis,
   CartesianGrid,
   Tooltip,
-  ResponsiveContainer,
   ReferenceLine,
-  ReferenceDot,
   ReferenceArea,
-  BarChart,
-  Bar,
   Legend,
 } from 'recharts';
+import {
+  NAV_EPS,
+  clampUnit,
+  initialPoolState,
+  rawNavFromState,
+  syncAccountingOnBefore,
+  syncAccountingOnAfter,
+  balancePoolPriceFromCashPct,
+  exitIsImbalancingAt,
+  computeEclpSpotPrice,
+  eclpReservesAtPrice,
+  makeEclpConfig,
+  quoteEclpSwap,
+  translateTargetCashToEclpBounds,
+  simulateTrade,
+} from '@/lib/v2Math.mjs';
+
+const ResponsiveContainerNoSSR = dynamic(
+  () => import('recharts').then((mod) => mod.ResponsiveContainer),
+  { ssr: false },
+);
 
 // =============================================================================
 // Royco Dusk v2 Simulator
@@ -36,9 +55,15 @@ const WAD = 1; // we work in fractions, not 1e18
 type Direction = 'exit' | 'enter';
 
 type PoolState = {
-  internalShares: number;   // ST shares held inside the pool
-  quoteReserves: number;    // pool's quote-asset balance (NAV units)
-  stShares: number;         // total ST shares minted — FIXED at bootstrap, preserved across trades (PDF §11)
+  internalShares: number;
+  quoteReserves: number;
+  stShares: number;
+  stRawCheckpoint: number;
+  jtRawCheckpoint: number;
+  stEffectiveNav: number;
+  jtEffectiveNav: number;
+  stIL: number;
+  jtIL: number;
 };
 
 // The four user-facing inputs (the "mental model" of an advanced DeFi user).
@@ -98,18 +123,7 @@ const initialPoolFromSetup = (s: SetupInputs): PoolState => {
   const cashPct = parseFloat(s.juniorCashPct) / 100;
   const aP = parseFloat(s.assetPrice) || 1;
   const qP = parseFloat(s.quotePrice) || 1;
-  if (![jt, ss, cashPct, aP, qP].every(Number.isFinite)) {
-    return { internalShares: 0, quoteReserves: 0, stShares: 0 };
-  }
-  const cashNav = jt * cashPct;
-  const shareNav = jt * (1 - cashPct);
-  const internalShares = shareNav / Math.max(aP, 1e-9);
-  const externalShares = ss / Math.max(aP, 1e-9);
-  return {
-    internalShares,
-    quoteReserves: cashNav / Math.max(qP, 1e-9),
-    stShares: externalShares + internalShares,
-  };
+  return initialPoolState(ss, jt, cashPct, aP, qP);
 };
 
 // PDF YDM piecewise linear curve (kink at 90% util). Inputs are fractions.
@@ -130,7 +144,7 @@ const ydmYieldShare = (util: number, y0: number, yT: number, yFull: number): num
 const DEFAULT_ECLP: EclpParams = {
   alpha: '0.97',
   beta: '1.03',
-  lambda: '500',
+  lambda: '100',            // valid with the default 90/10 target and ±3% close-side tolerance
   phi: '0.05',             // rotation angle (radians-ish); real Gyro E-CLPs use 0.001–0.1
   swapFeeRate: '0.05',     // 5 bps
 };
@@ -148,45 +162,10 @@ const fmtCommas = (v: string): string => {
 const fmtNav = (n: number, digits = 2) =>
   new Intl.NumberFormat('en-US', { minimumFractionDigits: digits, maximumFractionDigits: digits }).format(n);
 
-// === Scenario presets — one-click market loads ===
-type Preset = {
-  id: string;
-  label: string;
-  desc: string;
-  partialSetup: Partial<SetupInputs>;
+const safeYdmShare = (ytPctInput: string, fallback = 0.15): number => {
+  const parsed = parseNum(ytPctInput) / 100;
+  return Number.isFinite(parsed) ? clampUnit(parsed) : clampUnit(fallback);
 };
-const PRESETS: Preset[] = [
-  {
-    id: 'susde',
-    label: 'sUSDe pool',
-    desc: '9% APY · balanced',
-    partialSetup: { underlyingYield: '9', seniorTrancheSize: '10,000,000', juniorTrancheSize: '2,000,000', juniorCashPct: '50', minCoverage: '10', quoteYield: '0' },
-  },
-  {
-    id: 'sdai',
-    label: 'sDAI pool',
-    desc: '5% APY · balanced',
-    partialSetup: { underlyingYield: '5', seniorTrancheSize: '20,000,000', juniorTrancheSize: '4,000,000', juniorCashPct: '50', minCoverage: '10', quoteYield: '0' },
-  },
-  {
-    id: 'usdc',
-    label: 'USDC pool',
-    desc: '0% APY · pure liquidity',
-    partialSetup: { underlyingYield: '0', seniorTrancheSize: '50,000,000', juniorTrancheSize: '5,000,000', juniorCashPct: '50', minCoverage: '5', quoteYield: '0' },
-  },
-  {
-    id: 'stressed',
-    label: 'Stressed @ 90% util',
-    desc: 'Tight coverage, share-heavy pool',
-    partialSetup: { underlyingYield: '9', seniorTrancheSize: '10,000,000', juniorTrancheSize: '1,111,111', juniorCashPct: '20', minCoverage: '10' },
-  },
-  {
-    id: 'fresh',
-    label: 'Fresh bootstrap',
-    desc: 'New market, low utilization',
-    partialSetup: { underlyingYield: '9', seniorTrancheSize: '1,000,000', juniorTrancheSize: '5,000,000', juniorCashPct: '90', minCoverage: '10' },
-  },
-];
 
 // Compact dollar format for tight KPI tiles: $2.0M, $1.5K, $123
 const fmtCompact = (n: number): string => {
@@ -202,132 +181,6 @@ const fmtCompact = (n: number): string => {
 const fmtPct = (n: number, digits = 2) =>
   `${(n * 100).toFixed(digits)}%`;
 
-// Heuristic κ (curvature) at current operating point. Units: 1 / NAV — so that
-// σ = κ × t² is in NAV when t is in NAV. (Stableswap analogue from PDF §10:
-// κ = K / (A·D), where D is pool size — note the inverse-size scaling.)
-//   λ × poolSize provides the inverse-size scaling
-//   Boundary factor ↑ as price approaches [α, β] edges (liquidity thins).
-//   φ rotates depth: for φ > 0, exit-direction κ is lower (deeper exit liq).
-const computeKappa = (
-  effectivePrice: number,
-  alpha: number,
-  beta: number,
-  lambda: number,
-  phi: number,
-  direction: Direction,
-  poolSizeNav: number,
-): number => {
-  if (!(beta > alpha) || !(lambda > 0) || !(poolSizeNav > 0)) return Infinity;
-  // Position within the price range [α, β]. Balance point = middle (0.5) by
-  // convention. The real E-CLP rotation places the peak slightly off-center,
-  // but for our asymmetric pool (α/β set to bracket the target price), the
-  // midpoint IS the balance.
-  const t = (effectivePrice - alpha) / (beta - alpha);
-  const distFromCenter = Math.min(1, Math.max(0, Math.abs(t - 0.5) / 0.5));
-  // Per PDF §10: κ approaches zero at the balance point and grows toward
-  // [α, β] boundaries. Small floor (0.05) avoids div-by-zero in tooltips.
-  const boundaryFactor = 0.05 + 12 * distFromCenter * distFromCenter;
-  // φ is the single rotation knob: positive φ → cheaper exits (deeper exit
-  // liquidity); negative φ → cheaper enters. In real Gyro E-CLP, φ is a
-  // rotation angle in radians (typical deployments: 0.001–0.1). We use it
-  // ONLY for direction asymmetry here, not as a depth-center shift — earlier
-  // versions double-applied φ, which over-stated the asymmetry.
-  const directionFactor = direction === 'exit'
-    ? Math.max(0.1, 1 - 0.8 * phi)
-    : Math.max(0.1, 1 + 0.8 * phi);
-  return (boundaryFactor * directionFactor) / (lambda * poolSizeNav);
-};
-
-// Apply a trade to (internalShares, quoteReserves).
-//
-// Convention: t = gross NAV the trader brings to the pool.
-//   * 'exit'  → trader gives t worth of ST shares; pool gives back (t−fee−σ)
-//               worth of quote.
-//   * 'enter' → trader gives t worth of quote; pool gives back (t−fee−σ)
-//               worth of ST shares.
-//
-// Pool charges: fee = swapFeeRate × t; slippage σ = ±κ × t² (sign = +1 for
-// imbalancing trades, −1 for balancing). ΔJT_RAW_NAV per trade = fee + σ
-// (PDF §11). Pool NAV conservation: ST_RAW + JT_RAW = assetPrice × stAssets
-// + quotePrice × quoteReserves holds exactly after the update.
-//
-// "Imbalancing" = the direction that pushes the pool further from its rate-
-// adjusted balance point (quote NAV = share NAV in pool). Share-heavy pool +
-// 'exit' is the canonical Dusk imbalancing case.
-const simulateTrade = (
-  state: PoolState,
-  tNav: number,
-  direction: Direction,
-  perShareNav: number,
-  quotePrice: number,
-  swapFeeRate: number,
-  kappa: number,
-  balancePoolPrice: number,
-): {
-  feeNav: number;
-  sigmaNav: number;
-  isImbalancing: boolean;
-  newState: PoolState;
-  jtEffDelta: number;
-  feasible: boolean;
-} => {
-  const sharesInPool = state.internalShares;
-  const quoteInPool = state.quoteReserves;
-  const shareNavInPool = sharesInPool * perShareNav;
-  const quoteNavInPool = quoteInPool * quotePrice;
-  // A trade is IMBALANCING if it moves the pool further from the curve's
-  // balance point (set by α/β), BALANCING if it moves toward. We classify by
-  // simulating the post-trade composition (ignoring fee/σ) and comparing
-  // distance-to-balance. This correctly handles asymmetric pools where the
-  // balance is e.g. 90% cash / 10% shares (NOT 50/50).
-  const currentPoolPrice = shareNavInPool > 0 ? quoteNavInPool / shareNavInPool : balancePoolPrice;
-  const newShareNavGross = direction === 'exit' ? shareNavInPool + tNav : Math.max(0, shareNavInPool - tNav);
-  const newQuoteNavGross = direction === 'exit' ? Math.max(0, quoteNavInPool - tNav) : quoteNavInPool + tNav;
-  const newPoolPriceGross = newShareNavGross > 0 ? newQuoteNavGross / newShareNavGross : balancePoolPrice;
-  const distFromBalanceNow = Math.abs(currentPoolPrice - balancePoolPrice);
-  const distFromBalanceAfter = Math.abs(newPoolPriceGross - balancePoolPrice);
-  const isImbalancing = distFromBalanceAfter >= distFromBalanceNow;
-
-  const sigmaSign = isImbalancing ? 1 : -1;
-  const sigmaNav = sigmaSign * kappa * tNav * tNav;
-  const feeNav = swapFeeRate * tNav;
-  // What the trader receives, in NAV. If σ ≥ t − fee, the trade is uneconomic.
-  const counterValueNav = tNav - feeNav - sigmaNav;
-
-  let dInternalShares = 0;
-  let dQuoteReserves = 0;
-  let feasible = true;
-
-  if (direction === 'exit') {
-    // Trader sells shares worth t NAV → pool. Pool pays out counterValueNav
-    // in quote tokens.
-    dInternalShares = tNav / Math.max(perShareNav, 1e-18);
-    dQuoteReserves = -counterValueNav / Math.max(quotePrice, 1e-18);
-    if (quoteInPool + dQuoteReserves < 0) feasible = false; // would drain pool
-    if (counterValueNav <= 0) feasible = false;             // trader gets nothing
-  } else {
-    // Trader pays t NAV of quote. Pool releases counterValueNav in shares.
-    dInternalShares = -counterValueNav / Math.max(perShareNav, 1e-18);
-    dQuoteReserves = tNav / Math.max(quotePrice, 1e-18);
-    if (sharesInPool + dInternalShares < 0) feasible = false; // pool has no shares
-    if (counterValueNav <= 0) feasible = false;
-  }
-
-  const newInternal = Math.max(0, sharesInPool + dInternalShares);
-  const newQuote = Math.max(0, quoteInPool + dQuoteReserves);
-  const jtEffDelta = feeNav + sigmaNav;
-
-  return {
-    feeNav,
-    sigmaNav,
-    isImbalancing,
-    // CRITICAL: preserve stShares — PDF §11 says trades shift external↔internal
-    // but don't mint/burn. Without this, Π would grow on every exit.
-    newState: { internalShares: newInternal, quoteReserves: newQuote, stShares: state.stShares },
-    jtEffDelta,
-    feasible,
-  };
-};
 
 export default function DuskV2Simulator() {
   const [setup, setSetup] = useState<SetupInputs>(DEFAULT_SETUP);
@@ -387,8 +240,7 @@ export default function DuskV2Simulator() {
   // Target pool composition translator: "I want a 90/10 pool" → α, β.
   const [targetSharesPct, setTargetSharesPct] = useState<string>('50');
   const [rangeTolerance, setRangeTolerance] = useState<string>('3');
-  const [heatmapMode, setHeatmapMode] = useState<'junior' | 'senior'>('junior');
-  type ChartTab = 'apy' | 'depth' | 'tune' | 'heatmap' | 'slippage' | 'exits';
+  type ChartTab = 'apy' | 'depth' | 'tune';
   const [activeChart, setActiveChart] = useState<ChartTab>('apy');
   // Single state — both breakdowns expand/collapse together so users can
   // compare Senior + Junior side-by-side.
@@ -445,11 +297,9 @@ export default function DuskV2Simulator() {
     const adapt = parseFloat(getNum('ad', '15'));
     if (Number.isFinite(adapt)) setAdaptYdmPct(adapt);
     const ch = get('ch', '');
-    if (['apy', 'depth', 'tune', 'heatmap', 'slippage', 'exits'].includes(ch)) {
+    if (['apy', 'depth', 'tune'].includes(ch)) {
       setActiveChart(ch as ChartTab);
     }
-    const hm = get('hm', '');
-    if (hm === 'junior' || hm === 'senior') setHeatmapMode(hm);
     // Defaults derived from Junior tranche: daily = JT/365, avg trade = JT/5
     const jtForDefaults = parseFloat((numWithCommas('j', DEFAULT_SETUP.juniorTrancheSize)).replace(/,/g, ''));
     const dvDefault = Number.isFinite(jtForDefaults) ? fmtCommas(Math.round(jtForDefaults / 365).toString()) : '3,078';
@@ -488,7 +338,6 @@ export default function DuskV2Simulator() {
     p.set('fee', eclp.swapFeeRate);
     p.set('ad', adaptYdmPct.toString());
     if (activeChart !== 'apy') p.set('ch', activeChart);
-    if (heatmapMode !== 'junior') p.set('hm', heatmapMode);
     p.set('dv', stripCommas(assumedDailyVolume));
     p.set('at', stripCommas(avgTradeSize));
     p.set('pi', pctImbalancing);
@@ -496,22 +345,24 @@ export default function DuskV2Simulator() {
     if (mmHurdle !== '20') p.set('mh', mmHurdle);
     const url = `${window.location.pathname}?${p.toString()}`;
     window.history.replaceState(null, '', url);
-  }, [setup, eclp, adaptYdmPct, activeChart, heatmapMode, assumedDailyVolume, avgTradeSize, pctImbalancing, redemptionDays, mmHurdle, urlHydrated]);
+  }, [setup, eclp, adaptYdmPct, activeChart, assumedDailyVolume, avgTradeSize, pctImbalancing, redemptionDays, mmHurdle, urlHydrated]);
 
-  // Auto-translate target composition → α, β.
-  // Balance price (NAV ratio cash/share) = (1 − sharePct) / sharePct.
-  // α and β bracket this with ±tolerance for the curve's active range.
+  // Auto-translate target reserve composition → α, β at oracle par.
   const applyTargetComposition = () => {
     const sharePct = parseNum(targetSharesPct) / 100;
-    const tol = parseNum(rangeTolerance) / 100;
-    if (!(sharePct > 0 && sharePct < 1) || !(tol > 0)) return;
-    const balancePrice = (1 - sharePct) / sharePct;
-    const alpha = balancePrice * (1 - tol);
-    const beta = balancePrice * (1 + tol);
+    if (!(sharePct > 0 && sharePct < 1)) return;
+    const translated = translateTargetCashToEclpBounds(
+      (1 - sharePct) * 100,
+      parseNum(rangeTolerance),
+      parseFloat(eclp.lambda),
+      parseFloat(eclp.phi),
+      1,
+    );
+    if (!translated) return;
     setEclp((e) => ({
       ...e,
-      alpha: alpha.toFixed(4),
-      beta: beta.toFixed(4),
+      alpha: translated.alpha.toFixed(4),
+      beta: translated.beta.toFixed(4),
     }));
   };
 
@@ -529,13 +380,20 @@ export default function DuskV2Simulator() {
   // clear session accumulators so the KPI bar / Junior card don't show stale
   // totals from a different pool state.
   useEffect(() => {
-    setPool(initialPoolFromSetup(setup));
+    const seedSetup: SetupInputs = {
+      ...DEFAULT_SETUP,
+      seniorTrancheSize: setup.seniorTrancheSize,
+      juniorTrancheSize: setup.juniorTrancheSize,
+      juniorCashPct: setup.juniorCashPct,
+      assetPrice: setup.assetPrice,
+      quotePrice: setup.quotePrice,
+    };
+    setPool(initialPoolFromSetup(seedSetup));
     setCumFees(0);
     setCumSigma(0);
     setCumVolume(0);
     setTradeCount(0);
     setTradeHistory([]);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [setup.seniorTrancheSize, setup.juniorTrancheSize, setup.juniorCashPct, setup.assetPrice, setup.quotePrice]);
 
   // Auto-sync trading forecast assumptions to Junior tranche size:
@@ -547,90 +405,133 @@ export default function DuskV2Simulator() {
     if (!Number.isFinite(jt) || jt <= 0) return;
     setAvgTradeSize(fmtCommas(Math.round(jt / 5).toString()));
     setAssumedDailyVolume(fmtCommas(Math.round(jt / 365).toString()));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [setup.juniorTrancheSize]);
 
-  // Keep target share % in sync with junior cash allocation, and auto-rotate
-  // E-CLP bounds so the pool stays in range. (User can still manually override
-  // α/β in the E-CLP Design section after.)
+  // Keep target share % in sync with junior cash allocation, and solve the
+  // E-CLP price bounds that place that reserve composition at oracle par.
   useEffect(() => {
     const cashPct = parseNum(setup.juniorCashPct);
     if (!Number.isFinite(cashPct) || cashPct <= 0 || cashPct >= 100) return;
     const newTarget = (100 - cashPct).toString();
     setTargetSharesPct(newTarget);
-    const sp = (100 - cashPct) / 100;
-    const tol = parseNum(rangeTolerance) / 100;
-    if (!(sp > 0 && sp < 1) || !(tol > 0)) return;
-    const balancePrice = (1 - sp) / sp;
+    const lambda = parseFloat(eclp.lambda);
+    const phi = parseFloat(eclp.phi);
+    const translated = translateTargetCashToEclpBounds(cashPct, parseNum(rangeTolerance), lambda, phi, 1);
+    if (!translated) return;
     setEclp((e) => ({
       ...e,
-      alpha: (balancePrice * (1 - tol)).toFixed(4),
-      beta: (balancePrice * (1 + tol)).toFixed(4),
+      alpha: translated.alpha.toFixed(4),
+      beta: translated.beta.toFixed(4),
     }));
-  }, [setup.juniorCashPct, rangeTolerance]);
+  }, [setup.juniorCashPct, rangeTolerance, eclp.lambda, eclp.phi]);
+
+  const eclpConfig = useMemo(
+    () => makeEclpConfig(
+      parseFloat(eclp.alpha),
+      parseFloat(eclp.beta),
+      parseFloat(eclp.lambda),
+      parseFloat(eclp.phi),
+    ),
+    [eclp.alpha, eclp.beta, eclp.lambda, eclp.phi],
+  );
+
+  const eclpRepair = useMemo(() => {
+    const currentLambda = parseFloat(eclp.lambda);
+    const cashPct = parseNum(setup.juniorCashPct);
+    const phi = parseFloat(eclp.phi);
+    const tolPct = parseNum(rangeTolerance);
+    if (![currentLambda, cashPct, phi, tolPct].every(Number.isFinite) || currentLambda <= 1) return null;
+    if (eclpConfig) return null;
+
+    const validAt = (lam: number) => {
+      const translated = translateTargetCashToEclpBounds(cashPct, tolPct, lam, phi, 1);
+      if (!translated) return null;
+      const cfg = makeEclpConfig(translated.alpha, translated.beta, lam, phi);
+      return cfg ? translated : null;
+    };
+
+    if (!validAt(1)) return null;
+    let lo = 1;
+    let hi = currentLambda;
+    for (let i = 0; i < 60; i++) {
+      const mid = (lo + hi) / 2;
+      if (validAt(mid)) lo = mid;
+      else hi = mid;
+    }
+    const safeLambda = Math.max(1, Math.floor(lo - 1e-6));
+    const translated = validAt(safeLambda);
+    return translated
+      ? { lambda: safeLambda, alpha: translated.alpha, beta: translated.beta }
+      : null;
+  }, [eclp.lambda, eclp.phi, eclpConfig, rangeTolerance, setup.juniorCashPct]);
+
+  const applyEclpRepair = () => {
+    if (!eclpRepair) return;
+    setEclp((e) => ({
+      ...e,
+      lambda: eclpRepair.lambda.toFixed(0),
+      alpha: eclpRepair.alpha.toFixed(4),
+      beta: eclpRepair.beta.toFixed(4),
+    }));
+  };
 
   // ---------- Derived quantities ----------
   const derived = useMemo(() => {
     const assetPrice = parseNum(setup.assetPrice);
     const quotePrice = parseNum(setup.quotePrice);
     const minCoverage = parseNum(setup.minCoverage) / 100;
-    const seniorSize = parseNum(setup.seniorTrancheSize);
 
     if (
       !Number.isFinite(assetPrice) || assetPrice <= 0 ||
       !Number.isFinite(quotePrice) || quotePrice <= 0 ||
-      !Number.isFinite(minCoverage) || minCoverage < 0 ||
-      !Number.isFinite(seniorSize) || seniorSize <= 0
+      !Number.isFinite(minCoverage) || minCoverage < 0
     ) {
       return null;
     }
 
-    // stShares is bootstrap-fixed (PDF §11). It comes from pool state, NOT
-    // recomputed from setup, so trades don't artificially grow Π.
-    // externalShares = stShares − internalShares; trades shift the partition
-    // without changing the total supply.
-    const internalShares = Math.max(0, pool.internalShares);
-    // No fallback to (seniorSize + internalShares) — that's the exact bug we
-    // fixed (Π would grow on every trade). If pool.stShares is invalid, bail.
     if (!(pool.stShares > 0)) return null;
+    const raw = rawNavFromState(pool, assetPrice, quotePrice);
+
     const stShares = pool.stShares;
-    const externalShares = Math.max(0, stShares - internalShares);
-    const stAssets = stShares; // 1:1 mint
-    const effectiveSupply = externalShares;
-
-    // PDF §05 quoter formulas
-    const ST_RAW_NAV =
-      assetPrice * stAssets * (stShares - internalShares) / stShares;
-    const JT_RAW_NAV =
-      assetPrice * stAssets * internalShares / stShares +
-      quotePrice * pool.quoteReserves;
-
-    const totalNav = assetPrice * stAssets + quotePrice * pool.quoteReserves;
+    const stAssets = raw.stAssets;
+    const internalShares = Math.max(0, pool.internalShares);
+    const externalShares = raw.externalShares;
+    const effectiveSupply = raw.effectiveSupply;
+    const ST_RAW_NAV = raw.ST_RAW_NAV;
+    const JT_RAW_NAV = raw.JT_RAW_NAV;
+    const totalNav = raw.totalNav;
     const conservationError = ST_RAW_NAV + JT_RAW_NAV - totalNav;
 
-    // Per-share NAVs
-    const perShareRaw = assetPrice * stAssets / stShares;
-    const perExternalEffective = effectiveSupply > 0 ? ST_RAW_NAV / effectiveSupply : perShareRaw;
+    const perShareRaw = raw.perShareRaw;
+    const ST_EFFECTIVE_NAV = Math.max(0, pool.stEffectiveNav);
+    const JT_EFFECTIVE_NAV = Math.max(0, pool.jtEffectiveNav);
+    const perExternalEffective = effectiveSupply > 0 ? ST_EFFECTIVE_NAV / effectiveSupply : perShareRaw;
 
     // PDF §09 dynamic β (composition-weighted)
     const beta = JT_RAW_NAV > 0
-      ? (assetPrice * stAssets * internalShares / stShares * WAD) / JT_RAW_NAV
+      ? (raw.shareNavInPool * WAD) / JT_RAW_NAV
       : 0;
 
-    // Required coverage and utilization (assume JT_EFFECTIVE_NAV ≈ JT_RAW_NAV
-    // for this view — no prior coverage applied).
-    const JT_EFFECTIVE_NAV = JT_RAW_NAV;
-    const requiredCoverage = (ST_RAW_NAV + JT_EFFECTIVE_NAV * beta) * minCoverage;
+    // Coverage sizing uses raw exposure; utilization divides by JT effective NAV.
+    const requiredCoverage = (ST_RAW_NAV + JT_RAW_NAV * beta) * minCoverage;
     const utilization = JT_EFFECTIVE_NAV > 0
       ? requiredCoverage / JT_EFFECTIVE_NAV
       : 0;
 
-    // Rate-adjusted pool price: ratio of (quote NAV in pool) to (share NAV in
-    // pool). At the balance point this equals 1; [α, β] should bracket 1.
-    const shareNavInPool = internalShares * perShareRaw;
-    const quoteNavInPool = quotePrice * pool.quoteReserves;
-    const poolSizeNav = shareNavInPool + quoteNavInPool;
-    const poolPrice = shareNavInPool > 0 ? quoteNavInPool / shareNavInPool : 1;
+    const shareNavInPool = raw.shareNavInPool;
+    const quoteNavInPool = raw.quoteNavInPool;
+    const poolSizeNav = raw.poolSizeNav;
+    const reserveRatio = raw.poolPrice;
+    const poolPrice = eclpConfig
+      ? computeEclpSpotPrice(
+          shareNavInPool,
+          quoteNavInPool,
+          parseFloat(eclp.alpha),
+          parseFloat(eclp.beta),
+          parseFloat(eclp.lambda),
+          parseFloat(eclp.phi),
+        )
+      : Number.NaN;
     const compositionFracQuote = poolSizeNav > 0 ? quoteNavInPool / poolSizeNav : 0;
 
     // Rate-provider branch (PDF §14)
@@ -650,14 +551,23 @@ export default function DuskV2Simulator() {
     return {
       assetPrice, stAssets, stShares, quotePrice, minCoverage,
       internalShares, externalShares, effectiveSupply,
-      ST_RAW_NAV, JT_RAW_NAV, JT_EFFECTIVE_NAV,
+      ST_RAW_NAV, JT_RAW_NAV, ST_EFFECTIVE_NAV, JT_EFFECTIVE_NAV,
       totalNav, conservationError,
       perShareRaw, perExternalEffective,
       beta, requiredCoverage, utilization,
-      poolPrice, poolSizeNav, shareNavInPool, quoteNavInPool, compositionFracQuote,
+      poolPrice, reserveRatio, poolSizeNav, shareNavInPool, quoteNavInPool, compositionFracQuote,
+      stIL: Math.max(0, pool.stIL),
+      jtIL: Math.max(0, pool.jtIL),
       rateBranch, rateReturn,
     };
-  }, [setup, pool]);
+  }, [setup, pool, eclp, eclpConfig]);
+
+  // Single source of truth for "balanced composition" in this simulator:
+  // the target implied by Junior cash allocation.
+  const balancePoolPrice = useMemo(
+    () => balancePoolPriceFromCashPct(parseNum(setup.juniorCashPct) / 100),
+    [setup.juniorCashPct],
+  );
 
   // ---------- Yields (mirrors v1's math, with dynamic β from `derived`) -----
   const yields = useMemo(() => {
@@ -672,11 +582,11 @@ export default function DuskV2Simulator() {
     const fYs = parseNum(setup.ysFee) / 100;
     if (![r, rQ, y0, yT, yFull, fJt, fSt, fYs].every(Number.isFinite)) return null;
 
-    const seniorCapital = derived.ST_RAW_NAV;       // external Senior NAV
-    const juniorCapital = derived.JT_RAW_NAV;       // pool BPT NAV
+    const seniorCapital = derived.ST_EFFECTIVE_NAV; // redeemable Senior effective NAV
+    const juniorCapital = derived.JT_EFFECTIVE_NAV; // redeemable Junior effective NAV
 
-    // Senior yield pool: external Senior NAV × underlying APY
-    const totalSeniorYield = r * seniorCapital;
+    // Senior yield pool: raw external Senior NAV × underlying APY.
+    const totalSeniorYield = r * derived.ST_RAW_NAV;
     const ydmShare = ydmYieldShare(derived.utilization, y0, yT, yFull);
     const juniorRiskPremiumGross = ydmShare * totalSeniorYield;
     const seniorYieldGross = totalSeniorYield - juniorRiskPremiumGross;
@@ -687,12 +597,6 @@ export default function DuskV2Simulator() {
     // Fee waterfall (same shape as v1)
     const ownAfterJt = juniorOwnYield * (1 - fJt);
     const riskAfterYs = juniorRiskPremiumGross * (1 - fYs);
-    const riskAfterJt = riskAfterYs * (1 - fJt);
-    const juniorNetYield = ownAfterJt + riskAfterJt;
-    const seniorNetYield = seniorYieldGross * (1 - fSt);
-
-    const baseJuniorAPY = juniorCapital > 0 ? juniorNetYield / juniorCapital : 0;
-    const seniorAPY = seniorCapital > 0 ? seniorNetYield / seniorCapital : 0;
     const protocolFees =
       juniorOwnYield * fJt + juniorRiskPremiumGross * fYs +
       riskAfterYs * fJt + seniorYieldGross * fSt;
@@ -726,27 +630,22 @@ export default function DuskV2Simulator() {
       : 0;
     const tradeFeeAPY = juniorCapital > 0 ? annualFeeRevenue / juniorCapital : 0;
 
-    // (2) Slippage residuals σ — scale with trade size² and direction.
-    // At current pool state, decide which direction is imbalancing.
-    const alpha = parseFloat(eclp.alpha);
-    const betaECLP = parseFloat(eclp.beta);
-    const lambda = parseFloat(eclp.lambda);
-    const phi = parseFloat(eclp.phi);
-    const kExit = computeKappa(derived.poolPrice, alpha, betaECLP, lambda, phi, 'exit', derived.poolSizeNav);
-    const kEnter = computeKappa(derived.poolPrice, alpha, betaECLP, lambda, phi, 'enter', derived.poolSizeNav);
-    const exitIsImb = derived.shareNavInPool >= derived.quoteNavInPool;
-    const kImb = exitIsImb ? kExit : kEnter;
-    const kBal = exitIsImb ? kEnter : kExit;
+    // (2) Slippage residuals σ, quoted through the exact Balancer E-CLP path.
+    const exitIsImb = exitIsImbalancingAt(derived.poolPrice, balancePoolPrice);
 
     const tradesPerDay = avgT > 0 && Number.isFinite(avgT) ? daily / avgT : 0;
-    // Use the AVERAGE of imbalancing/balancing κ for annualization so pImb
-    // remains a clean "% of flow that helps Junior" knob. (Asymmetric κ from φ
-    // is correctly applied per-trade in simulateTrade — but annualizing with
-    // it makes pImp > 50% sometimes net negative, which is unintuitive given
-    // the user input semantics.)
-    const kAvg = (kImb + kBal) / 2;
-    const sigmaPerImbTrade = kAvg * avgT * avgT;
-    const sigmaPerBalTrade = -kAvg * avgT * avgT;
+    const exitSigmaTrade = eclpConfig
+      ? simulateTrade(pool, avgT, 'exit', derived.perShareRaw, derived.quotePrice, 0, eclpConfig, balancePoolPrice)
+      : null;
+    const enterSigmaTrade = eclpConfig
+      ? simulateTrade(pool, avgT, 'enter', derived.perShareRaw, derived.quotePrice, 0, eclpConfig, balancePoolPrice)
+      : null;
+    const sigmaPerImbTrade = exitIsImb
+      ? (exitSigmaTrade?.feasible ? exitSigmaTrade.sigmaNav : 0)
+      : (enterSigmaTrade?.feasible ? enterSigmaTrade.sigmaNav : 0);
+    const sigmaPerBalTrade = exitIsImb
+      ? (enterSigmaTrade?.feasible ? enterSigmaTrade.sigmaNav : 0)
+      : (exitSigmaTrade?.feasible ? exitSigmaTrade.sigmaNav : 0);
     const annualSigmaImb = tradesPerDay * pImb * sigmaPerImbTrade * 365;
     const annualSigmaBal = tradesPerDay * (1 - pImb) * sigmaPerBalTrade * 365;
     const annualSigma = annualSigmaImb + annualSigmaBal;
@@ -771,9 +670,9 @@ export default function DuskV2Simulator() {
       annualFeeRevenue, tradeFeeAPY, juniorTotalNetYield,
       baseJuniorAPY: baseJuniorAPYAdapted,
       annualSigma, annualSigmaImb, annualSigmaBal, sigmaAPY,
-      kImb, kBal, exitIsImb,
+      exitIsImb,
     };
-  }, [derived, setup, assumedDailyVolume, avgTradeSize, pctImbalancing, eclp, adaptYdmPct, includeTradingYield]);
+  }, [derived, setup, assumedDailyVolume, avgTradeSize, pctImbalancing, eclp, eclpConfig, pool, adaptYdmPct, includeTradingYield, balancePoolPrice]);
 
   // ---------- Trade preview ----------
   const tradePreview = useMemo(() => {
@@ -787,58 +686,151 @@ export default function DuskV2Simulator() {
     const phi = parseFloat(eclp.phi);
     const swapFeeRate = parseFloat(eclp.swapFeeRate) / 100;
     if (![alpha, beta, lambda, phi, swapFeeRate].every(Number.isFinite)) return null;
+    if (!eclpConfig) return null;
 
-    const kappa = computeKappa(
-      derived.poolPrice, alpha, beta, lambda, phi, tradeDirection, derived.poolSizeNav,
+    const ydmShareForAccounting = yields
+      ? yields.ydmShare
+      : safeYdmShare(setup.ydmYT);
+    const syncedBefore = syncAccountingOnBefore(
+      pool,
+      derived.assetPrice,
+      derived.quotePrice,
+      ydmShareForAccounting,
     );
+
     const result = simulateTrade(
-      { internalShares: derived.internalShares, quoteReserves: pool.quoteReserves, stShares: pool.stShares },
+      syncedBefore,
       t,
       tradeDirection,
       derived.perShareRaw,
       derived.quotePrice,
       swapFeeRate,
-      kappa,
-      (alpha + beta) / 2, // balance price = midpoint of α/β
+      eclpConfig,
+      balancePoolPrice,
     );
+    const newShareNavInPool = result.newState.internalShares * derived.perShareRaw;
+    const newQuoteNavInPool = result.newState.quoteReserves * derived.quotePrice;
+    const newPoolPrice = computeEclpSpotPrice(newShareNavInPool, newQuoteNavInPool, alpha, beta, lambda, phi);
+    const rangeEps = Math.max(1e-9, Math.abs(beta - alpha) * 1e-6);
+    const inRange = newPoolPrice >= alpha - rangeEps && newPoolPrice <= beta + rangeEps;
+    const feasible = result.feasible && inRange;
+    const accountedState = feasible
+      ? syncAccountingOnAfter(
+          syncedBefore,
+          result.newState,
+          derived.assetPrice,
+          derived.quotePrice,
+          ydmShareForAccounting,
+        )
+      : syncedBefore;
+    const newRaw = rawNavFromState(accountedState, derived.assetPrice, derived.quotePrice);
 
-    // Post-trade derived state — same formulas as `derived`, on the new pool.
-    const newInternal = result.newState.internalShares;
-    const newExternal = Math.max(0, derived.stShares - newInternal);
-    const ST_RAW_NAV_new =
-      derived.assetPrice * derived.stAssets * newExternal / derived.stShares;
-    const JT_RAW_NAV_new =
-      derived.assetPrice * derived.stAssets * newInternal / derived.stShares +
-      derived.quotePrice * result.newState.quoteReserves;
+    // Post-trade derived state — same formulas as `derived`, on the synced state.
+    const newInternal = accountedState.internalShares;
+    const newExternal = newRaw.externalShares;
+    const ST_RAW_NAV_new = newRaw.ST_RAW_NAV;
+    const JT_RAW_NAV_new = newRaw.JT_RAW_NAV;
     const beta_new = JT_RAW_NAV_new > 0
-      ? (derived.assetPrice * derived.stAssets * newInternal / derived.stShares * WAD) / JT_RAW_NAV_new
+      ? (newRaw.shareNavInPool * WAD) / JT_RAW_NAV_new
       : 0;
-    const util_new = JT_RAW_NAV_new > 0
-      ? (ST_RAW_NAV_new + JT_RAW_NAV_new * beta_new) * derived.minCoverage / JT_RAW_NAV_new
+    const requiredCoverageNew = (ST_RAW_NAV_new + JT_RAW_NAV_new * beta_new) * derived.minCoverage;
+    const util_new = accountedState.jtEffectiveNav > 0
+      ? requiredCoverageNew / accountedState.jtEffectiveNav
       : 0;
 
     // Conservation check on the new state.
-    const totalNavNew = derived.assetPrice * derived.stAssets
-                      + derived.quotePrice * result.newState.quoteReserves;
-    const conservationErrorNew = ST_RAW_NAV_new + JT_RAW_NAV_new - totalNavNew;
+    const conservationErrorNew = ST_RAW_NAV_new + JT_RAW_NAV_new - newRaw.totalNav;
     const counterValueNav = Math.max(0, t - result.feeNav - result.sigmaNav);
+    const jtEffDelta = accountedState.jtEffectiveNav - syncedBefore.jtEffectiveNav;
 
     return {
-      kappa,
       tNav: t,
       feeNav: result.feeNav,
       sigmaNav: result.sigmaNav,
-      jtEffDelta: result.jtEffDelta,
+      jtEffDelta,
       isImbalancing: result.isImbalancing,
-      feasible: result.feasible,
-      newState: result.newState,
+      feasible,
+      newState: accountedState,
       newInternal, newExternal,
       ST_RAW_NAV_new, JT_RAW_NAV_new, beta_new, util_new,
       utilDelta: util_new - derived.utilization,
       conservationErrorNew,
       counterValueNav,
     };
-  }, [derived, pool, tradeSize, tradeDirection, eclp]);
+  }, [derived, pool, tradeSize, tradeDirection, eclp, eclpConfig, balancePoolPrice, yields, setup.ydmYT]);
+
+  // Maximum currently executable Senior exit size, respecting:
+  //  1) swap feasibility (cash + external shares + positive payout),
+  //  2) E-CLP range bounds [α, β],
+  //  3) post-trade Junior coverage.
+  const maxSafeExitNow = useMemo(() => {
+    if (!derived) return 0;
+
+    const alpha = parseFloat(eclp.alpha);
+    const beta = parseFloat(eclp.beta);
+    const lambda = parseFloat(eclp.lambda);
+    const phi = parseFloat(eclp.phi);
+    const swapFeeRate = parseFloat(eclp.swapFeeRate) / 100;
+    if (![alpha, beta, lambda, phi, swapFeeRate].every(Number.isFinite)) return 0;
+    if (!eclpConfig) return 0;
+
+    const ydmShareForAccounting = yields ? yields.ydmShare : safeYdmShare(setup.ydmYT);
+    const syncedBefore = syncAccountingOnBefore(
+      pool,
+      derived.assetPrice,
+      derived.quotePrice,
+      ydmShareForAccounting,
+    );
+    const rangeEps = Math.max(1e-9, Math.abs(beta - alpha) * 1e-6);
+
+    const isSafeExit = (tNav: number): boolean => {
+      if (!(tNav > 0)) return true;
+      const sim = simulateTrade(
+        syncedBefore,
+        tNav,
+        'exit',
+        derived.perShareRaw,
+        derived.quotePrice,
+        swapFeeRate,
+        eclpConfig,
+        balancePoolPrice,
+      );
+      if (!sim.feasible) return false;
+
+      const postShareNav = sim.newState.internalShares * derived.perShareRaw;
+      const postQuoteNav = sim.newState.quoteReserves * derived.quotePrice;
+      const postPrice = computeEclpSpotPrice(postShareNav, postQuoteNav, alpha, beta, lambda, phi);
+      const inRange = postPrice >= alpha - rangeEps && postPrice <= beta + rangeEps;
+      if (!inRange) return false;
+
+      const accounted = syncAccountingOnAfter(
+        syncedBefore,
+        sim.newState,
+        derived.assetPrice,
+        derived.quotePrice,
+        ydmShareForAccounting,
+      );
+      const postRaw = rawNavFromState(accounted, derived.assetPrice, derived.quotePrice);
+      const betaPost = postRaw.JT_RAW_NAV > 0 ? postRaw.shareNavInPool / postRaw.JT_RAW_NAV : 0;
+      const requiredCoveragePost = (postRaw.ST_RAW_NAV + postRaw.JT_RAW_NAV * betaPost) * derived.minCoverage;
+      return requiredCoveragePost <= accounted.jtEffectiveNav + NAV_EPS;
+    };
+
+    const externalShares = Math.max(0, syncedBefore.stShares - syncedBefore.internalShares);
+    const maxExitBySupply = externalShares * derived.perShareRaw;
+    const hiSeed = Math.max(0, Math.min(maxExitBySupply, Math.max(0, derived.poolSizeNav * 2)));
+    if (!(hiSeed > 0)) return 0;
+    if (isSafeExit(hiSeed)) return hiSeed;
+
+    let lo = 0;
+    let hi = hiSeed;
+    for (let i = 0; i < 60; i++) {
+      const mid = (lo + hi) / 2;
+      if (isSafeExit(mid)) lo = mid;
+      else hi = mid;
+    }
+    return lo;
+  }, [derived, eclp, eclpConfig, pool, balancePoolPrice, yields, setup.ydmYT]);
 
   const executeTrade = () => {
     if (!tradePreview || !tradePreview.feasible) return;
@@ -863,114 +855,6 @@ export default function DuskV2Simulator() {
   };
 
   // ---------- Charts ----------
-  // Slippage curve: at current pool state, determine which direction is
-  // imbalancing vs balancing, then plot σ/t (bps of t) for each.
-  const slippageChartData = useMemo(() => {
-    if (!derived) return [];
-    const alpha = parseFloat(eclp.alpha);
-    const beta = parseFloat(eclp.beta);
-    const lambda = parseFloat(eclp.lambda);
-    const phi = parseFloat(eclp.phi);
-    const swapFeeRate = parseFloat(eclp.swapFeeRate) / 100;
-    if (![alpha, beta, lambda, phi, swapFeeRate].every(Number.isFinite)) return [];
-
-    const kExit = computeKappa(derived.poolPrice, alpha, beta, lambda, phi, 'exit', derived.poolSizeNav);
-    const kEnter = computeKappa(derived.poolPrice, alpha, beta, lambda, phi, 'enter', derived.poolSizeNav);
-
-    // At current state, which direction is imbalancing?
-    const exitIsImbalancing = derived.shareNavInPool >= derived.quoteNavInPool;
-    const kImb = exitIsImbalancing ? kExit : kEnter;
-    const kBal = exitIsImbalancing ? kEnter : kExit;
-
-    // Make sure the chart spans the balancing soft-guarantee threshold so the
-    // crossing is visible.
-    const balThreshold = kBal > 0 ? swapFeeRate / kBal : 0;
-    const maxT = Math.max(
-      parseNum(tradeSize) * 2.5,
-      balThreshold * 1.6,
-      pool.quoteReserves * 0.5,
-      1,
-    );
-
-    const data: Array<{
-      t: number;
-      feeBps: number;
-      sigImbBps: number;
-      sigBalBps: number;
-      jtBalBps: number;
-    }> = [];
-    const N = 80;
-    for (let i = 1; i <= N; i++) {
-      const t = (i / N) * maxT;
-      const feeBps = swapFeeRate * 10000;
-      // σ/t = κ × t. Express as bps-of-t.
-      const sigImbBps = (kImb * t) * 10000;       // imbalancing: positive (pool gain)
-      const sigBalBps = -(kBal * t) * 10000;      // balancing: negative (pool loss)
-      const jtBalBps = feeBps + sigBalBps;        // ΔJT_EFF/t for balancing direction
-      data.push({ t, feeBps, sigImbBps, sigBalBps, jtBalBps });
-    }
-    return data;
-  }, [derived, pool, eclp, tradeSize]);
-
-  // Utilization-vs-cumulative-exits scan: from current state, simulate
-  // sequential exit trades of fixed size and plot utilization.
-  const utilChartData = useMemo(() => {
-    if (!derived) return [];
-    const alpha = parseFloat(eclp.alpha);
-    const beta = parseFloat(eclp.beta);
-    const lambda = parseFloat(eclp.lambda);
-    const phi = parseFloat(eclp.phi);
-    const swapFeeRate = parseFloat(eclp.swapFeeRate) / 100;
-    if (![alpha, beta, lambda, phi, swapFeeRate].every(Number.isFinite)) return [];
-
-    const steps = 60;
-    const stepSize = Math.max(pool.quoteReserves / steps, 1);
-    let state: PoolState = {
-      internalShares: derived.internalShares,
-      quoteReserves: pool.quoteReserves,
-      stShares: pool.stShares,
-    };
-    let cumExit = 0;
-    let jtEff = derived.JT_EFFECTIVE_NAV;
-    const data: Array<{ cumExit: number; util: number; jtEff: number; beta: number }> = [
-      {
-        cumExit: 0,
-        util: derived.utilization * 100,
-        jtEff,
-        beta: derived.beta * 100,
-      },
-    ];
-
-    for (let i = 0; i < steps; i++) {
-      const perShare = derived.assetPrice * derived.stAssets / derived.stShares;
-      const shareNavInPool = state.internalShares * perShare;
-      const quoteNavInPool = derived.quotePrice * state.quoteReserves;
-      const poolSizeNav = shareNavInPool + quoteNavInPool;
-      const poolPrice = shareNavInPool > 0 ? quoteNavInPool / shareNavInPool : 1;
-      const kappa = computeKappa(poolPrice, alpha, beta, lambda, phi, 'exit', poolSizeNav);
-      const res = simulateTrade(
-        state, stepSize, 'exit', perShare, derived.quotePrice, swapFeeRate, kappa, (alpha + beta) / 2,
-      );
-      if (!res.feasible) break;
-      state = res.newState;
-      cumExit += stepSize;
-      jtEff += res.jtEffDelta;
-
-      const newExternal = Math.max(0, derived.stShares - state.internalShares);
-      const ST_RAW = derived.assetPrice * derived.stAssets * newExternal / derived.stShares;
-      const JT_RAW = derived.assetPrice * derived.stAssets * state.internalShares / derived.stShares
-                   + derived.quotePrice * state.quoteReserves;
-      const betaNew = JT_RAW > 0
-        ? (derived.assetPrice * derived.stAssets * state.internalShares / derived.stShares) / JT_RAW
-        : 0;
-      const util = JT_RAW > 0
-        ? (ST_RAW + JT_RAW * betaNew) * derived.minCoverage / JT_RAW * 100
-        : 0;
-      data.push({ cumExit, util, jtEff, beta: betaNew * 100 });
-      if (state.quoteReserves <= 0) break;
-    }
-    return data;
-  }, [derived, pool, eclp]);
 
   // YDM + Net APY chart — sweeps utilization from 0 to 1.
   const apyChartData = useMemo(() => {
@@ -1022,16 +906,35 @@ export default function DuskV2Simulator() {
     const SLIP_THRESHOLD_BPS = 50;
     const slipFrac = SLIP_THRESHOLD_BPS / 10000;
     const data: Array<{ price: number; depthExit: number; depthEnter: number; cashPct: number }> = [];
+    const cfg = makeEclpConfig(alpha, beta, lambda, phi);
+    if (!cfg) return [];
+    const exactDepthAt = (price: number, direction: Direction): number => {
+      const reserves = eclpReservesAtPrice(alpha, beta, lambda, phi, price);
+      if (!reserves) return 0;
+      const scale = derived.poolSizeNav / Math.max(reserves.shareNav + reserves.quoteNav, 1e-18);
+      const shareNav = reserves.shareNav * scale;
+      const quoteNav = reserves.quoteNav * scale;
+      const withinThreshold = (t: number) => {
+        const q = quoteEclpSwap(shareNav, quoteNav, t, direction, 0, cfg);
+        return q.feasible && t > 0 && Math.abs(q.sigmaNav / t) <= slipFrac;
+      };
+      let hi = Math.max(derived.poolSizeNav * 0.05, 1);
+      while (withinThreshold(hi) && hi < derived.poolSizeNav * 2) hi *= 2;
+      hi = Math.min(hi, derived.poolSizeNav * 2);
+      if (withinThreshold(hi)) return hi;
+      let lo = 0;
+      for (let j = 0; j < 48; j++) {
+        const mid = (lo + hi) / 2;
+        if (withinThreshold(mid)) lo = mid;
+        else hi = mid;
+      }
+      return lo;
+    };
     for (let i = 0; i <= 100; i++) {
       const price = alpha + (beta - alpha) * (i / 100);
-      const kExit = computeKappa(price, alpha, beta, lambda, phi, 'exit', derived.poolSizeNav);
-      const kEnter = computeKappa(price, alpha, beta, lambda, phi, 'enter', derived.poolSizeNav);
-      // σ/t = κ × t. Solve κ × t = slipFrac → t = slipFrac / κ.
-      const depthExit = kExit > 0 ? Math.min(1e12, slipFrac / kExit) : 0;
-      const depthEnter = kEnter > 0 ? Math.min(1e12, slipFrac / kEnter) : 0;
-      // Composition at this price: cashNAV/(cashNAV + shareNAV).
-      // With price = cashNAV/shareNAV, cashFrac = price/(1+price).
-      const cashPct = (price / (1 + price)) * 100;
+      const depthExit = exactDepthAt(price, 'exit');
+      const depthEnter = exactDepthAt(price, 'enter');
+      const cashPct = (eclpReservesAtPrice(alpha, beta, lambda, phi, price)?.quoteFrac ?? 0) * 100;
       data.push({ price, depthExit, depthEnter, cashPct });
     }
     return data;
@@ -1041,49 +944,75 @@ export default function DuskV2Simulator() {
   // Goal: help user pick λ such that slippage on a typical exit trade
   // compensates a market maker holding to redemption.
   //   target_slippage_bps = hurdle_apr × (days / 365) × 10000
-  //   κ_target = target_bps / (t × 10000)
-  //   λ_recommended = (boundary × direction) / (κ_target × poolSize)
-  // The 4 chart lines are dynamically centered on the recommendation so the
-  // user can see "what if I 4× more / 4× less concentrated."
+  // Solve λ against the exact Balancer E-CLP outGivenIn path, while translating
+  // α/β for each candidate λ so the target reserve mix remains at oracle par.
   const concentrationTune = useMemo(() => {
     if (!derived) return null;
-    const alpha = parseFloat(eclp.alpha);
-    const beta = parseFloat(eclp.beta);
     const lambda = parseFloat(eclp.lambda);
     const phi = parseFloat(eclp.phi);
-    if (![alpha, beta, lambda, phi].every(Number.isFinite)) return null;
+    const swapFeeRate = parseFloat(eclp.swapFeeRate) / 100;
+    if (![lambda, phi, swapFeeRate].every(Number.isFinite)) return null;
 
-    const exitIsImb = derived.shareNavInPool >= derived.quoteNavInPool;
-    const direction: Direction = exitIsImb ? 'exit' : 'enter';
-
-    // Reverse-engineer the boundary × direction factor at the current pool
-    // state by computing κ at λ=1 and inverting.
-    const kAtLambda1 = computeKappa(derived.poolPrice, alpha, beta, 1, phi, direction, derived.poolSizeNav);
-    const boundaryDirProduct = kAtLambda1 * derived.poolSizeNav; // since κ = bd / (λ × poolSize)
+    const direction: Direction = 'exit';
 
     const days = Math.max(0.01, parseNum(redemptionDays));
     const hurdle = Math.max(0.0001, parseNum(mmHurdle) / 100);
     const targetSlippageBps = hurdle * (days / 365) * 10000;
-    const targetSlippageFrac = targetSlippageBps / 10000;
 
-    // avgT defaults to 1/5 of Junior tranche, auto-synced on Junior change.
-    // User can override via the right-panel input — that override sticks until
-    // they change Junior again.
     const avgT = Math.max(1, parseNum(avgTradeSize));
-    const kTarget = targetSlippageFrac / avgT;
-    const recommendedLambda = kTarget > 0
-      ? boundaryDirProduct / (kTarget * derived.poolSizeNav)
-      : 0;
+    const targetCashPct = parseNum(setup.juniorCashPct);
+    const tolPct = parseNum(rangeTolerance);
 
-    // Pick 4 multipliers centered on the recommendation: 1/16, 1/4, 1, 4 relative
-    // to the recommended λ. Lines show: very loose, loose, recommended, tight.
-    const baseLambdas = recommendedLambda > 0
-      ? [recommendedLambda / 16, recommendedLambda / 4, recommendedLambda, recommendedLambda * 4]
-      : [lambda * 0.0625, lambda * 0.25, lambda, lambda * 4];
+    const slippageBpsAt = (candidateLambda: number): number | null => {
+      const lam = Math.max(1, candidateLambda);
+      const bounds = translateTargetCashToEclpBounds(targetCashPct, tolPct, lam, phi, 1);
+      if (!bounds) return null;
+      const cfg = makeEclpConfig(bounds.alpha, bounds.beta, lam, phi);
+      if (!cfg) return null;
+      const sim = simulateTrade(
+        pool,
+        avgT,
+        direction,
+        derived.perShareRaw,
+        derived.quotePrice,
+        0,
+        cfg,
+        balancePoolPrice,
+      );
+      if (!sim.feasible) return null;
+      return Math.max(0, (sim.sigmaNav / avgT) * 10000);
+    };
+
+    let lo = 1;
+    let hi = Math.max(2, lambda);
+    let hiSlip = slippageBpsAt(hi);
+    while ((hiSlip === null || hiSlip > targetSlippageBps) && hi < 1_000_000) {
+      hi *= 2;
+      hiSlip = slippageBpsAt(hi);
+    }
+    const loSlip = slippageBpsAt(lo);
+    let recommendedLambda = lambda;
+    if (loSlip !== null && loSlip <= targetSlippageBps) {
+      recommendedLambda = lo;
+    } else if (hiSlip !== null) {
+      for (let i = 0; i < 64; i++) {
+        const mid = (lo + hi) / 2;
+        const midSlip = slippageBpsAt(mid);
+        if (midSlip === null) {
+          lo = mid;
+          continue;
+        }
+        if (midSlip > targetSlippageBps) lo = mid;
+        else hi = mid;
+      }
+      recommendedLambda = hi;
+    }
+
+    const baseLambdas = [recommendedLambda / 16, recommendedLambda / 4, recommendedLambda, recommendedLambda * 4]
+      .map((lam) => Math.max(1, lam));
 
     return {
       direction,
-      boundaryDirProduct,
       targetSlippageBps,
       recommendedLambda,
       baseLambdas,
@@ -1091,14 +1020,14 @@ export default function DuskV2Simulator() {
       days,
       hurdle,
     };
-  }, [derived, eclp, redemptionDays, mmHurdle, avgTradeSize]);
+  }, [derived, eclp, setup.juniorCashPct, rangeTolerance, redemptionDays, mmHurdle, avgTradeSize, pool, balancePoolPrice]);
 
   const concentrationChartData = useMemo(() => {
     if (!derived || !concentrationTune) return [];
     const { direction, baseLambdas } = concentrationTune;
-    const alpha = parseFloat(eclp.alpha);
-    const beta = parseFloat(eclp.beta);
     const phi = parseFloat(eclp.phi);
+    const targetCashPct = parseNum(setup.juniorCashPct);
+    const tolPct = parseNum(rangeTolerance);
     const maxT = Math.max(derived.poolSizeNav * 0.5, parseNum(tradeSize) * 3, concentrationTune.avgT * 5, 100_000);
     const N = 60;
     const data: Array<{ t: number; [key: string]: number }> = [];
@@ -1106,62 +1035,24 @@ export default function DuskV2Simulator() {
       const t = (i / N) * maxT;
       const row: { t: number; [key: string]: number } = { t };
       baseLambdas.forEach((lam, idx) => {
-        const k = computeKappa(derived.poolPrice, alpha, beta, lam, phi, direction, derived.poolSizeNav);
-        row[`line_${idx}`] = (k * t) * 10000;
+        const bounds = translateTargetCashToEclpBounds(targetCashPct, tolPct, lam, phi, 1);
+        const cfg = bounds ? makeEclpConfig(bounds.alpha, bounds.beta, lam, phi) : null;
+        const sim = simulateTrade(
+          pool,
+          t,
+          direction,
+          derived.perShareRaw,
+          derived.quotePrice,
+          0,
+          cfg,
+          balancePoolPrice,
+        );
+        row[`line_${idx}`] = sim.feasible ? Math.max(0, (sim.sigmaNav / t) * 10000) : Number.NaN;
       });
       data.push(row);
     }
     return data;
-  }, [derived, eclp, tradeSize, concentrationTune]);
-
-  // ----- Sensitivity heatmap --------------------------------------------
-  // Junior + Senior APY across (utilization × % shares in pool) grid.
-  // util determines required coverage / pool TVL; sharePct determines β.
-  // We parameterize: at fixed Π and minCov, util ↔ poolSize 1:1.
-  type HeatCell = { util: number; sharePct: number; juniorAPY: number; seniorAPY: number };
-  const heatmapData = useMemo<HeatCell[]>(() => {
-    if (!derived || !yields) return [];
-    const N_UTIL = 15;
-    const N_SHARES = 15;
-    const cells: HeatCell[] = [];
-    const Pi = derived.assetPrice * derived.stAssets;
-    const minCov = derived.minCoverage;
-    const r = yields.r;
-    const rQ = yields.rQ;
-    for (let iu = 0; iu < N_UTIL; iu++) {
-      const util = ((iu + 0.5) / N_UTIL) * 1.0;        // 0.033 .. 0.967
-      const poolSize = Pi * minCov / Math.max(util, 1e-9);
-      for (let is = 0; is < N_SHARES; is++) {
-        const sharePct = (is + 0.5) / N_SHARES;        // 0.033 .. 0.967
-        const shareNavInPool = sharePct * poolSize;
-        const quoteNavInPool = (1 - sharePct) * poolSize;
-        const ST_RAW = Math.max(0, Pi - shareNavInPool);
-        const JT_RAW = poolSize;
-        const ydm = ydmYieldShare(util, yields.effY0, yields.effYT, yields.effYFull);
-        const totalSeniorYield = r * ST_RAW;
-        const juniorRiskPremium = ydm * totalSeniorYield * (1 - yields.fYs) * (1 - yields.fJt);
-        const seniorYield = (totalSeniorYield - ydm * totalSeniorYield) * (1 - yields.fSt);
-        const juniorOwn = (shareNavInPool * r + quoteNavInPool * rQ) * (1 - yields.fJt);
-        const juniorAPY = JT_RAW > 0 ? (juniorOwn + juniorRiskPremium) / JT_RAW : 0;
-        const seniorAPY = ST_RAW > 0 ? seniorYield / ST_RAW : 0;
-        cells.push({ util, sharePct, juniorAPY, seniorAPY });
-      }
-    }
-    return cells;
-  }, [derived, yields]);
-
-  // Composition stacked bar — single category, NAV-weighted.
-  const compositionData = useMemo(() => {
-    if (!derived) return [];
-    const shareValueInPool = derived.internalShares * derived.perShareRaw;
-    return [
-      {
-        label: 'JT BPT composition',
-        Quote: derived.quotePrice * pool.quoteReserves,
-        InternalShares: shareValueInPool,
-      },
-    ];
-  }, [derived, pool]);
+  }, [derived, eclp, setup.juniorCashPct, rangeTolerance, tradeSize, concentrationTune, pool, balancePoolPrice]);
 
   // ===========================================================================
   // Render
@@ -1212,8 +1103,8 @@ export default function DuskV2Simulator() {
               Junior tranche deficit — coverage breach
             </div>
             <div className="text-[11px] text-[#fecaca]">
-              Required coverage <span className="font-mono font-semibold">${fmtNav(derived.requiredCoverage, 0)}</span> exceeds Junior NAV <span className="font-mono font-semibold">${fmtNav(derived.JT_RAW_NAV, 0)}</span> — Junior is under-collateralized by{' '}
-              <span className="font-mono font-bold text-white">${fmtNav(derived.requiredCoverage - derived.JT_RAW_NAV, 0)}</span>.
+              Required coverage <span className="font-mono font-semibold">${fmtNav(derived.requiredCoverage, 0)}</span> exceeds Junior effective NAV <span className="font-mono font-semibold">${fmtNav(derived.JT_EFFECTIVE_NAV, 0)}</span> — Junior is under-collateralized by{' '}
+              <span className="font-mono font-bold text-white">${fmtNav(derived.requiredCoverage - derived.JT_EFFECTIVE_NAV, 0)}</span>.
               Increase Junior tranche size or reduce min coverage.
             </div>
           </div>
@@ -1235,7 +1126,7 @@ export default function DuskV2Simulator() {
               <CompactInput label="Underlying APY" tip="Yield your token earns natively (9% for sUSDe, 0% for USDC)" value={setup.underlyingYield} onChange={(v) => setSetup((s) => ({ ...s, underlyingYield: v }))} suffix="%" />
               <CompactInput label="Senior tranche size" tip="External Senior NAV" value={setup.seniorTrancheSize} onChange={(v) => setSetup((s) => ({ ...s, seniorTrancheSize: fmtCommas(v.replace(/[^0-9.]/g, '')) }))} prefix="$" accent="cyan" />
               <CompactInput label="Junior tranche size" tip="JT pool TVL — what Junior deposited (cash + shares)" value={setup.juniorTrancheSize} onChange={(v) => setSetup((s) => ({ ...s, juniorTrancheSize: fmtCommas(v.replace(/[^0-9.]/g, '')) }))} prefix="$" accent="amber" />
-              <CompactInput label="Junior cash allocation" tip="% of Junior deposited as quote (rest is ST shares). Changing this auto-syncs the E-CLP target composition and rotates α/β to keep the pool in range." value={setup.juniorCashPct} onChange={(v) => setSetup((s) => ({ ...s, juniorCashPct: v }))} suffix="%" />
+              <CompactInput label="Junior cash allocation" tip="% of Junior deposited as quote (rest is ST shares). Changing this solves the E-CLP price bounds that put that reserve mix at spot price 1." value={setup.juniorCashPct} onChange={(v) => setSetup((s) => ({ ...s, juniorCashPct: v }))} suffix="%" />
               <CompactInput label="Min coverage" tip="Coverage Seniors require, as % of (ST + JT × β). Drives required coverage → utilization." value={setup.minCoverage} onChange={(v) => setSetup((s) => ({ ...s, minCoverage: v }))} suffix="%" />
               <CompactInput
                 label="Concentration (λ)"
@@ -1267,7 +1158,7 @@ export default function DuskV2Simulator() {
                     if (!(targetUtil > floor)) return;
                     const newJtSize = ss * mc / (targetUtil - floor);
                     if (!Number.isFinite(newJtSize) || newJtSize <= 0) return;
-                    setSetup((s) => ({ ...s, juniorTrancheSize: fmtCommas(newJtSize.toFixed(0)) }));
+                    setSetup((s) => ({ ...s, juniorTrancheSize: fmtCommas(newJtSize.toFixed(2)) }));
                   };
                   const snaps: Array<{ label: string; util: number; tone?: 'green' | 'amber' | 'red' }> = [
                     { label: '25%', util: 0.25 },
@@ -1362,10 +1253,10 @@ export default function DuskV2Simulator() {
             </p>
             <div className="bg-[#0a0c10] border border-[#2a2f38] rounded p-2 mb-2">
               <div className="text-[9px] uppercase tracking-wider text-[#fbbf24] mb-1 font-semibold">Quick set: target pool mix</div>
-              <p className="text-[9px] text-[#6b7280] mb-1.5 leading-snug">Want a 90/10 cash-heavy pool? Type 10% shares. Sets the min/max price automatically.</p>
+              <p className="text-[9px] text-[#6b7280] mb-1.5 leading-snug">Want a 90/10 cash-heavy pool at par? Type 10% shares. Sets the Balancer price bounds automatically.</p>
               <div className="grid grid-cols-2 gap-1 mb-2">
                 <CompactInput label="Target % shares" tip="At balance, the pool will hold this % in ST shares and the rest in cash." value={targetSharesPct} onChange={setTargetSharesPct} suffix="%" />
-                <CompactInput label="± price tolerance" tip="How wide the price range is around the balance point. ±3% = Curve-like tight peg. ±20% = wider range." value={rangeTolerance} onChange={setRangeTolerance} suffix="%" />
+                <CompactInput label="Price tolerance" tip="Width on the close side of oracle par. The opposite side widens automatically to hit the target reserve composition." value={rangeTolerance} onChange={setRangeTolerance} suffix="%" />
               </div>
               <button onClick={applyTargetComposition} className="w-full bg-[#fbbf24] text-[#0a0c10] text-[10px] font-semibold py-1 rounded hover:bg-[#fcd34d]">
                 Apply to min/max price
@@ -1373,8 +1264,17 @@ export default function DuskV2Simulator() {
               {(() => {
                 const sp = parseNum(targetSharesPct) / 100;
                 if (!(sp > 0 && sp < 1)) return null;
-                const bp = (1 - sp) / sp;
-                return <div className="text-[9px] font-mono text-[#6b7280] mt-1 text-center">→ balance price ≈ {bp.toFixed(4)} (cash per share)</div>;
+                const lambda = parseFloat(eclp.lambda);
+                const phi = parseFloat(eclp.phi);
+                const translated = translateTargetCashToEclpBounds((1 - sp) * 100, parseNum(rangeTolerance), lambda, phi, 1);
+                if (!translated) {
+                  return (
+                    <div className="text-[9px] text-[#f87171] mt-1 text-center">
+                      No Balancer-valid bounds for this target. Lower λ or widen price tolerance.
+                    </div>
+                  );
+                }
+                return <div className="text-[9px] font-mono text-[#6b7280] mt-1 text-center">→ α {translated.alpha.toFixed(4)} / β {translated.beta.toFixed(4)} at spot ≈ 1.0000</div>;
               })()}
             </div>
             <div className="space-y-2">
@@ -1395,13 +1295,15 @@ export default function DuskV2Simulator() {
               <div className="grid grid-cols-3 gap-1">
                 <CompactInput
                   label="Concentration"
-                  tip="Like Curve's A factor. Higher = deeper liquidity near balance, less slippage on small trades. Typical Curve A is 100-500; E-CLP λ is similar. Default 500."
+                  tip="Like Curve's A factor. Higher = deeper liquidity near balance, less slippage on small trades. Balancer E-CLP λ must be ≥ 1. Default 100 because tighter 90/10 pools need lower λ or wider bounds to pass Balancer validation."
                   value={eclp.lambda}
                   onChange={(v) => setEclp(s => ({ ...s, lambda: v }))}
+                  disabled={tradeCount > 0}
+                  lockedHint={tradeCount > 0 ? `Locked — ${tradeCount} trade${tradeCount === 1 ? '' : 's'} executed. λ is immutable per PDF §03. Reset session to edit.` : undefined}
                 />
                 <CompactInput
                   label="Exit skew"
-                  tip="Rotates depth asymmetrically. 0 = symmetric (like Curve). +0.3 = exits 30% cheaper than entries. -0.3 = entries cheaper. Curve has no equivalent — it's always symmetric."
+                  tip="Balancer rotation magnitude. 0 = symmetric (like Curve). Higher values skew the ellipse and change which side receives more depth. Curve has no equivalent."
                   value={eclp.phi}
                   onChange={(v) => setEclp(s => ({ ...s, phi: v }))}
                 />
@@ -1414,9 +1316,45 @@ export default function DuskV2Simulator() {
                 />
               </div>
               <div className="text-[9px] font-mono text-[#6b7280] tabular-nums leading-relaxed mt-2 space-y-0.5">
-                <div>current pool price: <span className="text-white">{derived.poolPrice.toFixed(4)}</span> {(derived.poolPrice >= parseFloat(eclp.alpha) && derived.poolPrice <= parseFloat(eclp.beta)) ? <span className="text-[#34d399]">✓ in range</span> : <span className="text-[#f87171]">⚠ out of range — trades fail</span>}</div>
-                <div title="Slippage steepness for an exit trade — smaller = deeper liquidity in that direction">slippage rate (exits): <span className="text-white">{computeKappa(derived.poolPrice, parseFloat(eclp.alpha), parseFloat(eclp.beta), parseFloat(eclp.lambda), parseFloat(eclp.phi), 'exit', derived.poolSizeNav).toExponential(2)}</span></div>
-                <div title="Slippage steepness for a buy trade — smaller = deeper liquidity in that direction">slippage rate (entries): <span className="text-white">{computeKappa(derived.poolPrice, parseFloat(eclp.alpha), parseFloat(eclp.beta), parseFloat(eclp.lambda), parseFloat(eclp.phi), 'enter', derived.poolSizeNav).toExponential(2)}</span></div>
+                {!eclpConfig ? (
+                  <div className="rounded border border-[#7f1d1d] bg-[#2b1012] p-2 text-[#fca5a5] whitespace-normal">
+                    Balancer rejects this α/β/λ/φ combo. Trades and depth are disabled because the pool could not be deployed with these parameters.
+                    {eclpRepair && (
+                      <button
+                        type="button"
+                        onClick={applyEclpRepair}
+                        className="ml-2 rounded bg-[#f87171] px-2 py-0.5 text-[9px] font-semibold text-[#0a0c10] hover:bg-[#fca5a5]"
+                      >
+                        Use λ {eclpRepair.lambda.toFixed(0)}
+                      </button>
+                    )}
+                  </div>
+                ) : (
+                  <>
+                    <div>
+                      current spot price:{' '}
+                      <span className="text-white">{Number.isFinite(derived.poolPrice) ? derived.poolPrice.toFixed(4) : 'invalid'}</span>{' '}
+                      {(Number.isFinite(derived.poolPrice) && derived.poolPrice >= parseFloat(eclp.alpha) && derived.poolPrice <= parseFloat(eclp.beta))
+                        ? <span className="text-[#34d399]">✓ in range</span>
+                        : <span className="text-[#f87171]">⚠ out of range — trades fail</span>}
+                    </div>
+                    <div>reserve ratio: <span className="text-white">{derived.reserveRatio.toFixed(4)}</span> quote/share NAV</div>
+                    {(() => {
+                      const avgT = Math.max(1, parseNum(avgTradeSize));
+                      const exitQuote = quoteEclpSwap(derived.shareNavInPool, derived.quoteNavInPool, avgT, 'exit', 0, eclpConfig);
+                      const enterQuote = quoteEclpSwap(derived.shareNavInPool, derived.quoteNavInPool, avgT, 'enter', 0, eclpConfig);
+                      const bps = (q: { feasible: boolean; sigmaNav: number }) => q.feasible ? (q.sigmaNav / avgT) * 10000 : null;
+                      const exitBps = bps(exitQuote);
+                      const enterBps = bps(enterQuote);
+                      return (
+                        <>
+                          <div title="Exact Balancer quote for the current avg trade size, excluding pool fee">exit impact @ avg trade: <span className="text-white">{exitBps === null ? 'infeasible' : `${exitBps.toFixed(1)} bps`}</span></div>
+                          <div title="Exact Balancer quote for the current avg trade size, excluding pool fee">entry impact @ avg trade: <span className="text-white">{enterBps === null ? 'infeasible' : `${enterBps.toFixed(1)} bps`}</span></div>
+                        </>
+                      );
+                    })()}
+                  </>
+                )}
               </div>
             </div>
           </CollapsibleSection>
@@ -1648,16 +1586,16 @@ export default function DuskV2Simulator() {
                         green
                       />
                       <div className="text-[9px] uppercase tracking-wider text-[#6b7280] font-semibold mt-2 mb-0.5">④ Slippage gains (σ)</div>
-                      <BreakdownRow
-                        label="Imbalancing premium"
-                        formula={`tradesPerDay × ${parseNum(pctImbalancing).toFixed(0)}% × κ_imb × t² × 365`}
+                        <BreakdownRow
+                          label="Imbalancing premium"
+                          formula={`tradesPerDay × ${parseNum(pctImbalancing).toFixed(0)}% × exact Balancer σ_exit/enter × 365`}
                         amount={yields.annualSigmaImb}
                         relativeTo={yields.juniorCapital}
                         green={yields.annualSigmaImb >= 0}
                       />
-                      <BreakdownRow
-                        label="Balancing cost"
-                        formula={`tradesPerDay × ${(100 - parseNum(pctImbalancing)).toFixed(0)}% × −κ_bal × t² × 365`}
+                        <BreakdownRow
+                          label="Balancing cost"
+                          formula={`tradesPerDay × ${(100 - parseNum(pctImbalancing)).toFixed(0)}% × exact Balancer σ_other side × 365`}
                         amount={yields.annualSigmaBal}
                         relativeTo={yields.juniorCapital}
                         red={yields.annualSigmaBal < 0}
@@ -1695,7 +1633,7 @@ export default function DuskV2Simulator() {
                   {activeChart === 'apy' && (
                     <div className="flex-1 min-h-[420px] flex flex-col">
                       <div className="text-xs text-[#9ca3af] mb-2">YDM yield split + Senior/Junior APY across utilization. Dashed vertical = current util.</div>
-                      <div className="flex-1 min-h-0"><ResponsiveContainer width="100%" height="100%">
+                      <div className="flex-1 min-h-0"><ResponsiveContainerNoSSR width="100%" height="100%" minWidth={0} minHeight={320}>
                         <LineChart data={apyChartData} margin={{ top: 10, right: 60, left: 50, bottom: 50 }}>
                           <CartesianGrid strokeDasharray="3 3" stroke="#2a2f38" />
                           <XAxis dataKey="util" type="number" domain={[0, 100]}
@@ -1717,17 +1655,17 @@ export default function DuskV2Simulator() {
                           <Line type="monotone" dataKey="juniorAPY" name="Junior APY (base)" stroke="#fbbf24" strokeWidth={3} dot={false} isAnimationActive={true} animationDuration={350} />
                           <Line type="monotone" dataKey="seniorAPY" name="Senior APY" stroke="#22d3ee" strokeWidth={3} dot={false} isAnimationActive={true} animationDuration={350} />
                         </LineChart>
-                      </ResponsiveContainer></div>
+                      </ResponsiveContainerNoSSR></div>
                     </div>
                   )}
                   {activeChart === 'depth' && (
                     <div className="flex-1 min-h-[420px] flex flex-col">
                       <div className="text-xs text-[#9ca3af] mb-2">Max trade size that keeps slippage under 50 bps, at each pool price. Dashed vertical = current price.</div>
-                      <div className="flex-1 min-h-0"><ResponsiveContainer width="100%" height="100%">
+                      <div className="flex-1 min-h-0"><ResponsiveContainerNoSSR width="100%" height="100%" minWidth={0} minHeight={320}>
                         <LineChart data={depthChartData} margin={{ top: 10, right: 30, left: 60, bottom: 50 }}>
                           <CartesianGrid strokeDasharray="3 3" stroke="#2a2f38" />
                           <XAxis dataKey="price" type="number" domain={['dataMin', 'dataMax']}
-                            label={{ value: 'Pool price (cash/share NAV)', position: 'insideBottom', offset: -10, fill: '#9ca3af', fontSize: 12 }}
+                            label={{ value: 'Spot price (quote/share NAV)', position: 'insideBottom', offset: -10, fill: '#9ca3af', fontSize: 12 }}
                             stroke="#6b7280" tick={{ fontSize: 11 }} tickFormatter={(v) => v.toFixed(3)} />
                           <YAxis label={{ value: 'Max trade ($, 50bps cap)', angle: -90, position: 'insideLeft', style: { textAnchor: 'middle' }, fill: '#9ca3af', fontSize: 12 }} stroke="#6b7280" tick={{ fontSize: 11 }} tickFormatter={(v) => v >= 1e6 ? `$${(v/1e6).toFixed(1)}M` : `$${(v/1e3).toFixed(0)}K`} />
                           <Tooltip contentStyle={{ background: '#0a0c10', border: '1px solid #2a2f38', borderRadius: 8, fontSize: 12 }}
@@ -1748,12 +1686,14 @@ export default function DuskV2Simulator() {
                               </>
                             );
                           })()}
-                          <ReferenceLine x={derived.poolPrice} stroke="#fbbf24" strokeWidth={2} strokeDasharray="5 5"
-                            label={{ value: 'NOW', position: 'insideTopRight', fill: '#fbbf24', fontSize: 10, fontWeight: 'bold', offset: 8 }} />
+                          {Number.isFinite(derived.poolPrice) && (
+                            <ReferenceLine x={derived.poolPrice} stroke="#fbbf24" strokeWidth={2} strokeDasharray="5 5"
+                              label={{ value: 'NOW', position: 'insideTopRight', fill: '#fbbf24', fontSize: 10, fontWeight: 'bold', offset: 8 }} />
+                          )}
                           <Line type="monotone" dataKey="depthExit" name="Exit depth (sell shares)" stroke="#34d399" strokeWidth={2} dot={false} isAnimationActive={true} animationDuration={350} />
                           <Line type="monotone" dataKey="depthEnter" name="Enter depth (buy shares)" stroke="#60a5fa" strokeWidth={2} dot={false} isAnimationActive={true} animationDuration={350} />
                         </LineChart>
-                      </ResponsiveContainer></div>
+                      </ResponsiveContainerNoSSR></div>
                     </div>
                   )}
                   {activeChart === 'tune' && (() => {
@@ -1761,7 +1701,6 @@ export default function DuskV2Simulator() {
                     const { recommendedLambda, targetSlippageBps, baseLambdas, days, hurdle, avgT } = concentrationTune;
                     const currentLambda = parseFloat(eclp.lambda);
                     const colors = ['#f87171', '#fbbf24', '#34d399', '#60a5fa'];
-                    const tNav = parseNum(tradeSize) || 0;
                     const alpha = parseFloat(eclp.alpha);
                     const beta = parseFloat(eclp.beta);
                     const phi = parseFloat(eclp.phi);
@@ -1816,10 +1755,16 @@ export default function DuskV2Simulator() {
                           </div>
                           <button
                             onClick={() => setEclp((s) => ({ ...s, lambda: recommendedLambda < 1 ? recommendedLambda.toFixed(3) : recommendedLambda.toFixed(0) }))}
-                            className="self-center bg-[#34d399] text-[#0a0c10] text-xs font-bold py-2 px-4 rounded hover:bg-[#6ee7b7] whitespace-nowrap"
+                            disabled={tradeCount > 0}
+                            className="self-center bg-[#34d399] text-[#0a0c10] text-xs font-bold py-2 px-4 rounded hover:bg-[#6ee7b7] whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed"
                           >
                             ▸ Set λ = {recommendedLambda < 1 ? recommendedLambda.toFixed(2) : recommendedLambda.toFixed(0)}
                           </button>
+                          {tradeCount > 0 && (
+                            <div className="text-[9px] text-[#fbbf24] text-center mt-1">
+                              Locked after trades. Reset session to change λ.
+                            </div>
+                          )}
                         </div>
 
                         {/* === Senior exit cost table === */}
@@ -1839,7 +1784,28 @@ export default function DuskV2Simulator() {
                               </thead>
                               <tbody>
                                 {(() => {
-                                  const k = computeKappa(derived.poolPrice, alpha, beta, recommendedLambda, phi, concentrationTune.direction, derived.poolSizeNav);
+                                  const effectiveRecommendedLambda = Math.max(1, recommendedLambda);
+                                  const recommendedBounds = translateTargetCashToEclpBounds(
+                                    parseNum(setup.juniorCashPct),
+                                    parseNum(rangeTolerance),
+                                    effectiveRecommendedLambda,
+                                    phi,
+                                    1,
+                                  );
+                                  const recAlpha = recommendedBounds?.alpha ?? alpha;
+                                  const recBeta = recommendedBounds?.beta ?? beta;
+                                  const recommendedConfig = makeEclpConfig(recAlpha, recBeta, effectiveRecommendedLambda, phi);
+                                  const swapFeeRate = parseFloat(eclp.swapFeeRate) / 100;
+                                  const ydmShareForAccounting = yields
+                                    ? yields.ydmShare
+                                    : safeYdmShare(setup.ydmYT);
+                                  const syncedBefore = syncAccountingOnBefore(
+                                    pool,
+                                    derived.assetPrice,
+                                    derived.quotePrice,
+                                    ydmShareForAccounting,
+                                  );
+                                  const rangeEps = Math.max(1e-9, Math.abs(recBeta - recAlpha) * 1e-6);
                                   const rAnnualBps = yields ? yields.r * 10000 : 1;
                                   const seniorCap = yields ? yields.seniorCapital : derived.poolSizeNav;
                                   const exitSizes = [
@@ -1851,25 +1817,65 @@ export default function DuskV2Simulator() {
                                     { label: '33% of Senior', t: seniorCap * 0.33 },
                                   ];
                                   return exitSizes.map((s, idx) => {
-                                    const bps = k * s.t * 10000;
-                                    const dollarCost = (bps / 10000) * s.t;
-                                    const counterValueNav = s.t - dollarCost; // trader receives this in quote
+                                    const sim = simulateTrade(
+                                      syncedBefore,
+                                      s.t,
+                                      'exit',
+                                      derived.perShareRaw,
+                                      derived.quotePrice,
+                                      swapFeeRate,
+                                      recommendedConfig,
+                                      balancePoolPrice,
+                                    );
+                                    const bps = s.t > 0 ? ((sim.feeNav + sim.sigmaNav) / s.t) * 10000 : 0;
+                                    const dollarCost = sim.feeNav + sim.sigmaNav;
+                                    const simCounterValueNav = Math.max(0, s.t - sim.feeNav - sim.sigmaNav);
+                                    const simShareNav = sim.newState.internalShares * derived.perShareRaw;
+                                    const simQuoteNav = sim.newState.quoteReserves * derived.quotePrice;
+                                    const simPoolPrice = computeEclpSpotPrice(simShareNav, simQuoteNav, recAlpha, recBeta, effectiveRecommendedLambda, phi);
+                                    const inRange = simPoolPrice >= recAlpha - rangeEps && simPoolPrice <= recBeta + rangeEps;
+                                    let coverageShortfall = 0;
+                                    if (sim.feasible && inRange) {
+                                      const accounted = syncAccountingOnAfter(
+                                        syncedBefore,
+                                        sim.newState,
+                                        derived.assetPrice,
+                                        derived.quotePrice,
+                                        ydmShareForAccounting,
+                                      );
+                                      const postRaw = rawNavFromState(accounted, derived.assetPrice, derived.quotePrice);
+                                      const betaPost = postRaw.JT_RAW_NAV > 0
+                                        ? postRaw.shareNavInPool / postRaw.JT_RAW_NAV
+                                        : 0;
+                                      const requiredCoveragePost = (postRaw.ST_RAW_NAV + postRaw.JT_RAW_NAV * betaPost) * derived.minCoverage;
+                                      coverageShortfall = requiredCoveragePost - accounted.jtEffectiveNav;
+                                    }
                                     const daysOfYield = rAnnualBps > 0 ? (bps / (rAnnualBps / 365)) : 0;
                                     const pctOfPos = bps / 100;
-                                    // Three independent infeasibility checks:
+                                    // Capacity checks:
                                     //   (a) trade size > pool TVL — pool literally can't fit this
-                                    //   (b) counter-value > pool's available cash — pool can't pay trader
+                                    //   (b) payout > pool cash — pool can't pay trader
                                     //   (c) slippage ≥ 100% — trader gets nothing
+                                    //   (d) post-trade goes out of [α,β] range
+                                    //   (e) post-trade coverage breach (Junior can't support it)
                                     const exceedsTVL = s.t > derived.poolSizeNav;
-                                    const exceedsCash = counterValueNav > derived.quoteNavInPool;
+                                    const exceedsCash = simCounterValueNav > derived.quoteNavInPool;
                                     const slipOverflow = bps >= 10000;
-                                    const infeasible = exceedsTVL || exceedsCash || slipOverflow;
+                                    const outOfRange = !inRange;
+                                    const coverageBreach = coverageShortfall > NAV_EPS;
+                                    const infeasible = !sim.feasible || exceedsTVL || exceedsCash || slipOverflow || outOfRange || coverageBreach;
                                     if (infeasible) {
-                                      const reason = exceedsTVL
-                                        ? `pool TVL only $${fmtCompact(derived.poolSizeNav)}`
-                                        : exceedsCash
-                                          ? `only $${fmtCompact(derived.quoteNavInPool)} cash in pool`
-                                          : `slippage ${bps.toFixed(0)} bps`;
+                                      const reason = !sim.feasible
+                                        ? 'insufficient pool liquidity'
+                                        : exceedsTVL
+                                          ? `pool TVL only $${fmtCompact(derived.poolSizeNav)}`
+                                          : exceedsCash
+                                            ? `only $${fmtCompact(derived.quoteNavInPool)} cash in pool`
+                                            : slipOverflow
+                                              ? `slippage ${bps.toFixed(0)} bps`
+                                              : outOfRange
+                                                ? `would push price outside [${recAlpha.toFixed(3)}, ${recBeta.toFixed(3)}]`
+                                                : `Junior coverage short by $${fmtCompact(Math.max(0, coverageShortfall))}`;
                                       return (
                                         <tr key={idx} className={idx % 2 === 0 ? 'bg-[#13161c]' : ''}>
                                           <td className="p-2 text-white">{s.label}</td>
@@ -1905,7 +1911,7 @@ export default function DuskV2Simulator() {
                           {' '}Curves above the line → MMs will arbitrage; below → exits stall.
                         </div>
 
-                        <div className="flex-1 min-h-0"><ResponsiveContainer width="100%" height="100%">
+                        <div className="flex-1 min-h-0"><ResponsiveContainerNoSSR width="100%" height="100%" minWidth={0} minHeight={320}>
                           <LineChart
                             data={concentrationChartData.map((row) => {
                               // Convert each line's bps to MM annualized yield:
@@ -1958,7 +1964,7 @@ export default function DuskV2Simulator() {
                               );
                             })}
                           </LineChart>
-                        </ResponsiveContainer></div>
+                        </ResponsiveContainerNoSSR></div>
                       </div>
                     );
                   })()}
@@ -1976,12 +1982,20 @@ export default function DuskV2Simulator() {
                 <div className="flex h-6 rounded overflow-hidden">
                   <div className="bg-[#fbbf24] flex items-center justify-center text-[10px] font-semibold text-[#0a0c10] transition-all"
                     style={{ width: `${(derived.shareNavInPool / Math.max(derived.poolSizeNav, 1)) * 100}%` }}>
-                    {derived.shareNavInPool > derived.poolSizeNav * 0.12 ? `ST shares · $${fmtNav(derived.shareNavInPool, 0)}` : ''}
+                    {derived.shareNavInPool > derived.poolSizeNav * 0.12
+                      ? `ST shares ${(derived.poolSizeNav > 0 ? (derived.shareNavInPool / derived.poolSizeNav) * 100 : 0).toFixed(1)}% · $${fmtNav(derived.shareNavInPool, 0)}`
+                      : ''}
                   </div>
                   <div className="bg-[#34d399] flex items-center justify-center text-[10px] font-semibold text-[#0a0c10] transition-all"
                     style={{ width: `${(derived.quoteNavInPool / Math.max(derived.poolSizeNav, 1)) * 100}%` }}>
-                    {derived.quoteNavInPool > derived.poolSizeNav * 0.12 ? `Cash · $${fmtNav(derived.quoteNavInPool, 0)}` : ''}
+                    {derived.quoteNavInPool > derived.poolSizeNav * 0.12
+                      ? `Cash ${(derived.poolSizeNav > 0 ? (derived.quoteNavInPool / derived.poolSizeNav) * 100 : 0).toFixed(1)}% · $${fmtNav(derived.quoteNavInPool, 0)}`
+                      : ''}
                   </div>
+                </div>
+                <div className="mt-1.5 grid grid-cols-2 gap-2 text-[10px] font-mono tabular-nums">
+                  <div className="text-[#fbbf24]">ST shares: {fmtPct(derived.poolSizeNav > 0 ? derived.shareNavInPool / derived.poolSizeNav : 0)} · ${fmtNav(derived.shareNavInPool, 0)}</div>
+                  <div className="text-[#34d399] text-right">Cash: {fmtPct(derived.poolSizeNav > 0 ? derived.quoteNavInPool / derived.poolSizeNav : 0)} · ${fmtNav(derived.quoteNavInPool, 0)}</div>
                 </div>
               </div>
             </>
@@ -2001,10 +2015,21 @@ export default function DuskV2Simulator() {
             const recvAccent = payIsShares ? 'green' : 'cyan';
             const tradeNav = parseNum(tradeSize) || 0;
             const recvNav = tradePreview ? tradePreview.counterValueNav : 0;
-            const effRate = tradeNav > 0 && recvNav > 0
-              ? (payIsShares ? recvNav / tradeNav : tradeNav / recvNav)
+            const payAmount = tradeNav > 0
+              ? (payIsShares
+                ? tradeNav / Math.max(derived.perShareRaw, 1e-18)
+                : tradeNav / Math.max(derived.quotePrice, 1e-18))
+              : 0;
+            const recvAmount = recvNav > 0
+              ? (payIsShares
+                ? recvNav / Math.max(derived.quotePrice, 1e-18)
+                : recvNav / Math.max(derived.perShareRaw, 1e-18))
+              : 0;
+            // Display both rates in quote/share terms.
+            const effRate = payAmount > 0 && recvAmount > 0
+              ? (payIsShares ? recvAmount / payAmount : payAmount / recvAmount)
               : 1;
-            const oracleRate = 1; // at price=1 the oracle rate is 1.0
+            const oracleRate = Math.max(1e-18, derived.perShareRaw / Math.max(derived.quotePrice, 1e-18));
             const slipBps = tradeNav > 0 && tradePreview
               ? ((tradePreview.sigmaNav + tradePreview.feeNav) / tradeNav) * 10000
               : 0;
@@ -2014,6 +2039,16 @@ export default function DuskV2Simulator() {
             const sigBps = tradeNav > 0 && tradePreview
               ? (tradePreview.sigmaNav / tradeNav) * 10000
               : 0;
+            const maxTradeNav = Math.max(derived.quoteNavInPool * 1.5, 1);
+            const tradeStepNav = Math.max(1, derived.quoteNavInPool / 200);
+            const seniorCap = yields ? yields.seniorCapital : 0;
+            const exitPresetPcts = [1, 5, 10, 20, 33];
+            const setExitPreset = (pct: number) => {
+              const target = seniorCap * (pct / 100);
+              const capped = Math.max(0, Math.min(target, maxSafeExitNow));
+              setTradeDirection('exit');
+              setTradeSize(fmtCommas(capped.toFixed(0)));
+            };
             return (
               <>
                 {/* You pay */}
@@ -2032,11 +2067,53 @@ export default function DuskV2Simulator() {
                     />
                   </div>
                   <input
-                    type="range" min={0} max={Math.max(pool.quoteReserves * 1.5, 1)} step={Math.max(1, pool.quoteReserves / 200)}
-                    value={Math.min(parseNum(tradeSize) || 0, Math.max(pool.quoteReserves * 1.5, 1))}
+                    type="range" min={0} max={maxTradeNav} step={tradeStepNav}
+                    value={Math.min(parseNum(tradeSize) || 0, maxTradeNav)}
                     onChange={(e) => setTradeSize(fmtCommas(e.target.value))}
                     className="w-full utilization-slider mt-2"
                   />
+                  <div className="mt-2.5 rounded border border-[#2a2f38] bg-[#0a0c10] p-2">
+                    <div className="flex items-center justify-between text-[10px] mb-1.5">
+                      <span className="text-[#9ca3af] uppercase tracking-wide">Max safe exit now</span>
+                      <span className="text-white font-mono tabular-nums">${fmtNav(maxSafeExitNow, 0)}</span>
+                    </div>
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => {
+                          setTradeDirection('exit');
+                          setTradeSize(fmtCommas(Math.max(0, maxSafeExitNow).toFixed(0)));
+                        }}
+                        disabled={maxSafeExitNow <= 0}
+                        className="text-[10px] px-2 py-1 rounded border border-[#34d399] text-[#34d399] hover:bg-[#34d399]/10 disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        Use max
+                      </button>
+                      <span className="text-[9px] text-[#6b7280]">
+                        capped by cash, range, and Junior coverage
+                      </span>
+                    </div>
+                    <div className="mt-2 grid grid-cols-5 gap-1">
+                      {exitPresetPcts.map((pct) => {
+                        const target = seniorCap * (pct / 100);
+                        const capped = Math.max(0, Math.min(target, maxSafeExitNow));
+                        const isCapped = capped + 1 < target;
+                        return (
+                          <button
+                            key={pct}
+                            onClick={() => setExitPreset(pct)}
+                            disabled={maxSafeExitNow <= 0}
+                            className="text-[10px] font-mono py-1 rounded border border-[#2a2f38] text-[#9ca3af] hover:text-white hover:border-white disabled:opacity-40 disabled:cursor-not-allowed"
+                            title={isCapped ? `Capped to $${fmtNav(capped, 0)} by current pool constraints` : `$${fmtNav(capped, 0)}`}
+                          >
+                            {pct}%{isCapped ? '*' : ''}
+                          </button>
+                        );
+                      })}
+                    </div>
+                    <div className="mt-1 text-[9px] text-[#6b7280]">
+                      presets are % of Senior TVL{maxSafeExitNow > 0 ? ` · ${exitPresetPcts.map((p) => `${p}%=$${fmtCompact(Math.min(seniorCap * (p / 100), maxSafeExitNow))}`).join(' · ')}` : ''}
+                    </div>
+                  </div>
                 </div>
 
                 {/* Swap direction button */}
@@ -2098,13 +2175,13 @@ export default function DuskV2Simulator() {
                             </span>
                           </div>
                           <div className="border-t border-[#2a2f38] my-1.5"></div>
-                          <div className="flex justify-between font-semibold">
-                            <span className="text-white">Total cost to trader</span>
-                            <span className="text-[#f87171] font-mono tabular-nums">
-                              −{slipBps.toFixed(1)} bps
-                              <span className="text-[#fca5a5] ml-1 text-[10px] font-normal">= {bpsToDays(slipBps)} yield</span>
-                            </span>
-                          </div>
+	                          <div className="flex justify-between font-semibold">
+	                            <span className="text-white">{slipBps >= 0 ? 'Total cost to trader' : 'Total rebate to trader'}</span>
+	                            <span className={`${slipBps >= 0 ? 'text-[#f87171]' : 'text-[#34d399]'} font-mono tabular-nums`}>
+	                              {Math.abs(slipBps).toFixed(1)} bps
+	                              <span className={`${slipBps >= 0 ? 'text-[#fca5a5]' : 'text-[#86efac]'} ml-1 text-[10px] font-normal`}>= {bpsToDays(slipBps)} yield</span>
+	                            </span>
+	                          </div>
                         </>
                       );
                     })()}
@@ -2117,7 +2194,7 @@ export default function DuskV2Simulator() {
                   disabled={!tradePreview || !tradePreview.feasible}
                   className="w-full bg-[#fbbf24] text-[#0a0c10] text-sm font-bold py-3 rounded hover:bg-[#fcd34d] disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
                 >
-                  {tradePreview && !tradePreview.feasible ? '✗ INFEASIBLE — insufficient liquidity' : '▶ EXECUTE TRADE'}
+                  {tradePreview && !tradePreview.feasible ? '✗ INFEASIBLE — bounds or liquidity' : '▶ EXECUTE TRADE'}
                 </button>
 
                 {/* Junior impact callout */}
@@ -2300,9 +2377,7 @@ function YieldSourceTile(props: { label: string; amount: number; tip?: string; g
   const abs = Math.abs(props.amount);
   const [show, setShow] = useState(false);
   const [pos, setPos] = useState({ x: 0, y: 0 });
-  const [mounted, setMounted] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
-  useEffect(() => setMounted(true), []);
   const onEnter = () => {
     if (!props.tip || !ref.current) return;
     const r = ref.current.getBoundingClientRect();
@@ -2318,7 +2393,7 @@ function YieldSourceTile(props: { label: string; amount: number; tip?: string; g
     >
       <div className="text-[8px] uppercase tracking-wider text-[#6b7280]">{props.label}</div>
       <div className={`text-[10px] font-mono tabular-nums ${isNeg ? 'text-[#f87171]' : props.green ? 'text-[#34d399]' : 'text-white'}`}>{sign}${fmtNav(abs, 0)}</div>
-      {props.tip && mounted && show && createPortal(
+      {props.tip && show && typeof document !== 'undefined' && createPortal(
         <div
           style={{
             position: 'fixed',
@@ -2350,88 +2425,10 @@ function PreviewLine(props: { label: string; value: string; green?: boolean; red
   );
 }
 
-type HeatmapCell = { util: number; sharePct: number; juniorAPY: number; seniorAPY: number };
-function HeatmapRender(props: {
-  cells: HeatmapCell[];
-  mode: 'junior' | 'senior';
-  curUtil: number;
-  curSharePct: number;
-}) {
-  if (props.cells.length === 0) return <p className="text-[#9ca3af] text-sm">No data.</p>;
-  const N = Math.round(Math.sqrt(props.cells.length));
-  const values = props.cells
-    .map((c) => (props.mode === 'junior' ? c.juniorAPY : c.seniorAPY))
-    .filter((v) => Number.isFinite(v) && v < 5 && v > -1);
-  const vMax = values.length ? Math.max(0.001, ...values) : 0.1;
-  const vMin = values.length ? Math.min(...values) : 0;
-  const color = (v: number) => {
-    if (!Number.isFinite(v)) return '#1a1d24';
-    const t = Math.min(1, Math.max(0, (v - vMin) / Math.max(vMax - vMin, 1e-9)));
-    if (props.mode === 'junior') {
-      const r = Math.round(20 + 235 * Math.pow(t, 0.7));
-      const g = Math.round(10 + 200 * Math.pow(t, 1.5));
-      const b = Math.round(60 + 30 * (1 - t));
-      return `rgb(${r}, ${g}, ${b})`;
-    } else {
-      const r = Math.round(30 + 220 * Math.pow(t, 0.7));
-      const g = Math.round(20 + 130 * Math.pow(t, 1.2));
-      const b = Math.round(50 + 10 * (1 - t));
-      return `rgb(${r}, ${g}, ${b})`;
-    }
-  };
-  const rows: HeatmapCell[][] = [];
-  for (let is = N - 1; is >= 0; is--) {
-    const row: HeatmapCell[] = [];
-    for (let iu = 0; iu < N; iu++) row.push(props.cells[iu * N + is]);
-    rows.push(row);
-  }
-  return (
-    <div className="flex-1 flex flex-col">
-      <div className="flex flex-1 min-h-0">
-        <div className="flex flex-col justify-between pr-2 text-[10px] text-[#6b7280] font-mono tabular-nums">
-          <span>100%</span><span>50%</span><span>0%</span>
-        </div>
-        <div className="flex-1 flex flex-col">
-          <div className="flex-1 grid gap-0" style={{ gridTemplateColumns: `repeat(${N}, 1fr)`, gridTemplateRows: `repeat(${N}, 1fr)` }}>
-            {rows.flatMap((row, ri) =>
-              row.map((cell, ci) => {
-                const v = props.mode === 'junior' ? cell.juniorAPY : cell.seniorAPY;
-                const isCurrent =
-                  Math.abs(cell.util - props.curUtil) < 0.5 / N &&
-                  Math.abs(cell.sharePct - props.curSharePct) < 0.5 / N;
-                return (
-                  <div
-                    key={`${ri}-${ci}`}
-                    title={`Util ${(cell.util * 100).toFixed(0)}%, Shares ${(cell.sharePct * 100).toFixed(0)}% → APY ${(v * 100).toFixed(2)}%`}
-                    className="border border-[#0f1115] cursor-help"
-                    style={{ background: color(v), boxShadow: isCurrent ? 'inset 0 0 0 2px #fbbf24' : undefined }}
-                  />
-                );
-              })
-            )}
-          </div>
-          <div className="flex justify-between text-[10px] text-[#6b7280] font-mono tabular-nums mt-1 px-1">
-            <span>0%</span><span>50%</span><span>100%</span>
-          </div>
-          <p className="text-[10px] text-[#6b7280] text-center mt-0.5">Utilization →</p>
-        </div>
-      </div>
-      <div className="mt-2 flex items-center gap-3">
-        <span className="text-[10px] text-[#9ca3af]">APY:</span>
-        <span className="text-[10px] font-mono text-white tabular-nums">{(vMin * 100).toFixed(1)}%</span>
-        <div className="flex-1 h-2.5 rounded" style={{ background: `linear-gradient(to right, ${color(vMin)}, ${color((vMin + vMax) / 2)}, ${color(vMax)})` }} />
-        <span className="text-[10px] font-mono text-white tabular-nums">{(vMax * 100).toFixed(1)}%</span>
-      </div>
-    </div>
-  );
-}
-
 function PortalTooltip(props: { tip: string }) {
   const [show, setShow] = useState(false);
   const [pos, setPos] = useState({ x: 0, y: 0 });
-  const [mounted, setMounted] = useState(false);
   const triggerRef = useRef<HTMLSpanElement>(null);
-  useEffect(() => setMounted(true), []);
   const onEnter = () => {
     if (!triggerRef.current) return;
     const r = triggerRef.current.getBoundingClientRect();
@@ -2446,7 +2443,7 @@ function PortalTooltip(props: { tip: string }) {
         onMouseLeave={() => setShow(false)}
         className="text-[9px] text-[#6b7280] hover:text-[#fbbf24] cursor-help transition-colors"
       >ⓘ</span>
-      {mounted && show && createPortal(
+      {show && typeof document !== 'undefined' && createPortal(
         <div
           style={{
             position: 'fixed',
@@ -2574,4 +2571,3 @@ function KpiTile(props: {
     </div>
   );
 }
-
