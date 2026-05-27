@@ -300,6 +300,7 @@ export default function DuskV2Simulator() {
     if (['apy', 'depth', 'tune'].includes(ch)) {
       setActiveChart(ch as ChartTab);
     }
+    setRangeTolerance(getNum('rt', '3'));
     // Defaults derived from Junior tranche: daily = JT/365, avg trade = JT/5
     const jtForDefaults = parseFloat((numWithCommas('j', DEFAULT_SETUP.juniorTrancheSize)).replace(/,/g, ''));
     const dvDefault = Number.isFinite(jtForDefaults) ? fmtCommas(Math.round(jtForDefaults / 365).toString()) : '3,078';
@@ -336,6 +337,7 @@ export default function DuskV2Simulator() {
     p.set('l', eclp.lambda);
     p.set('phi', eclp.phi);
     p.set('fee', eclp.swapFeeRate);
+    if (rangeTolerance !== '3') p.set('rt', rangeTolerance);
     p.set('ad', adaptYdmPct.toString());
     if (activeChart !== 'apy') p.set('ch', activeChart);
     p.set('dv', stripCommas(assumedDailyVolume));
@@ -345,7 +347,7 @@ export default function DuskV2Simulator() {
     if (mmHurdle !== '20') p.set('mh', mmHurdle);
     const url = `${window.location.pathname}?${p.toString()}`;
     window.history.replaceState(null, '', url);
-  }, [setup, eclp, adaptYdmPct, activeChart, assumedDailyVolume, avgTradeSize, pctImbalancing, redemptionDays, mmHurdle, urlHydrated]);
+  }, [setup, eclp, rangeTolerance, adaptYdmPct, activeChart, assumedDailyVolume, avgTradeSize, pctImbalancing, redemptionDays, mmHurdle, urlHydrated]);
 
   // Auto-translate target reserve composition → α, β at oracle par.
   const applyTargetComposition = () => {
@@ -399,7 +401,7 @@ export default function DuskV2Simulator() {
   // Auto-sync trading forecast assumptions to Junior tranche size:
   //   avg trade = 1/5 of JT (~20% of pool TVL)
   //   daily volume = JT / 365 (= 100% annual turnover)
-  // Keeps the concentration recommendation calibrated to realistic flow.
+  // Keeps the pool-parameter recommendation calibrated to realistic flow.
   useEffect(() => {
     const jt = parseNum(setup.juniorTrancheSize);
     if (!Number.isFinite(jt) || jt <= 0) return;
@@ -453,7 +455,7 @@ export default function DuskV2Simulator() {
     if (!validAt(1)) return null;
     let lo = 1;
     let hi = currentLambda;
-    for (let i = 0; i < 60; i++) {
+    for (let i = 0; i < 24; i++) {
       const mid = (lo + hi) / 2;
       if (validAt(mid)) lo = mid;
       else hi = mid;
@@ -824,7 +826,7 @@ export default function DuskV2Simulator() {
 
     let lo = 0;
     let hi = hiSeed;
-    for (let i = 0; i < 60; i++) {
+    for (let i = 0; i < 24; i++) {
       const mid = (lo + hi) / 2;
       if (isSafeExit(mid)) lo = mid;
       else hi = mid;
@@ -897,7 +899,7 @@ export default function DuskV2Simulator() {
   // For each price p ∈ [α, β], compute the maximum trade size that keeps
   // slippage σ/t below 50 bps. Higher value = more depth at that price.
   const depthChartData = useMemo(() => {
-    if (!derived) return [];
+    if (!derived || activeChart !== 'depth') return [];
     const alpha = parseFloat(eclp.alpha);
     const beta = parseFloat(eclp.beta);
     const lambda = parseFloat(eclp.lambda);
@@ -923,35 +925,37 @@ export default function DuskV2Simulator() {
       hi = Math.min(hi, derived.poolSizeNav * 2);
       if (withinThreshold(hi)) return hi;
       let lo = 0;
-      for (let j = 0; j < 48; j++) {
+      for (let j = 0; j < 16; j++) {
         const mid = (lo + hi) / 2;
         if (withinThreshold(mid)) lo = mid;
         else hi = mid;
       }
       return lo;
     };
-    for (let i = 0; i <= 100; i++) {
-      const price = alpha + (beta - alpha) * (i / 100);
+    const POINTS = 16;
+    for (let i = 0; i <= POINTS; i++) {
+      const price = alpha + (beta - alpha) * (i / POINTS);
       const depthExit = exactDepthAt(price, 'exit');
       const depthEnter = exactDepthAt(price, 'enter');
       const cashPct = (eclpReservesAtPrice(alpha, beta, lambda, phi, price)?.quoteFrac ?? 0) * 100;
       data.push({ price, depthExit, depthEnter, cashPct });
     }
     return data;
-  }, [derived, eclp]);
+  }, [derived, eclp, activeChart]);
 
-  // ----- Concentration tuner ----------------------------------------------
-  // Goal: help user pick λ such that slippage on a typical exit trade
-  // compensates a market maker holding to redemption.
+  // ----- Pool parameter solver --------------------------------------------
+  // Goal: derive deployable α/β/λ/tolerance params such that curve impact on a
+  // typical Senior exit compensates a market maker holding to redemption.
   //   target_slippage_bps = hurdle_apr × (days / 365) × 10000
-  // Solve λ against the exact Balancer E-CLP outGivenIn path, while translating
-  // α/β for each candidate λ so the target reserve mix remains at oracle par.
-  const concentrationTune = useMemo(() => {
-    if (!derived) return null;
-    const lambda = parseFloat(eclp.lambda);
+  // The old λ-only search was under-specified: for a fixed target composition,
+  // the active price band is the missing degree of freedom. This jointly solves
+  // the band and λ while keeping the reserve mix at oracle par.
+  const poolParamTune = useMemo(() => {
+    if (!derived || activeChart !== 'tune') return null;
+    const currentLambda = Math.max(1, parseFloat(eclp.lambda));
     const phi = parseFloat(eclp.phi);
     const swapFeeRate = parseFloat(eclp.swapFeeRate) / 100;
-    if (![lambda, phi, swapFeeRate].every(Number.isFinite)) return null;
+    if (![currentLambda, phi, swapFeeRate].every(Number.isFinite)) return null;
 
     const direction: Direction = 'exit';
 
@@ -961,14 +965,47 @@ export default function DuskV2Simulator() {
 
     const avgT = Math.max(1, parseNum(avgTradeSize));
     const targetCashPct = parseNum(setup.juniorCashPct);
-    const tolPct = parseNum(rangeTolerance);
+    const currentTolerance = Math.max(0.01, parseNum(rangeTolerance));
+    if (!(targetCashPct > 0 && targetCashPct < 100)) return null;
 
-    const slippageBpsAt = (candidateLambda: number): number | null => {
+    type Candidate = {
+      lambda: number;
+      tolerance: number;
+      alpha: number;
+      beta: number;
+      quoteFrac: number;
+      slippageBps: number;
+      errorBps: number;
+      cfg: NonNullable<ReturnType<typeof makeEclpConfig>>;
+    };
+
+    const candidateCache = new Map<string, Candidate | null>();
+    const evaluated: Candidate[] = [];
+
+    const candidateAt = (candidateLambda: number, candidateTolerance: number): Candidate | null => {
       const lam = Math.max(1, candidateLambda);
-      const bounds = translateTargetCashToEclpBounds(targetCashPct, tolPct, lam, phi, 1);
-      if (!bounds) return null;
+      const tol = Math.max(0.05, candidateTolerance);
+      const key = `${lam.toPrecision(12)}:${tol.toPrecision(10)}`;
+      if (candidateCache.has(key)) return candidateCache.get(key) ?? null;
+
+      const bounds = translateTargetCashToEclpBounds(targetCashPct, tol, lam, phi, 1);
+      if (!bounds) {
+        candidateCache.set(key, null);
+        return null;
+      }
+      const quoteFrac = bounds.quoteFrac ?? Number.NaN;
+      const targetQuoteFrac = targetCashPct / 100;
+      if (!Number.isFinite(quoteFrac) || Math.abs(quoteFrac - targetQuoteFrac) > 0.0025) {
+        candidateCache.set(key, null);
+        return null;
+      }
+
       const cfg = makeEclpConfig(bounds.alpha, bounds.beta, lam, phi);
-      if (!cfg) return null;
+      if (!cfg) {
+        candidateCache.set(key, null);
+        return null;
+      }
+
       const sim = simulateTrade(
         pool,
         avgT,
@@ -979,64 +1016,177 @@ export default function DuskV2Simulator() {
         cfg,
         balancePoolPrice,
       );
-      if (!sim.feasible) return null;
-      return Math.max(0, (sim.sigmaNav / avgT) * 10000);
+      if (!sim.feasible) {
+        candidateCache.set(key, null);
+        return null;
+      }
+
+      const slippageBps = Math.max(0, (sim.sigmaNav / avgT) * 10000);
+      const result = {
+        lambda: lam,
+        tolerance: tol,
+        alpha: bounds.alpha,
+        beta: bounds.beta,
+        quoteFrac,
+        slippageBps,
+        errorBps: Math.abs(slippageBps - targetSlippageBps),
+        cfg,
+      };
+      candidateCache.set(key, result);
+      evaluated.push(result);
+      return result;
     };
 
-    let lo = 1;
-    let hi = Math.max(2, lambda);
-    let hiSlip = slippageBpsAt(hi);
-    while ((hiSlip === null || hiSlip > targetSlippageBps) && hi < 1_000_000) {
-      hi *= 2;
-      hiSlip = slippageBpsAt(hi);
-    }
-    const loSlip = slippageBpsAt(lo);
-    let recommendedLambda = lambda;
-    if (loSlip !== null && loSlip <= targetSlippageBps) {
-      recommendedLambda = lo;
-    } else if (hiSlip !== null) {
-      for (let i = 0; i < 64; i++) {
-        const mid = (lo + hi) / 2;
-        const midSlip = slippageBpsAt(mid);
-        if (midSlip === null) {
-          lo = mid;
-          continue;
-        }
-        if (midSlip > targetSlippageBps) lo = mid;
-        else hi = mid;
+    const toleranceSamples = [
+      0.25, 0.5, 0.75, 1, 1.25, 1.5, 1.75, 2, 2.25, 2.5, 2.75, 3,
+      3.5, 4, 4.5, 5, 5.5, 6, 7, 8, 9, 10, 12, 15, 18, 22, 28,
+    ];
+
+    const betterByError = (a: Candidate | null, b: Candidate | null): Candidate | null => {
+      if (!a) return b;
+      if (!b) return a;
+      if (b.errorBps < a.errorBps - 1e-9) return b;
+      if (Math.abs(b.errorBps - a.errorBps) <= 1e-9) {
+        const aDistance = Math.abs(Math.log(a.lambda / currentLambda)) + Math.abs(a.tolerance - currentTolerance) / 10;
+        const bDistance = Math.abs(Math.log(b.lambda / currentLambda)) + Math.abs(b.tolerance - currentTolerance) / 10;
+        return bDistance < aDistance ? b : a;
       }
-      recommendedLambda = hi;
+      return a;
+    };
+
+    const solveToleranceForLambda = (lam: number): Candidate | null => {
+      let best: Candidate | null = null;
+      let prev: Candidate | null = null;
+      let bracket: [Candidate, Candidate] | null = null;
+
+      for (const tol of toleranceSamples) {
+        const candidate = candidateAt(lam, tol);
+        best = betterByError(best, candidate);
+        if (candidate && prev) {
+          const prevDelta = prev.slippageBps - targetSlippageBps;
+          const nextDelta = candidate.slippageBps - targetSlippageBps;
+          if (prevDelta === 0 || nextDelta === 0 || prevDelta * nextDelta < 0) {
+            bracket = bracket ?? [prev, candidate];
+          }
+        }
+        if (candidate) prev = candidate;
+      }
+
+      if (bracket) {
+        let [lo, hi] = bracket;
+        for (let i = 0; i < 16; i++) {
+          const midTol = (lo.tolerance + hi.tolerance) / 2;
+          const mid = candidateAt(lam, midTol);
+          if (!mid) break;
+          best = betterByError(best, mid);
+          const loDelta = lo.slippageBps - targetSlippageBps;
+          const midDelta = mid.slippageBps - targetSlippageBps;
+          if (loDelta === 0 || loDelta * midDelta <= 0) hi = mid;
+          else lo = mid;
+        }
+      }
+
+      return best;
+    };
+
+    const MATCH_TOLERANCE_BPS = 1.5;
+    let recommended = solveToleranceForLambda(currentLambda);
+
+    if (!recommended || recommended.errorBps > MATCH_TOLERANCE_BPS) {
+      const lambdaSamples = [
+        currentLambda,
+        1, 2, 5, 10, 20, 35, 50, 75, 100, 125, 150, 200, 300, 500, 750, 1000,
+      ].filter((lam, idx, arr) => (
+        Number.isFinite(lam) &&
+        lam >= 1 &&
+        arr.findIndex((other) => Math.abs(other - lam) <= 1e-6) === idx
+      ));
+
+      let bestByScore: Candidate | null = recommended;
+      lambdaSamples.forEach((lam) => {
+        const candidate = solveToleranceForLambda(lam);
+        if (!candidate) return;
+        if (!bestByScore) {
+          bestByScore = candidate;
+          return;
+        }
+        const currentScore =
+          bestByScore.errorBps +
+          0.05 * Math.abs(Math.log(bestByScore.lambda / currentLambda)) +
+          0.01 * Math.abs(bestByScore.tolerance - currentTolerance);
+        const candidateScore =
+          candidate.errorBps +
+          0.05 * Math.abs(Math.log(candidate.lambda / currentLambda)) +
+          0.01 * Math.abs(candidate.tolerance - currentTolerance);
+        if (candidateScore < currentScore) bestByScore = candidate;
+      });
+      recommended = bestByScore;
     }
 
-    const baseLambdas = [recommendedLambda / 16, recommendedLambda / 4, recommendedLambda, recommendedLambda * 4]
-      .map((lam) => Math.max(1, lam));
+    if (!recommended) return null;
+
+    const minAttainableBps = evaluated.length
+      ? Math.min(...evaluated.map((candidate) => candidate.slippageBps))
+      : recommended.slippageBps;
+    const maxAttainableBps = evaluated.length
+      ? Math.max(...evaluated.map((candidate) => candidate.slippageBps))
+      : recommended.slippageBps;
+    const tuneStatus: 'matched' | 'closest' | 'target-below-min' | 'target-above-max' =
+      recommended.errorBps <= MATCH_TOLERANCE_BPS
+        ? 'matched'
+        : targetSlippageBps < minAttainableBps
+          ? 'target-below-min'
+          : targetSlippageBps > maxAttainableBps
+            ? 'target-above-max'
+            : 'closest';
+
+    const lineSeeds: Array<{ label: string; lambda: number; tolerance: number }> = [
+      { label: 'current inputs', lambda: currentLambda, tolerance: currentTolerance },
+      { label: 'narrower band', lambda: recommended.lambda, tolerance: recommended.tolerance * 0.75 },
+      { label: 'recommended', lambda: recommended.lambda, tolerance: recommended.tolerance },
+      { label: 'wider band', lambda: recommended.lambda, tolerance: recommended.tolerance * 1.25 },
+      { label: 'lower λ', lambda: Math.max(1, recommended.lambda / 2), tolerance: recommended.tolerance },
+    ];
+    const baseLineConfigs = lineSeeds
+      .map((seed) => {
+        const candidate = seed.label === 'recommended'
+          ? recommended
+          : candidateAt(seed.lambda, seed.tolerance);
+        return candidate ? { ...candidate, label: seed.label } : null;
+      })
+      .filter((candidate, idx, arr): candidate is Candidate & { label: string } => (
+        !!candidate &&
+        arr.findIndex((other) => !!other && Math.abs(other.lambda - candidate.lambda) <= 1e-6 && Math.abs(other.tolerance - candidate.tolerance) <= 1e-6) === idx
+      ));
 
     return {
       direction,
       targetSlippageBps,
-      recommendedLambda,
-      baseLambdas,
+      recommended,
+      recommendedSlipBps: recommended.slippageBps,
+      baseLineConfigs,
       avgT,
       days,
       hurdle,
+      tuneStatus,
+      minAttainableBps,
+      maxAttainableBps,
+      currentLambda,
+      currentTolerance,
+      targetCashPct,
     };
-  }, [derived, eclp, setup.juniorCashPct, rangeTolerance, redemptionDays, mmHurdle, avgTradeSize, pool, balancePoolPrice]);
+  }, [derived, eclp, setup.juniorCashPct, rangeTolerance, redemptionDays, mmHurdle, avgTradeSize, pool, balancePoolPrice, activeChart]);
 
-  const concentrationChartData = useMemo(() => {
-    if (!derived || !concentrationTune) return [];
-    const { direction, baseLambdas } = concentrationTune;
-    const phi = parseFloat(eclp.phi);
-    const targetCashPct = parseNum(setup.juniorCashPct);
-    const tolPct = parseNum(rangeTolerance);
-    const maxT = Math.max(derived.poolSizeNav * 0.5, parseNum(tradeSize) * 3, concentrationTune.avgT * 5, 100_000);
-    const N = 60;
+  const poolParamChartData = useMemo(() => {
+    if (!derived || !poolParamTune || activeChart !== 'tune') return [];
+    const { direction, baseLineConfigs } = poolParamTune;
+    const maxT = Math.max(derived.poolSizeNav * 0.5, parseNum(tradeSize) * 3, poolParamTune.avgT * 5, 100_000);
+    const N = 18;
     const data: Array<{ t: number; [key: string]: number }> = [];
     for (let i = 1; i <= N; i++) {
       const t = (i / N) * maxT;
       const row: { t: number; [key: string]: number } = { t };
-      baseLambdas.forEach((lam, idx) => {
-        const bounds = translateTargetCashToEclpBounds(targetCashPct, tolPct, lam, phi, 1);
-        const cfg = bounds ? makeEclpConfig(bounds.alpha, bounds.beta, lam, phi) : null;
+      baseLineConfigs.forEach(({ cfg }, idx) => {
         const sim = simulateTrade(
           pool,
           t,
@@ -1052,7 +1202,7 @@ export default function DuskV2Simulator() {
       data.push(row);
     }
     return data;
-  }, [derived, eclp, setup.juniorCashPct, rangeTolerance, tradeSize, concentrationTune, pool, balancePoolPrice]);
+  }, [derived, tradeSize, poolParamTune, pool, balancePoolPrice, activeChart]);
 
   // ===========================================================================
   // Render
@@ -1129,9 +1279,9 @@ export default function DuskV2Simulator() {
               <CompactInput label="Junior tranche size" tip="JT pool TVL — what Junior deposited (cash + shares)" value={setup.juniorTrancheSize} onChange={(v) => setSetup((s) => ({ ...s, juniorTrancheSize: fmtCommas(v.replace(/[^0-9.]/g, '')) }))} prefix="$" accent="amber" />
               <CompactInput label="Junior cash allocation" tip="% of Junior deposited as quote (rest is ST shares). Changing this solves the E-CLP price bounds that put that reserve mix at spot price 1." value={setup.juniorCashPct} onChange={(v) => setSetup((s) => ({ ...s, juniorCashPct: v }))} suffix="%" />
               <CompactInput label="Min coverage" tip="Coverage Seniors require, as % of (ST + JT × β). Drives required coverage → utilization." value={setup.minCoverage} onChange={(v) => setSetup((s) => ({ ...s, minCoverage: v }))} suffix="%" />
-              <CompactInput
-                label="Concentration (λ)"
-                tip="The single most important pool-design knob. Like Curve's A factor. Higher = deeper pool, less slippage. For RWAs, use the 'Simulating concentration' chart tab to back into λ from duration + MM hurdle. Typical: 0.1–10 for long-duration RWAs, 100–2000 for tight stableswap-like pools. IMMUTABLE per PDF §03 — set once at pool deployment."
+                <CompactInput
+                  label="Concentration (λ)"
+                  tip="The single most important pool-design knob. Like Curve's A factor. Higher = deeper pool, less slippage. For RWAs, use the Pool parameters tab to derive α/β/λ from duration, MM hurdle, target cash mix, and average exit size. IMMUTABLE per PDF §03 — set once at pool deployment."
                 value={eclp.lambda}
                 onChange={(v) => setEclp((s) => ({ ...s, lambda: v }))}
                 disabled={tradeCount > 0}
@@ -1628,7 +1778,7 @@ export default function DuskV2Simulator() {
                 <div className="border-b border-[#2a2f38] px-1 py-1 flex gap-0 bg-[#0c0e13] flex-wrap">
                   <ChartTabBtn label="📈 Yield curves" active={activeChart === 'apy'} onClick={() => setActiveChart('apy')} />
                   <ChartTabBtn label="🌊 Pool depth" active={activeChart === 'depth'} onClick={() => setActiveChart('depth')} />
-                  <ChartTabBtn label="🎯 Simulating concentration" active={activeChart === 'tune'} onClick={() => setActiveChart('tune')} />
+                  <ChartTabBtn label="Pool parameters" active={activeChart === 'tune'} onClick={() => setActiveChart('tune')} />
                 </div>
                 <div className="p-3 flex-1 flex flex-col min-h-0">
                   {activeChart === 'apy' && (
@@ -1652,9 +1802,9 @@ export default function DuskV2Simulator() {
                           <ReferenceLine x={derived.utilization * 100} stroke="#fbbf24" strokeWidth={2} strokeDasharray="5 5"
                             label={{ value: `← you are here (${(derived.utilization * 100).toFixed(0)}% util)`, position: 'insideTopLeft', fill: '#fbbf24', fontSize: 10, fontWeight: 'bold', offset: 8 }} />
                           <ReferenceLine y={yields.r * 100} stroke="#6b7280" strokeDasharray="4 4" label={{ value: `r=${(yields.r * 100).toFixed(1)}%`, position: 'right', fill: '#6b7280', fontSize: 10 }} />
-                          <Line type="monotone" dataKey="ydm" name="YDM yield share" stroke="#e5e7eb" strokeWidth={2} dot={false} isAnimationActive={true} animationDuration={350} />
-                          <Line type="monotone" dataKey="juniorAPY" name="Junior APY (base)" stroke="#fbbf24" strokeWidth={3} dot={false} isAnimationActive={true} animationDuration={350} />
-                          <Line type="monotone" dataKey="seniorAPY" name="Senior APY" stroke="#22d3ee" strokeWidth={3} dot={false} isAnimationActive={true} animationDuration={350} />
+                          <Line type="monotone" dataKey="ydm" name="YDM yield share" stroke="#e5e7eb" strokeWidth={2} dot={false} isAnimationActive={false} />
+                          <Line type="monotone" dataKey="juniorAPY" name="Junior APY (base)" stroke="#fbbf24" strokeWidth={3} dot={false} isAnimationActive={false} />
+                          <Line type="monotone" dataKey="seniorAPY" name="Senior APY" stroke="#22d3ee" strokeWidth={3} dot={false} isAnimationActive={false} />
                         </LineChart>
                       </ResponsiveContainerNoSSR></div>
                     </div>
@@ -1691,20 +1841,53 @@ export default function DuskV2Simulator() {
                             <ReferenceLine x={derived.poolPrice} stroke="#fbbf24" strokeWidth={2} strokeDasharray="5 5"
                               label={{ value: 'NOW', position: 'insideTopRight', fill: '#fbbf24', fontSize: 10, fontWeight: 'bold', offset: 8 }} />
                           )}
-                          <Line type="monotone" dataKey="depthExit" name="Exit depth (sell shares)" stroke="#34d399" strokeWidth={2} dot={false} isAnimationActive={true} animationDuration={350} />
-                          <Line type="monotone" dataKey="depthEnter" name="Enter depth (buy shares)" stroke="#60a5fa" strokeWidth={2} dot={false} isAnimationActive={true} animationDuration={350} />
+                          <Line type="monotone" dataKey="depthExit" name="Exit depth (sell shares)" stroke="#34d399" strokeWidth={2} dot={false} isAnimationActive={false} />
+                          <Line type="monotone" dataKey="depthEnter" name="Enter depth (buy shares)" stroke="#60a5fa" strokeWidth={2} dot={false} isAnimationActive={false} />
                         </LineChart>
                       </ResponsiveContainerNoSSR></div>
                     </div>
                   )}
                   {activeChart === 'tune' && (() => {
-                    if (!concentrationTune) return null;
-                    const { recommendedLambda, targetSlippageBps, baseLambdas, days, hurdle, avgT } = concentrationTune;
-                    const currentLambda = parseFloat(eclp.lambda);
-                    const colors = ['#f87171', '#fbbf24', '#34d399', '#60a5fa'];
-                    const alpha = parseFloat(eclp.alpha);
-                    const beta = parseFloat(eclp.beta);
+                    if (!poolParamTune) {
+                      return (
+                        <div className="flex-1 min-h-[420px] flex items-center justify-center text-sm text-[#9ca3af]">
+                          No deployable Balancer E-CLP parameter set found for this pool size, target cash mix, and average exit size.
+                        </div>
+                      );
+                    }
+                    const {
+                      recommended,
+                      recommendedSlipBps,
+                      targetSlippageBps,
+                      baseLineConfigs,
+                      days,
+                      hurdle,
+                      avgT,
+                      tuneStatus,
+                      minAttainableBps,
+                      maxAttainableBps,
+                      currentLambda,
+                      currentTolerance,
+                      targetCashPct,
+                    } = poolParamTune;
+                    const colors = ['#f87171', '#fbbf24', '#34d399', '#60a5fa', '#a78bfa'];
                     const phi = parseFloat(eclp.phi);
+                    const lambdaInput = recommended.lambda < 100
+                      ? recommended.lambda.toFixed(recommended.lambda < 10 ? 2 : 1)
+                      : Math.max(1, Math.floor(recommended.lambda)).toFixed(0);
+                    const lambdaDisplay = recommended.lambda < 100
+                      ? recommended.lambda.toFixed(recommended.lambda < 10 ? 2 : 1)
+                      : Math.max(1, Math.floor(recommended.lambda)).toFixed(0);
+                    const toleranceInput = recommended.tolerance.toFixed(2);
+                    const applyRecommendedParams = () => {
+                      setRangeTolerance(toleranceInput);
+                      setEclp((s) => ({
+                        ...s,
+                        alpha: recommended.alpha.toFixed(4),
+                        beta: recommended.beta.toFixed(4),
+                        lambda: lambdaInput,
+                      }));
+                    };
                     return (
                       <div className="flex-1 min-h-[420px] flex flex-col">
                         {/* === Duration + Hurdle inputs === */}
@@ -1734,43 +1917,69 @@ export default function DuskV2Simulator() {
                             <p className="text-[9px] text-[#6b7280] mt-0.5">Cost of capital for a crypto MM. ~20% is typical.</p>
                           </div>
                           <div className="bg-[#13161c] border border-[#fbbf24]/40 rounded p-2 min-w-[180px]">
-                            <div className="text-[9px] uppercase tracking-wider text-[#fbbf24] font-semibold">Target slippage</div>
+                            <div className="text-[9px] uppercase tracking-wider text-[#fbbf24] font-semibold">Target curve impact</div>
                             <div className="text-xl font-bold text-white tabular-nums font-mono">{targetSlippageBps.toFixed(0)} bps</div>
                             <div className="text-[9px] text-[#9ca3af] mt-0.5">= {hurdle * 100}% × {days}/365 = MM compensation for holding to redemption</div>
                           </div>
                         </div>
 
                         {/* === Recommendation card === */}
-                        <div className="grid grid-cols-1 md:grid-cols-[1fr_auto] gap-2 mb-3 bg-gradient-to-r from-[#0a2918] to-[#13161c] border border-[#16a34a]/50 rounded p-3">
+                        <div className="grid grid-cols-1 xl:grid-cols-[1fr_auto] gap-3 mb-3 bg-gradient-to-r from-[#0a2918] to-[#13161c] border border-[#16a34a]/50 rounded p-3">
                           <div>
-                            <div className="text-[10px] uppercase tracking-wider text-[#34d399] font-semibold mb-1">Recommended concentration</div>
-                            <div className="flex items-baseline gap-2">
-                              <span className="text-3xl font-bold text-white tabular-nums font-mono">λ ≈ {recommendedLambda < 1 ? recommendedLambda.toFixed(3) : recommendedLambda.toFixed(0)}</span>
-                              <span className="text-xs text-[#9ca3af]">
-                                ({currentLambda > 0 ? (recommendedLambda > currentLambda ? `${(recommendedLambda / currentLambda).toFixed(1)}× tighter than current ${currentLambda}` : `${(currentLambda / recommendedLambda).toFixed(1)}× looser than current ${currentLambda}`) : ''})
-                              </span>
+                            <div className="text-[10px] uppercase tracking-wider text-[#34d399] font-semibold mb-1">Recommended pool parameters</div>
+                            <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-7 gap-2">
+                              <ParamTile label="α min price" value={recommended.alpha.toFixed(4)} />
+                              <ParamTile label="β max price" value={recommended.beta.toFixed(4)} />
+                              <ParamTile label="λ" value={lambdaDisplay} />
+                              <ParamTile label="φ skew" value={phi.toFixed(3)} />
+                              <ParamTile label="Swap fee" value={`${parseFloat(eclp.swapFeeRate).toFixed(2)}%`} />
+                              <ParamTile label="Close-side band" value={`${recommended.tolerance.toFixed(2)}%`} />
+                              <ParamTile label="Junior cash target" value={`${targetCashPct.toFixed(1)}%`} />
                             </div>
                             <div className="text-[11px] text-[#9ca3af] mt-1.5 leading-snug">
-                              At avg trade size <span className="font-mono text-white">${fmtCompact(avgT)}</span> (1/5 of Junior tranche), this λ produces exactly <span className="font-mono text-white">{targetSlippageBps.toFixed(0)} bps</span> slippage — the threshold an MM needs to clear a {hurdle * 100}% APY hurdle while holding {days} days.
+                              {tuneStatus === 'matched' && (
+                                <>
+                                  At avg exit <span className="font-mono text-white">${fmtCompact(avgT)}</span>, these params produce <span className="font-mono text-white">{recommendedSlipBps.toFixed(0)} bps</span> curve impact versus a <span className="font-mono text-white">{targetSlippageBps.toFixed(0)} bps</span> target. The solver keeps λ near the current setting when possible and moves the band width because that is the missing parameter.
+                                </>
+                              )}
+                              {tuneStatus === 'closest' && (
+                                <>
+                                  Closest valid set produces <span className="font-mono text-white">{recommendedSlipBps.toFixed(0)} bps</span> versus target <span className="font-mono text-white">{targetSlippageBps.toFixed(0)} bps</span>. Exact hit was not found inside the deployable search grid.
+                                </>
+                              )}
+                              {tuneStatus === 'target-below-min' && (
+                                <>
+                                  Target is <span className="font-mono text-white">{targetSlippageBps.toFixed(0)} bps</span>, but the lowest searched deployable impact is about <span className="font-mono text-white">{minAttainableBps.toFixed(0)} bps</span>. Use a lower avg exit size, a deeper pool, or a wider/lower-impact design if you need less impact.
+                                </>
+                              )}
+                              {tuneStatus === 'target-above-max' && (
+                                <>
+                                  Target is <span className="font-mono text-white">{targetSlippageBps.toFixed(0)} bps</span>, but the highest searched deployable impact is about <span className="font-mono text-white">{maxAttainableBps.toFixed(0)} bps</span>. Increase avg exit size, narrow the range, or accept that exits may not clear the MM hurdle.
+                                </>
+                              )}
+                              <br />
+                              <span className="text-[#6b7280]">
+                                Current inputs: λ {currentLambda.toFixed(currentLambda < 100 ? 1 : 0)}, close-side band {currentTolerance.toFixed(2)}%. φ and fee are carried through from the current E-CLP config; fee is excluded from the target and included in the exit-cost table.
+                              </span>
                             </div>
                           </div>
                           <button
-                            onClick={() => setEclp((s) => ({ ...s, lambda: recommendedLambda < 1 ? recommendedLambda.toFixed(3) : recommendedLambda.toFixed(0) }))}
+                            onClick={applyRecommendedParams}
                             disabled={tradeCount > 0}
                             className="self-center bg-[#34d399] text-[#0a0c10] text-xs font-bold py-2 px-4 rounded hover:bg-[#6ee7b7] whitespace-nowrap disabled:opacity-40 disabled:cursor-not-allowed"
                           >
-                            ▸ Set λ = {recommendedLambda < 1 ? recommendedLambda.toFixed(2) : recommendedLambda.toFixed(0)}
+                            Set pool params
                           </button>
                           {tradeCount > 0 && (
                             <div className="text-[9px] text-[#fbbf24] text-center mt-1">
-                              Locked after trades. Reset session to change λ.
+                              Locked after trades. Reset session to change immutable E-CLP params.
                             </div>
                           )}
                         </div>
 
                         {/* === Senior exit cost table === */}
                         <div className="mb-3">
-                          <div className="text-[10px] uppercase tracking-wider text-[#22d3ee] font-semibold mb-1.5">Senior exit cost (at recommended λ)</div>
+                          <div className="text-[10px] uppercase tracking-wider text-[#22d3ee] font-semibold mb-1.5">Senior exit cost (recommended params)</div>
                           <div className="bg-[#0a0c10] rounded border border-[#2a2f38] overflow-hidden">
                             <table className="w-full text-[11px] tabular-nums">
                               <thead>
@@ -1785,17 +1994,10 @@ export default function DuskV2Simulator() {
                               </thead>
                               <tbody>
                                 {(() => {
-                                  const effectiveRecommendedLambda = Math.max(1, recommendedLambda);
-                                  const recommendedBounds = translateTargetCashToEclpBounds(
-                                    parseNum(setup.juniorCashPct),
-                                    parseNum(rangeTolerance),
-                                    effectiveRecommendedLambda,
-                                    phi,
-                                    1,
-                                  );
-                                  const recAlpha = recommendedBounds?.alpha ?? alpha;
-                                  const recBeta = recommendedBounds?.beta ?? beta;
-                                  const recommendedConfig = makeEclpConfig(recAlpha, recBeta, effectiveRecommendedLambda, phi);
+                                  const effectiveRecommendedLambda = recommended.lambda;
+                                  const recAlpha = recommended.alpha;
+                                  const recBeta = recommended.beta;
+                                  const recommendedConfig = recommended.cfg;
                                   const swapFeeRate = parseFloat(eclp.swapFeeRate) / 100;
                                   const ydmShareForAccounting = yields
                                     ? yields.ydmShare
@@ -1907,18 +2109,18 @@ export default function DuskV2Simulator() {
                         {/* === MM yield chart === */}
                         <div className="text-[10px] uppercase tracking-wider text-[#34d399] font-semibold mb-1">MM perspective: annualized yield from arbing exits</div>
                         <div className="text-xs text-[#9ca3af] mb-2">
-                          For each λ, shows what return an MM gets buying a Senior&apos;s discounted share and holding {days} days to redemption.
+                          Each curve is a deployable parameter set. It shows the implied annualized return from curve impact if an MM buys a discounted Senior share and holds {days} days to redemption.
                           <span className="text-[#fbbf24]"> Yellow line = your MM hurdle ({hurdle * 100}% APY).</span>
-                          {' '}Curves above the line → MMs will arbitrage; below → exits stall.
+                          {' '}Curves above the line clear the hurdle; curves below can stall.
                         </div>
 
                         <div className="flex-1 min-h-0"><ResponsiveContainerNoSSR width="100%" height="100%" minWidth={0} minHeight={320}>
                           <LineChart
-                            data={concentrationChartData.map((row) => {
+                            data={poolParamChartData.map((row) => {
                               // Convert each line's bps to MM annualized yield:
                               // mm_apy = slippage_frac × (365 / days)
                               const out: { [key: string]: number } = { t: row.t };
-                              baseLambdas.forEach((_, idx) => {
+                              baseLineConfigs.forEach((_, idx) => {
                                 const bps = row[`line_${idx}`] as number;
                                 const slipFrac = bps / 10000;
                                 out[`mm_${idx}`] = slipFrac * (365 / days) * 100; // as %
@@ -1947,20 +2149,19 @@ export default function DuskV2Simulator() {
                               label={{ value: `MM hurdle = ${hurdle * 100}% APY`, position: 'right', fill: '#fbbf24', fontSize: 10 }} />
                             <ReferenceLine x={avgT} stroke="#9ca3af" strokeDasharray="3 3"
                               label={{ value: `avg exit $${fmtCompact(avgT)}`, position: 'top', fill: '#9ca3af', fontSize: 10 }} />
-                            {baseLambdas.map((lam, idx) => {
-                              const isRec = idx === 2;
+                            {baseLineConfigs.map((line, idx) => {
+                              const isRec = line.label === 'recommended';
                               return (
                                 <Line
                                   key={idx}
                                   type="monotone"
                                   dataKey={`mm_${idx}`}
-                                  name={`λ = ${lam < 1 ? lam.toFixed(2) : lam.toFixed(0)}${isRec ? ' (recommended)' : ''}`}
-                                  stroke={colors[idx]}
+                                  name={`${line.label}: λ ${line.lambda < 100 ? line.lambda.toFixed(line.lambda < 10 ? 2 : 1) : line.lambda.toFixed(0)} / band ${line.tolerance.toFixed(2)}%`}
+                                  stroke={colors[idx % colors.length]}
                                   strokeWidth={isRec ? 3 : 1.5}
                                   strokeDasharray={isRec ? undefined : '4 2'}
                                   dot={false}
-                                  isAnimationActive={true}
-                                  animationDuration={350}
+                                  isAnimationActive={false}
                                 />
                               );
                             })}
@@ -2291,7 +2492,7 @@ export default function DuskV2Simulator() {
                 value={avgTradeSize}
                 onChange={(v) => setAvgTradeSize(fmtCommas(v.replace(/[^0-9.]/g, '')))}
                 prefix="$"
-                tip="Average single-trade size. Auto-defaults to Junior tranche / 5 (~20% of pool TVL). Slippage (σ) scales with t² so larger trades have outsize impact. Used for concentration recommendation."
+                tip="Average single-trade size. Auto-defaults to Junior tranche / 5 (~20% of pool TVL). Slippage (σ) scales with t² so larger trades have outsize impact. Used by the Pool parameters solver."
               />
               <CompactInput
                 label="% imbalancing"
@@ -2369,6 +2570,15 @@ function ChartTabBtn(props: { label: string; active: boolean; onClick: () => voi
     >
       {props.label}
     </button>
+  );
+}
+
+function ParamTile(props: { label: string; value: string }) {
+  return (
+    <div className="bg-[#0a0c10] border border-[#2a2f38] rounded px-2 py-1.5">
+      <div className="text-[8px] uppercase tracking-wider text-[#6b7280] font-semibold">{props.label}</div>
+      <div className="text-sm text-white font-mono tabular-nums font-bold leading-tight">{props.value}</div>
+    </div>
   );
 }
 
