@@ -69,8 +69,8 @@ function run() {
     let state = initialPoolState(senior, junior, cashPct, assetPrice, quotePrice);
 
     for (let i = 0; i < STEPS; i++) {
-      const beforeSync = syncAccountingOnBefore(state, assetPrice, quotePrice, ydmShare);
-      const rawBefore = rawNavFromState(beforeSync, assetPrice, quotePrice);
+      const beforeSync = syncAccountingOnBefore(state, assetPrice, quotePrice, ydmShare, eclpConfig);
+      const rawBefore = rawNavFromState(beforeSync, assetPrice, quotePrice, eclpConfig);
 
       const direction = rng() < 0.72 ? 'exit' : 'enter';
       const maxExit = rawBefore.externalShares * rawBefore.perShareRaw;
@@ -107,13 +107,21 @@ function run() {
         continue;
       }
 
-      state = syncAccountingOnAfter(beforeSync, trade.newState, assetPrice, quotePrice, ydmShare);
+      state = syncAccountingOnAfter(beforeSync, trade.newState, assetPrice, quotePrice, ydmShare, eclpConfig);
       acceptedTrades++;
 
-      const raw = rawNavFromState(state, assetPrice, quotePrice);
+      const raw = rawNavFromState(state, assetPrice, quotePrice, eclpConfig);
       const conservation = raw.ST_RAW_NAV + raw.JT_RAW_NAV - raw.totalNav;
       const effTotal = state.stEffectiveNav + state.jtEffectiveNav;
       const rawTotal = raw.ST_RAW_NAV + raw.JT_RAW_NAV;
+
+      // Spec: ST_RAW is exogenous to swaps; JT_RAW only grows by captured fee+σ.
+      // Tolerance is relative (1e-4) to absorb invariant-recovery numerical noise;
+      // it is still orders of magnitude below the LIVE model's drift (~tNav per
+      // swap), so it cleanly distinguishes "conservative" from "live".
+      const stRawDrift = raw.ST_RAW_NAV - rawBefore.ST_RAW_NAV;
+      const jtRawGain = raw.JT_RAW_NAV - rawBefore.JT_RAW_NAV;
+      const tol = Math.max(1, rawBefore.totalNav * 1e-4);
 
       try {
         assertFinite(state.internalShares, 'internalShares');
@@ -137,6 +145,12 @@ function run() {
         }
         if (state.stIL < -1e-7 || state.jtIL < -1e-7) {
           throw new Error(`negative IL: stIL=${state.stIL}, jtIL=${state.jtIL}`);
+        }
+        if (Math.abs(stRawDrift) > tol + Math.abs(jtRawGain)) {
+          throw new Error(`ST_RAW not exogenous to swap: drift ${stRawDrift}`);
+        }
+        if (jtRawGain < -tol) {
+          throw new Error(`JT_RAW decreased on a swap: ${jtRawGain}`);
         }
       } catch (err) {
         failures.push({
