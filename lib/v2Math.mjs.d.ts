@@ -145,6 +145,7 @@ export function syncAccountingOnBefore(
   assetPrice: number,
   quotePrice: number,
   ydmShare: number,
+  eclpConfig?: EclpConfig | null,
 ): PoolState;
 
 export function syncAccountingOnAfter(
@@ -153,6 +154,7 @@ export function syncAccountingOnAfter(
   assetPrice: number,
   quotePrice: number,
   ydmShare: number,
+  eclpConfig?: EclpConfig | null,
 ): PoolState;
 
 export function simulateTrade(
