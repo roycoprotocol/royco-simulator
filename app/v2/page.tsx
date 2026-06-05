@@ -46,6 +46,9 @@ const ResponsiveContainerNoSSR = dynamic(
 //   * effectiveSupply = totalSupply − internalShares (shares in pool excluded).
 //   * Coverage β fixed at 100% — we conservatively assume Junior could be fully
 //     ST-share exposed, so utilization is independent of the cash/stablecoin split.
+//   * Raw NAVs are conservative (balance-point) values: JT_RAW = the BPT's fair
+//     value at the invariant L (spec P_A), ST_RAW = senior's own underlying. Both
+//     are invariant to pure swaps; only fees (which grow L) and the rate move them.
 //   * E-CLP parameters (α, β, λ, φ) drive the pool's slippage profile (κ).
 //   * Exit-direction swaps are unconditionally non-increasing in utilization
 //     (Section 11 Theorem) — the fee dominates slippage for imbalancing trades.
@@ -72,7 +75,7 @@ type PoolState = {
 // share-counting to model a pool.
 type SetupInputs = {
   underlyingYield: string;       // % APY on the underlying asset
-  seniorTrancheSize: string;     // $ — external Senior NAV (ST_RAW_NAV)
+  seniorTrancheSize: string;     // $ — Senior tranche's own underlying NAV (exogenous ST_RAW)
   juniorTrancheSize: string;     // $ — JT pool TVL (JT_RAW_NAV)
   juniorCashPct: string;         // % of Junior allocated to quote (vs ST shares)
   // Protocol parameters (defaults usually fine)
