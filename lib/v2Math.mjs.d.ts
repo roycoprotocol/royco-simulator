@@ -118,6 +118,14 @@ export function rawNavFromState(
   quotePrice: number,
 ): RawNavSnapshot;
 
+export function coverageNavAtBalance(
+  state: PoolState,
+  assetPrice: number,
+  quotePrice: number,
+  eclpConfig: EclpConfig | null,
+  balancePoolPrice?: number,
+): number;
+
 export function applyDuskWaterfall(
   checkpoint: Pick<PoolState, 'stRawCheckpoint' | 'jtRawCheckpoint' | 'stEffectiveNav' | 'jtEffectiveNav' | 'stIL' | 'jtIL'>,
   currentRaw: RawNavSnapshot,

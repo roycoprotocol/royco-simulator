@@ -21,6 +21,7 @@ import {
   clampUnit,
   initialPoolState,
   rawNavFromState,
+  coverageNavAtBalance,
   syncAccountingOnBefore,
   syncAccountingOnAfter,
   balancePoolPriceFromCashPct,
@@ -44,13 +45,13 @@ const ResponsiveContainerNoSSR = dynamic(
 // Models Dusk's new mechanics on top of Dawn:
 //   * Junior Tranche capital is an E-CLP BPT (quote + ST-share reserves).
 //   * effectiveSupply = totalSupply − internalShares (shares in pool excluded).
-//   * Dynamic β computed per-sync from composition.
+//   * Coverage β fixed at 100% — we conservatively assume Junior could be fully
+//     ST-share exposed, so utilization is independent of the cash/stablecoin split.
 //   * E-CLP parameters (α, β, λ, φ) drive the pool's slippage profile (κ).
 //   * Exit-direction swaps are unconditionally non-increasing in utilization
 //     (Section 11 Theorem) — the fee dominates slippage for imbalancing trades.
 // =============================================================================
 
-const WAD = 1; // we work in fractions, not 1e18
 
 type Direction = 'exit' | 'enter';
 
@@ -106,7 +107,7 @@ const DEFAULT_SETUP: SetupInputs = {
   minCoverage: '10',
   ydmY0: '15',
   ydmYT: '15',
-  ydmYFull: '100',
+  ydmYFull: '40',
   jtFee: '0',
   stFee: '0',
   ysFee: '0',
@@ -131,7 +132,9 @@ const initialPoolFromSetup = (s: SetupInputs): PoolState => {
 // isn't even covered, so Junior takes 100% of yield (no more discount for
 // being "protected" — the protection has lapsed).
 const ydmYieldShare = (util: number, y0: number, yT: number, yFull: number): number => {
-  if (util >= 1) return 1; // deficit → all yield to Junior
+  if (util > 1) return 1; // only a true deficit (util > 100%) routes all yield to Junior
+  // At exactly 100% util the pool is exactly covered (not in drawdown), so the
+  // curve returns Y_full — not a forced 100%.
   const u = Math.min(Math.max(util, 0), 1);
   const discount = yT - y0;
   const premium = yFull - yT;
@@ -236,7 +239,11 @@ export default function DuskV2Simulator() {
   const [showProtocolDefaults, setShowProtocolDefaults] = useState(false);
   const [showAdvancedSetup, setShowAdvancedSetup] = useState(false);
   // YDM adaptation slider — shifts the whole curve up/down (like v1).
+  // `adaptYdmPct` holds the effective Y_T (0–100%); the slider displays the signed
+  // shift from the base Y_T set in PROTOCOL, so 0% = no translation.
   const [adaptYdmPct, setAdaptYdmPct] = useState<number>(15);
+  const baseYTPct = Number.isFinite(parseNum(setup.ydmYT)) ? parseNum(setup.ydmYT) : 15;
+  const translateDelta = Math.round(adaptYdmPct - baseYTPct); // signed shift shown on the slider
   // Target pool composition translator: "I want a 90/10 pool" → α, β.
   const [targetSharesPct, setTargetSharesPct] = useState<string>('50');
   const [rangeTolerance, setRangeTolerance] = useState<string>('3');
@@ -509,13 +516,14 @@ export default function DuskV2Simulator() {
     const JT_EFFECTIVE_NAV = Math.max(0, pool.jtEffectiveNav);
     const perExternalEffective = effectiveSupply > 0 ? ST_EFFECTIVE_NAV / effectiveSupply : perShareRaw;
 
-    // PDF §09 dynamic β (composition-weighted)
-    const beta = JT_RAW_NAV > 0
-      ? (raw.shareNavInPool * WAD) / JT_RAW_NAV
-      : 0;
+    // β fixed at 100%: for coverage/utilization we conservatively assume Junior's
+    // entire NAV could be in ST shares (vs the PDF §09 composition-weighted β).
+    // This also makes utilization independent of the Junior cash/stablecoin split.
+    const beta = 1;
 
-    // Coverage sizing uses raw exposure; utilization divides by JT effective NAV.
-    const requiredCoverage = (ST_RAW_NAV + JT_RAW_NAV * beta) * minCoverage;
+    // Coverage basis is valued at the pool's balance point so utilization doesn't
+    // slide as swaps push cash in/out of the pool (β = 1 ⇒ basis = totalNav at balance).
+    const requiredCoverage = coverageNavAtBalance(pool, assetPrice, quotePrice, eclpConfig) * minCoverage;
     const utilization = JT_EFFECTIVE_NAV > 0
       ? requiredCoverage / JT_EFFECTIVE_NAV
       : 0;
@@ -589,19 +597,10 @@ export default function DuskV2Simulator() {
 
     // Senior yield pool: raw external Senior NAV × underlying APY.
     const totalSeniorYield = r * derived.ST_RAW_NAV;
-    const ydmShare = ydmYieldShare(derived.utilization, y0, yT, yFull);
-    const juniorRiskPremiumGross = ydmShare * totalSeniorYield;
-    const seniorYieldGross = totalSeniorYield - juniorRiskPremiumGross;
 
     // Junior's own yield: shares-in-pool earn underlying, quote earns its rate
     const juniorOwnYield = derived.shareNavInPool * r + derived.quoteNavInPool * rQ;
-
-    // Fee waterfall (same shape as v1)
     const ownAfterJt = juniorOwnYield * (1 - fJt);
-    const riskAfterYs = juniorRiskPremiumGross * (1 - fYs);
-    const protocolFees =
-      juniorOwnYield * fJt + juniorRiskPremiumGross * fYs +
-      riskAfterYs * fJt + seniorYieldGross * fSt;
 
     // YDM adaptation: shift the whole curve up/down by user's slider input
     // (Y_T jumps to the slider value; Y₀ and Y_full shift by the same delta).
@@ -618,6 +617,12 @@ export default function DuskV2Simulator() {
     const seniorNetYieldAdapted = seniorYieldGrossAdapted * (1 - fSt);
     const baseJuniorAPYAdapted = juniorCapital > 0 ? juniorNetYieldAdapted / juniorCapital : 0;
     const seniorAPYAdapted = seniorCapital > 0 ? seniorNetYieldAdapted / seniorCapital : 0;
+
+    // Fee waterfall (same shape as v1) — computed from the adapted YDM share so
+    // fees stay consistent with the net yields above.
+    const protocolFees =
+      juniorOwnYield * fJt + juniorRiskPremiumAdapted * fYs +
+      riskAfterYsAdapted * fJt + seniorYieldGrossAdapted * fSt;
 
     // ----- Annualized trading economics ----------------------------------
     // Inputs: daily volume, avg trade size, % of volume that's imbalancing.
@@ -732,10 +737,9 @@ export default function DuskV2Simulator() {
     const newExternal = newRaw.externalShares;
     const ST_RAW_NAV_new = newRaw.ST_RAW_NAV;
     const JT_RAW_NAV_new = newRaw.JT_RAW_NAV;
-    const beta_new = JT_RAW_NAV_new > 0
-      ? (newRaw.shareNavInPool * WAD) / JT_RAW_NAV_new
-      : 0;
-    const requiredCoverageNew = (ST_RAW_NAV_new + JT_RAW_NAV_new * beta_new) * derived.minCoverage;
+    // Post-trade coverage valued at the balance point (β = 1), so the preview
+    // doesn't slide just because the trade left the pool off balance.
+    const requiredCoverageNew = coverageNavAtBalance(accountedState, derived.assetPrice, derived.quotePrice, eclpConfig, balancePoolPrice) * derived.minCoverage;
     const util_new = accountedState.jtEffectiveNav > 0
       ? requiredCoverageNew / accountedState.jtEffectiveNav
       : 0;
@@ -754,7 +758,7 @@ export default function DuskV2Simulator() {
       feasible,
       newState: accountedState,
       newInternal, newExternal,
-      ST_RAW_NAV_new, JT_RAW_NAV_new, beta_new, util_new,
+      ST_RAW_NAV_new, JT_RAW_NAV_new, util_new,
       utilDelta: util_new - derived.utilization,
       conservationErrorNew,
       counterValueNav,
@@ -812,9 +816,7 @@ export default function DuskV2Simulator() {
         derived.quotePrice,
         ydmShareForAccounting,
       );
-      const postRaw = rawNavFromState(accounted, derived.assetPrice, derived.quotePrice);
-      const betaPost = postRaw.JT_RAW_NAV > 0 ? postRaw.shareNavInPool / postRaw.JT_RAW_NAV : 0;
-      const requiredCoveragePost = (postRaw.ST_RAW_NAV + postRaw.JT_RAW_NAV * betaPost) * derived.minCoverage;
+      const requiredCoveragePost = coverageNavAtBalance(accounted, derived.assetPrice, derived.quotePrice, eclpConfig, balancePoolPrice) * derived.minCoverage;
       return requiredCoveragePost <= accounted.jtEffectiveNav + NAV_EPS;
     };
 
@@ -1232,7 +1234,7 @@ export default function DuskV2Simulator() {
               <KpiTile label="SENIOR APY" value={fmtPct(yields.seniorAPY)} accent="cyan" />
               <KpiTile label="JUNIOR APY" value={fmtPct(yields.juniorAPY)} accent="amber" />
               <KpiTile label="UTIL" value={fmtPct(derived.utilization)} accent={derived.utilization > 1 ? 'red' : undefined} />
-              <KpiTile label="β" value={fmtPct(derived.beta)} accent={derived.beta > 1 ? 'red' : undefined} />
+              <KpiTile label="β" value={fmtPct(derived.beta)} />
               <KpiTile label="MARKET TVL" value={`$${fmtCompact(yields.seniorCapital + yields.juniorCapital)}`} />
               <KpiTile label="E-CLP TVL" value={`$${fmtCompact(derived.poolSizeNav)}`} />
               <KpiTile label="ST TVL" value={`$${fmtCompact(yields.seniorCapital)}`} />
@@ -1278,7 +1280,7 @@ export default function DuskV2Simulator() {
               <CompactInput label="Senior tranche size" tip="External Senior NAV" value={setup.seniorTrancheSize} onChange={(v) => setSetup((s) => ({ ...s, seniorTrancheSize: fmtCommas(v.replace(/[^0-9.]/g, '')) }))} prefix="$" accent="cyan" />
               <CompactInput label="Junior tranche size" tip="JT pool TVL — what Junior deposited (cash + shares)" value={setup.juniorTrancheSize} onChange={(v) => setSetup((s) => ({ ...s, juniorTrancheSize: fmtCommas(v.replace(/[^0-9.]/g, '')) }))} prefix="$" accent="amber" />
               <CompactInput label="Junior cash allocation" tip="% of Junior deposited as quote (rest is ST shares). Changing this solves the E-CLP price bounds that put that reserve mix at spot price 1." value={setup.juniorCashPct} onChange={(v) => setSetup((s) => ({ ...s, juniorCashPct: v }))} suffix="%" />
-              <CompactInput label="Min coverage" tip="Coverage Seniors require, as % of (ST + JT × β). Drives required coverage → utilization." value={setup.minCoverage} onChange={(v) => setSetup((s) => ({ ...s, minCoverage: v }))} suffix="%" />
+              <CompactInput label="Min coverage" tip="Coverage Seniors require, as % of (ST + JT). β is fixed at 100% (Junior conservatively treated as fully ST-share exposed), so coverage and utilization ignore the cash split. Drives required coverage → utilization." value={setup.minCoverage} onChange={(v) => setSetup((s) => ({ ...s, minCoverage: v }))} suffix="%" />
                 <CompactInput
                   label="Concentration (λ)"
                   tip="The single most important pool-design knob. Like Curve's A factor. Higher = deeper pool, less slippage. For RWAs, use the Pool parameters tab to derive α/β/λ from duration, MM hurdle, target cash mix, and average exit size. IMMUTABLE per PDF §03 — set once at pool deployment."
@@ -1303,11 +1305,12 @@ export default function DuskV2Simulator() {
                 {(() => {
                   const setUtil = (targetUtil: number) => {
                     const ss = parseNum(setup.seniorTrancheSize);
-                    const cp = parseNum(setup.juniorCashPct) / 100;
                     const mc = parseNum(setup.minCoverage) / 100;
-                    const floor = (1 - cp) * mc;
-                    if (!(targetUtil > floor)) return;
-                    const newJtSize = ss * mc / (targetUtil - floor);
+                    const util = Math.min(1, targetUtil); // never scrub past 100% utilization
+                    // β = 1 ⇒ utilization = ss·mc/jt + mc, so the floor (as jt → ∞) is mc.
+                    const floor = mc;
+                    if (!(util > floor)) return;
+                    const newJtSize = ss * mc / (util - floor);
                     if (!Number.isFinite(newJtSize) || newJtSize <= 0) return;
                     setSetup((s) => ({ ...s, juniorTrancheSize: fmtCommas(newJtSize.toFixed(2)) }));
                   };
@@ -1362,16 +1365,22 @@ export default function DuskV2Simulator() {
                     </div>
                   );
                 })()}
-                {/* YDM kink slider */}
+                {/* Adapt YDM — signed translate of the whole curve */}
                 <div>
                   <div className="flex justify-between items-baseline mb-1 text-[10px]">
-                    <span className="text-[#9ca3af]">YDM kink (Y_T at 90% util)</span>
-                    <span className="font-mono text-white tabular-nums">{adaptYdmPct}%</span>
+                    <span className="text-[#9ca3af]">Adapt YDM (translate curve)</span>
+                    <span className="font-mono text-white tabular-nums">
+                      {translateDelta > 0 ? '+' : ''}{translateDelta}%
+                      {translateDelta !== 0 && (
+                        <button onClick={() => setAdaptYdmPct(baseYTPct)}
+                          className="ml-2 font-sans text-[#6b7280] hover:text-white" title="Reset translation">reset</button>
+                      )}
+                    </span>
                   </div>
-                  <input type="range" min={1} max={80} step={1} value={adaptYdmPct}
+                  <input type="range" min={0} max={100} step={1} value={adaptYdmPct}
                     onChange={(e) => setAdaptYdmPct(parseInt(e.target.value))}
                     className="w-full utilization-slider" />
-                  <p className="text-[9px] text-[#6b7280] mt-1">Higher = more of Senior&apos;s yield routes to Junior.</p>
+                  <p className="text-[9px] text-[#6b7280] mt-1">Shifts the whole curve up/down; shape (slopes) set by Y₀/Y_T/Y_full below. Clamped to 0–100%.</p>
                 </div>
               </div>
             </div>
@@ -1383,7 +1392,7 @@ export default function DuskV2Simulator() {
               <CompactInput label="Quote APY" value={setup.quoteYield} onChange={(v) => setSetup(s => ({ ...s, quoteYield: v }))} suffix="%" />
               <div className="grid grid-cols-3 gap-1">
                 <CompactInput label="Y₀" value={setup.ydmY0} onChange={(v) => setSetup(s => ({ ...s, ydmY0: v }))} suffix="%" />
-                <CompactInput label="Y_T" value={setup.ydmYT} onChange={(v) => setSetup(s => ({ ...s, ydmYT: v }))} suffix="%" />
+                <CompactInput label="Y_T" value={setup.ydmYT} onChange={(v) => { setSetup(s => ({ ...s, ydmYT: v })); setAdaptYdmPct(Number.isFinite(parseNum(v)) ? parseNum(v) : 15); }} suffix="%" />
                 <CompactInput label="Y_full" value={setup.ydmYFull} onChange={(v) => setSetup(s => ({ ...s, ydmYFull: v }))} suffix="%" />
               </div>
               <div className="grid grid-cols-3 gap-1">
@@ -1798,7 +1807,7 @@ export default function DuskV2Simulator() {
                           <ReferenceArea x1={0} x2={90} fill="#22d3ee" fillOpacity={0.04} ifOverflow="hidden"
                             label={{ value: 'sub-target', position: 'insideTopLeft', fill: '#22d3ee', fontSize: 10, opacity: 0.6 }} />
                           <ReferenceArea x1={90} x2={100} fill="#fbbf24" fillOpacity={0.08} ifOverflow="hidden"
-                            label={{ value: 'breach zone', position: 'insideTopRight', fill: '#fbbf24', fontSize: 10, opacity: 0.8 }} />
+                            label={{ value: 'above target', position: 'insideTopRight', fill: '#fbbf24', fontSize: 10, opacity: 0.8 }} />
                           <ReferenceLine x={derived.utilization * 100} stroke="#fbbf24" strokeWidth={2} strokeDasharray="5 5"
                             label={{ value: `← you are here (${(derived.utilization * 100).toFixed(0)}% util)`, position: 'insideTopLeft', fill: '#fbbf24', fontSize: 10, fontWeight: 'bold', offset: 8 }} />
                           <ReferenceLine y={yields.r * 100} stroke="#6b7280" strokeDasharray="4 4" label={{ value: `r=${(yields.r * 100).toFixed(1)}%`, position: 'right', fill: '#6b7280', fontSize: 10 }} />
@@ -2046,11 +2055,7 @@ export default function DuskV2Simulator() {
                                         derived.quotePrice,
                                         ydmShareForAccounting,
                                       );
-                                      const postRaw = rawNavFromState(accounted, derived.assetPrice, derived.quotePrice);
-                                      const betaPost = postRaw.JT_RAW_NAV > 0
-                                        ? postRaw.shareNavInPool / postRaw.JT_RAW_NAV
-                                        : 0;
-                                      const requiredCoveragePost = (postRaw.ST_RAW_NAV + postRaw.JT_RAW_NAV * betaPost) * derived.minCoverage;
+                                      const requiredCoveragePost = coverageNavAtBalance(accounted, derived.assetPrice, derived.quotePrice, recommendedConfig, balancePoolPrice) * derived.minCoverage;
                                       coverageShortfall = requiredCoveragePost - accounted.jtEffectiveNav;
                                     }
                                     const daysOfYield = rAnnualBps > 0 ? (bps / (rAnnualBps / 365)) : 0;
@@ -2413,10 +2418,6 @@ export default function DuskV2Simulator() {
                       <span>{tradePreview.jtEffDelta >= 0 ? '▲ +' : '▼ '}${fmtNav(Math.abs(tradePreview.jtEffDelta))}</span>
                     </div>
                     <div className="space-y-0.5 text-[10px]">
-                      <PreviewLine
-                        label="β shifts"
-                        value={`${fmtPct(derived.beta)} → ${fmtPct(tradePreview.beta_new)} ${tradePreview.beta_new > derived.beta ? '▲' : tradePreview.beta_new < derived.beta ? '▼' : '→'}`}
-                      />
                       <PreviewLine
                         label="utilization"
                         value={`${fmtPct(derived.utilization)} → ${fmtPct(tradePreview.util_new)} ${tradePreview.utilDelta > 0 ? '▲' : tradePreview.utilDelta < 0 ? '▼' : '→'}`}
