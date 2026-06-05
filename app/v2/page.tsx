@@ -21,7 +21,6 @@ import {
   clampUnit,
   initialPoolState,
   rawNavFromState,
-  coverageNavAtBalance,
   syncAccountingOnBefore,
   syncAccountingOnAfter,
   balancePoolPriceFromCashPct,
@@ -499,7 +498,7 @@ export default function DuskV2Simulator() {
     }
 
     if (!(pool.stShares > 0)) return null;
-    const raw = rawNavFromState(pool, assetPrice, quotePrice);
+    const raw = rawNavFromState(pool, assetPrice, quotePrice, eclpConfig);
 
     const stShares = pool.stShares;
     const stAssets = raw.stAssets;
@@ -521,9 +520,9 @@ export default function DuskV2Simulator() {
     // This also makes utilization independent of the Junior cash/stablecoin split.
     const beta = 1;
 
-    // Coverage basis is valued at the pool's balance point so utilization doesn't
-    // slide as swaps push cash in/out of the pool (β = 1 ⇒ basis = totalNav at balance).
-    const requiredCoverage = coverageNavAtBalance(pool, assetPrice, quotePrice, eclpConfig) * minCoverage;
+    // β = 1 and raw NAVs are already the conservative balance-point values, so the
+    // coverage basis is just (ST_RAW + JT_RAW) = totalNav — swap-invariant.
+    const requiredCoverage = (ST_RAW_NAV + JT_RAW_NAV * beta) * minCoverage;
     const utilization = JT_EFFECTIVE_NAV > 0
       ? requiredCoverage / JT_EFFECTIVE_NAV
       : 0;
@@ -703,6 +702,7 @@ export default function DuskV2Simulator() {
       derived.assetPrice,
       derived.quotePrice,
       ydmShareForAccounting,
+      eclpConfig,
     );
 
     const result = simulateTrade(
@@ -728,9 +728,10 @@ export default function DuskV2Simulator() {
           derived.assetPrice,
           derived.quotePrice,
           ydmShareForAccounting,
+          eclpConfig,
         )
       : syncedBefore;
-    const newRaw = rawNavFromState(accountedState, derived.assetPrice, derived.quotePrice);
+    const newRaw = rawNavFromState(accountedState, derived.assetPrice, derived.quotePrice, eclpConfig);
 
     // Post-trade derived state — same formulas as `derived`, on the synced state.
     const newInternal = accountedState.internalShares;
@@ -739,7 +740,7 @@ export default function DuskV2Simulator() {
     const JT_RAW_NAV_new = newRaw.JT_RAW_NAV;
     // Post-trade coverage valued at the balance point (β = 1), so the preview
     // doesn't slide just because the trade left the pool off balance.
-    const requiredCoverageNew = coverageNavAtBalance(accountedState, derived.assetPrice, derived.quotePrice, eclpConfig, balancePoolPrice) * derived.minCoverage;
+    const requiredCoverageNew = (ST_RAW_NAV_new + JT_RAW_NAV_new) * derived.minCoverage;
     const util_new = accountedState.jtEffectiveNav > 0
       ? requiredCoverageNew / accountedState.jtEffectiveNav
       : 0;
@@ -786,6 +787,7 @@ export default function DuskV2Simulator() {
       derived.assetPrice,
       derived.quotePrice,
       ydmShareForAccounting,
+      eclpConfig,
     );
     const rangeEps = Math.max(1e-9, Math.abs(beta - alpha) * 1e-6);
 
@@ -815,8 +817,10 @@ export default function DuskV2Simulator() {
         derived.assetPrice,
         derived.quotePrice,
         ydmShareForAccounting,
+        eclpConfig,
       );
-      const requiredCoveragePost = coverageNavAtBalance(accounted, derived.assetPrice, derived.quotePrice, eclpConfig, balancePoolPrice) * derived.minCoverage;
+      const postRaw = rawNavFromState(accounted, derived.assetPrice, derived.quotePrice, eclpConfig);
+      const requiredCoveragePost = (postRaw.ST_RAW_NAV + postRaw.JT_RAW_NAV) * derived.minCoverage;
       return requiredCoveragePost <= accounted.jtEffectiveNav + NAV_EPS;
     };
 
@@ -2016,6 +2020,7 @@ export default function DuskV2Simulator() {
                                     derived.assetPrice,
                                     derived.quotePrice,
                                     ydmShareForAccounting,
+                                    recommendedConfig,
                                   );
                                   const rangeEps = Math.max(1e-9, Math.abs(recBeta - recAlpha) * 1e-6);
                                   const rAnnualBps = yields ? yields.r * 10000 : 1;
@@ -2054,8 +2059,10 @@ export default function DuskV2Simulator() {
                                         derived.assetPrice,
                                         derived.quotePrice,
                                         ydmShareForAccounting,
+                                        recommendedConfig,
                                       );
-                                      const requiredCoveragePost = coverageNavAtBalance(accounted, derived.assetPrice, derived.quotePrice, recommendedConfig, balancePoolPrice) * derived.minCoverage;
+                                      const postRaw = rawNavFromState(accounted, derived.assetPrice, derived.quotePrice, recommendedConfig);
+                                      const requiredCoveragePost = (postRaw.ST_RAW_NAV + postRaw.JT_RAW_NAV) * derived.minCoverage;
                                       coverageShortfall = requiredCoveragePost - accounted.jtEffectiveNav;
                                     }
                                     const daysOfYield = rAnnualBps > 0 ? (bps / (rAnnualBps / 365)) : 0;
