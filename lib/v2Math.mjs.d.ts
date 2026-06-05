@@ -118,6 +118,13 @@ export function rawNavFromState(
   quotePrice: number,
 ): RawNavSnapshot;
 
+export function poolReservesAtBalance(
+  shareNavInPool: number,
+  quoteNavInPool: number,
+  eclpConfig: EclpConfig | null,
+  balancePoolPrice?: number,
+): { balShareNav: number; balQuoteNav: number };
+
 export function coverageNavAtBalance(
   state: PoolState,
   assetPrice: number,
