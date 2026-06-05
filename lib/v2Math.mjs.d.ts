@@ -116,6 +116,7 @@ export function rawNavFromState(
   state: PoolState,
   assetPrice: number,
   quotePrice: number,
+  eclpConfig?: EclpConfig | null,
 ): RawNavSnapshot;
 
 export function poolReservesAtBalance(
