@@ -1,4 +1,3 @@
-// @ts-nocheck
 "use client";
 // =============================================================================
 // Capital efficiency — Day vs Dusk.  One scorecard: coverage, capital, per-tranche yield.
@@ -18,21 +17,28 @@
 //   Dusk LT = N/A                                              (no separate liquidity tranche)
 //   carry = wST·ST_net + (1−wST)·stable + swap   (BPT carry).  See CLAUDE.md §5 / §7.
 // =============================================================================
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { C } from "./theme";
 
-const SOURCES = [
+type Source = { id: number; name: string; cov: number; minLiq: number; sRisk: number; sLiq: number };
+type Globals = { Ustar: number; Lustar: number; wST: number; APY: number; stable: number; turnover: number; feeBps: number };
+type Calc = {
+  ltSize: number; jtSize: number; duskSize: number; dayCap: number; duskCap: number;
+  stNet: number; dayJT: number; dayLT: number; duskJT: number; capSave: number;
+};
+
+const SOURCES: Source[] = ([
   ["InfiniFi 13w", 0.2, 0.12, 0.2, 0.1], ["reUSDe", 0.2, 0.12, 0.2, 0.1], ["Ember eEARN", 0.16, 0.11, 0.16, 0.09],
   ["apyUSD", 0.16, 0.11, 0.16, 0.09], ["msY", 0.16, 0.11, 0.16, 0.09], ["Re7 Midas Vault", 0.22, 0.13, 0.22, 0.11],
   ["Tulipa RE RWA", 0.16, 0.11, 0.16, 0.09], ["ACRDX Centrifuge", 0.24, 0.14, 0.24, 0.11], ["D2 Finance", 0.2, 0.12, 0.2, 0.1],
   ["Zivoe", 0.2, 0.12, 0.2, 0.1], ["Dual Mint", 0.16, 0.11, 0.16, 0.09], ["Pareto Rockaway", 0.22, 0.13, 0.22, 0.11],
-].map(([name, cov, minLiq, sRisk, sLiq], id) => ({ id, name, cov, minLiq, sRisk, sLiq }));
+] as [string, number, number, number, number][]).map(([name, cov, minLiq, sRisk, sLiq], id) => ({ id, name, cov, minLiq, sRisk, sLiq }));
 
 const DAY = C.lt, DUSK = C.jt, POS = C.pos;
-const mlt = (x) => x.toFixed(2) + "×";
-const pc1 = (x) => (x * 100).toFixed(1) + "%";
+const mlt = (x: number) => x.toFixed(2) + "×";
+const pc1 = (x: number) => (x * 100).toFixed(1) + "%";
 
-function calc(s, g) {
+function calc(s: Source, g: Globals): Calc {
   const ltSize = s.minLiq / g.Lustar;
   // Day JT (β=1, co-invested in source) covers external senior + the LT's ST shares (wST·L):
   //   U = cov·(1 + wST·L + J)/J = U*  ⇒  J = cov·(1 + wST·L)/(U* − cov)
@@ -54,8 +60,13 @@ function calc(s, g) {
   return { ltSize, jtSize, duskSize, dayCap, duskCap, stNet, dayJT, dayLT, duskJT, capSave: (dayCap - duskCap) / dayCap };
 }
 
-function Row({ label, day, dusk, accentRow, last }) {
-  const cell = (d, accent) => (
+type Cell = {
+  v: string; win?: string; na?: boolean; dim?: boolean; big?: boolean;
+  mark?: string; bar?: number; note?: string;
+};
+
+function Row({ label, day, dusk, accentRow, last }: { label: string; day: Cell; dusk: Cell; accentRow?: string; last?: boolean }) {
+  const cell = (d: Cell, accent: string) => (
     <div className="flex-1 flex flex-col justify-center gap-2.5 px-6 py-4" style={{ background: d.win ? `${POS}0F` : "transparent" }}>
       <div className="flex items-baseline gap-2">
         <span style={{ color: d.na ? C.dim : d.dim ? C.text : accent }} className={d.big ? "font-mono text-[23px] font-bold tabular-nums leading-none tracking-tight" : "text-[13px] font-medium leading-snug"}>{d.v}</span>
@@ -81,10 +92,10 @@ function Row({ label, day, dusk, accentRow, last }) {
   );
 }
 
-function Pct({ value, onChange, w = 46 }) {
+function Pct({ value, onChange, w = 46 }: { value: number; onChange: (v: number) => void; w?: number }) {
   return <span className="inline-flex items-center"><input type="number" step={0.5} value={+(value * 100).toFixed(1)} onChange={(e) => onChange((parseFloat(e.target.value) || 0) / 100)} style={{ width: w, background: C.panel2, color: C.text, border: `1px solid ${C.line}` }} className="font-mono text-[12px] tabular-nums rounded-lg px-2 py-1 text-right outline-none focus:border-sky-500" /><span style={{ color: C.dim }} className="text-[10px] ml-0.5">%</span></span>;
 }
-const F = ({ l, children }) => <span className="inline-flex items-center gap-1.5"><span style={{ color: C.mut }} className="text-[10.5px]">{l}</span>{children}</span>;
+const F = ({ l, children }: { l: string; children: ReactNode }) => <span className="inline-flex items-center gap-1.5"><span style={{ color: C.mut }} className="text-[10.5px]">{l}</span>{children}</span>;
 
 export default function CapitalEfficiency() {
   const [g, setG] = useState({ Ustar: 0.9, Lustar: 0.9, wST: 0.1, APY: 0.12, stable: 0.035, turnover: 8, feeBps: 10 });
@@ -92,8 +103,8 @@ export default function CapitalEfficiency() {
   const [id, setId] = useState(0);
   const s = rows[id];
   const c = calc(s, g);
-  const setS = (k, v) => setRows((xs) => xs.map((x) => (x.id === id ? { ...x, [k]: v } : x)));
-  const set = (k, v) => setG({ ...g, [k]: v });
+  const setS = (k: "cov" | "minLiq" | "sRisk" | "sLiq", v: number) => setRows((xs) => xs.map((x) => (x.id === id ? { ...x, [k]: v } : x)));
+  const set = (k: "APY" | "stable" | "wST", v: number) => setG({ ...g, [k]: v });
   const capMax = Math.max(c.dayCap, c.duskCap);
   const yMax = Math.max(c.dayJT, c.dayLT, c.duskJT, c.stNet) * 1.05;
   // dynamic junior-yield descriptor (so the prose never contradicts the numbers)
@@ -170,7 +181,7 @@ export default function CapitalEfficiency() {
 
         {/* takeaway */}
         <div style={{ color: C.mut }} className="text-[12.5px] leading-relaxed mt-4 px-1">
-          <b style={{ color: C.text }}>The read:</b> the senior earns the same, and the juniors are {jtCmp} (<span style={{ color: DAY }}>Day {pc1(c.dayJT)}</span> from source + premium; <span style={{ color: DUSK }}>Dusk {pc1(c.duskJT)}</span>, premium-heavy on lazy BPT capital). So the trade is structural: <span style={{ color: DUSK }}>Dusk</span> locks <b style={{ color: POS }}>{Math.round(c.capSave * 100)}% less capital</b> (one pool, sized to <span className="font-mono">max(coverage, liquidity)</span>) — but its coverage is <b style={{ color: DUSK }}>reflexive</b> (a run drives the pool senior-heavy → β→1, the fixed point), and it has no separate LT. <span style={{ color: DAY }}>Day</span> pays more capital for coverage that's independent of the pool and a distinct LT ({pc1(c.dayLT)}). <span style={{ color: C.dim }}>Less capital vs robustness — that's the trade.</span>
+          <b style={{ color: C.text }}>The read:</b> the senior earns the same, and the juniors are {jtCmp} (<span style={{ color: DAY }}>Day {pc1(c.dayJT)}</span> from source + premium; <span style={{ color: DUSK }}>Dusk {pc1(c.duskJT)}</span>, premium-heavy on lazy BPT capital). So the trade is structural: <span style={{ color: DUSK }}>Dusk</span> locks <b style={{ color: POS }}>{Math.round(c.capSave * 100)}% less capital</b> (one pool, sized to <span className="font-mono">max(coverage, liquidity)</span>) — but its coverage is <b style={{ color: DUSK }}>reflexive</b> (a run drives the pool senior-heavy → β→1, the fixed point), and it has no separate LT. <span style={{ color: DAY }}>Day</span> pays more capital for coverage that&apos;s independent of the pool and a distinct LT ({pc1(c.dayLT)}). <span style={{ color: C.dim }}>Less capital vs robustness — that&apos;s the trade.</span>
         </div>
 
         {/* all sources */}
