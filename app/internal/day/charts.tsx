@@ -98,7 +98,7 @@ export function LineChart({ xs, series, height = 180, yLabel, xFmt, yFmt, bands 
 }
 
 // Market-state ribbon over time (PERPETUAL vs FIXED_TERM)
-export function StateTimeline({ xs, states, xFmt }: { xs: number[]; states: string[]; xFmt?: (x: number) => string }) {
+export function StateTimeline({ xs, states }: { xs: number[]; states: string[]; xFmt?: (x: number) => string }) {
   const W = 760;
   const H = 26;
   const padL = 52;

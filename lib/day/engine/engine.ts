@@ -176,7 +176,7 @@ export function reconcile(
 
   // ---- JT own PnL (its own deployment) -----------------------------------
   if (dJT < -dust) {
-    let loss = -dJT;
+    const loss = -dJT;
     const absorbed = Math.min(loss, jtEff);
     jtEff -= absorbed;
     const spill = loss - absorbed;
@@ -372,7 +372,7 @@ export function stRedeem(state: LiveState, cfg: MarketConfig, shares: number, by
     return blocked(state, "st-redeem", "ST redeem blocked: only enabled in PERPETUAL (the secondary pool is the intended exit in FIXED_TERM).");
   if (shares > state.stShares + dust) shares = state.stShares;
   const frac = shares / state.stShares;
-  let redemptionNAV = frac * state.stEffectiveNAV;
+  const redemptionNAV = frac * state.stEffectiveNAV;
 
   // ST self-liquidation bonus when the liquidation threshold is breached
   let bonus = 0;

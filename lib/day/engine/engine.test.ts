@@ -5,7 +5,7 @@
 
 import { MarketState } from "./types";
 import { Sim, defaultConfig, steadyYear, type StepInput } from "./runner";
-import { utilization, ltRawNAV, ltPrice } from "./engine";
+import { ltPrice } from "./engine";
 import { YEAR_SEC, ydmShare } from "./ydm";
 import { eclpParamsForWeight, eclpSellValue, eclpInvariant, eclpTVL, reservesPerL } from "./eclp";
 
