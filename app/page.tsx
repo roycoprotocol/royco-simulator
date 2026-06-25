@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ReferenceDot } from 'recharts';
+import DaySimulator from './DaySimulator';
 
 const ResponsiveContainerNoSSR = dynamic(
   () => import('recharts').then((mod) => mod.ResponsiveContainer),
@@ -176,6 +177,8 @@ export default function YieldSimulator() {
 
   const defaultAdaptYdm = parseFloat(defaultSelectedInputs.ydmYT) || 10;
   const [adaptYdm, setAdaptYdm] = useState<number>(defaultAdaptYdm); // effective Y_T as % (1-100)
+
+  const [simulatorView, setSimulatorView] = useState<'dawn' | 'day'>('dawn');
 
   const [showExplainer, setShowExplainer] = useState<boolean>(false);
   const [showAdvanced, setShowAdvanced] = useState<boolean>(false);
@@ -734,9 +737,28 @@ export default function YieldSimulator() {
         {/* Header */}
         <div className="text-center mb-12">
           <div className="flex items-center justify-center gap-3 mb-3">
-            <span className="text-[10px] tracking-wide uppercase text-[#0a0a0a] bg-[#eef0f4] border border-[#e5e5e0] rounded-full px-2.5 py-1">
-              v1 · Dawn
-            </span>
+            <div className="inline-flex items-center bg-[#eef0f4] border border-[#e5e5e0] rounded-full p-0.5">
+              <button
+                onClick={() => setSimulatorView('dawn')}
+                className={`text-[10px] tracking-wide uppercase rounded-full px-2.5 py-1 transition-colors ${
+                  simulatorView === 'dawn'
+                    ? 'bg-[#0a0a0a] text-white'
+                    : 'text-[#0a0a0a] hover:bg-white'
+                }`}
+              >
+                v1 · Dawn
+              </button>
+              <button
+                onClick={() => setSimulatorView('day')}
+                className={`text-[10px] tracking-wide uppercase rounded-full px-2.5 py-1 transition-colors ${
+                  simulatorView === 'day'
+                    ? 'bg-[#0a0a0a] text-white'
+                    : 'text-[#0a0a0a] hover:bg-white'
+                }`}
+              >
+                V2 - Day
+              </button>
+            </div>
           </div>
           <h1 className="text-5xl md:text-6xl font-semibold text-[#0a0a0a] mb-4 tracking-tight">
             Royco Tranching Simulator
@@ -745,6 +767,8 @@ export default function YieldSimulator() {
             Calculate senior and junior tranche yields using the YDM model
           </p>
         </div>
+
+        {simulatorView === 'dawn' ? (<>
 
         {/* Section Label: Explainer */}
         <div className="flex items-center gap-3 mb-4">
@@ -1647,6 +1671,8 @@ export default function YieldSimulator() {
             </div>
           </div>
         )}
+
+        </>) : (<DaySimulator />)}
 
         {/* Footer */}
         <footer className="mt-16 py-8 border-t border-[#e5e5e0]">
