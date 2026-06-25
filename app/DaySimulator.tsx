@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useRef, useEffect } from 'react';
 import dynamic from 'next/dynamic';
 import {
   LineChart,
@@ -291,6 +291,50 @@ export default function DaySimulator() {
   // --- explainer ---
   const [showExplainer, setShowExplainer] = useState(false);
 
+  // --- yield-split bar per-segment width measurement ---
+  // Each of the three segments gets its own ref. We observe the BAR CONTAINER
+  // (not the segments) and read each segment's real rendered offsetWidth inside
+  // the callback. This avoids any render→resize→render loop: the labels we write
+  // are flex-centered inside fixed-`%`-width segments, so they never change a
+  // segment's px width, and we never observe an element whose size our state
+  // could alter.
+  const barRef = useRef<HTMLDivElement>(null);
+  const segRefs = useRef<Array<HTMLDivElement | null>>([null, null, null]);
+  const [segWidths, setSegWidths] = useState<[number, number, number]>([
+    600, 120, 90,
+  ]);
+  useEffect(() => {
+    const container = barRef.current;
+    if (!container) return;
+    const update = () =>
+      setSegWidths((prev) => {
+        const next: [number, number, number] = [
+          segRefs.current[0]?.offsetWidth ?? prev[0],
+          segRefs.current[1]?.offsetWidth ?? prev[1],
+          segRefs.current[2]?.offsetWidth ?? prev[2],
+        ];
+        return next[0] === prev[0] && next[1] === prev[1] && next[2] === prev[2]
+          ? prev
+          : next;
+      });
+    update();
+    const rafId = requestAnimationFrame(update);
+    // Observe every segment so a `%`-driven width change (when the split
+    // shifts) is measured even though the container itself never resizes.
+    let ro: ResizeObserver | undefined;
+    if (typeof ResizeObserver !== 'undefined') {
+      ro = new ResizeObserver(update);
+      ro.observe(container);
+      segRefs.current.forEach((el) => el && ro!.observe(el));
+    }
+    window.addEventListener('resize', update);
+    return () => {
+      cancelAnimationFrame(rafId);
+      ro?.disconnect();
+      window.removeEventListener('resize', update);
+    };
+  }, []);
+
   // ---------------------------------------------------------------------------
   // Config + sim (duplicated from app/internal/day/Simulator.tsx — keep in sync)
   // ---------------------------------------------------------------------------
@@ -461,34 +505,110 @@ export default function DaySimulator() {
 
         {/* Yield-split bar */}
         <div className="mt-4">
-          <p className="text-[12px] text-[#666666] mb-1.5">How each $1 of senior yield splits</p>
+          <p className="text-[12px] text-[#666666] mb-1.5">Where each $1 of senior yield goes</p>
           <div
+            ref={barRef}
             className="w-full flex overflow-hidden rounded-md border border-[#E5E5E0]"
-            style={{ height: 48 }}
+            style={{ height: 54 }}
           >
-            <div
-              style={{
-                width: `${seniorKeepFrac * 100}%`,
-                background: '#C8873E',
-                transition: 'width .25s ease',
-                marginRight: 2,
-              }}
-            />
-            <div
-              style={{
-                width: `${riskShareFrac * 100}%`,
-                background: '#16A34A',
-                transition: 'width .25s ease',
-                marginRight: 2,
-              }}
-            />
-            <div
-              style={{
-                width: `${liqShareFrac * 100}%`,
-                background: '#2563EB',
-                transition: 'width .25s ease',
-              }}
-            />
+            {/* Segment: Senior keeps */}
+            {(() => {
+              const w = segWidths[0];
+              return (
+                <div
+                  ref={(el) => {
+                    segRefs.current[0] = el;
+                  }}
+                  style={{
+                    width: `${seniorKeepFrac * 100}%`,
+                    background: '#C8873E',
+                    transition: 'width .25s ease',
+                    marginRight: 2,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    overflow: 'hidden',
+                    whiteSpace: 'nowrap',
+                    padding: '0 8px',
+                  }}
+                >
+                  {w >= 96 ? (
+                    <>
+                      <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.85)', lineHeight: 1.2 }}>Senior keeps</span>
+                      <span style={{ fontSize: 15, fontWeight: 700, color: '#fff', lineHeight: 1.2 }}>{seniorKeepPct}%</span>
+                    </>
+                  ) : w >= 36 ? (
+                    <span style={{ fontSize: 12, fontWeight: 700, color: '#fff' }}>{seniorKeepPct}%</span>
+                  ) : null}
+                </div>
+              );
+            })()}
+            {/* Segment: Risk → JT */}
+            {(() => {
+              const w = segWidths[1];
+              return (
+                <div
+                  ref={(el) => {
+                    segRefs.current[1] = el;
+                  }}
+                  style={{
+                    width: `${riskShareFrac * 100}%`,
+                    background: '#16A34A',
+                    transition: 'width .25s ease',
+                    marginRight: 2,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    overflow: 'hidden',
+                    whiteSpace: 'nowrap',
+                    padding: '0 8px',
+                  }}
+                >
+                  {w >= 96 ? (
+                    <>
+                      <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.85)', lineHeight: 1.2 }}>Risk &#x2192; JT</span>
+                      <span style={{ fontSize: 15, fontWeight: 700, color: '#fff', lineHeight: 1.2 }}>{riskSharePct}%</span>
+                    </>
+                  ) : w >= 36 ? (
+                    <span style={{ fontSize: 12, fontWeight: 700, color: '#fff' }}>{riskSharePct}%</span>
+                  ) : null}
+                </div>
+              );
+            })()}
+            {/* Segment: Liquidity → LT */}
+            {(() => {
+              const w = segWidths[2];
+              return (
+                <div
+                  ref={(el) => {
+                    segRefs.current[2] = el;
+                  }}
+                  style={{
+                    width: `${liqShareFrac * 100}%`,
+                    background: '#2563EB',
+                    transition: 'width .25s ease',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    overflow: 'hidden',
+                    whiteSpace: 'nowrap',
+                    padding: '0 8px',
+                  }}
+                >
+                  {w >= 96 ? (
+                    <>
+                      <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.85)', lineHeight: 1.2 }}>Liquidity &#x2192; LT</span>
+                      <span style={{ fontSize: 15, fontWeight: 700, color: '#fff', lineHeight: 1.2 }}>{liqSharePct}%</span>
+                    </>
+                  ) : w >= 36 ? (
+                    <span style={{ fontSize: 12, fontWeight: 700, color: '#fff' }}>{liqSharePct}%</span>
+                  ) : null}
+                </div>
+              );
+            })()}
           </div>
           <div className="flex flex-wrap items-center gap-x-6 gap-y-1 mt-2">
             <span className="flex items-center gap-1.5 text-[12px] text-[#666666]">
