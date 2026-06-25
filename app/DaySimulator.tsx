@@ -162,7 +162,7 @@ function NumIn({
         value={+(value * scale).toFixed(4)}
         onChange={(e) => onChange((parseFloat(e.target.value) || 0) / scale)}
         style={{ width: w }}
-        className="font-mono text-[12px] tabular-nums rounded px-1.5 py-[3px] text-right outline-none border border-[#e5e5e0] bg-white text-[#0a0a0a] focus:border-[#C8873E]"
+        className="font-mono text-[12px] tabular-nums rounded px-1.5 py-[3px] text-right outline-none border border-[#e5e5e0] bg-white text-[#0a0a0a] focus:border-[#8A6A41]"
       />
       {suffix && (
         <span className="text-[9px] text-[#999999]">{suffix}</span>
@@ -241,6 +241,10 @@ export default function DaySimulator() {
   const [initST, setInitST] = useState(40_000_000);
   const [initJT, setInitJT] = useState(10_000_000);
   const [initLT, setInitLT] = useState(6_000_000);
+
+  // --- operating utilization (drives premium shares → APYs / split bar / chart dots) ---
+  const [covUtil, setCovUtil] = useState(90); // coverage utilization %, 0–100
+  const [lqUtil, setLqUtil] = useState(90); // liquidity utilization %, 0–100
 
   // --- advanced inputs ---
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -383,6 +387,22 @@ export default function DaySimulator() {
   // Final snapshot (no timeline scrubber)
   const cur = sim.history[sim.history.length - 1];
 
+  // Clamp helper — keeps a value in [0,1] and guards against non-finite inputs.
+  const safeFrac = (x: number) =>
+    Number.isFinite(x) ? Math.max(0, Math.min(1, x)) : 0;
+
+  // ---------------------------------------------------------------------------
+  // Premium shares — driven by the two operating-utilization sliders (NOT the
+  // engine snapshot). Same ydmShare call shape the curve charts use, so at the
+  // 90% defaults these reproduce the @90 target anchors exactly.
+  // ---------------------------------------------------------------------------
+  const riskShare = safeFrac(
+    ydmShare(riskYDM, riskYDM.yTarget, covUtil / 100, cfg.targetUtilization),
+  );
+  const liqShare = safeFrac(
+    ydmShare(liqYDM, liqYDM.yTarget, lqUtil / 100, cfg.liqTargetUtilization),
+  );
+
   // ---------------------------------------------------------------------------
   // APY derivation (duplicated from app/internal/day/Simulator.tsx — keep in sync)
   // Ustar / Lustar come from cfg (target utilizations, both default 0.9).
@@ -393,12 +413,12 @@ export default function DaySimulator() {
   const wST = 0.1; // ST weight in the E-CLP BPT at the default peg (the displayed pool composition varies with market conditions / the concentration band, but the APY math uses the peg weight)
   const ltSize = minLiq / Lustar;
   const jtSize = (coverage * (1 + wST * ltSize)) / (Ustar - coverage);
-  const stNet = apy * (1 - cur.riskShare - cur.liqShare);
+  const stNet = apy * (1 - riskShare - liqShare);
   const swap = (turnover * swapBps) / 10000;
   const carry = wST * stNet + (1 - wST) * stableYield + swap;
   const stAPY = stNet;
-  const jtAPY = apy + (cur.riskShare * apy) / jtSize;
-  const ltAPY = (cur.liqShare * apy) / ltSize + carry;
+  const jtAPY = apy + (riskShare * apy) / jtSize;
+  const ltAPY = (liqShare * apy) / ltSize + carry;
 
   // ---------------------------------------------------------------------------
   // YDM chart data — 101 points sweeping each curve over its OWN utilization
@@ -427,21 +447,20 @@ export default function DaySimulator() {
   // Clamp to the [0,100] axis and guard against non-finite utilizations
   // (e.g. ∞ when a denominator collapses) so Recharts never receives NaN/∞.
   const clamp = (v: number) => Math.max(0, Math.min(100, v));
-  const riskDotX = cur.utilization * 100;
-  const riskDotY = cur.riskShare * 100;
-  const liqDotX = cur.liquidityUtilization * 100;
-  const liqDotY = cur.liqShare * 100;
+  // "now" dots follow the operating-utilization sliders, not the engine snapshot.
+  const riskDotX = covUtil;
+  const riskDotY = riskShare * 100;
+  const liqDotX = lqUtil;
+  const liqDotY = liqShare * 100;
   const showRiskDot = Number.isFinite(riskDotX) && Number.isFinite(riskDotY);
   const showLiqDot = Number.isFinite(liqDotX) && Number.isFinite(liqDotY);
 
   // ---------------------------------------------------------------------------
-  // Yield-split bar — how the CURRENT senior yield divides between the three
-  // tranches (from the live snapshot `cur`). Guarded against undefined / NaN.
+  // Yield-split bar — how the senior yield divides between the three tranches,
+  // driven by the operating-utilization sliders (riskShare / liqShare above).
   // ---------------------------------------------------------------------------
-  const safeFrac = (x: number) =>
-    Number.isFinite(x) ? Math.max(0, Math.min(1, x)) : 0;
-  const riskShareFrac = safeFrac(cur?.riskShare ?? 0);
-  const liqShareFrac = safeFrac(cur?.liqShare ?? 0);
+  const riskShareFrac = riskShare;
+  const liqShareFrac = liqShare;
   const seniorKeepFrac = safeFrac(1 - riskShareFrac - liqShareFrac);
   const seniorKeepPct = Math.round(seniorKeepFrac * 100);
   const riskSharePct = Math.round(riskShareFrac * 100);
@@ -468,10 +487,10 @@ export default function DaySimulator() {
         >
           <div className="kpi-flash bg-white rounded-lg border border-[#E5E5E0] p-4 shadow-sm">
             <div className="flex items-center gap-2 mb-1">
-              <span className="w-2 h-2 rounded-full" style={{ background: '#C8873E' }} />
+              <span className="w-2 h-2 rounded-full" style={{ background: '#8A6A41' }} />
               <span className="text-[13px] text-[#666666]">Senior · ST</span>
             </div>
-            <p className="font-mono tabular-nums text-4xl sm:text-5xl leading-none text-[#C8873E]" style={{ fontWeight: 600 }}>
+            <p className="font-mono tabular-nums text-4xl sm:text-5xl leading-none text-[#0A0A0A]" style={{ fontWeight: 600 }}>
               {(stAPY * 100).toFixed(1)}
               <span className="text-2xl sm:text-3xl">%</span>
             </p>
@@ -480,10 +499,10 @@ export default function DaySimulator() {
 
           <div className="kpi-flash bg-white rounded-lg border border-[#E5E5E0] p-4 shadow-sm">
             <div className="flex items-center gap-2 mb-1">
-              <span className="w-2 h-2 rounded-full" style={{ background: '#16A34A' }} />
+              <span className="w-2 h-2 rounded-full" style={{ background: '#3F6B4E' }} />
               <span className="text-[13px] text-[#666666]">Junior · JT</span>
             </div>
-            <p className="font-mono tabular-nums text-4xl sm:text-5xl leading-none text-[#16A34A]" style={{ fontWeight: 600 }}>
+            <p className="font-mono tabular-nums text-4xl sm:text-5xl leading-none text-[#0A0A0A]" style={{ fontWeight: 600 }}>
               {(jtAPY * 100).toFixed(1)}
               <span className="text-2xl sm:text-3xl">%</span>
             </p>
@@ -492,10 +511,10 @@ export default function DaySimulator() {
 
           <div className="kpi-flash bg-white rounded-lg border border-[#E5E5E0] p-4 shadow-sm">
             <div className="flex items-center gap-2 mb-1">
-              <span className="w-2 h-2 rounded-full" style={{ background: '#2563EB' }} />
+              <span className="w-2 h-2 rounded-full" style={{ background: '#3C5A82' }} />
               <span className="text-[13px] text-[#666666]">Liquidity · LT</span>
             </div>
-            <p className="font-mono tabular-nums text-4xl sm:text-5xl leading-none text-[#2563EB]" style={{ fontWeight: 600 }}>
+            <p className="font-mono tabular-nums text-4xl sm:text-5xl leading-none text-[#0A0A0A]" style={{ fontWeight: 600 }}>
               {(ltAPY * 100).toFixed(1)}
               <span className="text-2xl sm:text-3xl">%</span>
             </p>
@@ -521,7 +540,7 @@ export default function DaySimulator() {
                   }}
                   style={{
                     width: `${seniorKeepFrac * 100}%`,
-                    background: '#C8873E',
+                    background: '#8A6A41',
                     transition: 'width .25s ease',
                     marginRight: 2,
                     display: 'flex',
@@ -554,7 +573,7 @@ export default function DaySimulator() {
                   }}
                   style={{
                     width: `${riskShareFrac * 100}%`,
-                    background: '#16A34A',
+                    background: '#3F6B4E',
                     transition: 'width .25s ease',
                     marginRight: 2,
                     display: 'flex',
@@ -587,7 +606,7 @@ export default function DaySimulator() {
                   }}
                   style={{
                     width: `${liqShareFrac * 100}%`,
-                    background: '#2563EB',
+                    background: '#3C5A82',
                     transition: 'width .25s ease',
                     display: 'flex',
                     flexDirection: 'column',
@@ -612,15 +631,15 @@ export default function DaySimulator() {
           </div>
           <div className="flex flex-wrap items-center gap-x-6 gap-y-1 mt-2">
             <span className="flex items-center gap-1.5 text-[12px] text-[#666666]">
-              <span className="w-2 h-2 rounded-full" style={{ background: '#C8873E' }} />
+              <span className="w-2 h-2 rounded-full" style={{ background: '#8A6A41' }} />
               Senior keeps <span className="font-mono tabular-nums font-semibold text-[#0a0a0a]">{seniorKeepPct}%</span>
             </span>
             <span className="flex items-center gap-1.5 text-[12px] text-[#666666]">
-              <span className="w-2 h-2 rounded-full" style={{ background: '#16A34A' }} />
+              <span className="w-2 h-2 rounded-full" style={{ background: '#3F6B4E' }} />
               Risk → JT <span className="font-mono tabular-nums font-semibold text-[#0a0a0a]">{riskSharePct}%</span>
             </span>
             <span className="flex items-center gap-1.5 text-[12px] text-[#666666]">
-              <span className="w-2 h-2 rounded-full" style={{ background: '#2563EB' }} />
+              <span className="w-2 h-2 rounded-full" style={{ background: '#3C5A82' }} />
               Liquidity → LT <span className="font-mono tabular-nums font-semibold text-[#0a0a0a]">{liqSharePct}%</span>
             </span>
           </div>
@@ -678,6 +697,68 @@ export default function DaySimulator() {
           </Card>
         </div>
 
+        {/* Operating utilization — drives the premium shares (and so the APYs,
+            the split bar, and the chart "now" dots) via the same ydmShare the
+            curves use. At 90% these reproduce the @90 target anchors. */}
+        <div className="mb-6">
+          <Card title="Operating utilization">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-[10.5px] uppercase tracking-wider text-[#666666]">
+                    Coverage utilization
+                  </span>
+                  <span
+                    className="text-[11px] font-mono tabular-nums font-semibold"
+                    style={{ color: '#3F6B4E' }}
+                  >
+                    {Math.round(covUtil)}%
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  step={1}
+                  value={Math.round(covUtil)}
+                  onChange={(e) => setCovUtil(parseFloat(e.target.value) || 0)}
+                  className="utilization-slider w-full"
+                  style={{ accentColor: '#3F6B4E', background: '#3F6B4E' }}
+                />
+                <p className="mt-0.5 text-[9px] text-[#999999]">
+                  &#x2192; risk premium {Math.round(riskShare * 100)}% of senior yield
+                </p>
+              </div>
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <span className="text-[10.5px] uppercase tracking-wider text-[#666666]">
+                    Liquidity utilization
+                  </span>
+                  <span
+                    className="text-[11px] font-mono tabular-nums font-semibold"
+                    style={{ color: '#3C5A82' }}
+                  >
+                    {Math.round(lqUtil)}%
+                  </span>
+                </div>
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  step={1}
+                  value={Math.round(lqUtil)}
+                  onChange={(e) => setLqUtil(parseFloat(e.target.value) || 0)}
+                  className="utilization-slider w-full"
+                  style={{ accentColor: '#3C5A82', background: '#3C5A82' }}
+                />
+                <p className="mt-0.5 text-[9px] text-[#999999]">
+                  &#x2192; liquidity premium {Math.round(liqShare * 100)}% of senior yield
+                </p>
+              </div>
+            </div>
+          </Card>
+        </div>
+
         {/* Premium YDMs — the two @90% target sliders + budget meter */}
         <Card title="Premium YDMs">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -685,7 +766,7 @@ export default function DaySimulator() {
               <AnchorSlider
                 label="Risk premium → JT"
                 value={riskYDM.yTarget}
-                accent="#16A34A"
+                accent="#3F6B4E"
                 onChange={(v) => setRiskAnchor('yTarget', v)}
               />
               <p className="mt-0.5 text-[9px] text-[#999999]">at 90% utilization (target)</p>
@@ -694,7 +775,7 @@ export default function DaySimulator() {
               <AnchorSlider
                 label="Liquidity premium → LT"
                 value={liqYDM.yTarget}
-                accent="#2563EB"
+                accent="#3C5A82"
                 onChange={(v) => setLiqAnchor('yTarget', v)}
               />
               <p className="mt-0.5 text-[9px] text-[#999999]">at 90% utilization (target)</p>
@@ -748,31 +829,31 @@ export default function DaySimulator() {
               {/* YDM curve tails */}
               <Card title="YDM curve shape">
                 <div className="flex flex-col gap-2.5">
-                  <p className="text-[9px] uppercase tracking-wider text-[#16A34A] mb-0.5">Risk premium → JT</p>
+                  <p className="text-[9px] uppercase tracking-wider text-[#3F6B4E] mb-0.5">Risk premium → JT</p>
                   <AnchorSlider
                     label="@0% util"
                     value={riskYDM.y0}
-                    accent="#16A34A"
+                    accent="#3F6B4E"
                     onChange={(v) => setRiskAnchor('y0', v)}
                   />
                   <AnchorSlider
                     label="@100% util"
                     value={riskYDM.y100}
-                    accent="#16A34A"
+                    accent="#3F6B4E"
                     onChange={(v) => setRiskAnchor('y100', v)}
                   />
                   <div className="border-t border-[#e5e5e0] my-1" />
-                  <p className="text-[9px] uppercase tracking-wider text-[#2563EB] mb-0.5">Liquidity premium → LT</p>
+                  <p className="text-[9px] uppercase tracking-wider text-[#3C5A82] mb-0.5">Liquidity premium → LT</p>
                   <AnchorSlider
                     label="@0% util"
                     value={liqYDM.y0}
-                    accent="#2563EB"
+                    accent="#3C5A82"
                     onChange={(v) => setLiqAnchor('y0', v)}
                   />
                   <AnchorSlider
                     label="@100% util"
                     value={liqYDM.y100}
-                    accent="#2563EB"
+                    accent="#3C5A82"
                     onChange={(v) => setLiqAnchor('y100', v)}
                   />
                 </div>
@@ -818,7 +899,7 @@ export default function DaySimulator() {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Chart 1 — Risk premium → JT (vs coverage utilization) */}
           <div>
-            <p className="text-sm font-semibold text-[#16A34A] mb-0.5">
+            <p className="text-sm font-semibold text-[#3F6B4E] mb-0.5">
               Risk premium → JT
             </p>
             <p className="text-xs text-[#666666] mb-2">vs coverage utilization</p>
@@ -871,8 +952,8 @@ export default function DaySimulator() {
                               At {d.x.toFixed(0)}% coverage utilization
                             </p>
                             <div className="flex justify-between gap-4 text-sm">
-                              <span className="text-[#16A34A]">Risk share (JT):</span>
-                              <span className="font-semibold text-[#16A34A]">
+                              <span className="text-[#3F6B4E]">Risk share (JT):</span>
+                              <span className="font-semibold text-[#3F6B4E]">
                                 {d.share.toFixed(2)}%
                               </span>
                             </div>
@@ -898,20 +979,20 @@ export default function DaySimulator() {
                       x={clamp(riskDotX)}
                       y={riskDotY}
                       r={6}
-                      fill="#16A34A"
+                      fill="#3F6B4E"
                       stroke="#fff"
                       strokeWidth={2}
-                      label={{ value: 'now', position: 'top', fill: '#16A34A', fontSize: 10 }}
+                      label={{ value: 'now', position: 'top', fill: '#3F6B4E', fontSize: 10 }}
                     />
                   )}
                   <Line
                     type="monotone"
                     dataKey="share"
                     name="Risk share → JT"
-                    stroke="#16A34A"
+                    stroke="#3F6B4E"
                     strokeWidth={3}
                     dot={false}
-                    activeDot={{ r: 5, fill: '#16A34A' }}
+                    activeDot={{ r: 5, fill: '#3F6B4E' }}
                     isAnimationActive={false}
                   />
                 </LineChart>
@@ -920,7 +1001,7 @@ export default function DaySimulator() {
           </div>
           {/* Chart 2 — Liquidity premium → LT (vs liquidity utilization) */}
           <div>
-            <p className="text-sm font-semibold text-[#2563EB] mb-0.5">
+            <p className="text-sm font-semibold text-[#3C5A82] mb-0.5">
               Liquidity premium → LT
             </p>
             <p className="text-xs text-[#666666] mb-2">vs liquidity utilization</p>
@@ -973,8 +1054,8 @@ export default function DaySimulator() {
                               At {d.x.toFixed(0)}% liquidity utilization
                             </p>
                             <div className="flex justify-between gap-4 text-sm">
-                              <span className="text-[#2563EB]">Liq share (LT):</span>
-                              <span className="font-semibold text-[#2563EB]">
+                              <span className="text-[#3C5A82]">Liq share (LT):</span>
+                              <span className="font-semibold text-[#3C5A82]">
                                 {d.share.toFixed(2)}%
                               </span>
                             </div>
@@ -1000,20 +1081,20 @@ export default function DaySimulator() {
                       x={clamp(liqDotX)}
                       y={liqDotY}
                       r={6}
-                      fill="#2563EB"
+                      fill="#3C5A82"
                       stroke="#fff"
                       strokeWidth={2}
-                      label={{ value: 'now', position: 'top', fill: '#2563EB', fontSize: 10 }}
+                      label={{ value: 'now', position: 'top', fill: '#3C5A82', fontSize: 10 }}
                     />
                   )}
                   <Line
                     type="monotone"
                     dataKey="share"
                     name="Liq share → LT"
-                    stroke="#2563EB"
+                    stroke="#3C5A82"
                     strokeWidth={3}
                     dot={false}
-                    activeDot={{ r: 5, fill: '#2563EB' }}
+                    activeDot={{ r: 5, fill: '#3C5A82' }}
                     isAnimationActive={false}
                   />
                 </LineChart>
@@ -1030,7 +1111,7 @@ export default function DaySimulator() {
           <p className="text-[9px] uppercase tracking-wider text-[#666666] mb-1">
             ST effective NAV
           </p>
-          <p className="font-mono text-[14px] tabular-nums text-[#C8873E]">
+          <p className="font-mono text-[14px] tabular-nums text-[#8A6A41]">
             {usd(cur.stEffectiveNAV)}
           </p>
           <p className="text-[9px] font-mono text-[#999999]">
@@ -1042,7 +1123,7 @@ export default function DaySimulator() {
           <p className="text-[9px] uppercase tracking-wider text-[#666666] mb-1">
             JT effective NAV
           </p>
-          <p className="font-mono text-[14px] tabular-nums text-[#16A34A]">
+          <p className="font-mono text-[14px] tabular-nums text-[#3F6B4E]">
             {usd(cur.jtEffectiveNAV)}
           </p>
           <p className="text-[9px] font-mono text-[#999999]">
@@ -1054,7 +1135,7 @@ export default function DaySimulator() {
           <p className="text-[9px] uppercase tracking-wider text-[#666666] mb-1">
             LT value
           </p>
-          <p className="font-mono text-[14px] tabular-nums text-[#2563EB]">
+          <p className="font-mono text-[14px] tabular-nums text-[#3C5A82]">
             {usd(cur.ltNAV)}
           </p>
           <p className="text-[9px] font-mono text-[#999999]">
@@ -1160,7 +1241,7 @@ export default function DaySimulator() {
                     </p>
                   </div>
                   <p className="text-sm text-[#555555] leading-relaxed">
-                    Utilization drives a <span className="font-semibold text-[#16A34A]">risk premium to JT</span> and a separate <span className="font-semibold text-[#2563EB]">liquidity premium to LT</span>. Senior keeps what remains. Combined, the two premiums are capped at 100% of senior yield — raising one reduces the other, so senior yield never goes negative.
+                    Utilization drives a <span className="font-semibold text-[#3F6B4E]">risk premium to JT</span> and a separate <span className="font-semibold text-[#3C5A82]">liquidity premium to LT</span>. Senior keeps what remains. Combined, the two premiums are capped at 100% of senior yield — raising one reduces the other, so senior yield never goes negative.
                   </p>
                 </div>
 
@@ -1195,40 +1276,40 @@ export default function DaySimulator() {
 
               {/* Slice strip — 3 cards */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="bg-[#C8873E] text-white rounded-lg p-4 flex items-center justify-between">
+                <div className="bg-[#8A6A41] text-white rounded-lg p-4 flex items-center justify-between">
                   <div>
                     <p className="text-xs uppercase tracking-wide text-white/70">
                       Senior slice (ST)
                     </p>
                     <p className="text-base font-semibold">Gets paid first</p>
                   </div>
-                  <span className="text-sm bg-white text-[#C8873E] px-3 py-1 rounded-full font-medium">
+                  <span className="text-sm bg-white text-[#8A6A41] px-3 py-1 rounded-full font-medium">
                     Lower risk
                   </span>
                 </div>
                 <div className="bg-white rounded-lg border border-[#e5e5e0] p-4 flex items-center justify-between shadow-[0_8px_24px_rgba(0,0,0,0.04)]">
                   <div>
-                    <p className="text-xs uppercase tracking-wide text-[#16A34A]">
+                    <p className="text-xs uppercase tracking-wide text-[#3F6B4E]">
                       Junior slice (JT)
                     </p>
                     <p className="text-base font-semibold text-[#0a0a0a]">
                       Takes first losses
                     </p>
                   </div>
-                  <span className="text-sm bg-[#16A34A] text-white px-3 py-1 rounded-full font-medium">
+                  <span className="text-sm bg-[#3F6B4E] text-white px-3 py-1 rounded-full font-medium">
                     Higher upside
                   </span>
                 </div>
-                <div className="bg-white rounded-lg border border-[#2563EB] p-4 flex items-center justify-between shadow-[0_8px_24px_rgba(0,0,0,0.04)]">
+                <div className="bg-white rounded-lg border border-[#3C5A82] p-4 flex items-center justify-between shadow-[0_8px_24px_rgba(0,0,0,0.04)]">
                   <div>
-                    <p className="text-xs uppercase tracking-wide text-[#2563EB]">
+                    <p className="text-xs uppercase tracking-wide text-[#3C5A82]">
                       Liquidity slice (LT)
                     </p>
                     <p className="text-base font-semibold text-[#0a0a0a]">
                       Backs redemptions
                     </p>
                   </div>
-                  <span className="text-sm bg-[#2563EB] text-white px-3 py-1 rounded-full font-medium">
+                  <span className="text-sm bg-[#3C5A82] text-white px-3 py-1 rounded-full font-medium">
                     Pool provider
                   </span>
                 </div>
