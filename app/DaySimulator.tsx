@@ -272,24 +272,43 @@ export default function DaySimulator() {
   const beta = 1;
 
   // ---------------------------------------------------------------------------
-  // Combined-≤100% clamp for the two YDM anchors (per anchor key y0/yTarget/y100).
-  // The EDITED side takes priority: it can reach 100%, sliding the other side
-  // down to 0 so riskYDM[k] + liqYDM[k] never exceeds 1. Both states update
-  // together so cfg always stays consistent.
+  // Combined-≤100% clamp for the two YDM anchors (per anchor key y0/yTarget/y100),
+  // plus per-tranche monotonicity: the @100% util anchor (y100) can never sit
+  // below the @90% target anchor (yTarget). The EDITED side takes priority: it
+  // can reach 100%, sliding the other side down so riskYDM[k] + liqYDM[k] never
+  // exceeds 1. Both states update together so cfg always stays consistent.
   // ---------------------------------------------------------------------------
   const setRiskAnchor = (k: keyof YDMConfig, raw: number) => {
     const v = Math.max(0, Math.min(1, raw));
-    setRiskYDM((r) => ({ ...r, [k]: v }));
-    setLiqYDM((l) =>
-      v + (l[k] as number) > 1 ? { ...l, [k]: Math.max(0, 1 - v) } : l,
-    );
+    const r = { ...riskYDM, [k]: v };
+    const l = { ...liqYDM };
+    // monotonicity: y100 >= yTarget for the edited tranche
+    if (k === 'yTarget') r.y100 = Math.max(r.y100, v);
+    if (k === 'y100') r.y100 = Math.max(v, r.yTarget); // y100 can't be set below yTarget
+    // existing combined-<=100% cap, per anchor (reduce the OTHER tranche)
+    (['y0', 'yTarget', 'y100'] as const).forEach((a) => {
+      if ((r[a] ?? 0) + (l[a] ?? 0) > 1) l[a] = Math.max(0, 1 - r[a]);
+    });
+    // if the cap pushed liq.y100 below liq.yTarget, pull liq.yTarget down to keep liq monotonic
+    l.yTarget = Math.min(l.yTarget, l.y100);
+    setRiskYDM(r);
+    setLiqYDM(l);
   };
   const setLiqAnchor = (k: keyof YDMConfig, raw: number) => {
     const v = Math.max(0, Math.min(1, raw));
-    setLiqYDM((l) => ({ ...l, [k]: v }));
-    setRiskYDM((r) =>
-      v + (r[k] as number) > 1 ? { ...r, [k]: Math.max(0, 1 - v) } : r,
-    );
+    const l = { ...liqYDM, [k]: v };
+    const r = { ...riskYDM };
+    // monotonicity: y100 >= yTarget for the edited tranche
+    if (k === 'yTarget') l.y100 = Math.max(l.y100, v);
+    if (k === 'y100') l.y100 = Math.max(v, l.yTarget); // y100 can't be set below yTarget
+    // existing combined-<=100% cap, per anchor (reduce the OTHER tranche)
+    (['y0', 'yTarget', 'y100'] as const).forEach((a) => {
+      if ((l[a] ?? 0) + (r[a] ?? 0) > 1) r[a] = Math.max(0, 1 - l[a]);
+    });
+    // if the cap pushed risk.y100 below risk.yTarget, pull risk.yTarget down to keep risk monotonic
+    r.yTarget = Math.min(r.yTarget, r.y100);
+    setLiqYDM(l);
+    setRiskYDM(r);
   };
 
   // --- explainer ---
@@ -792,10 +811,7 @@ export default function DaySimulator() {
                 accent="#3F6B4E"
                 onChange={(v) => setRiskAnchor('yTarget', v)}
               />
-              <p className="mt-0.5 text-[9px] text-[#999999]">at 90% coverage utilization (target)</p>
-              <p className="mt-0.5 text-[9px] text-[#3F6B4E]">
-                Effective at {Math.round(covUtil)}% coverage utilization: {Math.round(riskShare * 100)}%
-              </p>
+              <p className="mt-0.5 text-[9px] text-[#999999]">at 90% utilization (target)</p>
             </div>
             <div>
               <AnchorSlider
@@ -804,10 +820,7 @@ export default function DaySimulator() {
                 accent="#3C5A82"
                 onChange={(v) => setLiqAnchor('yTarget', v)}
               />
-              <p className="mt-0.5 text-[9px] text-[#999999]">at 90% liquidity utilization (target)</p>
-              <p className="mt-0.5 text-[9px] text-[#3C5A82]">
-                Effective at {Math.round(lqUtil)}% liquidity utilization: {Math.round(liqShare * 100)}%
-              </p>
+              <p className="mt-0.5 text-[9px] text-[#999999]">at 90% utilization (target)</p>
             </div>
           </div>
 
@@ -924,7 +937,7 @@ export default function DaySimulator() {
           key={`${stAPY.toFixed(4)}-${jtAPY.toFixed(4)}-${ltAPY.toFixed(4)}`}
           className="grid grid-cols-1 sm:grid-cols-3 gap-3"
         >
-          <div className="kpi-flash bg-white rounded-lg border border-[#E5E5E0] p-4 shadow-sm">
+          <div className="group relative kpi-flash bg-white rounded-lg border border-[#E5E5E0] p-4 shadow-sm">
             <div className="flex items-center gap-2 mb-1">
               <span className="w-2 h-2 rounded-full" style={{ background: '#8A6A41' }} />
               <span className="text-[13px] text-[#666666]">Senior · ST</span>
@@ -934,9 +947,33 @@ export default function DaySimulator() {
               <span className="text-2xl sm:text-3xl">%</span>
             </p>
             <p className="text-[12px] text-[#999999] mt-1.5">paid first · lower risk</p>
+            {/* Hover breakdown */}
+            <div className="hidden group-hover:block absolute left-0 top-full mt-2 z-20 w-72 text-left bg-white border border-[#E5E5E0] rounded-lg shadow-lg p-3">
+              <p className="text-[12px] font-medium text-[#0a0a0a]">
+                ST Net &#183; <span className="font-mono" style={{ color: '#8A6A41' }}>{Math.round(stAPY * 100)}%</span>
+              </p>
+              <p className="text-[11px] text-[#666666] mt-0.5">APY &#215; (1 &#8722; risk &#8722; liq)</p>
+              <div className="mt-2 space-y-1.5">
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className="text-[11px] text-[#666666]">Base APY</span>
+                  <span className="text-[11px] font-mono" style={{ color: '#8A6A41' }}>{Math.round(apy * 100)}%</span>
+                </div>
+                <p className="text-[10px] text-[#999999] -mt-1">the source yield</p>
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className="text-[11px] text-[#666666]">&#8722; Risk premium</span>
+                  <span className="text-[11px] font-mono" style={{ color: '#8A6A41' }}>{Math.round(riskShare * 100)}% &#215; APY</span>
+                </div>
+                <p className="text-[10px] text-[#999999] -mt-1">paid to JT</p>
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className="text-[11px] text-[#666666]">&#8722; Liquidity premium</span>
+                  <span className="text-[11px] font-mono" style={{ color: '#8A6A41' }}>{Math.round(liqShare * 100)}% &#215; APY</span>
+                </div>
+                <p className="text-[10px] text-[#999999] -mt-1">paid to LT</p>
+              </div>
+            </div>
           </div>
 
-          <div className="kpi-flash bg-white rounded-lg border border-[#E5E5E0] p-4 shadow-sm">
+          <div className="group relative kpi-flash bg-white rounded-lg border border-[#E5E5E0] p-4 shadow-sm">
             <div className="flex items-center gap-2 mb-1">
               <span className="w-2 h-2 rounded-full" style={{ background: '#3F6B4E' }} />
               <span className="text-[13px] text-[#666666]">Junior · JT</span>
@@ -946,9 +983,27 @@ export default function DaySimulator() {
               <span className="text-2xl sm:text-3xl">%</span>
             </p>
             <p className="text-[12px] text-[#999999] mt-1.5">first-loss · earns risk premium</p>
+            {/* Hover breakdown */}
+            <div className="hidden group-hover:block absolute left-0 top-full mt-2 z-20 w-72 text-left bg-white border border-[#E5E5E0] rounded-lg shadow-lg p-3">
+              <p className="text-[12px] font-medium text-[#0a0a0a]">
+                Day JT &#183; <span className="font-mono" style={{ color: '#3F6B4E' }}>{Math.round(jtAPY * 100)}%</span>
+              </p>
+              <p className="text-[11px] text-[#666666] mt-0.5">APY + (risk &#215; APY) &#247; JT size</p>
+              <div className="mt-2 space-y-1.5">
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className="text-[11px] text-[#666666]">Co-invested (&#946;=1)</span>
+                  <span className="text-[11px] font-mono" style={{ color: '#3F6B4E' }}>{Math.round(apy * 100)}%</span>
+                </div>
+                <p className="text-[10px] text-[#999999] -mt-1">JT sits in the same asset as ST &#8594; earns the source APY</p>
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className="text-[11px] text-[#666666]">Risk premium</span>
+                  <span className="text-[11px] font-mono" style={{ color: '#3F6B4E' }}>{Math.round(riskShare * 100)}% &#215; APY &#247; JT size {Math.round(jtSize * 100)}%</span>
+                </div>
+              </div>
+            </div>
           </div>
 
-          <div className="kpi-flash bg-white rounded-lg border border-[#E5E5E0] p-4 shadow-sm">
+          <div className="group relative kpi-flash bg-white rounded-lg border border-[#E5E5E0] p-4 shadow-sm">
             <div className="flex items-center gap-2 mb-1">
               <span className="w-2 h-2 rounded-full" style={{ background: '#3C5A82' }} />
               <span className="text-[13px] text-[#666666]">Liquidity · LT</span>
@@ -958,15 +1013,33 @@ export default function DaySimulator() {
               <span className="text-2xl sm:text-3xl">%</span>
             </p>
             <p className="text-[12px] text-[#999999] mt-1.5">backs redemptions · earns liquidity premium</p>
+            {/* Hover breakdown */}
+            <div className="hidden group-hover:block absolute left-0 top-full mt-2 z-20 w-72 text-left bg-white border border-[#E5E5E0] rounded-lg shadow-lg p-3">
+              <p className="text-[12px] font-medium text-[#0a0a0a]">
+                Day LT &#183; <span className="font-mono" style={{ color: '#3C5A82' }}>{Math.round(ltAPY * 100)}%</span>
+              </p>
+              <p className="text-[11px] text-[#666666] mt-0.5">(liq &#215; APY) &#247; LT size + swap + BPT carry</p>
+              <div className="mt-2 space-y-1.5">
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className="text-[11px] text-[#666666]">Liquidity premium</span>
+                  <span className="text-[11px] font-mono" style={{ color: '#3C5A82' }}>{Math.round(liqShare * 100)}% &#215; APY &#247; LT size {Math.round(ltSize * 100)}%</span>
+                </div>
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className="text-[11px] text-[#666666]">Swap fees</span>
+                  <span className="text-[11px] font-mono" style={{ color: '#3C5A82' }}>{turnover}&#215;/yr &#215; {swapBps}bps</span>
+                </div>
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className="text-[11px] text-[#666666]">BPT carry</span>
+                  <span className="text-[11px] font-mono" style={{ color: '#3C5A82' }}>{Math.round(wST * 100)}% &#215; ST-yield + {Math.round((1 - wST) * 100)}% &#215; {Math.round(stableYield * 100)}% stable</span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
         {/* Yield-split bar */}
         <div className="mt-4">
-          <p className="text-[12px] text-[#666666] mb-0.5">Where each $1 of senior yield goes</p>
-          <p className="text-[11px] text-[#999999] mb-1.5">
-            at your operating utilization &#8212; coverage {Math.round(covUtil)}%&nbsp;&middot;&nbsp;liquidity {Math.round(lqUtil)}%
-          </p>
+          <p className="text-[12px] text-[#666666] mb-1.5">Where each $1 of senior yield goes</p>
           <div
             ref={barRef}
             className="w-full flex overflow-hidden rounded-md border border-[#E5E5E0]"
