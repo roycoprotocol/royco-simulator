@@ -8,6 +8,35 @@
   --accent: #000000;
   --font-geist-sans: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   --font-geist-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  --font-mono-stack: "SF Mono","Fira Code","Fira Mono","Roboto Mono",monospace;
+  --accent: #feb901;
+  --accent-background: rgba(254, 185, 1, 0.18);
+  --accent-foreground: #ffffff;
+  --success: #22c55e;
+  --success-background: rgba(34, 197, 94, 0.18);
+  --success-foreground: #ffffff;
+  --warning: #f97316;
+  --warning-background: rgba(249, 115, 22, 0.18);
+  --warning-foreground: #ffffff;
+  --error: #ef4444;
+  --error-background: rgba(239, 68, 68, 0.18);
+  --error-foreground: #ffffff;
+  --info: #3b82f6;
+  --info-background: rgba(59, 130, 246, 0.18);
+  --info-foreground: #ffffff;
+  --insight: #f92672;
+  --insight-background: rgba(249, 38, 114, 0.18);
+  --insight-foreground: #ffffff;
+  --muted: #1c1c18;
+  --muted-foreground: #75715e;
+  --foundation: #000000;
+  --theme-background: #0c0c0a;
+  --theme-foreground: #f5f4ec;
+  --theme-border: #33332b;
+  --primary-text: #f8f8f2;
+  --secondary-text: #c9c5b4;
+  --tertiary-text: #908b78;
+  --quaternary-text: #6b6757;
 }
 
 @theme inline {
@@ -75,6 +104,16 @@ body {
   height: 10px;
   border-radius: 9999px;
   background: #86efac;
+}
+
+.utilization-slider.slider-dark::-webkit-slider-thumb {
+  background: var(--theme-foreground);
+  border: 2px solid var(--theme-background);
+}
+
+.utilization-slider.slider-dark::-moz-range-thumb {
+  background: var(--theme-foreground);
+  border: 2px solid var(--theme-background);
 }
 
 /* === Dashboard animation helpers === */

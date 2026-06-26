@@ -729,19 +729,19 @@ export default function YieldSimulator() {
   };
 
   return (
-    <div className="min-h-screen bg-[#FBFBF8] py-16 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen py-16 px-4 sm:px-6 lg:px-8 bg-[#FBFBF8]">
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="text-center mb-12">
           <div className="flex items-center justify-center gap-3 mb-3">
-            <span className="text-[10px] tracking-wide uppercase text-[#0a0a0a] bg-[#eef0f4] border border-[#e5e5e0] rounded-full px-2.5 py-1">
+            <span className="inline-flex items-center text-[10px] tracking-wide uppercase rounded-full px-2.5 py-1 bg-[#0a0a0a] text-white">
               v1 · Dawn
             </span>
           </div>
-          <h1 className="text-5xl md:text-6xl font-semibold text-[#0a0a0a] mb-4 tracking-tight">
+          <h1 className="text-5xl md:text-6xl mb-4 tracking-tight font-semibold text-[#0a0a0a]">
             Royco Tranching Simulator
           </h1>
-          <p className="text-lg text-[#666666] max-w-2xl mx-auto">
+          <p className="text-lg max-w-2xl mx-auto text-[#666666]">
             Calculate senior and junior tranche yields using the YDM model
           </p>
         </div>
@@ -1651,8 +1651,8 @@ export default function YieldSimulator() {
         {/* Footer */}
         <footer className="mt-16 py-8 border-t border-[#e5e5e0]">
           <div className="max-w-6xl mx-auto px-4 text-center">
-            <p className="text-sm text-[#666666] mb-2">
-              Built by <a href="https://www.royco.org" target="_blank" rel="noopener noreferrer" className="text-[#0a0a0a] font-medium hover:underline">Royco</a>
+            <p className="text-sm mb-2 text-[#666666]">
+              Built by <a href="https://www.royco.org" target="_blank" rel="noopener noreferrer" className="font-medium hover:underline text-[#0a0a0a]">Royco</a>
             </p>
             <p className="text-xs text-[#999999]">
               Royco Tranching Simulator • Understanding yield tranching through the YDM model

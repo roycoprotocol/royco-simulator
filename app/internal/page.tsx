@@ -34,7 +34,7 @@ export default function InternalPage() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {/* Dusk card */}
           <Link
             href="/internal/dusk"
@@ -74,6 +74,26 @@ export default function InternalPage() {
             </h2>
             <p className="text-xs text-[#6b7280]">
               Full day-cycle engine with intraday event sequencing and runner output.
+            </p>
+          </Link>
+          {/* Day Frontend card */}
+          <Link
+            href="/internal/day-frontend"
+            className="group block bg-[#0a0c10] border border-[#1f242c] rounded-lg p-6 hover:border-[#feb901] transition-colors"
+          >
+            <div className="flex items-start justify-between mb-3">
+              <span className="text-[10px] tracking-widest uppercase text-[#feb901]">
+                frontend
+              </span>
+              <span className="text-[#feb901] text-sm opacity-0 group-hover:opacity-100 transition-opacity">
+                →
+              </span>
+            </div>
+            <h2 className="text-base font-medium text-[#e5e7eb] mb-1">
+              Day Frontend (v3)
+            </h2>
+            <p className="text-xs text-[#6b7280]">
+              Public-facing redesigned Day simulator — dark / Inter UI, stacked &amp; sidebar layouts.
             </p>
           </Link>
         </div>
