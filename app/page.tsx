@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ReferenceDot } from 'recharts';
 import DaySimulator from './DaySimulator';
+import DaySimulatorSidebar from './DaySimulatorSidebar';
 
 const ResponsiveContainerNoSSR = dynamic(
   () => import('recharts').then((mod) => mod.ResponsiveContainer),
@@ -178,7 +179,7 @@ export default function YieldSimulator() {
   const defaultAdaptYdm = parseFloat(defaultSelectedInputs.ydmYT) || 10;
   const [adaptYdm, setAdaptYdm] = useState<number>(defaultAdaptYdm); // effective Y_T as % (1-100)
 
-  const [simulatorView, setSimulatorView] = useState<'dawn' | 'day'>('dawn');
+  const [simulatorView, setSimulatorView] = useState<'dawn' | 'day' | 'sidebar'>('dawn');
 
   const [showExplainer, setShowExplainer] = useState<boolean>(false);
   const [showAdvanced, setShowAdvanced] = useState<boolean>(false);
@@ -757,6 +758,16 @@ export default function YieldSimulator() {
                 }`}
               >
                 V2 - Day
+              </button>
+              <button
+                onClick={() => setSimulatorView('sidebar')}
+                className={`text-[10px] tracking-wide uppercase rounded-full px-2.5 py-1 transition-colors ${
+                  simulatorView === 'sidebar'
+                    ? 'bg-[#0a0a0a] text-white'
+                    : 'text-[#0a0a0a] hover:bg-white'
+                }`}
+              >
+                V2 · Sidebar
               </button>
             </div>
           </div>
@@ -1672,7 +1683,7 @@ export default function YieldSimulator() {
           </div>
         )}
 
-        </>) : (<DaySimulator />)}
+        </>) : simulatorView === 'day' ? (<DaySimulator />) : (<DaySimulatorSidebar />)}
 
         {/* Footer */}
         <footer className="mt-16 py-8 border-t border-[#e5e5e0]">
