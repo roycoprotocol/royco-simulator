@@ -3,8 +3,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ReferenceLine, ReferenceDot } from 'recharts';
-import DaySimulator from './DaySimulator';
-import DaySimulatorSidebar from './DaySimulatorSidebar';
 
 const ResponsiveContainerNoSSR = dynamic(
   () => import('recharts').then((mod) => mod.ResponsiveContainer),
@@ -178,8 +176,6 @@ export default function YieldSimulator() {
 
   const defaultAdaptYdm = parseFloat(defaultSelectedInputs.ydmYT) || 10;
   const [adaptYdm, setAdaptYdm] = useState<number>(defaultAdaptYdm); // effective Y_T as % (1-100)
-
-  const [simulatorView, setSimulatorView] = useState<'dawn' | 'day' | 'sidebar'>('dawn');
 
   const [showExplainer, setShowExplainer] = useState<boolean>(false);
   const [showAdvanced, setShowAdvanced] = useState<boolean>(false);
@@ -732,83 +728,23 @@ export default function YieldSimulator() {
     );
   };
 
-  const dark = simulatorView !== 'dawn';
-
   return (
-    <div
-      className={`min-h-screen py-16 px-4 sm:px-6 lg:px-8 ${dark ? '' : 'bg-[#FBFBF8]'}`}
-      style={dark ? { background: 'var(--foundation)', color: 'var(--theme-foreground)', fontFamily: 'var(--font-inter)' } : undefined}
-    >
+    <div className="min-h-screen py-16 px-4 sm:px-6 lg:px-8 bg-[#FBFBF8]">
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="text-center mb-12">
           <div className="flex items-center justify-center gap-3 mb-3">
-            <div
-              className={`inline-flex items-center rounded-full p-0.5 border ${
-                dark ? 'border-[var(--theme-border)] bg-[var(--muted)]' : 'bg-[#eef0f4] border-[#e5e5e0]'
-              }`}
-            >
-              <button
-                onClick={() => setSimulatorView('dawn')}
-                className={`text-[10px] tracking-wide uppercase rounded-full px-2.5 py-1 transition-colors ${
-                  simulatorView === 'dawn'
-                    ? dark
-                      ? 'bg-[var(--accent-background)] text-[var(--accent)]'
-                      : 'bg-[#0a0a0a] text-white'
-                    : dark
-                      ? 'text-[var(--muted-foreground)] hover:text-[var(--theme-foreground)]'
-                      : 'text-[#0a0a0a] hover:bg-white'
-                }`}
-              >
-                v1 · Dawn
-              </button>
-              <button
-                onClick={() => setSimulatorView('day')}
-                className={`text-[10px] tracking-wide uppercase rounded-full px-2.5 py-1 transition-colors ${
-                  simulatorView === 'day'
-                    ? dark
-                      ? 'bg-[var(--accent-background)] text-[var(--accent)]'
-                      : 'bg-[#0a0a0a] text-white'
-                    : dark
-                      ? 'text-[var(--muted-foreground)] hover:text-[var(--theme-foreground)]'
-                      : 'text-[#0a0a0a] hover:bg-white'
-                }`}
-              >
-                V2 - Day
-              </button>
-              <button
-                onClick={() => setSimulatorView('sidebar')}
-                className={`text-[10px] tracking-wide uppercase rounded-full px-2.5 py-1 transition-colors ${
-                  simulatorView === 'sidebar'
-                    ? dark
-                      ? 'bg-[var(--accent-background)] text-[var(--accent)]'
-                      : 'bg-[#0a0a0a] text-white'
-                    : dark
-                      ? 'text-[var(--muted-foreground)] hover:text-[var(--theme-foreground)]'
-                      : 'text-[#0a0a0a] hover:bg-white'
-                }`}
-              >
-                V2 · Sidebar
-              </button>
-            </div>
+            <span className="inline-flex items-center text-[10px] tracking-wide uppercase rounded-full px-2.5 py-1 bg-[#0a0a0a] text-white">
+              v1 · Dawn
+            </span>
           </div>
-          <h1
-            className={`text-5xl md:text-6xl mb-4 tracking-tight ${
-              dark ? 'font-medium text-[var(--primary-text)]' : 'font-semibold text-[#0a0a0a]'
-            }`}
-          >
+          <h1 className="text-5xl md:text-6xl mb-4 tracking-tight font-semibold text-[#0a0a0a]">
             Royco Tranching Simulator
           </h1>
-          <p
-            className={`text-lg max-w-2xl mx-auto ${
-              dark ? 'text-[var(--tertiary-text)]' : 'text-[#666666]'
-            }`}
-          >
+          <p className="text-lg max-w-2xl mx-auto text-[#666666]">
             Calculate senior and junior tranche yields using the YDM model
           </p>
         </div>
-
-        {simulatorView === 'dawn' ? (<>
 
         {/* Section Label: Explainer */}
         <div className="flex items-center gap-3 mb-4">
@@ -1712,15 +1648,13 @@ export default function YieldSimulator() {
           </div>
         )}
 
-        </>) : simulatorView === 'day' ? (<DaySimulator />) : (<DaySimulatorSidebar />)}
-
         {/* Footer */}
-        <footer className={`mt-16 py-8 border-t ${dark ? 'border-[var(--theme-border)]' : 'border-[#e5e5e0]'}`}>
+        <footer className="mt-16 py-8 border-t border-[#e5e5e0]">
           <div className="max-w-6xl mx-auto px-4 text-center">
-            <p className={`text-sm mb-2 ${dark ? 'text-[var(--muted-foreground)]' : 'text-[#666666]'}`}>
-              Built by <a href="https://www.royco.org" target="_blank" rel="noopener noreferrer" className={`font-medium hover:underline ${dark ? 'text-[var(--theme-foreground)]' : 'text-[#0a0a0a]'}`}>Royco</a>
+            <p className="text-sm mb-2 text-[#666666]">
+              Built by <a href="https://www.royco.org" target="_blank" rel="noopener noreferrer" className="font-medium hover:underline text-[#0a0a0a]">Royco</a>
             </p>
-            <p className={`text-xs ${dark ? 'text-[var(--muted-foreground)]' : 'text-[#999999]'}`}>
+            <p className="text-xs text-[#999999]">
               Royco Tranching Simulator • Understanding yield tranching through the YDM model
             </p>
           </div>
