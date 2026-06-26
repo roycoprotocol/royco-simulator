@@ -477,173 +477,196 @@ export default function DaySimulator() {
   return (
     <div className="w-full">
       {/* ================================================================== */}
-      {/* A) HERO BAND — sticky, results-first                                */}
+      {/* A) EXPLAINER — top of page                                          */}
       {/* ================================================================== */}
-      <div className="sticky top-0 z-10 bg-[#FBFBF8] border-b border-[#E5E5E0] py-4 mb-8">
-        {/* Three big APY cards */}
-        <div
-          key={`${stAPY.toFixed(4)}-${jtAPY.toFixed(4)}-${ltAPY.toFixed(4)}`}
-          className="grid grid-cols-1 sm:grid-cols-3 gap-3"
+      <div className="flex items-center gap-3 mb-4">
+        <span className="text-[11px] tracking-wide uppercase text-[#0a0a0a] bg-[#eef0f4] border border-[#e5e5e0] rounded-full px-3 py-1">
+          Explainer
+        </span>
+        <span className="flex-1 h-px bg-gradient-to-r from-[#d6d6d0] via-[#e5e5e0] to-transparent" />
+      </div>
+
+      <div className="bg-white rounded-lg border border-[#e5e5e0] p-6 mb-8 shadow-sm">
+        <button
+          onClick={() => setShowExplainer(!showExplainer)}
+          className="w-full flex items-center justify-between text-left"
         >
-          <div className="kpi-flash bg-white rounded-lg border border-[#E5E5E0] p-4 shadow-sm">
-            <div className="flex items-center gap-2 mb-1">
-              <span className="w-2 h-2 rounded-full" style={{ background: '#8A6A41' }} />
-              <span className="text-[13px] text-[#666666]">Senior · ST</span>
+          <div className="flex items-center gap-3">
+            <div className="bg-[#0a0a0a] rounded-full p-2">
+              <svg
+                className="w-5 h-5 text-white"
+                fill="none"
+                viewBox="0 0 24 24"
+                stroke="currentColor"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                />
+              </svg>
             </div>
-            <p className="font-mono tabular-nums text-4xl sm:text-5xl leading-none text-[#0A0A0A]" style={{ fontWeight: 600 }}>
-              {(stAPY * 100).toFixed(1)}
-              <span className="text-2xl sm:text-3xl">%</span>
-            </p>
-            <p className="text-[12px] text-[#999999] mt-1.5">paid first · lower risk</p>
-          </div>
-
-          <div className="kpi-flash bg-white rounded-lg border border-[#E5E5E0] p-4 shadow-sm">
-            <div className="flex items-center gap-2 mb-1">
-              <span className="w-2 h-2 rounded-full" style={{ background: '#3F6B4E' }} />
-              <span className="text-[13px] text-[#666666]">Junior · JT</span>
+            <div>
+              <h3 className="text-lg font-semibold text-[#0a0a0a]">
+                How V2 - Day works
+              </h3>
+              <p className="text-sm text-[#666666]">
+                Click to learn about the three-tranche structure
+              </p>
             </div>
-            <p className="font-mono tabular-nums text-4xl sm:text-5xl leading-none text-[#0A0A0A]" style={{ fontWeight: 600 }}>
-              {(jtAPY * 100).toFixed(1)}
-              <span className="text-2xl sm:text-3xl">%</span>
-            </p>
-            <p className="text-[12px] text-[#999999] mt-1.5">first-loss · earns risk premium</p>
           </div>
-
-          <div className="kpi-flash bg-white rounded-lg border border-[#E5E5E0] p-4 shadow-sm">
-            <div className="flex items-center gap-2 mb-1">
-              <span className="w-2 h-2 rounded-full" style={{ background: '#3C5A82' }} />
-              <span className="text-[13px] text-[#666666]">Liquidity · LT</span>
-            </div>
-            <p className="font-mono tabular-nums text-4xl sm:text-5xl leading-none text-[#0A0A0A]" style={{ fontWeight: 600 }}>
-              {(ltAPY * 100).toFixed(1)}
-              <span className="text-2xl sm:text-3xl">%</span>
-            </p>
-            <p className="text-[12px] text-[#999999] mt-1.5">backs redemptions · earns liquidity premium</p>
-          </div>
-        </div>
-
-        {/* Yield-split bar */}
-        <div className="mt-4">
-          <p className="text-[12px] text-[#666666] mb-1.5">Where each $1 of senior yield goes</p>
-          <div
-            ref={barRef}
-            className="w-full flex overflow-hidden rounded-md border border-[#E5E5E0]"
-            style={{ height: 54 }}
+          <svg
+            className={`w-6 h-6 text-[#666666] transition-transform ${showExplainer ? 'rotate-180' : ''}`}
+            fill="none"
+            viewBox="0 0 24 24"
+            stroke="currentColor"
           >
-            {/* Segment: Senior keeps */}
-            {(() => {
-              const w = segWidths[0];
-              return (
-                <div
-                  ref={(el) => {
-                    segRefs.current[0] = el;
-                  }}
-                  style={{
-                    width: `${seniorKeepFrac * 100}%`,
-                    background: '#8A6A41',
-                    transition: 'width .25s ease',
-                    marginRight: 2,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    overflow: 'hidden',
-                    whiteSpace: 'nowrap',
-                    padding: '0 8px',
-                  }}
-                >
-                  {w >= 96 ? (
-                    <>
-                      <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.85)', lineHeight: 1.2 }}>Senior keeps</span>
-                      <span style={{ fontSize: 15, fontWeight: 700, color: '#fff', lineHeight: 1.2 }}>{seniorKeepPct}%</span>
-                    </>
-                  ) : w >= 36 ? (
-                    <span style={{ fontSize: 12, fontWeight: 700, color: '#fff' }}>{seniorKeepPct}%</span>
-                  ) : null}
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth={2}
+              d="M19 9l-7 7-7-7"
+            />
+          </svg>
+        </button>
+
+        {showExplainer && (
+          <div className="mt-6 text-[#0a0a0a] border-t border-[#e5e5e0] pt-6">
+            <div className="bg-gradient-to-br from-[#fff7e8] via-[#f6fbff] to-[#eef4ff] border border-[#e7e2d8] rounded-xl p-6 md:p-8 shadow-sm space-y-6">
+
+              {/* Key takeaway */}
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
+                <div className="flex items-center gap-3">
+                  <div className="bg-[#0a0a0a] text-white text-xs font-semibold rounded-full px-3 py-1 tracking-wide">
+                    Key Takeaway
+                  </div>
+                  <p className="text-sm text-[#444444]">
+                    Day adds a Liquidity Tranche (LT) that backs senior redemptions via an E-CLP BPT pool, earning swap fees and a liquidity premium from the YDM.
+                  </p>
                 </div>
-              );
-            })()}
-            {/* Segment: Risk → JT */}
-            {(() => {
-              const w = segWidths[1];
-              return (
-                <div
-                  ref={(el) => {
-                    segRefs.current[1] = el;
-                  }}
-                  style={{
-                    width: `${riskShareFrac * 100}%`,
-                    background: '#3F6B4E',
-                    transition: 'width .25s ease',
-                    marginRight: 2,
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    overflow: 'hidden',
-                    whiteSpace: 'nowrap',
-                    padding: '0 8px',
-                  }}
-                >
-                  {w >= 96 ? (
-                    <>
-                      <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.85)', lineHeight: 1.2 }}>Risk &#x2192; JT</span>
-                      <span style={{ fontSize: 15, fontWeight: 700, color: '#fff', lineHeight: 1.2 }}>{riskSharePct}%</span>
-                    </>
-                  ) : w >= 36 ? (
-                    <span style={{ fontSize: 12, fontWeight: 700, color: '#fff' }}>{riskSharePct}%</span>
-                  ) : null}
+              </div>
+
+              {/* Concept grid — 4 cards */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                <div className="bg-white rounded-lg border border-[#e5e5e0] p-4 shadow-[0_8px_24px_rgba(0,0,0,0.04)]">
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="text-xs font-bold tracking-wide text-[#0a0a0a] bg-[#f1f3f5] px-2 py-1 rounded">
+                      1
+                    </span>
+                    <p className="text-sm font-semibold text-[#0a0a0a]">
+                      One pool, three slices
+                    </p>
+                  </div>
+                  <p className="text-sm text-[#555555] leading-relaxed">
+                    Senior (ST) = paid first, protected. Junior (JT) = first-loss buffer. Liquidity (LT) = pool-backed redemption layer.
+                  </p>
                 </div>
-              );
-            })()}
-            {/* Segment: Liquidity → LT */}
-            {(() => {
-              const w = segWidths[2];
-              return (
-                <div
-                  ref={(el) => {
-                    segRefs.current[2] = el;
-                  }}
-                  style={{
-                    width: `${liqShareFrac * 100}%`,
-                    background: '#3C5A82',
-                    transition: 'width .25s ease',
-                    display: 'flex',
-                    flexDirection: 'column',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    overflow: 'hidden',
-                    whiteSpace: 'nowrap',
-                    padding: '0 8px',
-                  }}
-                >
-                  {w >= 96 ? (
-                    <>
-                      <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.85)', lineHeight: 1.2 }}>Liquidity &#x2192; LT</span>
-                      <span style={{ fontSize: 15, fontWeight: 700, color: '#fff', lineHeight: 1.2 }}>{liqSharePct}%</span>
-                    </>
-                  ) : w >= 36 ? (
-                    <span style={{ fontSize: 12, fontWeight: 700, color: '#fff' }}>{liqSharePct}%</span>
-                  ) : null}
+
+                <div className="bg-white rounded-lg border border-[#e5e5e0] p-4 shadow-[0_8px_24px_rgba(0,0,0,0.04)]">
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="text-xs font-bold tracking-wide text-[#0a0a0a] bg-[#f1f3f5] px-2 py-1 rounded">
+                      2
+                    </span>
+                    <p className="text-sm font-semibold text-[#0a0a0a]">
+                      Two YDMs, dual premiums
+                    </p>
+                  </div>
+                  <p className="text-sm text-[#555555] leading-relaxed">
+                    Utilization drives a <span className="font-semibold text-[#3F6B4E]">risk premium to JT</span> and a separate <span className="font-semibold text-[#3C5A82]">liquidity premium to LT</span>. Senior keeps what remains. Combined, the two premiums are capped at 100% of senior yield — raising one reduces the other, so senior yield never goes negative.
+                  </p>
                 </div>
-              );
-            })()}
+
+                <div className="bg-white rounded-lg border border-[#e5e5e0] p-4 shadow-[0_8px_24px_rgba(0,0,0,0.04)]">
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="text-xs font-bold tracking-wide text-[#0a0a0a] bg-[#f1f3f5] px-2 py-1 rounded">
+                      3
+                    </span>
+                    <p className="text-sm font-semibold text-[#0a0a0a]">
+                      E-CLP BPT pool
+                    </p>
+                  </div>
+                  <p className="text-sm text-[#555555] leading-relaxed">
+                    The pool targets a concentrated mix — roughly <strong>10% senior shares to 90% tokenized T-bills</strong> by default — but the actual split shifts with market conditions and the E-CLP concentration band (advanced). Min liquidity = the % of senior assets that must stay pool-backed.
+                  </p>
+                </div>
+
+                <div className="bg-white rounded-lg border border-[#e5e5e0] p-4 shadow-[0_8px_24px_rgba(0,0,0,0.04)]">
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="text-xs font-bold tracking-wide text-[#0a0a0a] bg-[#f1f3f5] px-2 py-1 rounded">
+                      4
+                    </span>
+                    <p className="text-sm font-semibold text-[#0a0a0a]">
+                      Liquidity slice (LT)
+                    </p>
+                  </div>
+                  <p className="text-sm text-[#555555] leading-relaxed">
+                    LT earns swap fees + T-bill yield + net senior yield on its ST leg + a liquidity premium routed by the liquidity YDM.
+                  </p>
+                </div>
+              </div>
+
+              {/* Slice strip — 3 cards */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="bg-[#8A6A41] text-white rounded-lg p-4 flex items-center justify-between">
+                  <div>
+                    <p className="text-xs uppercase tracking-wide text-white/70">
+                      Senior slice (ST)
+                    </p>
+                    <p className="text-base font-semibold">Gets paid first</p>
+                  </div>
+                  <span className="text-sm bg-white text-[#8A6A41] px-3 py-1 rounded-full font-medium">
+                    Lower risk
+                  </span>
+                </div>
+                <div className="bg-white rounded-lg border border-[#e5e5e0] p-4 flex items-center justify-between shadow-[0_8px_24px_rgba(0,0,0,0.04)]">
+                  <div>
+                    <p className="text-xs uppercase tracking-wide text-[#3F6B4E]">
+                      Junior slice (JT)
+                    </p>
+                    <p className="text-base font-semibold text-[#0a0a0a]">
+                      Takes first losses
+                    </p>
+                  </div>
+                  <span className="text-sm bg-[#3F6B4E] text-white px-3 py-1 rounded-full font-medium">
+                    Higher upside
+                  </span>
+                </div>
+                <div className="bg-white rounded-lg border border-[#3C5A82] p-4 flex items-center justify-between shadow-[0_8px_24px_rgba(0,0,0,0.04)]">
+                  <div>
+                    <p className="text-xs uppercase tracking-wide text-[#3C5A82]">
+                      Liquidity slice (LT)
+                    </p>
+                    <p className="text-base font-semibold text-[#0a0a0a]">
+                      Backs redemptions
+                    </p>
+                  </div>
+                  <span className="text-sm bg-[#3C5A82] text-white px-3 py-1 rounded-full font-medium">
+                    Pool provider
+                  </span>
+                </div>
+              </div>
+
+              {/* TBD placeholders */}
+              <div className="space-y-3">
+                <p className="text-xs font-semibold uppercase tracking-wide text-[#666666]">
+                  Open specification questions
+                </p>
+                <div className="space-y-2">
+                  <div className="rounded-lg border border-[#fde68a] bg-[#fffbeb] px-4 py-3 text-xs text-[#854d0e]">
+                    <span className="font-semibold">TBD — needs input:</span> Exact utilization threshold / governance rule at which LT redemptions are blocked versus allowed (the simulation blocks when liquidityUtilization exceeds 1 but the on-chain threshold and any override path are not yet specified).
+                  </div>
+                  <div className="rounded-lg border border-[#fde68a] bg-[#fffbeb] px-4 py-3 text-xs text-[#854d0e]">
+                    <span className="font-semibold">TBD — needs input:</span> LP-facing fee-split framing and headline-APY presentation beyond the formula above (swap fee + T-bill yield + net senior yield on the ST leg + liquidity premium).
+                  </div>
+                  <div className="rounded-lg border border-[#fde68a] bg-[#fffbeb] px-4 py-3 text-xs text-[#854d0e]">
+                    <span className="font-semibold">TBD — needs input:</span> Lock-up period, secondary-market access, and &apos;run&apos; mitigation narrative for LT holders beyond what the scenario engine models.
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
-          <div className="flex flex-wrap items-center gap-x-6 gap-y-1 mt-2">
-            <span className="flex items-center gap-1.5 text-[12px] text-[#666666]">
-              <span className="w-2 h-2 rounded-full" style={{ background: '#8A6A41' }} />
-              Senior keeps <span className="font-mono tabular-nums font-semibold text-[#0a0a0a]">{seniorKeepPct}%</span>
-            </span>
-            <span className="flex items-center gap-1.5 text-[12px] text-[#666666]">
-              <span className="w-2 h-2 rounded-full" style={{ background: '#3F6B4E' }} />
-              Risk → JT <span className="font-mono tabular-nums font-semibold text-[#0a0a0a]">{riskSharePct}%</span>
-            </span>
-            <span className="flex items-center gap-1.5 text-[12px] text-[#666666]">
-              <span className="w-2 h-2 rounded-full" style={{ background: '#3C5A82' }} />
-              Liquidity → LT <span className="font-mono tabular-nums font-semibold text-[#0a0a0a]">{liqSharePct}%</span>
-            </span>
-          </div>
-        </div>
+        )}
       </div>
 
       {/* ================================================================== */}
@@ -880,7 +903,184 @@ export default function DaySimulator() {
       </div>
 
       {/* ================================================================== */}
-      {/* C) PREMIUM CURVES — unchanged charts                                */}
+      {/* C) HERO BAND — results, now in-flow (not sticky)                   */}
+      {/* ================================================================== */}
+      <div className="flex items-center gap-3 mb-4">
+        <span className="text-[11px] tracking-wide uppercase text-[#0a0a0a] bg-[#eef0f4] border border-[#e5e5e0] rounded-full px-3 py-1">
+          Results
+        </span>
+        <span className="flex-1 h-px bg-gradient-to-r from-[#d6d6d0] via-[#e5e5e0] to-transparent" />
+      </div>
+
+      <div className="py-4 mb-8">
+        {/* Three big APY cards */}
+        <div
+          key={`${stAPY.toFixed(4)}-${jtAPY.toFixed(4)}-${ltAPY.toFixed(4)}`}
+          className="grid grid-cols-1 sm:grid-cols-3 gap-3"
+        >
+          <div className="kpi-flash bg-white rounded-lg border border-[#E5E5E0] p-4 shadow-sm">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="w-2 h-2 rounded-full" style={{ background: '#8A6A41' }} />
+              <span className="text-[13px] text-[#666666]">Senior · ST</span>
+            </div>
+            <p className="font-mono tabular-nums text-4xl sm:text-5xl leading-none text-[#0A0A0A]" style={{ fontWeight: 600 }}>
+              {(stAPY * 100).toFixed(1)}
+              <span className="text-2xl sm:text-3xl">%</span>
+            </p>
+            <p className="text-[12px] text-[#999999] mt-1.5">paid first · lower risk</p>
+          </div>
+
+          <div className="kpi-flash bg-white rounded-lg border border-[#E5E5E0] p-4 shadow-sm">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="w-2 h-2 rounded-full" style={{ background: '#3F6B4E' }} />
+              <span className="text-[13px] text-[#666666]">Junior · JT</span>
+            </div>
+            <p className="font-mono tabular-nums text-4xl sm:text-5xl leading-none text-[#0A0A0A]" style={{ fontWeight: 600 }}>
+              {(jtAPY * 100).toFixed(1)}
+              <span className="text-2xl sm:text-3xl">%</span>
+            </p>
+            <p className="text-[12px] text-[#999999] mt-1.5">first-loss · earns risk premium</p>
+          </div>
+
+          <div className="kpi-flash bg-white rounded-lg border border-[#E5E5E0] p-4 shadow-sm">
+            <div className="flex items-center gap-2 mb-1">
+              <span className="w-2 h-2 rounded-full" style={{ background: '#3C5A82' }} />
+              <span className="text-[13px] text-[#666666]">Liquidity · LT</span>
+            </div>
+            <p className="font-mono tabular-nums text-4xl sm:text-5xl leading-none text-[#0A0A0A]" style={{ fontWeight: 600 }}>
+              {(ltAPY * 100).toFixed(1)}
+              <span className="text-2xl sm:text-3xl">%</span>
+            </p>
+            <p className="text-[12px] text-[#999999] mt-1.5">backs redemptions · earns liquidity premium</p>
+          </div>
+        </div>
+
+        {/* Yield-split bar */}
+        <div className="mt-4">
+          <p className="text-[12px] text-[#666666] mb-1.5">Where each $1 of senior yield goes</p>
+          <div
+            ref={barRef}
+            className="w-full flex overflow-hidden rounded-md border border-[#E5E5E0]"
+            style={{ height: 54 }}
+          >
+            {/* Segment: Senior keeps */}
+            {(() => {
+              const w = segWidths[0];
+              return (
+                <div
+                  ref={(el) => {
+                    segRefs.current[0] = el;
+                  }}
+                  style={{
+                    width: `${seniorKeepFrac * 100}%`,
+                    background: '#8A6A41',
+                    transition: 'width .25s ease',
+                    marginRight: 2,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    overflow: 'hidden',
+                    whiteSpace: 'nowrap',
+                    padding: '0 8px',
+                  }}
+                >
+                  {w >= 96 ? (
+                    <>
+                      <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.85)', lineHeight: 1.2 }}>Senior keeps</span>
+                      <span style={{ fontSize: 15, fontWeight: 700, color: '#fff', lineHeight: 1.2 }}>{seniorKeepPct}%</span>
+                    </>
+                  ) : w >= 36 ? (
+                    <span style={{ fontSize: 12, fontWeight: 700, color: '#fff' }}>{seniorKeepPct}%</span>
+                  ) : null}
+                </div>
+              );
+            })()}
+            {/* Segment: Risk → JT */}
+            {(() => {
+              const w = segWidths[1];
+              return (
+                <div
+                  ref={(el) => {
+                    segRefs.current[1] = el;
+                  }}
+                  style={{
+                    width: `${riskShareFrac * 100}%`,
+                    background: '#3F6B4E',
+                    transition: 'width .25s ease',
+                    marginRight: 2,
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    overflow: 'hidden',
+                    whiteSpace: 'nowrap',
+                    padding: '0 8px',
+                  }}
+                >
+                  {w >= 96 ? (
+                    <>
+                      <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.85)', lineHeight: 1.2 }}>Risk &#x2192; JT</span>
+                      <span style={{ fontSize: 15, fontWeight: 700, color: '#fff', lineHeight: 1.2 }}>{riskSharePct}%</span>
+                    </>
+                  ) : w >= 36 ? (
+                    <span style={{ fontSize: 12, fontWeight: 700, color: '#fff' }}>{riskSharePct}%</span>
+                  ) : null}
+                </div>
+              );
+            })()}
+            {/* Segment: Liquidity → LT */}
+            {(() => {
+              const w = segWidths[2];
+              return (
+                <div
+                  ref={(el) => {
+                    segRefs.current[2] = el;
+                  }}
+                  style={{
+                    width: `${liqShareFrac * 100}%`,
+                    background: '#3C5A82',
+                    transition: 'width .25s ease',
+                    display: 'flex',
+                    flexDirection: 'column',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    overflow: 'hidden',
+                    whiteSpace: 'nowrap',
+                    padding: '0 8px',
+                  }}
+                >
+                  {w >= 96 ? (
+                    <>
+                      <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.85)', lineHeight: 1.2 }}>Liquidity &#x2192; LT</span>
+                      <span style={{ fontSize: 15, fontWeight: 700, color: '#fff', lineHeight: 1.2 }}>{liqSharePct}%</span>
+                    </>
+                  ) : w >= 36 ? (
+                    <span style={{ fontSize: 12, fontWeight: 700, color: '#fff' }}>{liqSharePct}%</span>
+                  ) : null}
+                </div>
+              );
+            })()}
+          </div>
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-1 mt-2">
+            <span className="flex items-center gap-1.5 text-[12px] text-[#666666]">
+              <span className="w-2 h-2 rounded-full" style={{ background: '#8A6A41' }} />
+              Senior keeps <span className="font-mono tabular-nums font-semibold text-[#0a0a0a]">{seniorKeepPct}%</span>
+            </span>
+            <span className="flex items-center gap-1.5 text-[12px] text-[#666666]">
+              <span className="w-2 h-2 rounded-full" style={{ background: '#3F6B4E' }} />
+              Risk → JT <span className="font-mono tabular-nums font-semibold text-[#0a0a0a]">{riskSharePct}%</span>
+            </span>
+            <span className="flex items-center gap-1.5 text-[12px] text-[#666666]">
+              <span className="w-2 h-2 rounded-full" style={{ background: '#3C5A82' }} />
+              Liquidity → LT <span className="font-mono tabular-nums font-semibold text-[#0a0a0a]">{liqSharePct}%</span>
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* ================================================================== */}
+      {/* D) PREMIUM CURVES — unchanged charts                                */}
       {/* ================================================================== */}
       <div className="flex items-center gap-3 mb-4">
         <span className="text-[11px] tracking-wide uppercase text-[#0a0a0a] bg-[#eef0f4] border border-[#e5e5e0] rounded-full px-3 py-1">
@@ -1144,198 +1344,6 @@ export default function DaySimulator() {
         </div>
       </div>
 
-      {/* ================================================================== */}
-      {/* E) EXPLAINER — moved to bottom                                      */}
-      {/* ================================================================== */}
-      <div className="flex items-center gap-3 mb-4">
-        <span className="text-[11px] tracking-wide uppercase text-[#0a0a0a] bg-[#eef0f4] border border-[#e5e5e0] rounded-full px-3 py-1">
-          Explainer
-        </span>
-        <span className="flex-1 h-px bg-gradient-to-r from-[#d6d6d0] via-[#e5e5e0] to-transparent" />
-      </div>
-
-      <div className="bg-white rounded-lg border border-[#e5e5e0] p-6 mb-8 shadow-sm">
-        <button
-          onClick={() => setShowExplainer(!showExplainer)}
-          className="w-full flex items-center justify-between text-left"
-        >
-          <div className="flex items-center gap-3">
-            <div className="bg-[#0a0a0a] rounded-full p-2">
-              <svg
-                className="w-5 h-5 text-white"
-                fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor"
-              >
-                <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={2}
-                  d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
-                />
-              </svg>
-            </div>
-            <div>
-              <h3 className="text-lg font-semibold text-[#0a0a0a]">
-                How V2 - Day works
-              </h3>
-              <p className="text-sm text-[#666666]">
-                Click to learn about the three-tranche structure
-              </p>
-            </div>
-          </div>
-          <svg
-            className={`w-6 h-6 text-[#666666] transition-transform ${showExplainer ? 'rotate-180' : ''}`}
-            fill="none"
-            viewBox="0 0 24 24"
-            stroke="currentColor"
-          >
-            <path
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              strokeWidth={2}
-              d="M19 9l-7 7-7-7"
-            />
-          </svg>
-        </button>
-
-        {showExplainer && (
-          <div className="mt-6 text-[#0a0a0a] border-t border-[#e5e5e0] pt-6">
-            <div className="bg-gradient-to-br from-[#fff7e8] via-[#f6fbff] to-[#eef4ff] border border-[#e7e2d8] rounded-xl p-6 md:p-8 shadow-sm space-y-6">
-
-              {/* Key takeaway */}
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
-                <div className="flex items-center gap-3">
-                  <div className="bg-[#0a0a0a] text-white text-xs font-semibold rounded-full px-3 py-1 tracking-wide">
-                    Key Takeaway
-                  </div>
-                  <p className="text-sm text-[#444444]">
-                    Day adds a Liquidity Tranche (LT) that backs senior redemptions via an E-CLP BPT pool, earning swap fees and a liquidity premium from the YDM.
-                  </p>
-                </div>
-              </div>
-
-              {/* Concept grid — 4 cards */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="bg-white rounded-lg border border-[#e5e5e0] p-4 shadow-[0_8px_24px_rgba(0,0,0,0.04)]">
-                  <div className="flex items-center gap-2 mb-3">
-                    <span className="text-xs font-bold tracking-wide text-[#0a0a0a] bg-[#f1f3f5] px-2 py-1 rounded">
-                      1
-                    </span>
-                    <p className="text-sm font-semibold text-[#0a0a0a]">
-                      One pool, three slices
-                    </p>
-                  </div>
-                  <p className="text-sm text-[#555555] leading-relaxed">
-                    Senior (ST) = paid first, protected. Junior (JT) = first-loss buffer. Liquidity (LT) = pool-backed redemption layer.
-                  </p>
-                </div>
-
-                <div className="bg-white rounded-lg border border-[#e5e5e0] p-4 shadow-[0_8px_24px_rgba(0,0,0,0.04)]">
-                  <div className="flex items-center gap-2 mb-3">
-                    <span className="text-xs font-bold tracking-wide text-[#0a0a0a] bg-[#f1f3f5] px-2 py-1 rounded">
-                      2
-                    </span>
-                    <p className="text-sm font-semibold text-[#0a0a0a]">
-                      Two YDMs, dual premiums
-                    </p>
-                  </div>
-                  <p className="text-sm text-[#555555] leading-relaxed">
-                    Utilization drives a <span className="font-semibold text-[#3F6B4E]">risk premium to JT</span> and a separate <span className="font-semibold text-[#3C5A82]">liquidity premium to LT</span>. Senior keeps what remains. Combined, the two premiums are capped at 100% of senior yield — raising one reduces the other, so senior yield never goes negative.
-                  </p>
-                </div>
-
-                <div className="bg-white rounded-lg border border-[#e5e5e0] p-4 shadow-[0_8px_24px_rgba(0,0,0,0.04)]">
-                  <div className="flex items-center gap-2 mb-3">
-                    <span className="text-xs font-bold tracking-wide text-[#0a0a0a] bg-[#f1f3f5] px-2 py-1 rounded">
-                      3
-                    </span>
-                    <p className="text-sm font-semibold text-[#0a0a0a]">
-                      E-CLP BPT pool
-                    </p>
-                  </div>
-                  <p className="text-sm text-[#555555] leading-relaxed">
-                    The pool targets a concentrated mix — roughly <strong>10% senior shares to 90% tokenized T-bills</strong> by default — but the actual split shifts with market conditions and the E-CLP concentration band (advanced). Min liquidity = the % of senior assets that must stay pool-backed.
-                  </p>
-                </div>
-
-                <div className="bg-white rounded-lg border border-[#e5e5e0] p-4 shadow-[0_8px_24px_rgba(0,0,0,0.04)]">
-                  <div className="flex items-center gap-2 mb-3">
-                    <span className="text-xs font-bold tracking-wide text-[#0a0a0a] bg-[#f1f3f5] px-2 py-1 rounded">
-                      4
-                    </span>
-                    <p className="text-sm font-semibold text-[#0a0a0a]">
-                      Liquidity slice (LT)
-                    </p>
-                  </div>
-                  <p className="text-sm text-[#555555] leading-relaxed">
-                    LT earns swap fees + T-bill yield + net senior yield on its ST leg + a liquidity premium routed by the liquidity YDM.
-                  </p>
-                </div>
-              </div>
-
-              {/* Slice strip — 3 cards */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="bg-[#8A6A41] text-white rounded-lg p-4 flex items-center justify-between">
-                  <div>
-                    <p className="text-xs uppercase tracking-wide text-white/70">
-                      Senior slice (ST)
-                    </p>
-                    <p className="text-base font-semibold">Gets paid first</p>
-                  </div>
-                  <span className="text-sm bg-white text-[#8A6A41] px-3 py-1 rounded-full font-medium">
-                    Lower risk
-                  </span>
-                </div>
-                <div className="bg-white rounded-lg border border-[#e5e5e0] p-4 flex items-center justify-between shadow-[0_8px_24px_rgba(0,0,0,0.04)]">
-                  <div>
-                    <p className="text-xs uppercase tracking-wide text-[#3F6B4E]">
-                      Junior slice (JT)
-                    </p>
-                    <p className="text-base font-semibold text-[#0a0a0a]">
-                      Takes first losses
-                    </p>
-                  </div>
-                  <span className="text-sm bg-[#3F6B4E] text-white px-3 py-1 rounded-full font-medium">
-                    Higher upside
-                  </span>
-                </div>
-                <div className="bg-white rounded-lg border border-[#3C5A82] p-4 flex items-center justify-between shadow-[0_8px_24px_rgba(0,0,0,0.04)]">
-                  <div>
-                    <p className="text-xs uppercase tracking-wide text-[#3C5A82]">
-                      Liquidity slice (LT)
-                    </p>
-                    <p className="text-base font-semibold text-[#0a0a0a]">
-                      Backs redemptions
-                    </p>
-                  </div>
-                  <span className="text-sm bg-[#3C5A82] text-white px-3 py-1 rounded-full font-medium">
-                    Pool provider
-                  </span>
-                </div>
-              </div>
-
-              {/* TBD placeholders */}
-              <div className="space-y-3">
-                <p className="text-xs font-semibold uppercase tracking-wide text-[#666666]">
-                  Open specification questions
-                </p>
-                <div className="space-y-2">
-                  <div className="rounded-lg border border-[#fde68a] bg-[#fffbeb] px-4 py-3 text-xs text-[#854d0e]">
-                    <span className="font-semibold">TBD — needs input:</span> Exact utilization threshold / governance rule at which LT redemptions are blocked versus allowed (the simulation blocks when liquidityUtilization exceeds 1 but the on-chain threshold and any override path are not yet specified).
-                  </div>
-                  <div className="rounded-lg border border-[#fde68a] bg-[#fffbeb] px-4 py-3 text-xs text-[#854d0e]">
-                    <span className="font-semibold">TBD — needs input:</span> LP-facing fee-split framing and headline-APY presentation beyond the formula above (swap fee + T-bill yield + net senior yield on the ST leg + liquidity premium).
-                  </div>
-                  <div className="rounded-lg border border-[#fde68a] bg-[#fffbeb] px-4 py-3 text-xs text-[#854d0e]">
-                    <span className="font-semibold">TBD — needs input:</span> Lock-up period, secondary-market access, and &apos;run&apos; mitigation narrative for LT holders beyond what the scenario engine models.
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
     </div>
   );
 }
