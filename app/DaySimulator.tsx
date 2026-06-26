@@ -1192,7 +1192,7 @@ export default function DaySimulator() {
             <p className="text-sm font-semibold text-[#3F6B4E] mb-0.5">
               Risk premium → JT
             </p>
-            <p className="text-xs text-[#666666] mb-2">premium share of senior yield (%) &middot; vs coverage utilization</p>
+            <p className="text-xs text-[#666666] mb-2">vs coverage utilization</p>
             <div className="h-64">
               <ResponsiveContainerNoSSR width="100%" height="100%" minWidth={0} minHeight={256}>
                 <LineChart
@@ -1217,7 +1217,15 @@ export default function DaySimulator() {
                     tickLine={false}
                   />
                   <YAxis
-                    width={30}
+                    label={{
+                      value: 'Premium share of senior yield (%)',
+                      angle: -90,
+                      position: 'insideLeft',
+                      style: { textAnchor: 'middle' },
+                      fill: '#0a0a0a',
+                      fontSize: 11,
+                    }}
+                    width={48}
                     domain={[0, 100]}
                     stroke="#666666"
                     tick={{ fontSize: 11 }}
@@ -1287,7 +1295,7 @@ export default function DaySimulator() {
             <p className="text-sm font-semibold text-[#3C5A82] mb-0.5">
               Liquidity premium → LT
             </p>
-            <p className="text-xs text-[#666666] mb-2">premium share of senior yield (%) &middot; vs liquidity utilization</p>
+            <p className="text-xs text-[#666666] mb-2">vs liquidity utilization</p>
             <div className="h-64">
               <ResponsiveContainerNoSSR width="100%" height="100%" minWidth={0} minHeight={256}>
                 <LineChart
@@ -1312,7 +1320,15 @@ export default function DaySimulator() {
                     tickLine={false}
                   />
                   <YAxis
-                    width={30}
+                    label={{
+                      value: 'Premium share of senior yield (%)',
+                      angle: -90,
+                      position: 'insideLeft',
+                      style: { textAnchor: 'middle' },
+                      fill: '#0a0a0a',
+                      fontSize: 11,
+                    }}
+                    width={48}
                     domain={[0, 100]}
                     stroke="#666666"
                     tick={{ fontSize: 11 }}
