@@ -823,7 +823,7 @@ export default function DaySimulatorSidebar() {
                 {/* Hover breakdown */}
                 <div className="hidden group-hover:block absolute left-0 top-full mt-2 z-20 w-80 text-left bg-[var(--theme-background)] border border-[var(--theme-border)] rounded-xl shadow-lg p-3">
                   <p className="text-[12px] font-medium text-[var(--primary-text)]">
-                    ST Net &#183; <span style={{ color: 'var(--success)' }}>{Math.round(stAPY * 100)}%</span>
+                    ST Net &#183; <span style={{ color: 'var(--success)' }}>{(stAPY * 100).toFixed(1)}%</span>
                   </p>
                   <p className="text-[11px] text-[var(--secondary-text)] mt-0.5">APY &#215; (1 &#8722; risk &#8722; liq)</p>
                   <div className="mt-2 space-y-1.5">
@@ -860,7 +860,7 @@ export default function DaySimulatorSidebar() {
                 {/* Hover breakdown */}
                 <div className="hidden group-hover:block absolute left-1/2 -translate-x-1/2 top-full mt-2 z-20 w-80 text-left bg-[var(--theme-background)] border border-[var(--theme-border)] rounded-xl shadow-lg p-3">
                   <p className="text-[12px] font-medium text-[var(--primary-text)]">
-                    Day JT &#183; <span style={{ color: 'var(--info)' }}>{Math.round(jtAPY * 100)}%</span>
+                    Day JT &#183; <span style={{ color: 'var(--info)' }}>{(jtAPY * 100).toFixed(1)}%</span>
                   </p>
                   <p className="text-[11px] text-[var(--secondary-text)] mt-0.5">APY + (risk &#215; APY) &#247; JT size</p>
                   <div className="mt-2 space-y-1.5">
@@ -871,7 +871,7 @@ export default function DaySimulatorSidebar() {
                     <p className="text-[10px] text-[var(--tertiary-text)] -mt-1">JT sits in the same asset as ST &#8594; earns the source APY</p>
                     <div className="flex items-start justify-between gap-3">
                       <span className="text-[11px] text-[var(--secondary-text)] flex-shrink-0 whitespace-nowrap">Risk premium</span>
-                      <span className="text-[11px] text-right" style={{ color: 'var(--info)' }}>{Math.round(riskShare * 100)}%&#215;APY&#247;JT size {Math.round(jtSize * 100)}%</span>
+                      <span className="text-[11px] text-right" style={{ color: 'var(--info)' }}>{Math.round(riskShare * 100)}%&#215;APY&#247;JT size {(jtSize * 100).toFixed(1)}%</span>
                     </div>
                   </div>
                 </div>
@@ -891,13 +891,13 @@ export default function DaySimulatorSidebar() {
                 {/* Hover breakdown */}
                 <div className="hidden group-hover:block absolute right-0 top-full mt-2 z-20 w-80 text-left bg-[var(--theme-background)] border border-[var(--theme-border)] rounded-xl shadow-lg p-3">
                   <p className="text-[12px] font-medium text-[var(--primary-text)]">
-                    Day LT &#183; <span style={{ color: 'var(--insight)' }}>{Math.round(ltAPY * 100)}%</span>
+                    Day LT &#183; <span style={{ color: 'var(--insight)' }}>{(ltAPY * 100).toFixed(1)}%</span>
                   </p>
                   <p className="text-[11px] text-[var(--secondary-text)] mt-0.5">(liq &#215; APY) &#247; LT size + swap + BPT carry</p>
                   <div className="mt-2 space-y-1.5">
                     <div className="flex items-start justify-between gap-3">
                       <span className="text-[11px] text-[var(--secondary-text)] flex-shrink-0 whitespace-nowrap">Liquidity premium</span>
-                      <span className="text-[11px] text-right" style={{ color: 'var(--insight)' }}>{Math.round(liqShare * 100)}%&#215;APY&#247;LT size {Math.round(ltSize * 100)}%</span>
+                      <span className="text-[11px] text-right" style={{ color: 'var(--insight)' }}>{Math.round(liqShare * 100)}%&#215;APY&#247;LT size {(ltSize * 100).toFixed(1)}%</span>
                     </div>
                     <div className="flex items-start justify-between gap-3">
                       <span className="text-[11px] text-[var(--secondary-text)] flex-shrink-0 whitespace-nowrap">Swap fees</span>
