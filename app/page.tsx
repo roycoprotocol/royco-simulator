@@ -732,19 +732,32 @@ export default function YieldSimulator() {
     );
   };
 
+  const dark = simulatorView !== 'dawn';
+
   return (
-    <div className="min-h-screen bg-[#FBFBF8] py-16 px-4 sm:px-6 lg:px-8">
+    <div
+      className={`min-h-screen py-16 px-4 sm:px-6 lg:px-8 ${dark ? '' : 'bg-[#FBFBF8]'}`}
+      style={dark ? { background: 'var(--foundation)', color: 'var(--theme-foreground)' } : undefined}
+    >
       <div className="max-w-6xl mx-auto">
         {/* Header */}
         <div className="text-center mb-12">
           <div className="flex items-center justify-center gap-3 mb-3">
-            <div className="inline-flex items-center bg-[#eef0f4] border border-[#e5e5e0] rounded-full p-0.5">
+            <div
+              className={`inline-flex items-center rounded-full p-0.5 border ${
+                dark ? 'border-[var(--theme-border)] bg-[var(--muted)]' : 'bg-[#eef0f4] border-[#e5e5e0]'
+              }`}
+            >
               <button
                 onClick={() => setSimulatorView('dawn')}
                 className={`text-[10px] tracking-wide uppercase rounded-full px-2.5 py-1 transition-colors ${
                   simulatorView === 'dawn'
-                    ? 'bg-[#0a0a0a] text-white'
-                    : 'text-[#0a0a0a] hover:bg-white'
+                    ? dark
+                      ? 'bg-[var(--accent-background)] text-[var(--accent)]'
+                      : 'bg-[#0a0a0a] text-white'
+                    : dark
+                      ? 'text-[var(--muted-foreground)] hover:text-[var(--theme-foreground)]'
+                      : 'text-[#0a0a0a] hover:bg-white'
                 }`}
               >
                 v1 · Dawn
@@ -753,8 +766,12 @@ export default function YieldSimulator() {
                 onClick={() => setSimulatorView('day')}
                 className={`text-[10px] tracking-wide uppercase rounded-full px-2.5 py-1 transition-colors ${
                   simulatorView === 'day'
-                    ? 'bg-[#0a0a0a] text-white'
-                    : 'text-[#0a0a0a] hover:bg-white'
+                    ? dark
+                      ? 'bg-[var(--accent-background)] text-[var(--accent)]'
+                      : 'bg-[#0a0a0a] text-white'
+                    : dark
+                      ? 'text-[var(--muted-foreground)] hover:text-[var(--theme-foreground)]'
+                      : 'text-[#0a0a0a] hover:bg-white'
                 }`}
               >
                 V2 - Day
@@ -763,18 +780,30 @@ export default function YieldSimulator() {
                 onClick={() => setSimulatorView('sidebar')}
                 className={`text-[10px] tracking-wide uppercase rounded-full px-2.5 py-1 transition-colors ${
                   simulatorView === 'sidebar'
-                    ? 'bg-[#0a0a0a] text-white'
-                    : 'text-[#0a0a0a] hover:bg-white'
+                    ? dark
+                      ? 'bg-[var(--accent-background)] text-[var(--accent)]'
+                      : 'bg-[#0a0a0a] text-white'
+                    : dark
+                      ? 'text-[var(--muted-foreground)] hover:text-[var(--theme-foreground)]'
+                      : 'text-[#0a0a0a] hover:bg-white'
                 }`}
               >
                 V2 · Sidebar
               </button>
             </div>
           </div>
-          <h1 className="text-5xl md:text-6xl font-semibold text-[#0a0a0a] mb-4 tracking-tight">
+          <h1
+            className={`text-5xl md:text-6xl font-semibold mb-4 tracking-tight ${
+              dark ? 'text-[var(--primary-text)]' : 'text-[#0a0a0a]'
+            }`}
+          >
             Royco Tranching Simulator
           </h1>
-          <p className="text-lg text-[#666666] max-w-2xl mx-auto">
+          <p
+            className={`text-lg max-w-2xl mx-auto ${
+              dark ? 'text-[var(--tertiary-text)]' : 'text-[#666666]'
+            }`}
+          >
             Calculate senior and junior tranche yields using the YDM model
           </p>
         </div>
@@ -1686,12 +1715,12 @@ export default function YieldSimulator() {
         </>) : simulatorView === 'day' ? (<DaySimulator />) : (<DaySimulatorSidebar />)}
 
         {/* Footer */}
-        <footer className="mt-16 py-8 border-t border-[#e5e5e0]">
+        <footer className={`mt-16 py-8 border-t ${dark ? 'border-[var(--theme-border)]' : 'border-[#e5e5e0]'}`}>
           <div className="max-w-6xl mx-auto px-4 text-center">
-            <p className="text-sm text-[#666666] mb-2">
-              Built by <a href="https://www.royco.org" target="_blank" rel="noopener noreferrer" className="text-[#0a0a0a] font-medium hover:underline">Royco</a>
+            <p className={`text-sm mb-2 ${dark ? 'text-[var(--muted-foreground)]' : 'text-[#666666]'}`}>
+              Built by <a href="https://www.royco.org" target="_blank" rel="noopener noreferrer" className={`font-medium hover:underline ${dark ? 'text-[var(--theme-foreground)]' : 'text-[#0a0a0a]'}`}>Royco</a>
             </p>
-            <p className="text-xs text-[#999999]">
+            <p className={`text-xs ${dark ? 'text-[var(--muted-foreground)]' : 'text-[#999999]'}`}>
               Royco Tranching Simulator • Understanding yield tranching through the YDM model
             </p>
           </div>
