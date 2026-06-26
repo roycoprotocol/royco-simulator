@@ -792,7 +792,10 @@ export default function DaySimulator() {
                 accent="#3F6B4E"
                 onChange={(v) => setRiskAnchor('yTarget', v)}
               />
-              <p className="mt-0.5 text-[9px] text-[#999999]">at 90% utilization (target)</p>
+              <p className="mt-0.5 text-[9px] text-[#999999]">at 90% coverage utilization (target)</p>
+              <p className="mt-0.5 text-[9px] text-[#3F6B4E]">
+                Effective at {Math.round(covUtil)}% coverage utilization: {Math.round(riskShare * 100)}%
+              </p>
             </div>
             <div>
               <AnchorSlider
@@ -801,7 +804,10 @@ export default function DaySimulator() {
                 accent="#3C5A82"
                 onChange={(v) => setLiqAnchor('yTarget', v)}
               />
-              <p className="mt-0.5 text-[9px] text-[#999999]">at 90% utilization (target)</p>
+              <p className="mt-0.5 text-[9px] text-[#999999]">at 90% liquidity utilization (target)</p>
+              <p className="mt-0.5 text-[9px] text-[#3C5A82]">
+                Effective at {Math.round(lqUtil)}% liquidity utilization: {Math.round(liqShare * 100)}%
+              </p>
             </div>
           </div>
 
@@ -821,7 +827,7 @@ export default function DaySimulator() {
               />
             </div>
             <p className="mt-1.5 text-[12px] text-[#999999]">
-              Premium budget — <span className="font-mono tabular-nums">{budgetPct}%</span> of senior yield allocated at target, <span className="font-mono tabular-nums">{budgetKeptPct}%</span> kept by senior (cap 100%)
+              Premium budget &#8212; <span className="font-mono tabular-nums">{budgetPct}%</span> of senior yield allocated at target, <span className="font-mono tabular-nums">{budgetKeptPct}%</span> kept by senior. Risk + liquidity premiums can never exceed 100% combined &#8212; at any utilization.
             </p>
           </div>
         </Card>
@@ -957,14 +963,17 @@ export default function DaySimulator() {
 
         {/* Yield-split bar */}
         <div className="mt-4">
-          <p className="text-[12px] text-[#666666] mb-1.5">Where each $1 of senior yield goes</p>
+          <p className="text-[12px] text-[#666666] mb-0.5">Where each $1 of senior yield goes</p>
+          <p className="text-[11px] text-[#999999] mb-1.5">
+            at your operating utilization &#8212; coverage {Math.round(covUtil)}%&nbsp;&middot;&nbsp;liquidity {Math.round(lqUtil)}%
+          </p>
           <div
             ref={barRef}
             className="w-full flex overflow-hidden rounded-md border border-[#E5E5E0]"
-            style={{ height: 54 }}
+            style={{ height: 54, gap: '2px' }}
           >
-            {/* Segment: Senior keeps */}
-            {(() => {
+            {/* Segment: Senior keeps — hidden when 0% */}
+            {seniorKeepFrac > 0.005 && (() => {
               const w = segWidths[0];
               return (
                 <div
@@ -975,7 +984,6 @@ export default function DaySimulator() {
                     width: `${seniorKeepFrac * 100}%`,
                     background: '#8A6A41',
                     transition: 'width .25s ease',
-                    marginRight: 2,
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',
@@ -996,8 +1004,8 @@ export default function DaySimulator() {
                 </div>
               );
             })()}
-            {/* Segment: Risk → JT */}
-            {(() => {
+            {/* Segment: Risk → JT — hidden when 0% */}
+            {riskShareFrac > 0.005 && (() => {
               const w = segWidths[1];
               return (
                 <div
@@ -1008,7 +1016,6 @@ export default function DaySimulator() {
                     width: `${riskShareFrac * 100}%`,
                     background: '#3F6B4E',
                     transition: 'width .25s ease',
-                    marginRight: 2,
                     display: 'flex',
                     flexDirection: 'column',
                     alignItems: 'center',
@@ -1029,8 +1036,8 @@ export default function DaySimulator() {
                 </div>
               );
             })()}
-            {/* Segment: Liquidity → LT */}
-            {(() => {
+            {/* Segment: Liquidity → LT — hidden when 0% */}
+            {liqShareFrac > 0.005 && (() => {
               const w = segWidths[2];
               return (
                 <div
@@ -1069,11 +1076,11 @@ export default function DaySimulator() {
             </span>
             <span className="flex items-center gap-1.5 text-[12px] text-[#666666]">
               <span className="w-2 h-2 rounded-full" style={{ background: '#3F6B4E' }} />
-              Risk → JT <span className="font-mono tabular-nums font-semibold text-[#0a0a0a]">{riskSharePct}%</span>
+              Risk &#x2192; JT <span className="font-mono tabular-nums font-semibold text-[#0a0a0a]">{riskSharePct}%</span>
             </span>
             <span className="flex items-center gap-1.5 text-[12px] text-[#666666]">
               <span className="w-2 h-2 rounded-full" style={{ background: '#3C5A82' }} />
-              Liquidity → LT <span className="font-mono tabular-nums font-semibold text-[#0a0a0a]">{liqSharePct}%</span>
+              Liquidity &#x2192; LT <span className="font-mono tabular-nums font-semibold text-[#0a0a0a]">{liqSharePct}%</span>
             </span>
           </div>
         </div>
