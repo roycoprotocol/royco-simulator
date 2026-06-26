@@ -737,7 +737,7 @@ export default function YieldSimulator() {
   return (
     <div
       className={`min-h-screen py-16 px-4 sm:px-6 lg:px-8 ${dark ? '' : 'bg-[#FBFBF8]'}`}
-      style={dark ? { background: 'var(--foundation)', color: 'var(--theme-foreground)' } : undefined}
+      style={dark ? { background: 'var(--foundation)', color: 'var(--theme-foreground)', fontFamily: 'var(--font-inter)' } : undefined}
     >
       <div className="max-w-6xl mx-auto">
         {/* Header */}
@@ -793,8 +793,8 @@ export default function YieldSimulator() {
             </div>
           </div>
           <h1
-            className={`text-5xl md:text-6xl font-semibold mb-4 tracking-tight ${
-              dark ? 'text-[var(--primary-text)]' : 'text-[#0a0a0a]'
+            className={`text-5xl md:text-6xl mb-4 tracking-tight ${
+              dark ? 'font-medium text-[var(--primary-text)]' : 'font-semibold text-[#0a0a0a]'
             }`}
           >
             Royco Tranching Simulator

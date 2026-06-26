@@ -161,7 +161,7 @@ function NumIn({
         value={+(value * scale).toFixed(4)}
         onChange={(e) => onChange((parseFloat(e.target.value) || 0) / scale)}
         style={{ width: w }}
-        className="font-mono text-[12px] tabular-nums rounded px-1.5 py-[3px] text-right outline-none border border-[var(--theme-border)] bg-[var(--theme-background)] text-[var(--primary-text)] focus:border-[var(--success)]"
+        className="text-[12px] tabular-nums rounded px-1.5 py-[3px] text-right outline-none border border-[var(--theme-border)] bg-[var(--theme-background)] text-[var(--primary-text)] focus:border-[var(--success)]"
       />
       {suffix && (
         <span className="text-[9px] text-[var(--tertiary-text)]">{suffix}</span>
@@ -178,7 +178,7 @@ function Card({
   children: React.ReactNode;
 }) {
   return (
-    <div className="bg-[var(--theme-background)] rounded-lg border border-[var(--theme-border)] p-4 shadow-sm">
+    <div className="bg-[var(--theme-background)] rounded-xl border border-[var(--theme-border)] p-4 shadow-sm">
       {title && (
         <p className="text-[10px] uppercase tracking-[0.12em] text-[var(--secondary-text)] mb-2">
           {title}
@@ -206,9 +206,9 @@ function AnchorSlider({
   return (
     <div className="flex flex-col gap-1">
       <div className="flex items-center justify-between">
-        <span className="text-[9px] font-mono text-[var(--tertiary-text)]">{label}</span>
+        <span className="text-[9px] text-[var(--tertiary-text)]">{label}</span>
         <span
-          className="text-[11px] font-mono tabular-nums font-semibold"
+          className="text-[11px] tabular-nums font-medium"
           style={{ color: accent }}
         >
           {(value * 100).toFixed(0)}%
@@ -499,7 +499,7 @@ export default function DaySimulatorSidebar() {
       {/* ================================================================== */}
       {/* A) EXPLAINER — slim full-width block at the very top                 */}
       {/* ================================================================== */}
-      <div className="bg-[var(--theme-background)] rounded-lg border border-[var(--theme-border)] p-6 mb-6 shadow-sm">
+      <div className="bg-[var(--theme-background)] rounded-xl border border-[var(--theme-border)] p-6 mb-6 shadow-sm">
         <button
           onClick={() => setShowExplainer(!showExplainer)}
           className="w-full flex items-center justify-between text-left"
@@ -521,7 +521,7 @@ export default function DaySimulatorSidebar() {
               </svg>
             </div>
             <div>
-              <h3 className="text-lg font-semibold text-[var(--primary-text)]">
+              <h3 className="text-lg font-medium text-[var(--primary-text)]">
                 How V2 - Day works
               </h3>
               <p className="text-sm text-[var(--secondary-text)]">
@@ -551,7 +551,7 @@ export default function DaySimulatorSidebar() {
               {/* Key takeaway */}
               <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3">
                 <div className="flex items-center gap-3">
-                  <div className="bg-[var(--accent-background)] text-[var(--accent)] text-xs font-semibold rounded-full px-3 py-1 tracking-wide">
+                  <div className="bg-[var(--accent-background)] text-[var(--accent)] text-xs font-medium rounded-full px-3 py-1 tracking-wide">
                     Key Takeaway
                   </div>
                   <p className="text-sm text-[var(--secondary-text)]">
@@ -562,12 +562,12 @@ export default function DaySimulatorSidebar() {
 
               {/* Concept grid — 4 cards */}
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                <div className="bg-[var(--theme-background)] rounded-lg border border-[var(--theme-border)] p-4 shadow-[0_8px_24px_rgba(0,0,0,0.04)]">
+                <div className="bg-[var(--theme-background)] rounded-xl border border-[var(--theme-border)] p-4 shadow-[0_8px_24px_rgba(0,0,0,0.04)]">
                   <div className="flex items-center gap-2 mb-3">
-                    <span className="text-xs font-bold tracking-wide text-[var(--muted-foreground)] bg-[var(--muted)] px-2 py-1 rounded">
+                    <span className="text-xs font-medium tracking-wide text-[var(--muted-foreground)] bg-[var(--muted)] px-2 py-1 rounded">
                       1
                     </span>
-                    <p className="text-sm font-semibold text-[var(--primary-text)]">
+                    <p className="text-sm font-medium text-[var(--primary-text)]">
                       One pool, three slices
                     </p>
                   </div>
@@ -576,26 +576,26 @@ export default function DaySimulatorSidebar() {
                   </p>
                 </div>
 
-                <div className="bg-[var(--theme-background)] rounded-lg border border-[var(--theme-border)] p-4 shadow-[0_8px_24px_rgba(0,0,0,0.04)]">
+                <div className="bg-[var(--theme-background)] rounded-xl border border-[var(--theme-border)] p-4 shadow-[0_8px_24px_rgba(0,0,0,0.04)]">
                   <div className="flex items-center gap-2 mb-3">
-                    <span className="text-xs font-bold tracking-wide text-[var(--muted-foreground)] bg-[var(--muted)] px-2 py-1 rounded">
+                    <span className="text-xs font-medium tracking-wide text-[var(--muted-foreground)] bg-[var(--muted)] px-2 py-1 rounded">
                       2
                     </span>
-                    <p className="text-sm font-semibold text-[var(--primary-text)]">
+                    <p className="text-sm font-medium text-[var(--primary-text)]">
                       Two YDMs, dual premiums
                     </p>
                   </div>
                   <p className="text-sm text-[var(--secondary-text)] leading-relaxed">
-                    Utilization drives a <span className="font-semibold text-[var(--info)]">risk premium to JT</span> and a separate <span className="font-semibold text-[var(--insight)]">liquidity premium to LT</span>. Senior keeps what remains. Combined, the two premiums are capped at 100% of senior yield — raising one reduces the other, so senior yield never goes negative.
+                    Utilization drives a <span className="font-medium text-[var(--info)]">risk premium to JT</span> and a separate <span className="font-medium text-[var(--insight)]">liquidity premium to LT</span>. Senior keeps what remains. Combined, the two premiums are capped at 100% of senior yield — raising one reduces the other, so senior yield never goes negative.
                   </p>
                 </div>
 
-                <div className="bg-[var(--theme-background)] rounded-lg border border-[var(--theme-border)] p-4 shadow-[0_8px_24px_rgba(0,0,0,0.04)]">
+                <div className="bg-[var(--theme-background)] rounded-xl border border-[var(--theme-border)] p-4 shadow-[0_8px_24px_rgba(0,0,0,0.04)]">
                   <div className="flex items-center gap-2 mb-3">
-                    <span className="text-xs font-bold tracking-wide text-[var(--muted-foreground)] bg-[var(--muted)] px-2 py-1 rounded">
+                    <span className="text-xs font-medium tracking-wide text-[var(--muted-foreground)] bg-[var(--muted)] px-2 py-1 rounded">
                       3
                     </span>
-                    <p className="text-sm font-semibold text-[var(--primary-text)]">
+                    <p className="text-sm font-medium text-[var(--primary-text)]">
                       E-CLP BPT pool
                     </p>
                   </div>
@@ -604,12 +604,12 @@ export default function DaySimulatorSidebar() {
                   </p>
                 </div>
 
-                <div className="bg-[var(--theme-background)] rounded-lg border border-[var(--theme-border)] p-4 shadow-[0_8px_24px_rgba(0,0,0,0.04)]">
+                <div className="bg-[var(--theme-background)] rounded-xl border border-[var(--theme-border)] p-4 shadow-[0_8px_24px_rgba(0,0,0,0.04)]">
                   <div className="flex items-center gap-2 mb-3">
-                    <span className="text-xs font-bold tracking-wide text-[var(--muted-foreground)] bg-[var(--muted)] px-2 py-1 rounded">
+                    <span className="text-xs font-medium tracking-wide text-[var(--muted-foreground)] bg-[var(--muted)] px-2 py-1 rounded">
                       4
                     </span>
-                    <p className="text-sm font-semibold text-[var(--primary-text)]">
+                    <p className="text-sm font-medium text-[var(--primary-text)]">
                       Liquidity slice (LT)
                     </p>
                   </div>
@@ -621,23 +621,23 @@ export default function DaySimulatorSidebar() {
 
               {/* Slice strip — 3 cards */}
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="bg-[var(--success)] text-white rounded-lg p-4 flex items-center justify-between">
+                <div className="bg-[var(--success)] text-white rounded-xl p-4 flex items-center justify-between">
                   <div>
                     <p className="text-xs uppercase tracking-wide text-white/70">
                       Senior slice (ST)
                     </p>
-                    <p className="text-base font-semibold">Gets paid first</p>
+                    <p className="text-base font-medium">Gets paid first</p>
                   </div>
                   <span className="text-sm bg-[var(--theme-background)] text-[var(--success)] px-3 py-1 rounded-full font-medium">
                     Lower risk
                   </span>
                 </div>
-                <div className="bg-[var(--theme-background)] rounded-lg border border-[var(--theme-border)] p-4 flex items-center justify-between shadow-[0_8px_24px_rgba(0,0,0,0.04)]">
+                <div className="bg-[var(--theme-background)] rounded-xl border border-[var(--theme-border)] p-4 flex items-center justify-between shadow-[0_8px_24px_rgba(0,0,0,0.04)]">
                   <div>
                     <p className="text-xs uppercase tracking-wide text-[var(--info)]">
                       Junior slice (JT)
                     </p>
-                    <p className="text-base font-semibold text-[var(--primary-text)]">
+                    <p className="text-base font-medium text-[var(--primary-text)]">
                       Takes first losses
                     </p>
                   </div>
@@ -645,12 +645,12 @@ export default function DaySimulatorSidebar() {
                     Higher upside
                   </span>
                 </div>
-                <div className="bg-[var(--theme-background)] rounded-lg border border-[var(--insight)] p-4 flex items-center justify-between shadow-[0_8px_24px_rgba(0,0,0,0.04)]">
+                <div className="bg-[var(--theme-background)] rounded-xl border border-[var(--insight)] p-4 flex items-center justify-between shadow-[0_8px_24px_rgba(0,0,0,0.04)]">
                   <div>
                     <p className="text-xs uppercase tracking-wide text-[var(--insight)]">
                       Liquidity slice (LT)
                     </p>
-                    <p className="text-base font-semibold text-[var(--primary-text)]">
+                    <p className="text-base font-medium text-[var(--primary-text)]">
                       Backs redemptions
                     </p>
                   </div>
@@ -662,18 +662,18 @@ export default function DaySimulatorSidebar() {
 
               {/* TBD placeholders */}
               <div className="space-y-3">
-                <p className="text-xs font-semibold uppercase tracking-wide text-[var(--secondary-text)]">
+                <p className="text-xs font-medium uppercase tracking-wide text-[var(--secondary-text)]">
                   Open specification questions
                 </p>
                 <div className="space-y-2">
-                  <div className="rounded-lg border border-[var(--warning)] bg-[var(--warning-background)] px-4 py-3 text-xs text-[var(--warning)]">
-                    <span className="font-semibold">TBD — needs input:</span> Exact utilization threshold / governance rule at which LT redemptions are blocked versus allowed (the simulation blocks when liquidityUtilization exceeds 1 but the on-chain threshold and any override path are not yet specified).
+                  <div className="rounded-xl border border-[var(--warning)] bg-[var(--warning-background)] px-4 py-3 text-xs text-[var(--warning)]">
+                    <span className="font-medium">TBD — needs input:</span> Exact utilization threshold / governance rule at which LT redemptions are blocked versus allowed (the simulation blocks when liquidityUtilization exceeds 1 but the on-chain threshold and any override path are not yet specified).
                   </div>
-                  <div className="rounded-lg border border-[var(--warning)] bg-[var(--warning-background)] px-4 py-3 text-xs text-[var(--warning)]">
-                    <span className="font-semibold">TBD — needs input:</span> LP-facing fee-split framing and headline-APY presentation beyond the formula above (swap fee + T-bill yield + net senior yield on the ST leg + liquidity premium).
+                  <div className="rounded-xl border border-[var(--warning)] bg-[var(--warning-background)] px-4 py-3 text-xs text-[var(--warning)]">
+                    <span className="font-medium">TBD — needs input:</span> LP-facing fee-split framing and headline-APY presentation beyond the formula above (swap fee + T-bill yield + net senior yield on the ST leg + liquidity premium).
                   </div>
-                  <div className="rounded-lg border border-[var(--warning)] bg-[var(--warning-background)] px-4 py-3 text-xs text-[var(--warning)]">
-                    <span className="font-semibold">TBD — needs input:</span> Lock-up period, secondary-market access, and &apos;run&apos; mitigation narrative for LT holders beyond what the scenario engine models.
+                  <div className="rounded-xl border border-[var(--warning)] bg-[var(--warning-background)] px-4 py-3 text-xs text-[var(--warning)]">
+                    <span className="font-medium">TBD — needs input:</span> Lock-up period, secondary-market access, and &apos;run&apos; mitigation narrative for LT holders beyond what the scenario engine models.
                   </div>
                 </div>
               </div>
@@ -809,103 +809,103 @@ export default function DaySimulatorSidebar() {
               key={`${stAPY.toFixed(4)}-${jtAPY.toFixed(4)}-${ltAPY.toFixed(4)}`}
               className="grid grid-cols-1 sm:grid-cols-3 gap-3"
             >
-              <div className="group relative kpi-flash bg-[var(--theme-background)] rounded-lg border border-[var(--theme-border)] p-4 shadow-sm">
+              <div className="group relative kpi-flash bg-[var(--theme-background)] rounded-xl border border-[var(--theme-border)] p-4 shadow-sm">
                 <div className="flex items-center gap-2 mb-1">
                   <span className="w-2 h-2 rounded-full" style={{ background: 'var(--success)' }} />
                   <span className="text-[13px] text-[var(--secondary-text)]">Senior · ST</span>
                 </div>
-                <p className="font-mono tabular-nums text-4xl sm:text-5xl leading-none text-[var(--success)]" style={{ fontWeight: 600 }}>
+                <p className="tabular-nums text-4xl sm:text-5xl leading-none text-[var(--success)]" style={{ fontWeight: 500 }}>
                   {(stAPY * 100).toFixed(1)}
                   <span className="text-2xl sm:text-3xl">%</span>
                 </p>
                 <p className="text-[12px] text-[var(--tertiary-text)] mt-1.5">paid first · lower risk</p>
-                <p className="text-[12px] font-mono tabular-nums text-[var(--success)] mt-1">NAV {usd(cur.stEffectiveNAV)}</p>
+                <p className="text-[12px] tabular-nums text-[var(--success)] mt-1">NAV {usd(cur.stEffectiveNAV)}</p>
                 {/* Hover breakdown */}
-                <div className="hidden group-hover:block absolute left-0 top-full mt-2 z-20 w-80 text-left bg-[var(--theme-background)] border border-[var(--theme-border)] rounded-lg shadow-lg p-3">
+                <div className="hidden group-hover:block absolute left-0 top-full mt-2 z-20 w-80 text-left bg-[var(--theme-background)] border border-[var(--theme-border)] rounded-xl shadow-lg p-3">
                   <p className="text-[12px] font-medium text-[var(--primary-text)]">
-                    ST Net &#183; <span className="font-mono" style={{ color: 'var(--success)' }}>{Math.round(stAPY * 100)}%</span>
+                    ST Net &#183; <span style={{ color: 'var(--success)' }}>{Math.round(stAPY * 100)}%</span>
                   </p>
                   <p className="text-[11px] text-[var(--secondary-text)] mt-0.5">APY &#215; (1 &#8722; risk &#8722; liq)</p>
                   <div className="mt-2 space-y-1.5">
                     <div className="flex items-start justify-between gap-3">
                       <span className="text-[11px] text-[var(--secondary-text)] flex-shrink-0 whitespace-nowrap">Base APY</span>
-                      <span className="text-[11px] font-mono text-right" style={{ color: 'var(--success)' }}>{Math.round(apy * 100)}%</span>
+                      <span className="text-[11px] text-right" style={{ color: 'var(--success)' }}>{Math.round(apy * 100)}%</span>
                     </div>
                     <p className="text-[10px] text-[var(--tertiary-text)] -mt-1">the source yield</p>
                     <div className="flex items-start justify-between gap-3">
                       <span className="text-[11px] text-[var(--secondary-text)] flex-shrink-0 whitespace-nowrap">&#8722; Risk premium</span>
-                      <span className="text-[11px] font-mono text-right" style={{ color: 'var(--success)' }}>{Math.round(riskShare * 100)}% &#215; APY</span>
+                      <span className="text-[11px] text-right" style={{ color: 'var(--success)' }}>{Math.round(riskShare * 100)}% &#215; APY</span>
                     </div>
                     <p className="text-[10px] text-[var(--tertiary-text)] -mt-1">paid to JT</p>
                     <div className="flex items-start justify-between gap-3">
                       <span className="text-[11px] text-[var(--secondary-text)] flex-shrink-0 whitespace-nowrap">&#8722; Liquidity premium</span>
-                      <span className="text-[11px] font-mono text-right" style={{ color: 'var(--success)' }}>{Math.round(liqShare * 100)}% &#215; APY</span>
+                      <span className="text-[11px] text-right" style={{ color: 'var(--success)' }}>{Math.round(liqShare * 100)}% &#215; APY</span>
                     </div>
                     <p className="text-[10px] text-[var(--tertiary-text)] -mt-1">paid to LT</p>
                   </div>
                 </div>
               </div>
 
-              <div className="group relative kpi-flash bg-[var(--theme-background)] rounded-lg border border-[var(--theme-border)] p-4 shadow-sm">
+              <div className="group relative kpi-flash bg-[var(--theme-background)] rounded-xl border border-[var(--theme-border)] p-4 shadow-sm">
                 <div className="flex items-center gap-2 mb-1">
                   <span className="w-2 h-2 rounded-full" style={{ background: 'var(--info)' }} />
                   <span className="text-[13px] text-[var(--secondary-text)]">Junior · JT</span>
                 </div>
-                <p className="font-mono tabular-nums text-4xl sm:text-5xl leading-none text-[var(--info)]" style={{ fontWeight: 600 }}>
+                <p className="tabular-nums text-4xl sm:text-5xl leading-none text-[var(--info)]" style={{ fontWeight: 500 }}>
                   {(jtAPY * 100).toFixed(1)}
                   <span className="text-2xl sm:text-3xl">%</span>
                 </p>
                 <p className="text-[12px] text-[var(--tertiary-text)] mt-1.5">first-loss · earns risk premium</p>
-                <p className="text-[12px] font-mono tabular-nums text-[var(--info)] mt-1">NAV {usd(cur.jtEffectiveNAV)}</p>
+                <p className="text-[12px] tabular-nums text-[var(--info)] mt-1">NAV {usd(cur.jtEffectiveNAV)}</p>
                 {/* Hover breakdown */}
-                <div className="hidden group-hover:block absolute left-0 top-full mt-2 z-20 w-80 text-left bg-[var(--theme-background)] border border-[var(--theme-border)] rounded-lg shadow-lg p-3">
+                <div className="hidden group-hover:block absolute left-1/2 -translate-x-1/2 top-full mt-2 z-20 w-80 text-left bg-[var(--theme-background)] border border-[var(--theme-border)] rounded-xl shadow-lg p-3">
                   <p className="text-[12px] font-medium text-[var(--primary-text)]">
-                    Day JT &#183; <span className="font-mono" style={{ color: 'var(--info)' }}>{Math.round(jtAPY * 100)}%</span>
+                    Day JT &#183; <span style={{ color: 'var(--info)' }}>{Math.round(jtAPY * 100)}%</span>
                   </p>
                   <p className="text-[11px] text-[var(--secondary-text)] mt-0.5">APY + (risk &#215; APY) &#247; JT size</p>
                   <div className="mt-2 space-y-1.5">
                     <div className="flex items-start justify-between gap-3">
                       <span className="text-[11px] text-[var(--secondary-text)] flex-shrink-0 whitespace-nowrap">Co-invested (&#946;=1)</span>
-                      <span className="text-[11px] font-mono text-right" style={{ color: 'var(--info)' }}>{Math.round(apy * 100)}%</span>
+                      <span className="text-[11px] text-right" style={{ color: 'var(--info)' }}>{Math.round(apy * 100)}%</span>
                     </div>
                     <p className="text-[10px] text-[var(--tertiary-text)] -mt-1">JT sits in the same asset as ST &#8594; earns the source APY</p>
                     <div className="flex items-start justify-between gap-3">
                       <span className="text-[11px] text-[var(--secondary-text)] flex-shrink-0 whitespace-nowrap">Risk premium</span>
-                      <span className="text-[11px] font-mono text-right" style={{ color: 'var(--info)' }}>{Math.round(riskShare * 100)}%&#215;APY&#247;JT size {Math.round(jtSize * 100)}%</span>
+                      <span className="text-[11px] text-right" style={{ color: 'var(--info)' }}>{Math.round(riskShare * 100)}%&#215;APY&#247;JT size {Math.round(jtSize * 100)}%</span>
                     </div>
                   </div>
                 </div>
               </div>
 
-              <div className="group relative kpi-flash bg-[var(--theme-background)] rounded-lg border border-[var(--theme-border)] p-4 shadow-sm">
+              <div className="group relative kpi-flash bg-[var(--theme-background)] rounded-xl border border-[var(--theme-border)] p-4 shadow-sm">
                 <div className="flex items-center gap-2 mb-1">
                   <span className="w-2 h-2 rounded-full" style={{ background: 'var(--insight)' }} />
                   <span className="text-[13px] text-[var(--secondary-text)]">Liquidity · LT</span>
                 </div>
-                <p className="font-mono tabular-nums text-4xl sm:text-5xl leading-none text-[var(--insight)]" style={{ fontWeight: 600 }}>
+                <p className="tabular-nums text-4xl sm:text-5xl leading-none text-[var(--insight)]" style={{ fontWeight: 500 }}>
                   {(ltAPY * 100).toFixed(1)}
                   <span className="text-2xl sm:text-3xl">%</span>
                 </p>
                 <p className="text-[12px] text-[var(--tertiary-text)] mt-1.5">backs redemptions · earns liquidity premium</p>
-                <p className="text-[12px] font-mono tabular-nums text-[var(--insight)] mt-1">NAV {usd(cur.ltNAV)}</p>
+                <p className="text-[12px] tabular-nums text-[var(--insight)] mt-1">NAV {usd(cur.ltNAV)}</p>
                 {/* Hover breakdown */}
-                <div className="hidden group-hover:block absolute left-0 top-full mt-2 z-20 w-80 text-left bg-[var(--theme-background)] border border-[var(--theme-border)] rounded-lg shadow-lg p-3">
+                <div className="hidden group-hover:block absolute right-0 top-full mt-2 z-20 w-80 text-left bg-[var(--theme-background)] border border-[var(--theme-border)] rounded-xl shadow-lg p-3">
                   <p className="text-[12px] font-medium text-[var(--primary-text)]">
-                    Day LT &#183; <span className="font-mono" style={{ color: 'var(--insight)' }}>{Math.round(ltAPY * 100)}%</span>
+                    Day LT &#183; <span style={{ color: 'var(--insight)' }}>{Math.round(ltAPY * 100)}%</span>
                   </p>
                   <p className="text-[11px] text-[var(--secondary-text)] mt-0.5">(liq &#215; APY) &#247; LT size + swap + BPT carry</p>
                   <div className="mt-2 space-y-1.5">
                     <div className="flex items-start justify-between gap-3">
                       <span className="text-[11px] text-[var(--secondary-text)] flex-shrink-0 whitespace-nowrap">Liquidity premium</span>
-                      <span className="text-[11px] font-mono text-right" style={{ color: 'var(--insight)' }}>{Math.round(liqShare * 100)}%&#215;APY&#247;LT size {Math.round(ltSize * 100)}%</span>
+                      <span className="text-[11px] text-right" style={{ color: 'var(--insight)' }}>{Math.round(liqShare * 100)}%&#215;APY&#247;LT size {Math.round(ltSize * 100)}%</span>
                     </div>
                     <div className="flex items-start justify-between gap-3">
                       <span className="text-[11px] text-[var(--secondary-text)] flex-shrink-0 whitespace-nowrap">Swap fees</span>
-                      <span className="text-[11px] font-mono text-right" style={{ color: 'var(--insight)' }}>{turnover}&#215;/yr &#215; {swapBps}bps</span>
+                      <span className="text-[11px] text-right" style={{ color: 'var(--insight)' }}>{turnover}&#215;/yr &#215; {swapBps}bps</span>
                     </div>
                     <div className="flex items-start justify-between gap-3">
                       <span className="text-[11px] text-[var(--secondary-text)] flex-shrink-0 whitespace-nowrap">BPT carry</span>
-                      <span className="text-[11px] font-mono text-right" style={{ color: 'var(--insight)' }}>{Math.round(wST * 100)}%&#215;ST-yield + {Math.round((1 - wST) * 100)}%&#215;{Math.round(stableYield * 100)}% stable</span>
+                      <span className="text-[11px] text-right" style={{ color: 'var(--insight)' }}>{Math.round(wST * 100)}%&#215;ST-yield + {Math.round((1 - wST) * 100)}%&#215;{Math.round(stableYield * 100)}% stable</span>
                     </div>
                   </div>
                 </div>
@@ -944,10 +944,10 @@ export default function DaySimulatorSidebar() {
                       {w >= 96 ? (
                         <>
                           <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.85)', lineHeight: 1.2 }}>Senior keeps</span>
-                          <span style={{ fontSize: 15, fontWeight: 700, color: '#fff', lineHeight: 1.2 }}>{seniorKeepPct}%</span>
+                          <span style={{ fontSize: 15, fontWeight: 600, color: '#fff', lineHeight: 1.2 }}>{seniorKeepPct}%</span>
                         </>
                       ) : w >= 36 ? (
-                        <span style={{ fontSize: 12, fontWeight: 700, color: '#fff' }}>{seniorKeepPct}%</span>
+                        <span style={{ fontSize: 12, fontWeight: 600, color: '#fff' }}>{seniorKeepPct}%</span>
                       ) : null}
                     </div>
                   );
@@ -976,10 +976,10 @@ export default function DaySimulatorSidebar() {
                       {w >= 96 ? (
                         <>
                           <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.85)', lineHeight: 1.2 }}>Risk &#x2192; JT</span>
-                          <span style={{ fontSize: 15, fontWeight: 700, color: '#fff', lineHeight: 1.2 }}>{riskSharePct}%</span>
+                          <span style={{ fontSize: 15, fontWeight: 600, color: '#fff', lineHeight: 1.2 }}>{riskSharePct}%</span>
                         </>
                       ) : w >= 36 ? (
-                        <span style={{ fontSize: 12, fontWeight: 700, color: '#fff' }}>{riskSharePct}%</span>
+                        <span style={{ fontSize: 12, fontWeight: 600, color: '#fff' }}>{riskSharePct}%</span>
                       ) : null}
                     </div>
                   );
@@ -1008,10 +1008,10 @@ export default function DaySimulatorSidebar() {
                       {w >= 96 ? (
                         <>
                           <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.85)', lineHeight: 1.2 }}>Liquidity &#x2192; LT</span>
-                          <span style={{ fontSize: 15, fontWeight: 700, color: '#fff', lineHeight: 1.2 }}>{liqSharePct}%</span>
+                          <span style={{ fontSize: 15, fontWeight: 600, color: '#fff', lineHeight: 1.2 }}>{liqSharePct}%</span>
                         </>
                       ) : w >= 36 ? (
-                        <span style={{ fontSize: 12, fontWeight: 700, color: '#fff' }}>{liqSharePct}%</span>
+                        <span style={{ fontSize: 12, fontWeight: 600, color: '#fff' }}>{liqSharePct}%</span>
                       ) : null}
                     </div>
                   );
@@ -1020,15 +1020,15 @@ export default function DaySimulatorSidebar() {
               <div className="flex flex-wrap items-center gap-x-6 gap-y-1 mt-2">
                 <span className="flex items-center gap-1.5 text-[12px] text-[var(--secondary-text)]">
                   <span className="w-2 h-2 rounded-full" style={{ background: 'var(--success)' }} />
-                  Senior keeps <span className="font-mono tabular-nums font-semibold text-[var(--primary-text)]">{seniorKeepPct}%</span>
+                  Senior keeps <span className="tabular-nums font-medium text-[var(--primary-text)]">{seniorKeepPct}%</span>
                 </span>
                 <span className="flex items-center gap-1.5 text-[12px] text-[var(--secondary-text)]">
                   <span className="w-2 h-2 rounded-full" style={{ background: 'var(--info)' }} />
-                  Risk &#x2192; JT <span className="font-mono tabular-nums font-semibold text-[var(--primary-text)]">{riskSharePct}%</span>
+                  Risk &#x2192; JT <span className="tabular-nums font-medium text-[var(--primary-text)]">{riskSharePct}%</span>
                 </span>
                 <span className="flex items-center gap-1.5 text-[12px] text-[var(--secondary-text)]">
                   <span className="w-2 h-2 rounded-full" style={{ background: 'var(--insight)' }} />
-                  Liquidity &#x2192; LT <span className="font-mono tabular-nums font-semibold text-[var(--primary-text)]">{liqSharePct}%</span>
+                  Liquidity &#x2192; LT <span className="tabular-nums font-medium text-[var(--primary-text)]">{liqSharePct}%</span>
                 </span>
               </div>
               <p className="mt-2 text-[12px] text-[var(--tertiary-text)]">
@@ -1040,8 +1040,8 @@ export default function DaySimulatorSidebar() {
           {/* (b) CHARTS — two cards, each with its util slider + @90% slider docked below */}
           <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
             {/* LEFT chart card — Risk premium → JT */}
-            <div className="bg-[var(--theme-background)] rounded-lg border border-[var(--theme-border)] p-6 shadow-sm">
-              <p className="text-sm font-semibold text-[var(--info)] mb-0.5">
+            <div className="bg-[var(--theme-background)] rounded-xl border border-[var(--theme-border)] p-6 shadow-sm">
+              <p className="text-sm font-medium text-[var(--info)] mb-0.5">
                 Risk premium → JT
               </p>
               <p className="text-xs text-[var(--secondary-text)] mb-2">vs coverage utilization</p>
@@ -1090,13 +1090,13 @@ export default function DaySimulatorSidebar() {
                             share: number;
                           };
                           return (
-                            <div className="bg-[var(--theme-background)] p-3 rounded-lg border-2 border-[var(--theme-border)] shadow-lg">
-                              <p className="text-xs font-semibold text-[var(--primary-text)] mb-1">
+                            <div className="bg-[var(--theme-background)] p-3 rounded-xl border-2 border-[var(--theme-border)] shadow-lg">
+                              <p className="text-xs font-medium text-[var(--primary-text)] mb-1">
                                 At {d.x.toFixed(0)}% coverage utilization
                               </p>
                               <div className="flex justify-between gap-4 text-sm">
                                 <span className="text-[var(--info)]">Risk share (JT):</span>
-                                <span className="font-semibold text-[var(--info)]">
+                                <span className="font-medium text-[var(--info)]">
                                   {d.share.toFixed(2)}%
                                 </span>
                               </div>
@@ -1149,7 +1149,7 @@ export default function DaySimulatorSidebar() {
                     Coverage utilization
                   </span>
                   <span
-                    className="text-[11px] font-mono tabular-nums font-semibold"
+                    className="text-[11px] tabular-nums font-medium"
                     style={{ color: 'var(--info)' }}
                   >
                     {Math.round(covUtil)}%
@@ -1183,8 +1183,8 @@ export default function DaySimulatorSidebar() {
             </div>
 
             {/* RIGHT chart card — Liquidity premium → LT */}
-            <div className="bg-[var(--theme-background)] rounded-lg border border-[var(--theme-border)] p-6 shadow-sm">
-              <p className="text-sm font-semibold text-[var(--insight)] mb-0.5">
+            <div className="bg-[var(--theme-background)] rounded-xl border border-[var(--theme-border)] p-6 shadow-sm">
+              <p className="text-sm font-medium text-[var(--insight)] mb-0.5">
                 Liquidity premium → LT
               </p>
               <p className="text-xs text-[var(--secondary-text)] mb-2">vs liquidity utilization</p>
@@ -1233,13 +1233,13 @@ export default function DaySimulatorSidebar() {
                             share: number;
                           };
                           return (
-                            <div className="bg-[var(--theme-background)] p-3 rounded-lg border-2 border-[var(--theme-border)] shadow-lg">
-                              <p className="text-xs font-semibold text-[var(--primary-text)] mb-1">
+                            <div className="bg-[var(--theme-background)] p-3 rounded-xl border-2 border-[var(--theme-border)] shadow-lg">
+                              <p className="text-xs font-medium text-[var(--primary-text)] mb-1">
                                 At {d.x.toFixed(0)}% liquidity utilization
                               </p>
                               <div className="flex justify-between gap-4 text-sm">
                                 <span className="text-[var(--insight)]">Liq share (LT):</span>
-                                <span className="font-semibold text-[var(--insight)]">
+                                <span className="font-medium text-[var(--insight)]">
                                   {d.share.toFixed(2)}%
                                 </span>
                               </div>
@@ -1292,7 +1292,7 @@ export default function DaySimulatorSidebar() {
                     Liquidity utilization
                   </span>
                   <span
-                    className="text-[11px] font-mono tabular-nums font-semibold"
+                    className="text-[11px] tabular-nums font-medium"
                     style={{ color: 'var(--insight)' }}
                   >
                     {Math.round(lqUtil)}%
