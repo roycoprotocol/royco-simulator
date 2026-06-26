@@ -282,15 +282,20 @@ export default function DaySimulator() {
     const v = Math.max(0, Math.min(1, raw));
     const r = { ...riskYDM, [k]: v };
     const l = { ...liqYDM };
-    // monotonicity: y100 >= yTarget for the edited tranche
-    if (k === 'yTarget') r.y100 = Math.max(r.y100, v);
-    if (k === 'y100') r.y100 = Math.max(v, r.yTarget); // y100 can't be set below yTarget
-    // existing combined-<=100% cap, per anchor (reduce the OTHER tranche)
+    // monotonicity for the edited (risk) tranche: y0 <= yTarget <= y100
+    if (k === 'y0') r.y0 = Math.min(v, r.yTarget);
+    if (k === 'yTarget') {
+      r.y0 = Math.min(r.y0, v);
+      r.y100 = Math.max(r.y100, v);
+    }
+    if (k === 'y100') r.y100 = Math.max(v, r.yTarget);
+    // combined <=100% cap, per anchor (reduce the OTHER tranche)
     (['y0', 'yTarget', 'y100'] as const).forEach((a) => {
       if ((r[a] ?? 0) + (l[a] ?? 0) > 1) l[a] = Math.max(0, 1 - r[a]);
     });
-    // if the cap pushed liq.y100 below liq.yTarget, pull liq.yTarget down to keep liq monotonic
+    // re-enforce the OTHER (liq) tranche's monotonicity after capping (top-down)
     l.yTarget = Math.min(l.yTarget, l.y100);
+    l.y0 = Math.min(l.y0, l.yTarget);
     setRiskYDM(r);
     setLiqYDM(l);
   };
@@ -298,15 +303,20 @@ export default function DaySimulator() {
     const v = Math.max(0, Math.min(1, raw));
     const l = { ...liqYDM, [k]: v };
     const r = { ...riskYDM };
-    // monotonicity: y100 >= yTarget for the edited tranche
-    if (k === 'yTarget') l.y100 = Math.max(l.y100, v);
-    if (k === 'y100') l.y100 = Math.max(v, l.yTarget); // y100 can't be set below yTarget
-    // existing combined-<=100% cap, per anchor (reduce the OTHER tranche)
+    // monotonicity for the edited (liq) tranche: y0 <= yTarget <= y100
+    if (k === 'y0') l.y0 = Math.min(v, l.yTarget);
+    if (k === 'yTarget') {
+      l.y0 = Math.min(l.y0, v);
+      l.y100 = Math.max(l.y100, v);
+    }
+    if (k === 'y100') l.y100 = Math.max(v, l.yTarget);
+    // combined <=100% cap, per anchor (reduce the OTHER tranche)
     (['y0', 'yTarget', 'y100'] as const).forEach((a) => {
       if ((l[a] ?? 0) + (r[a] ?? 0) > 1) r[a] = Math.max(0, 1 - l[a]);
     });
-    // if the cap pushed risk.y100 below risk.yTarget, pull risk.yTarget down to keep risk monotonic
+    // re-enforce the OTHER (risk) tranche's monotonicity after capping (top-down)
     r.yTarget = Math.min(r.yTarget, r.y100);
+    r.y0 = Math.min(r.y0, r.yTarget);
     setLiqYDM(l);
     setRiskYDM(r);
   };
