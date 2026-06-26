@@ -821,25 +821,25 @@ export default function DaySimulatorSidebar() {
                 <p className="text-[12px] text-[#999999] mt-1.5">paid first · lower risk</p>
                 <p className="text-[12px] font-mono tabular-nums text-[#8A6A41] mt-1">NAV {usd(cur.stEffectiveNAV)}</p>
                 {/* Hover breakdown */}
-                <div className="hidden group-hover:block absolute left-0 top-full mt-2 z-20 w-72 text-left bg-white border border-[#E5E5E0] rounded-lg shadow-lg p-3">
+                <div className="hidden group-hover:block absolute left-0 top-full mt-2 z-20 w-80 text-left bg-white border border-[#E5E5E0] rounded-lg shadow-lg p-3">
                   <p className="text-[12px] font-medium text-[#0a0a0a]">
                     ST Net &#183; <span className="font-mono" style={{ color: '#8A6A41' }}>{Math.round(stAPY * 100)}%</span>
                   </p>
                   <p className="text-[11px] text-[#666666] mt-0.5">APY &#215; (1 &#8722; risk &#8722; liq)</p>
                   <div className="mt-2 space-y-1.5">
-                    <div className="flex items-baseline justify-between gap-2">
-                      <span className="text-[11px] text-[#666666]">Base APY</span>
-                      <span className="text-[11px] font-mono" style={{ color: '#8A6A41' }}>{Math.round(apy * 100)}%</span>
+                    <div className="flex items-start justify-between gap-3">
+                      <span className="text-[11px] text-[#666666] flex-shrink-0 whitespace-nowrap">Base APY</span>
+                      <span className="text-[11px] font-mono text-right" style={{ color: '#8A6A41' }}>{Math.round(apy * 100)}%</span>
                     </div>
                     <p className="text-[10px] text-[#999999] -mt-1">the source yield</p>
-                    <div className="flex items-baseline justify-between gap-2">
-                      <span className="text-[11px] text-[#666666]">&#8722; Risk premium</span>
-                      <span className="text-[11px] font-mono" style={{ color: '#8A6A41' }}>{Math.round(riskShare * 100)}% &#215; APY</span>
+                    <div className="flex items-start justify-between gap-3">
+                      <span className="text-[11px] text-[#666666] flex-shrink-0 whitespace-nowrap">&#8722; Risk premium</span>
+                      <span className="text-[11px] font-mono text-right" style={{ color: '#8A6A41' }}>{Math.round(riskShare * 100)}% &#215; APY</span>
                     </div>
                     <p className="text-[10px] text-[#999999] -mt-1">paid to JT</p>
-                    <div className="flex items-baseline justify-between gap-2">
-                      <span className="text-[11px] text-[#666666]">&#8722; Liquidity premium</span>
-                      <span className="text-[11px] font-mono" style={{ color: '#8A6A41' }}>{Math.round(liqShare * 100)}% &#215; APY</span>
+                    <div className="flex items-start justify-between gap-3">
+                      <span className="text-[11px] text-[#666666] flex-shrink-0 whitespace-nowrap">&#8722; Liquidity premium</span>
+                      <span className="text-[11px] font-mono text-right" style={{ color: '#8A6A41' }}>{Math.round(liqShare * 100)}% &#215; APY</span>
                     </div>
                     <p className="text-[10px] text-[#999999] -mt-1">paid to LT</p>
                   </div>
@@ -858,20 +858,20 @@ export default function DaySimulatorSidebar() {
                 <p className="text-[12px] text-[#999999] mt-1.5">first-loss · earns risk premium</p>
                 <p className="text-[12px] font-mono tabular-nums text-[#3F6B4E] mt-1">NAV {usd(cur.jtEffectiveNAV)}</p>
                 {/* Hover breakdown */}
-                <div className="hidden group-hover:block absolute left-0 top-full mt-2 z-20 w-72 text-left bg-white border border-[#E5E5E0] rounded-lg shadow-lg p-3">
+                <div className="hidden group-hover:block absolute left-0 top-full mt-2 z-20 w-80 text-left bg-white border border-[#E5E5E0] rounded-lg shadow-lg p-3">
                   <p className="text-[12px] font-medium text-[#0a0a0a]">
                     Day JT &#183; <span className="font-mono" style={{ color: '#3F6B4E' }}>{Math.round(jtAPY * 100)}%</span>
                   </p>
                   <p className="text-[11px] text-[#666666] mt-0.5">APY + (risk &#215; APY) &#247; JT size</p>
                   <div className="mt-2 space-y-1.5">
-                    <div className="flex items-baseline justify-between gap-2">
-                      <span className="text-[11px] text-[#666666]">Co-invested (&#946;=1)</span>
-                      <span className="text-[11px] font-mono" style={{ color: '#3F6B4E' }}>{Math.round(apy * 100)}%</span>
+                    <div className="flex items-start justify-between gap-3">
+                      <span className="text-[11px] text-[#666666] flex-shrink-0 whitespace-nowrap">Co-invested (&#946;=1)</span>
+                      <span className="text-[11px] font-mono text-right" style={{ color: '#3F6B4E' }}>{Math.round(apy * 100)}%</span>
                     </div>
                     <p className="text-[10px] text-[#999999] -mt-1">JT sits in the same asset as ST &#8594; earns the source APY</p>
-                    <div className="flex items-baseline justify-between gap-2">
-                      <span className="text-[11px] text-[#666666]">Risk premium</span>
-                      <span className="text-[11px] font-mono" style={{ color: '#3F6B4E' }}>{Math.round(riskShare * 100)}% &#215; APY &#247; JT size {Math.round(jtSize * 100)}%</span>
+                    <div className="flex items-start justify-between gap-3">
+                      <span className="text-[11px] text-[#666666] flex-shrink-0 whitespace-nowrap">Risk premium</span>
+                      <span className="text-[11px] font-mono text-right" style={{ color: '#3F6B4E' }}>{Math.round(riskShare * 100)}%&#215;APY&#247;JT size {Math.round(jtSize * 100)}%</span>
                     </div>
                   </div>
                 </div>
@@ -889,23 +889,23 @@ export default function DaySimulatorSidebar() {
                 <p className="text-[12px] text-[#999999] mt-1.5">backs redemptions · earns liquidity premium</p>
                 <p className="text-[12px] font-mono tabular-nums text-[#3C5A82] mt-1">NAV {usd(cur.ltNAV)}</p>
                 {/* Hover breakdown */}
-                <div className="hidden group-hover:block absolute left-0 top-full mt-2 z-20 w-72 text-left bg-white border border-[#E5E5E0] rounded-lg shadow-lg p-3">
+                <div className="hidden group-hover:block absolute left-0 top-full mt-2 z-20 w-80 text-left bg-white border border-[#E5E5E0] rounded-lg shadow-lg p-3">
                   <p className="text-[12px] font-medium text-[#0a0a0a]">
                     Day LT &#183; <span className="font-mono" style={{ color: '#3C5A82' }}>{Math.round(ltAPY * 100)}%</span>
                   </p>
                   <p className="text-[11px] text-[#666666] mt-0.5">(liq &#215; APY) &#247; LT size + swap + BPT carry</p>
                   <div className="mt-2 space-y-1.5">
-                    <div className="flex items-baseline justify-between gap-2">
-                      <span className="text-[11px] text-[#666666]">Liquidity premium</span>
-                      <span className="text-[11px] font-mono" style={{ color: '#3C5A82' }}>{Math.round(liqShare * 100)}% &#215; APY &#247; LT size {Math.round(ltSize * 100)}%</span>
+                    <div className="flex items-start justify-between gap-3">
+                      <span className="text-[11px] text-[#666666] flex-shrink-0 whitespace-nowrap">Liquidity premium</span>
+                      <span className="text-[11px] font-mono text-right" style={{ color: '#3C5A82' }}>{Math.round(liqShare * 100)}%&#215;APY&#247;LT size {Math.round(ltSize * 100)}%</span>
                     </div>
-                    <div className="flex items-baseline justify-between gap-2">
-                      <span className="text-[11px] text-[#666666]">Swap fees</span>
-                      <span className="text-[11px] font-mono" style={{ color: '#3C5A82' }}>{turnover}&#215;/yr &#215; {swapBps}bps</span>
+                    <div className="flex items-start justify-between gap-3">
+                      <span className="text-[11px] text-[#666666] flex-shrink-0 whitespace-nowrap">Swap fees</span>
+                      <span className="text-[11px] font-mono text-right" style={{ color: '#3C5A82' }}>{turnover}&#215;/yr &#215; {swapBps}bps</span>
                     </div>
-                    <div className="flex items-baseline justify-between gap-2">
-                      <span className="text-[11px] text-[#666666]">BPT carry</span>
-                      <span className="text-[11px] font-mono" style={{ color: '#3C5A82' }}>{Math.round(wST * 100)}% &#215; ST-yield + {Math.round((1 - wST) * 100)}% &#215; {Math.round(stableYield * 100)}% stable</span>
+                    <div className="flex items-start justify-between gap-3">
+                      <span className="text-[11px] text-[#666666] flex-shrink-0 whitespace-nowrap">BPT carry</span>
+                      <span className="text-[11px] font-mono text-right" style={{ color: '#3C5A82' }}>{Math.round(wST * 100)}%&#215;ST-yield + {Math.round((1 - wST) * 100)}%&#215;{Math.round(stableYield * 100)}% stable</span>
                     </div>
                   </div>
                 </div>
