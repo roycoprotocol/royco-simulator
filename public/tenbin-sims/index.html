@@ -121,12 +121,13 @@ details[open]>.setupSummary:after{content:"-"}
 .setupDropdown{display:grid;gap:12px;border-top:1px solid var(--line);padding-top:12px}
 .deployToolbar{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:12px;align-items:end}
 .copyBtn{border:1px solid var(--line);background:var(--panel);color:var(--ink);padding:9px 12px;font-size:10.5px;font-weight:600;letter-spacing:.08em;text-transform:uppercase;cursor:pointer}
+.shareBtn{justify-self:end;white-space:nowrap}
 .deploySnapshot{width:100%;min-height:265px;resize:vertical;border:1px solid var(--line);background:rgba(255,253,249,.72);padding:10px 12px;font-family:"SFMono-Regular",Consolas,monospace;font-size:10.5px;line-height:1.45;color:#554E45;white-space:pre;overflow:auto}
 @media(max-width:1180px){.builderGrid{grid-template-columns:repeat(3,minmax(180px,1fr))}.outcomeGrid,.guardrails{grid-template-columns:repeat(2,minmax(0,1fr))}}
 @media(max-width:980px){.recommendation{grid-template-columns:1fr 1fr}.recLead{grid-column:1/-1}.stat{grid-template-columns:repeat(3,minmax(0,1fr))}.infoBody{grid-template-columns:1fr}}
 @media(max-width:620px){.outcomeGrid{grid-template-columns:repeat(2,minmax(0,1fr))}.recommendation{grid-template-columns:1fr}.recLead{grid-column:auto}.builderGrid,.guardrails,.stat{grid-template-columns:1fr}.setupSummary,.infoSummary{grid-template-columns:minmax(0,1fr) auto;gap:8px}.setupSummary .summaryPill{grid-column:1/-1;grid-row:2;white-space:normal;line-height:1.35}}
 @media(min-width:761px){.controlGroup{flex-wrap:nowrap}.presets{flex-wrap:nowrap}}
-@media(max-width:700px){body{border-top-width:4px}.wrap{padding:20px 18px 44px}h1{font-size:34px}.sub{font-size:13px;margin-bottom:14px}.bar{display:grid;grid-template-columns:1fr;align-items:stretch}.controlGroup{width:100%;align-items:flex-start;gap:7px}.seg,.presets{width:100%;display:grid;grid-template-columns:1fr 1fr}.presets{grid-template-columns:1fr}.seg button,.presets button{width:100%}.chartbox{height:300px}.recLead h2{font-size:21px}.recommendation{padding:14px}}
+@media(max-width:700px){body{border-top-width:4px}.wrap{padding:20px 18px 44px}h1{font-size:34px}.sub{font-size:13px;margin-bottom:14px}.bar{display:grid;grid-template-columns:1fr;align-items:stretch}.controlGroup{width:100%;align-items:flex-start;gap:7px}.seg,.presets{width:100%;display:grid;grid-template-columns:1fr 1fr}.presets{grid-template-columns:1fr}.seg button,.presets button,.shareBtn{width:100%}.shareBtn{justify-self:stretch}.chartbox{height:300px}.recLead h2{font-size:21px}.recommendation{padding:14px}}
 </style></head>
 <body>
 <div class="wrap">
@@ -142,6 +143,8 @@ details[open]>.setupSummary:after{content:"-"}
     <button data-m="stBRL">stBRL</button>
     </div>
   </div>
+  <div></div>
+  <button type="button" class="copyBtn shareBtn" id="copyPermalinkBtn">Copy link</button>
 </div>
 
 <div class="decisionShell">
@@ -851,12 +854,14 @@ const liqUtilInput_=document.getElementById('liqUtilInput'), selfLiqBonusInput_=
   liqUtilValue_=document.getElementById('liqUtilValue'), selfLiqBonusValue_=document.getElementById('selfLiqBonusValue'),
   liqUtilHint_=document.getElementById('liqUtilHint'), selfLiqBonusHint_=document.getElementById('selfLiqBonusHint'),
   exitSummaryPill_=document.getElementById('exitSummaryPill'), copyDeployBtn_=document.getElementById('copyDeployBtn'),
-  deploySnapshot_=document.getElementById('deploySnapshot'), deployStatusPill_=document.getElementById('deployStatusPill');
+  copyPermalinkBtn_=document.getElementById('copyPermalinkBtn'), deploySnapshot_=document.getElementById('deploySnapshot'),
+  deployStatusPill_=document.getElementById('deployStatusPill');
 const brushSvg_=document.getElementById('brushSvg'), brushTrack_=document.getElementById('brushTrack'), brushFill_=document.getElementById('brushFill'),
   brushStart_=document.getElementById('brushStart'), brushEnd_=document.getElementById('brushEnd'),
   brushTicks_=document.getElementById('brushTicks'), timeStartLabel_=document.getElementById('timeStartLabel'),
   timeEndLabel_=document.getElementById('timeEndLabel'), timeLabel_=document.getElementById('timeLabel'),
   chartDetails_=document.getElementById('chartDetails');
+let PERMALINK_READY=false;
 function refreshPresetLabels(){ const P=PRESETS[MKT];
   pc.textContent=P.Conservative.cov+'% first-loss · '+P.Conservative.obs+'d obs · '+P.Conservative.ys+'% to Junior';
   pm.textContent=P.Moderate.cov+'% first-loss · '+P.Moderate.obs+'d obs · '+P.Moderate.ys+'% to Junior';
@@ -864,8 +869,9 @@ function refreshPresetLabels(){ const P=PRESETS[MKT];
 function markPreset(){ const P=PRESETS[MKT]; const match=Object.keys(P).find(k=>P[k].cov==+cov_.value&&P[k].obs==+obs_.value&&P[k].ys==+ys_.value);
   PRESET=match||null;
   document.querySelectorAll('#presets button').forEach(b=>b.classList.toggle('on',b.dataset.p===match)); }
-function setPreset(p){ PRESET=p; const v=PRESETS[MKT][p]; cov_.value=v.cov; obs_.value=v.obs; ys_.value=v.ys;
-  covv.textContent=v.cov; obsv.textContent=v.obs; ysv.textContent=v.ys; markPreset(); render(); }
+function updateTermReadouts(){ covv.textContent=cov_.value; obsv.textContent=obs_.value; ysv.textContent=ys_.value; }
+function setPreset(p,sync=true){ PRESET=p; const v=PRESETS[MKT][p]; cov_.value=v.cov; obs_.value=v.obs; ys_.value=v.ys;
+  updateTermReadouts(); markPreset(); render(); if(sync) syncPermalinkUrl(); }
 function updateExitControls(){
   const bufferPct=inputNum(liqUtilInput_,EXIT_BUFFER_DEFAULT,EXIT_BUFFER_MIN,EXIT_BUFFER_MAX), bonus=inputNum(selfLiqBonusInput_,0.25,0,5);
   if(liqUtilValue_) liqUtilValue_.textContent=fmtPct(bufferPct,1)+'% buffer remaining';
@@ -874,20 +880,104 @@ function updateExitControls(){
   if(selfLiqBonusHint_) selfLiqBonusHint_.textContent=exitBonusNote(bonus);
   if(exitSummaryPill_) exitSummaryPill_.textContent=fmtPct(bufferPct,1)+'% Junior buffer remaining / '+bonus.toFixed(2)+'% bonus';
 }
-cov_.addEventListener('input',()=>{covv.textContent=cov_.value; markPreset(); render();});
-obs_.addEventListener('input',()=>{obsv.textContent=obs_.value; markPreset(); render();});
-ys_.addEventListener('input',()=>{ysv.textContent=ys_.value; markPreset(); render();});
+function setMarketButton(market){
+  document.querySelectorAll('#mkt button').forEach(b=>b.classList.toggle('on',b.dataset.m===market));
+}
+function getParam(params,keys){
+  for(const key of keys){ const value=params.get(key); if(value!==null&&value!=='') return value; }
+  return null;
+}
+function setRangeFromParam(params,keys,el){
+  const raw=getParam(params,keys), parsed=Number(raw);
+  if(raw===null||!Number.isFinite(parsed)) return false;
+  const min=Number(el.min), max=Number(el.max), step=Number(el.step)||1;
+  const clamped=clamp(parsed,min,max), rounded=step>=1?Math.round(clamped):Math.round(clamped/step)*step;
+  el.value=String(+clamp(rounded,min,max).toFixed(6));
+  return true;
+}
+function currentPermalink(){
+  const url=new URL(window.location.href);
+  url.hash='';
+  url.search='';
+  url.searchParams.set('market',MKT);
+  url.searchParams.set('preset',PRESET||'custom');
+  url.searchParams.set('coverage',cov_.value);
+  url.searchParams.set('obs',obs_.value);
+  url.searchParams.set('yieldShare',ys_.value);
+  url.searchParams.set('exitBuffer',fmtPct(inputNum(liqUtilInput_,EXIT_BUFFER_DEFAULT,EXIT_BUFFER_MIN,EXIT_BUFFER_MAX),4));
+  url.searchParams.set('exitBonus',fmtPct(inputNum(selfLiqBonusInput_,0.25,0,5),2));
+  return url.toString();
+}
+function syncPermalinkUrl(force=false){
+  const url=currentPermalink();
+  if((PERMALINK_READY||force)&&window.history&&window.history.replaceState) window.history.replaceState(null,'',url);
+  return url;
+}
+async function writeClipboardText(txt){
+  const area=document.createElement('textarea');
+  area.value=txt;
+  area.setAttribute('readonly','');
+  area.style.position='fixed';
+  area.style.left='-9999px';
+  area.style.top='0';
+  document.body.appendChild(area);
+  area.focus();
+  area.select();
+  let ok=false;
+  try{ ok=document.execCommand('copy'); }catch(e){ ok=false; }
+  document.body.removeChild(area);
+  if(ok) return true;
+  try{
+    if(navigator.clipboard&&window.isSecureContext){ await navigator.clipboard.writeText(txt); return true; }
+  }catch(e){}
+  return false;
+}
+async function copyPermalink(){
+  if(!copyPermalinkBtn_) return;
+  const url=syncPermalinkUrl(true), original=copyPermalinkBtn_.textContent;
+  if(await writeClipboardText(url)){
+    copyPermalinkBtn_.textContent='Copied link';
+    setTimeout(()=>{ copyPermalinkBtn_.textContent=original; },1200);
+  }else{
+    copyPermalinkBtn_.textContent='Copy failed';
+    setTimeout(()=>{ copyPermalinkBtn_.textContent=original; },1600);
+  }
+}
+function hydrateFromPermalink(){
+  const params=new URLSearchParams(window.location.search), requestedMarket=params.get('market');
+  MKT=PRESETS[requestedMarket]?requestedMarket:DEFAULT_MARKET;
+  setMarketButton(MKT);
+  refreshPresetLabels();
+  const requestedPreset=params.get('preset')||params.get('p')||DEFAULT_PRESET;
+  const preset=PRESETS[MKT][requestedPreset]?requestedPreset:DEFAULT_PRESET;
+  const base=PRESETS[MKT][preset];
+  cov_.value=base.cov; obs_.value=base.obs; ys_.value=base.ys;
+  setRangeFromParam(params,['coverage','cov'],cov_);
+  setRangeFromParam(params,['obs','observation','observationPeriod'],obs_);
+  setRangeFromParam(params,['yieldShare','ys','seniorYieldSharePaidToJunior'],ys_);
+  setRangeFromParam(params,['exitBuffer','seniorExitTrigger','buffer'],liqUtilInput_);
+  setRangeFromParam(params,['exitBonus','bonus','seniorExitBonus'],selfLiqBonusInput_);
+  updateTermReadouts();
+  markPreset();
+  updateExitControls();
+  render();
+  PERMALINK_READY=true;
+  if(window.location.search) syncPermalinkUrl(true);
+}
+cov_.addEventListener('input',()=>{updateTermReadouts(); markPreset(); render(); syncPermalinkUrl();});
+obs_.addEventListener('input',()=>{updateTermReadouts(); markPreset(); render(); syncPermalinkUrl();});
+ys_.addEventListener('input',()=>{updateTermReadouts(); markPreset(); render(); syncPermalinkUrl();});
 [liqUtilInput_,selfLiqBonusInput_].forEach(el=>{
-  if(el) el.addEventListener('input',()=>{ updateExitControls(); render(); });
-  if(el) el.addEventListener('change',()=>{ updateExitControls(); render(); });
+  if(el) el.addEventListener('input',()=>{ updateExitControls(); render(); syncPermalinkUrl(); });
+  if(el) el.addEventListener('change',()=>{ updateExitControls(); render(); syncPermalinkUrl(); });
 });
+if(copyPermalinkBtn_) copyPermalinkBtn_.addEventListener('click',copyPermalink);
 if(copyDeployBtn_) copyDeployBtn_.addEventListener('click',async()=>{
   const txt='value' in deploySnapshot_ ? deploySnapshot_.value : deploySnapshot_.textContent;
-  try{
-    await navigator.clipboard.writeText(txt);
+  if(await writeClipboardText(txt)){
     copyDeployBtn_.textContent='Copied';
     setTimeout(()=>{ copyDeployBtn_.textContent='Copy'; },1200);
-  }catch(e){
+  }else{
     if('select' in deploySnapshot_){ deploySnapshot_.focus(); deploySnapshot_.select(); }
     copyDeployBtn_.textContent='Select text';
     setTimeout(()=>{ copyDeployBtn_.textContent='Copy'; },1600);
@@ -906,9 +996,9 @@ brushEnd_.addEventListener('keydown',ev=>{ if(ev.key==='ArrowLeft'||ev.key==='Ar
 if(chartDetails_) chartDetails_.addEventListener('toggle',()=>{ if(chartDetails_.open){ syncTimeControls(); draw(); drawBrushOverview(); }});
 document.querySelectorAll('#presets button').forEach(b=>b.addEventListener('click',()=>setPreset(b.dataset.p)));
 document.querySelectorAll('#mkt button').forEach(b=>b.addEventListener('click',()=>{
-  document.querySelectorAll('#mkt button').forEach(x=>x.classList.remove('on')); b.classList.add('on');
+  setMarketButton(b.dataset.m);
   const nextPreset=PRESET||DEFAULT_PRESET; MKT=b.dataset.m;
   refreshPresetLabels(); setPreset(nextPreset); }));
 
-updateExitControls(); refreshPresetLabels(); setPreset(DEFAULT_PRESET);
+hydrateFromPermalink();
 </script></body></html>
