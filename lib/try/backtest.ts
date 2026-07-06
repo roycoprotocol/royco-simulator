@@ -32,6 +32,14 @@ export interface BacktestParams {
   /** Junior deposit, in whole "dollars". */
   depositJT: number;
   series: PricePoint[]; // series[0] is the genesis mark (price base)
+  /**
+   * Intended product model (default true): whenever the market is PERPETUAL
+   * (deposits allowed) and Junior's buffer has drained below the target, fresh
+   * Junior capital is attracted to restore coverage to the target — re-protecting
+   * Senior from its (possibly marked-down) new level. Set false to model FIXED
+   * Junior capital (Junior can be permanently exhausted, Senior nakedly exposed).
+   */
+  maintainJuniorCoverage?: boolean;
 }
 
 export interface BacktestStep {
@@ -43,10 +51,12 @@ export interface BacktestStep {
   il: bigint; // outstanding JT coverage impermanent loss
   coverageUtilWad: bigint;
   marketState: MarketState;
-  stIndex: number; // Senior effective NAV, indexed to $100 at genesis
-  jtIndex: number; // Junior effective NAV, indexed to $100 at genesis
+  stIndex: number; // Senior share price, indexed to $100 at genesis (per-unit, clean)
+  jtIndex: number; // Junior share price, indexed to $100 at genesis (per-unit; replenishment mints at price, so index is undistorted)
   inObservation: boolean; // marketState === FIXED_TERM
-  juniorLossLocked: boolean; // this step: term elapsed / exhaustion → Junior permanently ate a covered loss
+  juniorLossLocked: boolean; // term elapsed / exhaustion → Junior permanently ate a covered loss
+  seniorMarkedDown: boolean; // Senior effective share price fell this step (a real Senior loss)
+  juniorReplenished: number; // fresh Junior capital attracted this step ($), 0 if none
 }
 
 export interface CalendarRow {
@@ -71,6 +81,8 @@ export interface BacktestResult {
   juniorMaxDrawdown: number;
   observationEvents: number; // count of PERPETUAL→FIXED_TERM entries
   juniorLossEvents: number; // count of permanent Junior loss lock-ins (term elapse / exhaustion)
+  seniorMarkdownEvents: number; // count of steps where Senior's share price fell
+  juniorCapitalInjected: number; // total fresh Junior capital attracted over the run ($)
   calendar: CalendarRow[];
 }
 
@@ -105,6 +117,7 @@ const toNum = (x: bigint): number => Number(x) / 1e18;
  */
 export function runBacktest(params: BacktestParams): BacktestResult {
   const { config, depositST, depositJT, series } = params;
+  const maintain = params.maintainJuniorCoverage ?? true;
   if (series.length === 0) {
     return emptyResult();
   }
@@ -112,6 +125,8 @@ export function runBacktest(params: BacktestParams): BacktestResult {
   const m = createMarket(config);
   const stNav0 = toNav(depositST);
   const jtNav0 = toNav(depositJT);
+  const minCovWAD = config.minCoverageWAD;
+  const targetUtilWAD = config.jtYDM.targetUtilizationWAD; // healthy refill point (Junior back to its target % of pool)
 
   // Genesis seeding via deposits (JT then ST), mirroring VectorGen.t.sol / parity.ts.
   deposit(m, "JT", 0n, jtNav0);
@@ -120,19 +135,30 @@ export function runBacktest(params: BacktestParams): BacktestResult {
   const priceWad0 = toPriceWad(series[0].price);
   const steps: BacktestStep[] = [];
 
-  // $100-indexing bases: captured on the first sync's effective NAVs.
-  let stBase = 0n;
+  // Share accounting for clean per-unit indices. Senior is fixed capital
+  // (shares constant). Junior is share-based: replenishment mints new shares at
+  // the current share price, so the Junior index reflects a held unit's return
+  // and is NOT distorted by fresh capital coming in.
+  let stShares = stNav0; // 1 share ~ 1 nav unit at genesis (price 1.0)
+  let jtShares = jtNav0;
+  let stBase = 0n; // Senior effective NAV at genesis (per-unit base)
   let jtBase = 0n;
+
+  // Running raw NAV carried across steps (scaled by price each step, bumped by deposits).
+  let jtRawCarry = jtNav0; // Junior raw NAV at the previous step's price
+  let prevPriceWad = priceWad0;
 
   let prevState: MarketState = "PERPETUAL";
   let prevIL = 0n;
+  let prevStIndex = 100;
 
   for (let i = 0; i < series.length; i++) {
     const p = series[i];
     const priceWad = toPriceWad(p.price);
-    // Co-invested: raw NAV = deposit * price / price0.
+    // Senior: fixed capital, raw NAV = deposit * price / price0.
     const stRaw = mulDiv(stNav0, priceWad, priceWad0, Rounding.Floor);
-    const jtRaw = mulDiv(jtNav0, priceWad, priceWad0, Rounding.Floor);
+    // Junior: carried raw NAV scaled by this step's price move (deposits are added after the sync).
+    const jtRaw = i === 0 ? jtNav0 : mulDiv(jtRawCarry, priceWad, prevPriceWad, Rounding.Floor);
     const dt = i === 0 ? 0n : secondsBetween(series[i - 1].date, p.date);
 
     const r = sync(m, stRaw, jtRaw, dt);
@@ -142,11 +168,40 @@ export function runBacktest(params: BacktestParams): BacktestResult {
       jtBase = r.jtEffectiveNAV === 0n ? 1n : r.jtEffectiveNAV;
     }
 
-    // Detect a permanent Junior loss lock-in: we were in a term, we're now
-    // perpetual, IL was outstanding, and the strategy has NOT recovered to the
-    // pre-drawdown mark (so this is a term-elapse/exhaustion erasure, not a repay).
+    // Per-unit indices (share price / genesis share price * 100).
+    const stIndex = (toNum(r.stEffectiveNAV) / toNum(stShares)) / (toNum(stBase) / toNum(stNav0)) * 100;
+    const jtSharePrice = toNum(r.jtEffectiveNAV) / toNum(jtShares);
+    const jtIndex = jtSharePrice / (toNum(jtBase) / toNum(jtNav0)) * 100;
+
     const backToPerpetual = prevState === "FIXED_TERM" && r.marketState === "PERPETUAL";
     const juniorLossLocked = backToPerpetual && prevIL > 0n && p.price < series[0].price;
+    const seniorMarkedDown = stIndex < prevStIndex - 1e-9;
+
+    // --- Junior replenishment (the intended product model) ---
+    // When PERPETUAL and Junior has drained below target, attract fresh Junior
+    // capital to restore coverage to the target, re-protecting Senior.
+    let juniorReplenished = 0;
+    let jtRawNext = r.jtRawNAV;
+    if (maintain && r.marketState === "PERPETUAL") {
+      // d solves: (stRaw + jtRaw + d)*minCov / (jtEff + d) = targetUtil.
+      const t1 = mulDiv(r.stRawNAV + r.jtRawNAV, minCovWAD, WAD, Rounding.Floor);
+      const t2 = mulDiv(r.jtEffectiveNAV, targetUtilWAD, WAD, Rounding.Floor);
+      const denom = targetUtilWAD - minCovWAD;
+      if (t1 > t2 && denom > 0n) {
+        const d = mulDiv(t1 - t2, WAD, denom, Rounding.Floor);
+        if (d > 0n) {
+          // Mint Junior shares at the current share price (no distortion), then deposit.
+          if (r.jtEffectiveNAV > 0n) {
+            jtShares += (d * jtShares) / r.jtEffectiveNAV;
+          } else {
+            jtShares += d; // fresh cohort when Junior was fully wiped
+          }
+          deposit(m, "JT", r.stRawNAV, r.jtRawNAV + d);
+          jtRawNext = r.jtRawNAV + d;
+          juniorReplenished = toNum(d);
+        }
+      }
+    }
 
     steps.push({
       date: p.date,
@@ -157,14 +212,19 @@ export function runBacktest(params: BacktestParams): BacktestResult {
       il: r.jtCoverageIL,
       coverageUtilWad: r.coverageUtilWad,
       marketState: r.marketState,
-      stIndex: (toNum(r.stEffectiveNAV) / toNum(stBase)) * 100,
-      jtIndex: (toNum(r.jtEffectiveNAV) / toNum(jtBase)) * 100,
+      stIndex,
+      jtIndex,
       inObservation: r.marketState === "FIXED_TERM",
       juniorLossLocked,
+      seniorMarkedDown,
+      juniorReplenished,
     });
 
     prevState = r.marketState;
     prevIL = r.jtCoverageIL;
+    prevStIndex = stIndex;
+    jtRawCarry = jtRawNext;
+    prevPriceWad = priceWad;
   }
 
   return summarize(steps, series);
@@ -182,13 +242,17 @@ function summarize(steps: BacktestStep[], series: PricePoint[]): BacktestResult 
 
   const cagr = (totalReturn: number) => (years > 0 ? Math.pow(1 + totalReturn, 1 / years) - 1 : 0);
 
-  // Observation + junior-loss event counts.
+  // Observation + junior-loss + senior-markdown + injected-capital tallies.
   let observationEvents = 0;
   let juniorLossEvents = 0;
+  let seniorMarkdownEvents = 0;
+  let juniorCapitalInjected = 0;
   let prevObs = false;
   for (const s of steps) {
     if (s.inObservation && !prevObs) observationEvents++;
     if (s.juniorLossLocked) juniorLossEvents++;
+    if (s.seniorMarkedDown) seniorMarkdownEvents++;
+    juniorCapitalInjected += s.juniorReplenished;
     prevObs = s.inObservation;
   }
 
@@ -208,6 +272,8 @@ function summarize(steps: BacktestStep[], series: PricePoint[]): BacktestResult 
     juniorMaxDrawdown: maxDrawdown(steps.map((s) => s.jtIndex)),
     observationEvents,
     juniorLossEvents,
+    seniorMarkdownEvents,
+    juniorCapitalInjected,
     calendar,
   };
 }
@@ -270,6 +336,8 @@ function emptyResult(): BacktestResult {
     juniorMaxDrawdown: 0,
     observationEvents: 0,
     juniorLossEvents: 0,
+    seniorMarkdownEvents: 0,
+    juniorCapitalInjected: 0,
     calendar: [],
   };
 }
