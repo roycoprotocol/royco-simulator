@@ -4,6 +4,15 @@ Questions the accountants / protocol eng must confirm before the reference model
 
 ## Blocking (change the numbers materially)
 
+**Q1 — RESOLVED (2026-07-06, product owner ACK).** The accountant's mechanism is accepted as correct for TRY, and the divergence from the Excel HWM/rolling-window is understood. Confirmed intended behavior:
+- The observation period = `FIXED_TERM`. **Senior only net-earns OUTSIDE it**; while in it, Senior gains repay Junior's coverage IL first (`RoycoDayAccountant.sol:585`).
+- The observation period **begins the instant Junior covers any Senior loss (first cent down), not after a 30% drawdown threshold.** Junior's 30% coverage is its *size* (absorption depth before exhaustion), not a trigger.
+- IL entry is **mark-to-last-sync** (vs prior checkpoint, no high-water mark); Senior resumes earning when Junior's covered loss is fully repaid (not when price exceeds a prior peak).
+- Deliverable is **accountant-accurate, not Excel-accurate** where they diverge (the Excel "Real Simulator" HWM tab is NOT a parity target).
+
+---
+_Original framing (retained for context):_
+
 **Q1 — The Excel's HWM + 30-day/30% rolling-drawdown window have no on-chain counterpart.** ⚠️ NEEDS EXPLICIT ACK
 Confirmed: the accountant is **mark-to-last-sync**, no high-water mark, no rolling lookback, no discrete realization (`RoycoDayAccountant.sol:505-516,557,288-292`). Junior covers Senior on *any* down-sync vs the prior checkpoint.
 Product owner chose "Mode B, 30-day" — but that maps to `fixedTermDurationSeconds` (a post-loss recovery/freeze term), which is **not** the Excel's rolling observation window. The 30-day term does give a recovery window *after* a loss (if price recovers within 30 days, Junior is repaid and the market reopens as if unharmed — loosely analogous to "a drawdown that recovers in-window doesn't stick"), but Senior gains/losses are still measured continuously mark-to-last-sync, and there is no HWM for Senior's earning.
