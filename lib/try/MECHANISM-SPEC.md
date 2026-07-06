@@ -65,7 +65,11 @@ Waterfall (`RoycoDayAccountant.sol:542-574`):
 
 **Permanent wipe vs recoverable:** recoverable by default (coverage → `jtCoverageImpermanentLoss`, first claim on future ST gains). Permanent only via the erasure branch. **Special case:** a permanently-perpetual market (`fixedTermDurationSeconds==0`) erases JT coverage IL *every sync* — so JT coverage is never retained/recovered there (`:660` first disjunct, `:665` comment). This choice materially changes results (OPEN QUESTION #3).
 
-**State transitions** (`:657-701`): IL ≤ dust → PERPETUAL (or stay FIXED_TERM); IL > dust → FIXED_TERM, and **liquidity premium + all protocol fees are zeroed while in fixed term** (`:692-700`); entering FIXED_TERM from PERPETUAL sets `fixedTermEndTimestamp = block.timestamp + fixedTermDurationSeconds` (`:699`).
+**State transitions** (`:657-701`) — PROVEN wei-exact in Phase 3 (see PARITY-REPORT.md), semantics confirmed 3 ways (code read + boundary vectors E1-E5 + real-time path):
+- **Force PERPETUAL + erase JT coverage IL** (`:660-672`) when ANY of: `fixedTermDurationSeconds==0`; **term elapsed** `initialMarketState==FIXED_TERM && fixedTermEndTimestamp <= block.timestamp` (operator is **non-strict `<=`**, `:661`); `coverageUtilization >= coverageLiquidationUtilization`; or Junior exhausted `jtEff==0 && stEff>0`. On this branch **Junior permanently eats the covered loss** (IL erased, not recovered).
+- Else IL ≤ dust → PERPETUAL if it was perpetual or IL fully wiped, else stay FIXED_TERM (`:674-690`).
+- Else IL > dust → FIXED_TERM; **liquidity premium + all protocol fees zeroed while in fixed term** (`:692-700`); the term anchor `fixedTermEndTimestamp = uint32(block.timestamp + fixedTermDurationSeconds)` is set **ONLY on a PERPETUAL→FIXED_TERM *entry*** (`:699`, guarded by `initialMarketState==PERPETUAL`) and **carried unchanged on FIXED_TERM→FIXED_TERM syncs** (it does NOT re-anchor each sync).
+- **Consequence for the 30-day "observation period":** a drawdown that has not recovered within one full term elapses at the next sync past the anchor → the market force-reopens PERPETUAL and Junior's covered loss becomes permanent, *even if the price later recovers* (recovery came too late). `initialMarketState` is the pre-sync stored `$.lastMarketState`. Premium accrual uses `block.timestamp` deltas; if time ever regressed it would `uint256`-underflow-revert at `:747` (cannot happen on-chain; was a harness artifact — see PARITY-REPORT.md).
 
 ---
 

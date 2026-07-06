@@ -34,6 +34,9 @@ Code freezes ALL user ops in FIXED_TERM (`DISABLED_IN_FIXED_TERM_STATE`). If BD 
 No leverage scalar in code; junior leverage is emergent from `minCoverage` + conservation (`:648`; `UtilsLib.sol:52`). Excel implies coverage = Junior is 33% of pool (5/15) and "~3×".
 → **Confirm** the exact `minCoverageWAD` for TRY (candidate: does "3×" mean `1/minCoverage = 3` → `minCoverage = 0.3333e18`? Excel's 30% buffer suggests `0.30e18`; the two differ). Also confirm `JT_COINVESTED` (β) = true/false for wiTRY.
 
+## Phase 3 status (2026-07-06): MECHANISM PROVEN wei-exact
+The TS reference engine (`engine.ts`) matches the real `RoycoDayAccountant` to the wei across 52 vectors (see PARITY-REPORT.md). The FIXED_TERM transition (entry-only anchor, `<=` elapse, IL-erased-on-elapse) was initially mis-modeled, caught by an adversarial boundary pass, and corrected + re-proven. Two apparent behaviors turned out to be **harness clock artifacts, not real semantics**: (a) Group-D "stayed FIXED_TERM across 30-day syncs" (frozen clock); (b) E6 "reverts on full in-term recovery" (backward clock underflow). Both resolved. **No open questions remain on the core mechanism** — only the parameter values below.
+
 ## Parameter confirmations (won't change mechanism, will change outputs)
 
 **Q2 — "47% senior share" → which YDM knob(s).**
