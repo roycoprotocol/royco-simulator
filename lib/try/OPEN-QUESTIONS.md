@@ -4,9 +4,15 @@ Questions the accountants / protocol eng must confirm before the reference model
 
 ## Blocking (change the numbers materially)
 
-**Q1 — The Excel's HWM + 30-day/30% rolling-drawdown window have no on-chain counterpart.**
-The accountant realizes PnL continuously per sync, path-independent; no high-water mark, no lookback window, no discrete realization (MECHANISM-SPEC §2; `RoycoDayAccountant.sol:475-643`). Its only "memory" is JT coverage-IL recovery (`:578-586`). 
-→ **Decide:** does the TRY product actually use an HWM / observation window (in which case it is a mechanism the *code does not implement* and the sim cannot be "accountant-accurate" while honoring it), or was the Excel window a modeling shortcut that should be dropped and re-expressed purely as `minCoverage` + `coverageLiquidationUtilization` params? The whole "accountant-accurate" claim hinges on this.
+**Q1 — The Excel's HWM + 30-day/30% rolling-drawdown window have no on-chain counterpart.** ⚠️ NEEDS EXPLICIT ACK
+Confirmed: the accountant is **mark-to-last-sync**, no high-water mark, no rolling lookback, no discrete realization (`RoycoDayAccountant.sol:505-516,557,288-292`). Junior covers Senior on *any* down-sync vs the prior checkpoint.
+Product owner chose "Mode B, 30-day" — but that maps to `fixedTermDurationSeconds` (a post-loss recovery/freeze term), which is **not** the Excel's rolling observation window. The 30-day term does give a recovery window *after* a loss (if price recovers within 30 days, Junior is repaid and the market reopens as if unharmed — loosely analogous to "a drawdown that recovers in-window doesn't stick"), but Senior gains/losses are still measured continuously mark-to-last-sync, and there is no HWM for Senior's earning.
+→ **Consequence to ACK:** the sim will reproduce the *accountant's* numbers, which will NOT match the Excel "Real Simulator" tab (that tab is built on HWM). Since "code is truth," the HWM + rolling-window are dropped. Confirm this is understood — the deliverable is accountant-accurate, not Excel-accurate, wherever they diverge.
+
+**RESOLVED (2026-07-06):**
+- ~~Q3~~ **Mode B**, `fixedTermDurationSeconds = 2_592_000` (30-day recovery term; ops freeze during it; IL recoverable then erased at term end if unrecovered).
+- ~~Q4~~ implied by Mode B: **no mid-drawdown redemptions** while in the 30-day term (frozen). Redemptions resume on return to PERPETUAL.
+- ~~Q5~~ **`minCoverageWAD = 0.30e18` (30%)**; Junior 33%-of-pool ⇒ U=90% start; 30%-of-pool ⇒ U=100%. **β `JT_COINVESTED = true`.**
 
 **Q3 — Fixed term vs permanently-perpetual, and the IL-erasure consequence.**
 If `fixedTermDurationSeconds == 0`, JT coverage IL is **erased every sync** (never recovered) and the market is always PERPETUAL (`:660-665`). If it's > 0, coverage IL persists and is recoverable, but **all deposits and redemptions freeze during the term** (`RoycoDayKernel.sol:223,257,293,327`). These produce very different Senior/Junior paths.

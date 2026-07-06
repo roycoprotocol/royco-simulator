@@ -6,6 +6,14 @@
 
 > **Headline finding:** the accountant realizes PnL **continuously per sync**, mark-to-market, path-independent. It has **no high-water mark, no rolling observation window, and no discrete realization trigger.** The Excel model's HWM + 30-day/30%-drawdown machinery has *no on-chain counterpart*; its only code-side "memory" is JT coverage impermanent-loss (IL) recovery. This is the central reconciliation issue for parity (§2, §8, OPEN-QUESTIONS #1).
 
+## RESOLVED PARAMETERS (product owner, 2026-07-06)
+Confirmed for the TRY/wiTRY market — feed these into the reference model:
+- **`minCoverageWAD = 0.30e18` (30%).** With Junior = 33% of pool and β=1, this starts the market at U=90% (the YDM target); Junior eroding to 30% of pool ⇒ U=100% (liquidation edge). (See §3, §6.)
+- **`JT_COINVESTED (β) = true`** — Junior takes the same market stress as Senior (leveraged residual of the same pool).
+- **`fixedTermDurationSeconds = 2_592_000` (30 days) — "Mode B."** On a covered Senior loss the market enters `FIXED_TERM` for 30 days: Junior's coverage is a *recoverable* IL claim (future Senior gains repay it first), and **all deposits + redemptions freeze** until the term expires or the market recovers. If not recovered by term end, Junior's IL is erased (Junior permanently eats the covered loss) and the market reopens PERPETUAL. (See §3.)
+- **IL entry = mark-to-last-sync** (confirmed): Junior covers, and IL is booked, whenever Senior's effective NAV falls versus the *previous sync checkpoint* — not versus a peak. `RoycoDayAccountant.sol:505-516,557-570,288-292`. **The Excel's HWM + 30-day rolling observation window are NOT this** and are dropped as non-code mechanisms (OPEN-QUESTIONS #1).
+- Still to confirm: `coverageLiquidationUtilizationWAD` (candidate = WAD, i.e. force-liquidate at U=100%); fee set (Q6); YDM curve shape realizing the 47% share (Q2/Q7).
+
 ---
 
 ## 1. Yield distribution — how Senior's share is computed
