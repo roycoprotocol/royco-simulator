@@ -20,7 +20,7 @@ import {
   type MarketConfig,
   type YDMCurve,
   type MarketState_Internal,
-} from "./engine.ts";
+} from "./engine";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
