@@ -8,38 +8,23 @@ export default function TryPage() {
     <div
       className="min-h-screen"
       style={{
-        fontFamily: 'var(--font-inter)',
-        background: 'var(--foundation)',
-        color: 'var(--theme-foreground)',
+        background: '#FBFAF7',
+        color: '#171511',
+        fontFamily:
+          "-apple-system, system-ui, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
       }}
     >
-      {/* Thin top bar */}
-      <div
-        className="border-b"
-        style={{ borderColor: 'var(--theme-border)', background: 'var(--theme-background)' }}
-      >
-        <div className="max-w-[1400px] mx-auto px-6 h-12 flex items-center gap-4">
-          <Link
-            href="/internal"
-            className="text-xs hover:underline"
-            style={{ color: 'var(--secondary-text)' }}
-          >
-            ← Internal
-          </Link>
-          <span className="text-sm font-semibold" style={{ color: 'var(--primary-text)' }}>
-            TRY Tranche Simulator
-          </span>
-          <span
-            className="ml-auto text-[10px] uppercase tracking-wide"
-            style={{ color: 'var(--tertiary-text)' }}
-          >
-            internal · accountant-accurate
-          </span>
+      <div className="max-w-[1120px] mx-auto px-6 py-8">
+        <Link
+          href="/internal"
+          className="hover:underline"
+          style={{ color: '#967756', fontSize: 11 }}
+        >
+          ← Internal
+        </Link>
+        <div className="mt-6">
+          <TrySimulator />
         </div>
-      </div>
-
-      <div className="max-w-[1400px] mx-auto px-6 py-6">
-        <TrySimulator />
       </div>
     </div>
   );
