@@ -106,3 +106,24 @@ body {
 .tabular-nums {
   transition: color 0.2s ease-out;
 }
+
+/* ===========================================================================
+   Internal dark-theme design tokens (used by /internal simulators).
+   Scoped to a single palette so the public light-theme sims are untouched.
+   =========================================================================== */
+:root {
+  --foundation: #0b0d12;
+  --theme-background: #14171f;
+  --theme-background-elevated: #1a1e29;
+  --theme-border: #262b38;
+  --theme-foreground: #e6e8ee;
+  --primary-text: #e6e8ee;
+  --secondary-text: #9aa2b1;
+  --tertiary-text: #667085;
+  --success: #34d399;
+  --info: #60a5fa;
+  --insight: #a78bfa;
+  --warning: #fbbf24;
+  --danger: #f87171;
+  --font-inter: var(--font-geist-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+}

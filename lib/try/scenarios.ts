@@ -136,7 +136,7 @@ export const SCENARIOS: HistoricalScenario[] = [
   {
     id: "since2024",
     label: "Since 2024",
-    note: "wiTRY +87% over 30 months; the post-pivot recovery regime.",
+    note: "wiTRY +88% from Jan 2024 to Jun 2026; the post-pivot recovery regime.",
     cadence: "monthly",
     points: toPricePoints(since2024 as RawSeries),
   },

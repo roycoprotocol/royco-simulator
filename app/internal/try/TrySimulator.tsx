@@ -561,7 +561,7 @@ export default function TrySimulator() {
       <footer className="pt-2 pb-8 text-[11px] leading-relaxed" style={{ color: 'var(--tertiary-text)' }}>
         Backtest math is the Royco Day accountant, proven wei-exact (52/52
         vectors). Parameters illustrative pending accountant sign-off
-        (OPEN-QUESTIONS). wiTRY series from the srwiTRY brief.
+        (OPEN-QUESTIONS). wiTRY series exported from the srwiTRY yield-flow workbook.
       </footer>
     </div>
   );
@@ -638,4 +638,3 @@ function NumberControl({
     </div>
   );
 }
-

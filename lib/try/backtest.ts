@@ -139,7 +139,7 @@ export function runBacktest(params: BacktestParams): BacktestResult {
   // (shares constant). Junior is share-based: replenishment mints new shares at
   // the current share price, so the Junior index reflects a held unit's return
   // and is NOT distorted by fresh capital coming in.
-  let stShares = stNav0; // 1 share ~ 1 nav unit at genesis (price 1.0)
+  const stShares = stNav0; // 1 share ~ 1 nav unit at genesis (price 1.0)
   let jtShares = jtNav0;
   let stBase = 0n; // Senior effective NAV at genesis (per-unit base)
   let jtBase = 0n;
@@ -231,7 +231,6 @@ export function runBacktest(params: BacktestParams): BacktestResult {
 }
 
 function summarize(steps: BacktestStep[], series: PricePoint[]): BacktestResult {
-  const first = steps[0];
   const last = steps[steps.length - 1];
   const totalSeconds = Number(secondsBetween(series[0].date, series[series.length - 1].date));
   const years = totalSeconds > 0 ? totalSeconds / YEAR_SECONDS : 0;
