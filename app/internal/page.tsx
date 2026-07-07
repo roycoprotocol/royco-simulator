@@ -76,7 +76,6 @@ export default function InternalPage() {
               Full day-cycle engine with intraday event sequencing and runner output.
             </p>
           </Link>
-
           {/* Day Frontend card */}
           <Link
             href="/internal/day-frontend"
@@ -95,27 +94,6 @@ export default function InternalPage() {
             </h2>
             <p className="text-xs text-[#6b7280]">
               Public-facing redesigned Day simulator — dark / Inter UI, stacked &amp; sidebar layouts.
-            </p>
-          </Link>
-
-          {/* TRY Tranche Simulator card */}
-          <Link
-            href="/internal/try"
-            className="group block bg-[#0a0c10] border border-[#1f242c] rounded-lg p-6 hover:border-[#6ea8fe] transition-colors"
-          >
-            <div className="flex items-start justify-between mb-3">
-              <span className="text-[10px] tracking-widest uppercase text-[#6ea8fe]">
-                markets
-              </span>
-              <span className="text-[#6ea8fe] text-sm opacity-0 group-hover:opacity-100 transition-opacity">
-                →
-              </span>
-            </div>
-            <h2 className="text-base font-medium text-[#e5e7eb] mb-1">
-              TRY Tranche Simulator
-            </h2>
-            <p className="text-xs text-[#6b7280]">
-              Accountant-accurate backtest of the srwiTRY senior / junior tranche market.
             </p>
           </Link>
         </div>
