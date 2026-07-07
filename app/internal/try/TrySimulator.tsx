@@ -9,7 +9,7 @@
 // runs for chart shading, formatting, and the trivial Junior pool-share %).
 // ---------------------------------------------------------------------------
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import dynamic from 'next/dynamic';
 import {
   LineChart,
@@ -33,18 +33,11 @@ import {
   type TryParams,
   type HistoricalScenario,
 } from '@/lib/try/scenarios';
-import {
-  createStubLiveAdapter,
-  LiveDataUnavailableError,
-  REQUIRED_LIVE_SOURCES,
-} from '@/lib/try/liveAdapter';
 
 const ResponsiveContainerNoSSR = dynamic(
   () => import('recharts').then((mod) => mod.ResponsiveContainer),
   { ssr: false },
 );
-
-type Mode = 'backtest' | 'live';
 
 // --- formatting helpers (presentational only) ------------------------------
 const fmtPct = (frac: number, digits = 2): string => {
@@ -76,10 +69,8 @@ const signColor = (frac: number): string =>
 export default function TrySimulator() {
   const [params, setParams] = useState<TryParams>(TRY_DEFAULT_PARAMS);
   const [scenarioId, setScenarioId] = useState<HistoricalScenario['id']>('since2024');
-  const [mode, setMode] = useState<Mode>('backtest');
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [maintainCoverage, setMaintainCoverage] = useState(true);
-  const [liveError, setLiveError] = useState<string | null>(null);
 
   const scenario = getScenario(scenarioId);
 
@@ -112,28 +103,6 @@ export default function TrySimulator() {
   const exposedSeniorEnd = exposedResult.steps.length
     ? exposedResult.steps[exposedResult.steps.length - 1].stIndex
     : 100;
-
-  // Live mode: probe the stub adapter; it always throws. Never fake numbers.
-  useEffect(() => {
-    if (mode !== 'live') return;
-    let cancelled = false;
-    createStubLiveAdapter()
-      .getSnapshot('try')
-      .then(() => {
-        if (!cancelled) setLiveError(null);
-      })
-      .catch((e: unknown) => {
-        if (cancelled) return;
-        setLiveError(
-          e instanceof LiveDataUnavailableError
-            ? e.message
-            : 'Live data is unavailable.',
-        );
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [mode]);
 
   // Which preset (if any) exactly matches current params — for active styling.
   const activePreset = useMemo(
@@ -212,27 +181,6 @@ export default function TrySimulator() {
           splits it so Senior is shielded by Junior&apos;s first-loss buffer, and
           Junior earns a share of Senior&apos;s yield for absorbing that risk.
         </p>
-
-        {/* Mode toggle */}
-        <div
-          className="inline-flex mt-4 rounded-lg border overflow-hidden text-xs"
-          style={{ borderColor: 'var(--theme-border)' }}
-        >
-          {(['backtest', 'live'] as Mode[]).map((m) => (
-            <button
-              key={m}
-              type="button"
-              onClick={() => setMode(m)}
-              className="px-4 py-2 transition-colors"
-              style={{
-                background: mode === m ? 'var(--theme-background-elevated)' : 'transparent',
-                color: mode === m ? 'var(--primary-text)' : 'var(--secondary-text)',
-              }}
-            >
-              {m === 'backtest' ? 'Backtest' : 'Live'}
-            </button>
-          ))}
-        </div>
       </section>
 
       {/* ================= B. CUSTOMIZE TERMS ================= */}
@@ -374,9 +322,8 @@ export default function TrySimulator() {
         </p>
       </section>
 
-      {/* ================= C. RESULTS (backtest only) ================= */}
-      {mode === 'backtest' && (
-        <>
+      {/* ================= C. RESULTS ================= */}
+      <>
           {/* KPI cards */}
           <section className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
             <Kpi label="Senior avg/yr" value={fmtSignedPct(result.seniorAvgYr)} color={COLORS.senior} />
@@ -449,13 +396,8 @@ export default function TrySimulator() {
                       fontSize: 12,
                     }}
                     labelStyle={{ color: 'var(--secondary-text)' }}
-                    formatter={(value: number | string, name: string, item: unknown) => {
+                    formatter={(value: number | string, name: string) => {
                       const v = typeof value === 'number' ? `$${value.toFixed(2)}` : value;
-                      // Append marketState once (on the strategy line).
-                      const payload = (item as { payload?: { marketState?: string } })?.payload;
-                      if (name === 'Strategy' && payload?.marketState) {
-                        return [`${v}  ·  ${payload.marketState}`, name];
-                      }
                       return [v, name];
                     }}
                   />
@@ -613,33 +555,9 @@ export default function TrySimulator() {
               promises. This is not an offer or investment advice.
             </p>
           </section>
-        </>
-      )}
+      </>
 
-      {/* ================= D. LIVE mode ================= */}
-      {mode === 'live' && (
-        <section
-          className="rounded-xl border p-5"
-          style={{ background: 'var(--theme-background)', borderColor: 'var(--theme-border)' }}
-        >
-          <h2 className="text-sm font-semibold" style={{ color: 'var(--primary-text)' }}>
-            Live mode not yet connected
-          </h2>
-          <p className="mt-2 text-sm" style={{ color: 'var(--secondary-text)' }}>
-            {liveError ??
-              'Deploy a TRY market and implement the live adapter to enable this view.'}{' '}
-            Backtest mode is fully validated (see lib/try/PARITY-REPORT.md).
-          </p>
-
-          <div className="mt-4 grid grid-cols-1 lg:grid-cols-3 gap-4">
-            <SourceList title="Subgraph queries" items={[...REQUIRED_LIVE_SOURCES.subgraph]} />
-            <SourceList title="Contract reads" items={[...REQUIRED_LIVE_SOURCES.contractReads]} />
-            <SourceList title="Oracle" items={[REQUIRED_LIVE_SOURCES.oracle]} />
-          </div>
-        </section>
-      )}
-
-      {/* ================= E. FOOTER ================= */}
+      {/* ================= FOOTER ================= */}
       <footer className="pt-2 pb-8 text-[11px] leading-relaxed" style={{ color: 'var(--tertiary-text)' }}>
         Backtest math is the Royco Day accountant, proven wei-exact (52/52
         vectors). Parameters illustrative pending accountant sign-off
@@ -721,23 +639,3 @@ function NumberControl({
   );
 }
 
-function SourceList({ title, items }: { title: string; items: string[] }) {
-  return (
-    <div
-      className="rounded-lg border p-4"
-      style={{ background: 'var(--theme-background-elevated)', borderColor: 'var(--theme-border)' }}
-    >
-      <p className="text-xs font-semibold uppercase tracking-wide mb-2" style={{ color: 'var(--secondary-text)' }}>
-        {title}
-      </p>
-      <ul className="space-y-2">
-        {items.map((it, i) => (
-          <li key={i} className="flex gap-2 text-[11px] leading-relaxed" style={{ color: 'var(--tertiary-text)' }}>
-            <span style={{ color: 'var(--warning)' }}>☐</span>
-            <span className="break-words">{it}</span>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
