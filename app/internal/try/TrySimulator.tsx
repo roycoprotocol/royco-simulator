@@ -6,7 +6,7 @@
 // comes from runBacktest() (which bridges to the validated engine). This
 // component performs NO tranche accounting itself; the only local computation
 // is presentational (indexing already-computed values, contiguous observation
-// runs for chart shading, formatting, and the trivial Junior pool-share %).
+// runs for chart shading, formatting, and derived display strings).
 // ---------------------------------------------------------------------------
 
 import { useMemo, useState } from 'react';
@@ -20,6 +20,7 @@ import {
   Tooltip,
   ReferenceArea,
   ReferenceDot,
+  Brush,
 } from 'recharts';
 
 import { runBacktest } from '@/lib/try/backtest';
@@ -29,6 +30,7 @@ import {
   SCENARIOS,
   buildConfig,
   getScenario,
+  paramsToDeposits,
   type TryParams,
   type HistoricalScenario,
 } from '@/lib/try/scenarios';
@@ -84,97 +86,93 @@ export default function TrySimulator() {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [maintainCoverage, setMaintainCoverage] = useState(true);
   const [showHistory, setShowHistory] = useState(true);
+  const [showDeploy, setShowDeploy] = useState(false);
+  const [hoverDate, setHoverDate] = useState<string | null>(null);
 
   const scenario = getScenario(scenarioId);
 
-  const result = useMemo(
-    () =>
-      runBacktest({
-        config: buildConfig(params),
-        depositST: params.depositST,
-        depositJT: params.depositJT,
-        series: getScenario(scenarioId).points,
-        maintainJuniorCoverage: maintainCoverage,
-      }),
-    [params, scenarioId, maintainCoverage],
-  );
-
-  // Counterfactual: the same path with FIXED Junior (no replenishment), used to
-  // show — in the disclaimer — what Senior's exposure looks like without the
-  // maintained-coverage assumption.
-  const exposedResult = useMemo(
-    () =>
-      runBacktest({
-        config: buildConfig(params),
-        depositST: params.depositST,
-        depositJT: params.depositJT,
-        series: getScenario(scenarioId).points,
-        maintainJuniorCoverage: false,
-      }),
-    [params, scenarioId],
-  );
-  const exposedSeniorEnd = exposedResult.steps.length
-    ? exposedResult.steps[exposedResult.steps.length - 1].stIndex
-    : 100;
+  const result = useMemo(() => {
+    const dep = paramsToDeposits(params);
+    return runBacktest({
+      config: buildConfig(params),
+      depositST: dep.depositST,
+      depositJT: dep.depositJT,
+      series: getScenario(scenarioId).points,
+      maintainJuniorCoverage: maintainCoverage,
+    });
+  }, [params, scenarioId, maintainCoverage]);
 
   // Which preset (if any) exactly matches current params — for active styling.
   const activePreset = useMemo(
     () =>
       PRESETS.find(
         (p) =>
-          p.params.depositST === params.depositST &&
-          p.params.depositJT === params.depositJT &&
-          p.params.seniorShareToJuniorPct === params.seniorShareToJuniorPct &&
+          p.params.firstLossPct === params.firstLossPct &&
           p.params.observationDays === params.observationDays &&
-          p.params.minCoveragePct === params.minCoveragePct,
+          p.params.seniorShareToJuniorPct === params.seniorShareToJuniorPct &&
+          p.params.juniorBufferRemainingPct === params.juniorBufferRemainingPct &&
+          p.params.seniorExitBonusPct === params.seniorExitBonusPct,
       ),
     [params],
   );
 
-  const jtPct =
-    params.depositST + params.depositJT > 0
-      ? (params.depositJT / (params.depositST + params.depositJT)) * 100
-      : 0;
+  const activeRun = useMemo(
+    () =>
+      hoverDate
+        ? result.observationRuns.find((r) => hoverDate >= r.startDate && hoverDate <= r.endDate) ?? null
+        : null,
+    [hoverDate, result.observationRuns],
+  );
 
-  // Contiguous observation runs → ReferenceArea shading (presentational).
-  const observationRuns = useMemo(() => {
-    const runs: { x1: string; x2: string }[] = [];
-    let start: string | null = null;
-    let prev: string | null = null;
+  const representedYears = useMemo(() => {
+    const counts: Record<string, number> = {};
     for (const s of result.steps) {
-      if (s.inObservation) {
-        if (start === null) start = s.date;
-        prev = s.date;
-      } else if (start !== null) {
-        runs.push({ x1: start, x2: prev ?? start });
-        start = null;
-        prev = null;
-      }
+      const y = s.date.slice(0, 4);
+      counts[y] = (counts[y] ?? 0) + 1;
     }
-    if (start !== null) runs.push({ x1: start, x2: prev ?? start });
-    return runs;
+    return new Set(Object.keys(counts).filter((y) => counts[y] >= 5));
   }, [result.steps]);
 
-  const lossMarkers = useMemo(
-    () => result.steps.filter((s) => s.juniorLossLocked),
-    [result.steps],
+  const perYearRows = useMemo(
+    () => result.perYear.filter((r) => representedYears.has(r.year)),
+    [result.perYear, representedYears],
   );
 
   const chartData = useMemo(
     () =>
-      result.steps.map((s) => ({
+      result.steps.map((s, i) => ({
         date: s.date,
         strategy: s.priceIndex,
+        juniorKept: result.juniorIfKept[i],
         senior: s.stIndex,
         junior: s.jtIndex,
         marketState: s.marketState,
       })),
+    [result.steps, result.juniorIfKept],
+  );
+
+  const erasedMarkers = useMemo(
+    () =>
+      result.steps
+        .filter((s) => Number(s.ilErased) > 0)
+        .map((s) => {
+          const denom = Number(s.jtEff) + Number(s.ilErased);
+          const pct = denom > 0 ? Math.round((Number(s.ilErased) / denom) * 100) : 0;
+          return { date: s.date, jtIndex: s.jtIndex, pct };
+        }),
     [result.steps],
   );
 
-  const seniorEnd = result.steps.length
-    ? result.steps[result.steps.length - 1].stIndex
-    : 100;
+  const seniorLossMarkers = useMemo(
+    () => result.steps.filter((s) => s.seniorMarkedDown),
+    [result.steps],
+  );
+
+  const seniorEnd = result.steps.length ? result.steps[result.steps.length - 1].stIndex : 100;
+  const juniorEnd = result.steps.length ? result.steps[result.steps.length - 1].jtIndex : 100;
+  const strategyEnd = result.steps.length ? result.steps[result.steps.length - 1].priceIndex : 100;
+  const firstDate = result.steps.length ? result.steps[0].date : '—';
+  const lastDate = result.steps.length ? result.steps[result.steps.length - 1].date : '—';
 
   const updateParam = (patch: Partial<TryParams>) =>
     setParams((p) => ({ ...p, ...patch }));
@@ -185,9 +183,17 @@ export default function TrySimulator() {
     }
   };
 
+  const deployString = `${params.firstLossPct.toFixed(0)}% first-loss · ${params.observationDays}d observation · ${params.seniorShareToJuniorPct}% to Junior · ${params.juniorBufferRemainingPct.toFixed(2)}% buffer remaining · ${params.seniorExitBonusPct.toFixed(2)}% Senior exit bonus`;
+
+  const copyDeployString = () => {
+    if (typeof window !== 'undefined' && navigator?.clipboard) {
+      navigator.clipboard.writeText(deployString).catch(() => {});
+    }
+  };
+
   return (
     <div className="flex flex-col gap-10">
-      {/* ================= 1. HERO ================= */}
+      {/* ================= 1. HEADER ================= */}
       <section>
         <div className="flex items-center gap-2">
           <span
@@ -208,7 +214,7 @@ export default function TrySimulator() {
               fontWeight: 600,
             }}
           >
-            ROYCO · srwiTRY MARKET
+            ROYCO · srwiTRY MARKET DESIGN
           </span>
         </div>
         <h1
@@ -225,36 +231,48 @@ export default function TrySimulator() {
           srwiTRY Market Builder
         </h1>
         <p className="mt-3 max-w-3xl" style={{ color: C.muted, fontSize: 14, lineHeight: 1.6 }}>
-          wiTRY is a Turkish-lira money-market-fund plus FX strategy. This market
-          splits it so Senior is shielded by Junior&apos;s first-loss buffer, and
-          Junior earns a share of Senior&apos;s yield for absorbing that risk.
+          A fast path for market creators to choose Senior/Junior terms, check the historical
+          tradeoff, and copy the market-design inputs.
         </p>
       </section>
 
-      {/* ================= 2. TABS ROW ================= */}
+      {/* ================= 2. LOADED MARKET ROW ================= */}
       <section className="flex items-end justify-between flex-wrap gap-4">
-        <div className="flex items-center gap-6" style={{ borderBottom: `1px solid ${C.border}` }}>
-          {SCENARIOS.map((s) => {
-            const active = s.id === scenarioId;
-            return (
-              <button
-                key={s.id}
-                type="button"
-                onClick={() => setScenarioId(s.id)}
-                style={{
-                  padding: '0 0 10px',
-                  fontSize: 13,
-                  fontWeight: active ? 600 : 400,
-                  color: active ? C.text : C.muted,
-                  borderBottom: `2px solid ${active ? C.accent : 'transparent'}`,
-                  marginBottom: -1,
-                  background: 'transparent',
-                }}
-              >
-                {s.label}
-              </button>
-            );
-          })}
+        <div className="flex items-end gap-6">
+          <span
+            style={{
+              color: C.kpiLabel,
+              textTransform: 'uppercase',
+              fontSize: 10,
+              letterSpacing: 1,
+              paddingBottom: 10,
+            }}
+          >
+            Loaded market
+          </span>
+          <div className="flex items-center gap-6" style={{ borderBottom: `1px solid ${C.border}` }}>
+            {SCENARIOS.map((s) => {
+              const active = s.id === scenarioId;
+              return (
+                <button
+                  key={s.id}
+                  type="button"
+                  onClick={() => setScenarioId(s.id)}
+                  style={{
+                    padding: '0 0 10px',
+                    fontSize: 13,
+                    fontWeight: active ? 600 : 400,
+                    color: active ? C.text : C.muted,
+                    borderBottom: `2px solid ${active ? C.accent : 'transparent'}`,
+                    marginBottom: -1,
+                    background: 'transparent',
+                  }}
+                >
+                  {s.label}
+                </button>
+              );
+            })}
+          </div>
         </div>
         <button
           type="button"
@@ -279,37 +297,22 @@ export default function TrySimulator() {
         style={{ background: C.cardBg, border: `1px solid ${C.border}`, borderRadius: 0 }}
         className="p-6"
       >
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          {/* left: description */}
-          <div>
+        <div className="flex flex-wrap items-start gap-8">
+          <div style={{ flex: '1 1 320px' }}>
             <Eyebrow>Overview</Eyebrow>
             <h2 className="mt-2" style={{ fontFamily: SERIF, fontWeight: 400, fontSize: 24, color: C.text }}>
               {scenario.label} projection
             </h2>
-            <p className="mt-3" style={{ color: C.muted, fontSize: 14, lineHeight: 1.6 }}>
-              Senior stays inside a {fmtSignedPct(result.seniorAvgYr, 1)}/yr band with{' '}
-              {result.observationEvents} observation periods over {result.years.toFixed(1)} years.
+            <p className="mt-3 max-w-2xl" style={{ color: C.muted, fontSize: 14, lineHeight: 1.6 }}>
+              Current {activePreset?.label ?? 'custom'} terms{' '}
+              {result.seniorLossEvents === 0
+                ? 'pass the Senior hard guardrail: no historical Senior loss events'
+                : `show ${result.seniorLossEvents} Senior loss events`}{' '}
+              with {params.firstLossPct.toFixed(0)}% first-loss protection, {params.observationDays}d
+              observation period, and {params.seniorShareToJuniorPct}% of Senior yield paid to Junior.
             </p>
-
-            {/* secondary stat row (keeps all six metrics visible) */}
-            <div className="mt-5 grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-4">
-              <SecondaryStat label="Strategy avg/yr" value={`${fmtSignedPct(result.strategyAvgYr, 1)}/yr`} />
-              <SecondaryStat
-                label="Senior max drawdown"
-                value={fmtPct(result.seniorMaxDrawdown)}
-                color={result.seniorMaxDrawdown > 0 ? C.danger : C.text}
-              />
-              <SecondaryStat label="Observation periods" value={String(result.observationEvents)} />
-              <SecondaryStat
-                label="Junior loss lock-ins"
-                value={String(result.juniorLossEvents)}
-                color={result.juniorLossEvents > 0 ? C.danger : C.text}
-              />
-            </div>
           </div>
-
-          {/* right: two KPI cards */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="flex flex-wrap gap-4" style={{ flex: '0 0 auto' }}>
             <Kpi label="Senior avg/yr" value={`${fmtSignedPct(result.seniorAvgYr, 1)}/yr`} />
             <Kpi label="Junior avg/yr" value={`${fmtSignedPct(result.juniorAvgYr, 1)}/yr`} />
           </div>
@@ -325,10 +328,10 @@ export default function TrySimulator() {
           <div>
             <Eyebrow>Customize terms</Eyebrow>
             <h2 className="mt-2" style={{ fontFamily: SERIF, fontWeight: 400, fontSize: 24, color: C.text }}>
-              Adjust the market terms.
+              Adjust the current market terms.
             </h2>
             <p className="mt-2" style={{ color: C.muted, fontSize: 14, lineHeight: 1.6 }}>
-              Change deposits, the yield share, and the observation cadence to reshape the tranches.
+              The loaded strategy path is already set. These five controls change the market terms.
             </p>
           </div>
           <button
@@ -355,7 +358,7 @@ export default function TrySimulator() {
           <div className="mt-6 flex flex-col gap-6">
             {/* Preset ladder */}
             <div>
-              <Eyebrow>Scenario</Eyebrow>
+              <Eyebrow>Preset ladder</Eyebrow>
               <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3">
                 {PRESETS.map((p) => {
                   const active = activePreset?.id === p.id;
@@ -374,8 +377,8 @@ export default function TrySimulator() {
                     >
                       <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{p.label}</div>
                       <div style={{ fontSize: 11, color: C.muted, marginTop: 4 }}>
-                        Junior {fmtUsd0(p.params.depositJT)}, {p.params.observationDays}-day
-                        observation, {p.params.seniorShareToJuniorPct}% share
+                        {p.params.firstLossPct}% first-loss · {p.params.observationDays}d obs ·{' '}
+                        {p.params.seniorShareToJuniorPct}% to Jr
                       </div>
                     </button>
                   );
@@ -386,70 +389,54 @@ export default function TrySimulator() {
             {/* Controls */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
               <SliderControl
-                label="Senior deposit ($)"
-                value={params.depositST}
-                min={100}
-                max={10000}
-                step={100}
-                display={fmtUsd0(params.depositST)}
-                desc="Protected capital that Junior shields from losses."
-                onChange={(v) => updateParam({ depositST: v })}
-              />
-              <SliderControl
-                label="Junior deposit ($)"
-                value={params.depositJT}
-                min={0}
-                max={10000}
-                step={50}
-                display={fmtUsd0(params.depositJT)}
-                desc="First-loss buffer that absorbs drawdowns for Senior."
-                onChange={(v) => updateParam({ depositJT: v })}
-              />
-              <SliderControl
-                label="Senior yield share to Junior (%)"
-                value={params.seniorShareToJuniorPct}
-                min={0}
-                max={100}
+                label="First-loss protection (%)"
+                value={params.firstLossPct}
+                min={8}
+                max={65}
                 step={1}
-                display={`${params.seniorShareToJuniorPct}%`}
-                desc="Portion of Senior yield paid to Junior for taking risk."
-                onChange={(v) => updateParam({ seniorShareToJuniorPct: v })}
+                display={`${params.firstLossPct.toFixed(0)}%`}
+                desc="Junior's share of the pool that absorbs losses first."
+                onChange={(v) => updateParam({ firstLossPct: v })}
               />
               <SliderControl
                 label="Observation period (days)"
                 value={params.observationDays}
-                min={1}
-                max={120}
+                min={7}
+                max={194}
                 step={1}
-                display={`${params.observationDays} days`}
-                desc="Window during which deposits and redemptions freeze."
+                display={`${params.observationDays}d`}
+                desc="Fixed-term window before an unrecovered loss locks in."
                 onChange={(v) => updateParam({ observationDays: v })}
               />
               <SliderControl
-                label="Min coverage (%)"
-                value={params.minCoveragePct}
-                min={0}
-                max={100}
+                label="Senior yield to Junior (%)"
+                value={params.seniorShareToJuniorPct}
+                min={20}
+                max={80}
                 step={1}
-                display={`${params.minCoveragePct}%`}
-                desc="Minimum Junior buffer rebuilt when deposits reopen."
-                onChange={(v) => updateParam({ minCoveragePct: v })}
+                display={`${params.seniorShareToJuniorPct}%`}
+                desc="Share of Senior's yield paid to Junior for taking first loss."
+                onChange={(v) => updateParam({ seniorShareToJuniorPct: v })}
               />
-            </div>
-
-            {/* Summary chips */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <SummaryChip
-                label="Senior protection"
-                body={`${result.seniorMarkdownEvents} markdowns, ${fmtPct(result.seniorMaxDrawdown)} max drawdown`}
+              <SliderControl
+                label="Junior buffer remaining (%)"
+                value={params.juniorBufferRemainingPct}
+                min={1}
+                max={99.91}
+                step={0.01}
+                display={`${params.juniorBufferRemainingPct.toFixed(2)}%`}
+                desc="Minimum Junior coverage before liquidation trips."
+                onChange={(v) => updateParam({ juniorBufferRemainingPct: v })}
               />
-              <SummaryChip
-                label="Junior tradeoff"
-                body={`${fmtSignedPct(result.juniorAvgYr)}/yr, ${result.juniorLossEvents} loss lock-ins`}
-              />
-              <SummaryChip
-                label="Coverage"
-                body={`Junior ≈ ${jtPct.toFixed(0)}% of pool, ${fmtUsd0(result.juniorCapitalInjected)} attracted`}
+              <SliderControl
+                label="Senior exit bonus (%)"
+                value={params.seniorExitBonusPct}
+                min={0}
+                max={5}
+                step={0.05}
+                display={`${params.seniorExitBonusPct.toFixed(2)}%`}
+                desc="Bonus to Senior on a protected exit (stSelfLiquidationBonus). Deploy parameter — does not affect the historical curve."
+                onChange={(v) => updateParam({ seniorExitBonusPct: v })}
               />
             </div>
           </div>
@@ -468,7 +455,7 @@ export default function TrySimulator() {
               Chart, metrics, and mechanics.
             </h2>
             <p className="mt-2" style={{ color: C.muted, fontSize: 14, lineHeight: 1.6 }}>
-              How the tranches tracked the strategy across the selected history.
+              Use this to sanity-check observation periods, erased claims, and protocol mechanics.
             </p>
           </div>
           <button
@@ -497,11 +484,17 @@ export default function TrySimulator() {
             <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mb-4" style={{ fontSize: 12, color: C.muted }}>
               <LegendSwatch color={C.seniorLine}>Senior share price</LegendSwatch>
               <LegendSwatch color={C.juniorLine}>Junior share price</LegendSwatch>
+              <LegendSwatch color={`${C.strategyLine}90`} dashed>
+                Junior if recoveries kept
+              </LegendSwatch>
               <LegendSwatch color={C.strategyLine} dashed>
                 Base strategy
               </LegendSwatch>
               <span className="flex items-center gap-2">
-                <span style={{ color: C.danger }}>▼</span> Junior loss locked
+                <span style={{ color: C.danger }}>▼</span> Junior recovery erased
+              </span>
+              <span className="flex items-center gap-2">
+                <span style={{ color: C.danger }}>●</span> Senior loss event
               </span>
               <span className="flex items-center gap-2">
                 <span
@@ -513,18 +506,34 @@ export default function TrySimulator() {
 
             <div style={{ width: '100%', height: 360 }}>
               <ResponsiveContainerNoSSR>
-                <LineChart data={chartData} margin={{ top: 8, right: 16, bottom: 8, left: 0 }}>
+                <LineChart
+                  data={chartData}
+                  margin={{ top: 8, right: 16, bottom: 8, left: 0 }}
+                  onMouseMove={(s) =>
+                    setHoverDate((s as { activeLabel?: string })?.activeLabel ?? null)
+                  }
+                  onMouseLeave={() => setHoverDate(null)}
+                >
                   <CartesianGrid strokeDasharray="3 3" stroke={C.border} />
-                  {observationRuns.map((r, i) => (
+                  {result.observationRuns.map((r, i) => (
                     <ReferenceArea
                       key={`obs-${i}`}
-                      x1={r.x1}
-                      x2={r.x2}
+                      x1={r.startDate}
+                      x2={r.endDate}
                       fill={C.obsFill}
-                      fillOpacity={0.32}
+                      fillOpacity={0.16}
                       stroke="none"
                     />
                   ))}
+                  {activeRun && (
+                    <ReferenceArea
+                      x1={activeRun.startDate}
+                      x2={activeRun.endDate}
+                      fill={C.obsFill}
+                      fillOpacity={0.3}
+                      stroke="none"
+                    />
+                  )}
                   <XAxis
                     dataKey="date"
                     tick={{ fill: C.kpiLabel, fontSize: 11 }}
@@ -568,6 +577,15 @@ export default function TrySimulator() {
                   />
                   <Line
                     type="monotone"
+                    dataKey="juniorKept"
+                    name="Junior (kept)"
+                    stroke={`${C.strategyLine}90`}
+                    strokeDasharray="2 3"
+                    dot={false}
+                    strokeWidth={1}
+                  />
+                  <Line
+                    type="monotone"
                     dataKey="senior"
                     name="Senior"
                     stroke={C.seniorLine}
@@ -582,22 +600,74 @@ export default function TrySimulator() {
                     dot={false}
                     strokeWidth={2}
                   />
-                  {lossMarkers.map((s, i) => (
+                  {erasedMarkers.map((s, i) => (
                     <ReferenceDot
-                      key={`loss-${i}`}
+                      key={`erased-${i}`}
                       x={s.date}
                       y={s.jtIndex}
-                      r={3.5}
+                      r={3}
+                      fill={C.danger}
+                      stroke={C.cardBg}
+                      label={
+                        s.pct >= 4
+                          ? { value: `erased -${s.pct}%`, position: 'top', fontSize: 9, fill: C.danger }
+                          : undefined
+                      }
+                    />
+                  ))}
+                  {seniorLossMarkers.map((s, i) => (
+                    <ReferenceDot
+                      key={`sloss-${i}`}
+                      x={s.date}
+                      y={s.stIndex}
+                      r={3}
                       fill={C.danger}
                       stroke={C.cardBg}
                     />
                   ))}
+                  {result.steps.length > 0 && (
+                    <ReferenceDot
+                      x={result.steps[result.steps.length - 1].date}
+                      y={seniorEnd}
+                      r={3}
+                      fill={C.seniorLine}
+                      stroke={C.cardBg}
+                      label={{ value: `Sr ${seniorEnd.toFixed(0)}`, position: 'right', fontSize: 10, fill: C.seniorLine }}
+                    />
+                  )}
+                  {result.steps.length > 0 && (
+                    <ReferenceDot
+                      x={result.steps[result.steps.length - 1].date}
+                      y={juniorEnd}
+                      r={3}
+                      fill={C.juniorLine}
+                      stroke={C.cardBg}
+                      label={{ value: `Jr ${juniorEnd.toFixed(0)}`, position: 'right', fontSize: 10, fill: C.juniorLine }}
+                    />
+                  )}
+                  <Brush dataKey="date" height={28} stroke={C.border} travellerWidth={8} />
                 </LineChart>
               </ResponsiveContainerNoSSR>
             </div>
 
-            {/* Calendar returns table */}
+            {/* Chart timeframe */}
+            <div className="mt-3 flex items-center justify-between" style={{ fontSize: 11, color: C.kpiLabel }}>
+              <span style={{ textTransform: 'uppercase', letterSpacing: 1 }}>Chart timeframe</span>
+              <span>Full history</span>
+            </div>
+            <div className="mt-1 flex items-center justify-between" style={{ fontSize: 11, color: C.muted, fontFamily: MONO }}>
+              <span>START {firstDate}</span>
+              <span>END {lastDate}</span>
+            </div>
+
+            {/* Calendar-year return / observation stats table */}
             <div className="mt-6 overflow-x-auto">
+              <p
+                className="mb-2"
+                style={{ color: C.eyebrow, textTransform: 'uppercase', letterSpacing: 1, fontSize: 11, fontWeight: 600 }}
+              >
+                Calendar-year return / observation stats
+              </p>
               <table className="w-full text-sm" style={{ fontVariantNumeric: 'tabular-nums' }}>
                 <thead>
                   <tr
@@ -609,73 +679,126 @@ export default function TrySimulator() {
                     }}
                     className="text-left"
                   >
-                    <th className="py-2 pr-4 font-semibold">Year</th>
-                    <th className="py-2 pr-4 font-semibold text-right">Strategy</th>
-                    <th className="py-2 pr-4 font-semibold text-right">Senior</th>
-                    <th className="py-2 pr-4 font-semibold text-right">Junior</th>
-                    <th className="py-2 font-semibold text-right">Senior end $100</th>
+                    <th className="py-2 pr-4 font-semibold">Metric</th>
+                    {perYearRows.map((row) => (
+                      <th key={row.year} className="py-2 pr-4 font-semibold text-right">
+                        {row.year}
+                      </th>
+                    ))}
+                    <th className="py-2 pr-4 font-semibold text-right">End $100 →</th>
+                    <th className="py-2 font-semibold text-right">Avg/yr / total</th>
                   </tr>
                 </thead>
-                <tbody>
-                  {result.calendar.map((row) => (
-                    <tr key={row.year} style={{ borderTop: `1px solid ${C.border}` }}>
-                      <td className="py-2 pr-4" style={{ color: C.text, fontFamily: MONO }}>
-                        {row.year}
+                <tbody style={{ fontFamily: MONO }}>
+                  <tr style={{ borderTop: `1px solid ${C.border}` }}>
+                    <td className="py-2 pr-4" style={{ color: C.text }}>Base strategy</td>
+                    {perYearRows.map((row) => (
+                      <td key={row.year} className="py-2 pr-4 text-right" style={{ color: signColor(row.baseReturn) }}>
+                        {fmtSignedPct(row.baseReturn)}
                       </td>
-                      <td
-                        className="py-2 pr-4 text-right"
-                        style={{ color: signColor(row.strategyReturn), fontFamily: MONO }}
-                      >
-                        {fmtSignedPct(row.strategyReturn)}
-                      </td>
-                      <td
-                        className="py-2 pr-4 text-right"
-                        style={{ color: signColor(row.seniorReturn), fontFamily: MONO }}
-                      >
-                        {fmtSignedPct(row.seniorReturn)}
-                      </td>
-                      <td
-                        className="py-2 pr-4 text-right"
-                        style={{ color: signColor(row.juniorReturn), fontFamily: MONO }}
-                      >
+                    ))}
+                    <td className="py-2 pr-4 text-right" style={{ color: C.text }}>${strategyEnd.toFixed(0)}</td>
+                    <td className="py-2 text-right" style={{ color: C.text }}>{fmtPct(result.strategyAvgYr, 1)} ann.</td>
+                  </tr>
+                  <tr style={{ borderTop: `1px solid ${C.border}` }}>
+                    <td className="py-2 pr-4" style={{ color: C.text }}>Junior return</td>
+                    {perYearRows.map((row) => (
+                      <td key={row.year} className="py-2 pr-4 text-right" style={{ color: signColor(row.juniorReturn) }}>
                         {fmtSignedPct(row.juniorReturn)}
                       </td>
-                      <td className="py-2 text-right" style={{ color: C.text, fontFamily: MONO }}>
-                        {fmtUsd(row.seniorEnd100)}
+                    ))}
+                    <td className="py-2 pr-4 text-right" style={{ color: C.text }}>${juniorEnd.toFixed(0)}</td>
+                    <td className="py-2 text-right" style={{ color: C.text }}>{fmtSignedPct(result.juniorAvgYr, 1)} ann.</td>
+                  </tr>
+                  <tr style={{ borderTop: `1px solid ${C.border}` }}>
+                    <td className="py-2 pr-4" style={{ color: C.text }}>Senior return</td>
+                    {perYearRows.map((row) => (
+                      <td key={row.year} className="py-2 pr-4 text-right" style={{ color: signColor(row.seniorReturn) }}>
+                        {fmtSignedPct(row.seniorReturn)}
                       </td>
-                    </tr>
-                  ))}
+                    ))}
+                    <td className="py-2 pr-4 text-right" style={{ color: C.text }}>${seniorEnd.toFixed(0)}</td>
+                    <td className="py-2 text-right" style={{ color: C.text }}>{fmtSignedPct(result.seniorAvgYr, 1)} ann.</td>
+                  </tr>
+                  <tr style={{ borderTop: `1px solid ${C.border}` }}>
+                    <td className="py-2 pr-4" style={{ color: C.text }}>Non-observation %</td>
+                    {perYearRows.map((row) => (
+                      <td key={row.year} className="py-2 pr-4 text-right" style={{ color: C.text }}>
+                        {fmtPct(row.nonObsPct / 100, 0)}
+                      </td>
+                    ))}
+                    <td className="py-2 pr-4 text-right" style={{ color: C.muted }}>—</td>
+                    <td className="py-2 text-right" style={{ color: C.text }}>{fmtPct(result.nonObservationPct / 100, 0)}</td>
+                  </tr>
+                  <tr style={{ borderTop: `1px solid ${C.border}` }}>
+                    <td className="py-2 pr-4" style={{ color: C.text }}>Observation periods triggered</td>
+                    {perYearRows.map((row) => (
+                      <td key={row.year} className="py-2 pr-4 text-right" style={{ color: C.text }}>
+                        {row.obsEvents}
+                      </td>
+                    ))}
+                    <td className="py-2 pr-4 text-right" style={{ color: C.muted }}>—</td>
+                    <td className="py-2 text-right" style={{ color: C.text }}>{result.observationEvents} total</td>
+                  </tr>
                 </tbody>
               </table>
+            </div>
+
+            {/* Additional outcome metrics */}
+            <div className="mt-6 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-x-6 gap-y-4">
+              <SecondaryStat
+                label="Senior worst drop"
+                value={`-${fmtPct(result.seniorMaxDrawdown)}`}
+                color={result.seniorMaxDrawdown > 0 ? C.danger : C.text}
+              />
+              <SecondaryStat
+                label="Junior worst drop"
+                value={`-${fmtPct(result.juniorMaxDrawdown)}`}
+                color={result.juniorMaxDrawdown > 0 ? C.danger : C.text}
+              />
+              <SecondaryStat label="Max observed observation period" value={`${result.maxObservationPeriodDays}d`} />
+              <SecondaryStat
+                label="Claims erased"
+                value={String(result.juniorLossRealizedEvents)}
+                color={result.juniorLossRealizedEvents > 0 ? C.danger : C.text}
+              />
+              <SecondaryStat
+                label="Claims value erased"
+                value={fmtUsd0(result.juniorCapitalLost)}
+                color={result.juniorCapitalLost > 0 ? C.danger : C.text}
+              />
+              <SecondaryStat
+                label="Senior loss events"
+                value={String(result.seniorLossEvents)}
+                color={result.seniorLossEvents > 0 ? C.danger : C.text}
+              />
             </div>
           </div>
         )}
       </section>
 
-      {/* ================= 6. DISCLAIMER ================= */}
-      <section
-        style={{
-          background: C.cardBg,
-          border: `1px solid ${C.border}`,
-          borderLeft: `3px solid ${C.accent}`,
-          borderRadius: 0,
-        }}
-        className="p-6"
-      >
-        <div className="flex items-start justify-between gap-4 flex-wrap">
-          <span
-            style={{
-              color: C.eyebrow,
-              textTransform: 'uppercase',
-              fontSize: 10,
-              letterSpacing: 1.5,
-              fontWeight: 600,
-            }}
-          >
-            Key modeling assumption
-          </span>
+      {/* ================= 6. PROTOCOL MECHANICS + PRESET LADDER ================= */}
+      <section className="grid grid-cols-1 md:grid-cols-2 gap-8">
+        <div>
+          <h3 style={{ fontFamily: SERIF, fontWeight: 400, fontSize: 18, color: C.text }}>
+            Protocol mechanics
+          </h3>
+          <ul className="mt-3 flex flex-col gap-3">
+            <BulletItem color={C.seniorLine}>
+              Senior is the protected side: losses reach Senior only after the Junior first-loss
+              cushion is used first.
+            </BulletItem>
+            <BulletItem color={C.juniorLine}>
+              Junior receives extra yield for taking first losses and can give up recoveries when
+              the observation period expires before the strategy recovers.
+            </BulletItem>
+            <BulletItem color={C.olive}>
+              Loaded model inputs: Senior and Junior follow the same wiTRY path, beta is 1.00, and
+              Junior starts with a modest extra cushion.
+            </BulletItem>
+          </ul>
           <label
-            className="flex items-center gap-2 cursor-pointer select-none"
+            className="mt-4 flex items-center gap-2 cursor-pointer select-none"
             style={{ color: C.muted, fontSize: 12 }}
           >
             <input
@@ -684,49 +807,108 @@ export default function TrySimulator() {
               onChange={(e) => setMaintainCoverage(e.target.checked)}
               style={{ accentColor: C.accent }}
             />
-            Assume Junior is replenished to hold the buffer
+            Assume Junior is replenished each period
           </label>
+          <p className="mt-3" style={{ color: C.kpiLabel, fontSize: 11, lineHeight: 1.6 }}>
+            Illustrative daily model, not a contract-exact implementation. wiTRY = Turkish-lira
+            money-market index (FRED IRSTCI01TRM156N) valued in USD via Frankfurter/ECB USD/TRY.
+            Engine is wei-exact to RoycoDayAccountant.sol.
+          </p>
+        </div>
+        <div>
+          <h3 style={{ fontFamily: SERIF, fontWeight: 400, fontSize: 18, color: C.text }}>
+            Preset ladder
+          </h3>
+          <ul className="mt-3 flex flex-col gap-3">
+            <BulletItem color={C.olive}>
+              <strong>Conservative</strong> — larger Junior cushion and more recovery time. Lower
+              Junior upside, fewer erased recovery claims.
+            </BulletItem>
+            <BulletItem color={C.accent}>
+              <strong>Balanced</strong> — middle setting: Senior stays protected historically, while
+              Junior still gets meaningful upside.
+            </BulletItem>
+            <BulletItem color={C.danger}>
+              <strong>Aggressive</strong> — smaller Junior cushion and shorter recovery time. Higher
+              Junior upside, more erased recovery claims.
+            </BulletItem>
+          </ul>
+          <p className="mt-3" style={{ color: C.kpiLabel, fontSize: 11, lineHeight: 1.6 }}>
+            Scenarios keep Senior near target and vary how much risk Junior takes.
+          </p>
+        </div>
+      </section>
+
+      {/* ================= 7. DEPLOY HANDOFF ================= */}
+      <section
+        style={{ background: C.cardBg, border: `1px solid ${C.border}`, borderRadius: 0 }}
+        className="p-6"
+      >
+        <div className="flex items-start justify-between gap-4">
+          <div>
+            <Eyebrow>Deploy handoff</Eyebrow>
+            <h2 className="mt-2" style={{ fontFamily: SERIF, fontWeight: 400, fontSize: 24, color: C.text }}>
+              Copy final market-design parameters.
+            </h2>
+            <p className="mt-2" style={{ color: C.muted, fontSize: 14, lineHeight: 1.6 }}>
+              This is the finalized parameter handoff, not the full integration package.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setShowDeploy((v) => !v)}
+            aria-label={showDeploy ? 'Collapse' : 'Expand'}
+            style={{
+              border: `1px solid ${C.border}`,
+              borderRadius: 0,
+              color: C.accent,
+              width: 32,
+              height: 32,
+              fontSize: 18,
+              lineHeight: 1,
+              background: 'transparent',
+              flexShrink: 0,
+            }}
+          >
+            {showDeploy ? '−' : '+'}
+          </button>
         </div>
 
-        {maintainCoverage ? (
-          <p className="mt-3" style={{ color: C.text, fontSize: 14, lineHeight: 1.7 }}>
-            These results assume <strong>maintained Junior coverage</strong>: each time an
-            observation period ends and deposits reopen, fresh Junior capital is attracted to
-            rebuild the buffer to at least the {params.minCoveragePct}% minimum, re-protecting
-            Senior from its (possibly marked-down) new level. This run assumes{' '}
-            <span style={{ fontFamily: MONO, fontWeight: 600 }}>
-              {fmtUsd(result.juniorCapitalInjected)}
-            </span>{' '}
-            of fresh Junior capital and {result.seniorMarkdownEvents} Senior mark-down
-            {result.seniorMarkdownEvents === 1 ? '' : 's'} over the horizon.{' '}
-            <strong>Senior&apos;s protection depends on that replenishment.</strong> If Junior
-            capital were not available in a crisis, Senior would be exposed once Junior is
-            exhausted and would track the strategy down, in this scenario that takes Senior to{' '}
-            <span style={{ fontFamily: MONO, fontWeight: 600, color: C.danger }}>
-              {fmtUsd(exposedSeniorEnd)}
-            </span>{' '}
-            instead of {fmtUsd(seniorEnd)} (uncheck the box to see the exposed case). Even with
-            replenishment, a single drawdown that exceeds the entire buffer within one
-            observation period still marks Senior down.
-          </p>
-        ) : (
-          <p className="mt-3" style={{ color: C.text, fontSize: 14, lineHeight: 1.7 }}>
-            <strong>Fixed Junior capital, no replenishment.</strong> Once a crash exhausts
-            Junior there is no buffer left, so Senior tracks the strategy down and ends at{' '}
-            <span style={{ fontFamily: MONO, fontWeight: 600, color: C.danger }}>
-              {fmtUsd(seniorEnd)}
-            </span>
-            . This is the raw on-chain accountant result with a fixed Junior tranche. The
-            intended product (checkbox on) continuously refills Junior, which is what protects
-            Senior.
-          </p>
+        {showDeploy && (
+          <div className="mt-6 flex flex-wrap items-center gap-4">
+            <div
+              style={{
+                border: `1px solid ${C.border}`,
+                borderRadius: 0,
+                padding: '12px 14px',
+                background: C.cardBg,
+                fontFamily: MONO,
+                fontSize: 13,
+                color: C.text,
+                flex: 1,
+                minWidth: 260,
+              }}
+            >
+              {deployString}
+            </div>
+            <button
+              type="button"
+              onClick={copyDeployString}
+              style={{
+                border: `1px solid ${C.border}`,
+                borderRadius: 0,
+                color: C.accent,
+                textTransform: 'uppercase',
+                fontSize: 10,
+                letterSpacing: 1,
+                padding: '10px 16px',
+                background: 'transparent',
+              }}
+            >
+              Copy
+            </button>
+          </div>
         )}
-
-        <p className="mt-4" style={{ color: C.kpiLabel, fontSize: 11, lineHeight: 1.6 }}>
-          Backtest math is the Royco Day accountant, proven wei-exact (52/52 vectors).
-          Parameters are illustrative and pending accountant sign-off. Projections, not
-          promises. This is not an offer or investment advice.
-        </p>
       </section>
 
       {/* ================= FOOTER ================= */}
@@ -786,19 +968,6 @@ function SecondaryStat({ label, value, color = C.text }: { label: string; value:
   );
 }
 
-function SummaryChip({ label, body }: { label: string; body: string }) {
-  return (
-    <div style={{ border: `1px solid ${C.border}`, borderRadius: 0, padding: '12px 14px', background: C.cardBg }}>
-      <p style={{ color: C.olive, textTransform: 'uppercase', fontSize: 9.5, letterSpacing: 1, fontWeight: 600 }}>
-        {label}
-      </p>
-      <p className="mt-1.5" style={{ color: C.text, fontSize: 13, lineHeight: 1.5 }}>
-        {body}
-      </p>
-    </div>
-  );
-}
-
 function LegendSwatch({ color, dashed, children }: { color: string; dashed?: boolean; children: React.ReactNode }) {
   return (
     <span className="flex items-center gap-2">
@@ -812,6 +981,25 @@ function LegendSwatch({ color, dashed, children }: { color: string; dashed?: boo
       />
       {children}
     </span>
+  );
+}
+
+function BulletItem({ color, children }: { color: string; children: React.ReactNode }) {
+  return (
+    <li className="flex items-start gap-2.5">
+      <span
+        style={{
+          marginTop: 6,
+          width: 6,
+          height: 6,
+          borderRadius: 9999,
+          background: color,
+          display: 'inline-block',
+          flexShrink: 0,
+        }}
+      />
+      <span style={{ color: C.muted, fontSize: 13, lineHeight: 1.6 }}>{children}</span>
+    </li>
   );
 }
 

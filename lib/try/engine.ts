@@ -95,6 +95,7 @@ export interface SyncResult {
   stEffectiveNAV: bigint;
   jtEffectiveNAV: bigint;
   jtCoverageIL: bigint;
+  jtCoverageImpermanentLossErased: bigint;
   coverageUtilWad: bigint;
   ltLiquidityPremium: bigint;
   stProtocolFee: bigint;
@@ -531,6 +532,7 @@ export function sync(state: MarketState_Internal, newStRawNAV: bigint, newJtRawN
     stEffectiveNAV: r.stEffectiveNAV,
     jtEffectiveNAV: r.jtEffectiveNAV,
     jtCoverageIL: r.jtCoverageImpermanentLoss,
+    jtCoverageImpermanentLossErased: r.jtCoverageImpermanentLossErased,
     coverageUtilWad: r.coverageUtilizationWAD,
     ltLiquidityPremium: r.ltLiquidityPremium,
     stProtocolFee: r.stProtocolFee,
