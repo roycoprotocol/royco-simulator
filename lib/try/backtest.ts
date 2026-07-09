@@ -49,12 +49,14 @@ export interface BacktestStep {
   stEff: bigint; // Senior effective NAV (NAV units, WAD-scaled)
   jtEff: bigint; // Junior effective NAV
   il: bigint; // outstanding JT coverage impermanent loss
+  ilErased: bigint; // outstanding JT coverage IL erased (forfeited) this step, 0 if none
   coverageUtilWad: bigint;
   marketState: MarketState;
   stIndex: number; // Senior share price, indexed to $100 at genesis (per-unit, clean)
   jtIndex: number; // Junior share price, indexed to $100 at genesis (per-unit; replenishment mints at price, so index is undistorted)
   inObservation: boolean; // marketState === FIXED_TERM
-  juniorLossLocked: boolean; // term elapsed / exhaustion → Junior permanently ate a covered loss
+  juniorLossLocked: boolean; // term elapsed / exhaustion → Junior permanently ate a covered loss (FIXED_TERM→PERPETUAL exit only; narrow, kept for compatibility)
+  juniorLossRealized: boolean; // corrected: Junior's outstanding IL was permanently erased this step (catches term-elapse, exhaustion, AND single-sync coverage-liquidation crashes)
   seniorMarkedDown: boolean; // Senior effective share price fell this step (a real Senior loss)
   juniorReplenished: number; // fresh Junior capital attracted this step ($), 0 if none
 }
@@ -66,6 +68,34 @@ export interface CalendarRow {
   seniorReturn: number; // fractional return over the calendar year
   juniorReturn: number;
   strategyReturn: number;
+}
+
+export interface PerYearRow {
+  year: string;
+  baseReturn: number; // strategy return within the year
+  seniorReturn: number;
+  juniorReturn: number;
+  nonObsPct: number; // % of steps within the year NOT inObservation
+  obsEvents: number; // observation-period entries (PERPETUAL→FIXED_TERM) triggered within the year
+}
+
+export interface ObservationRun {
+  startDate: string; // date of the first FIXED_TERM step in the run
+  endDate: string; // date used for chart band end (extended one step past the run's last FIXED_TERM step for render width)
+  strategyDrawdownPct: number; // peak-to-trough decline of priceIndex over the run, in percent (>= 0)
+}
+
+/**
+ * A merged "observation episode": one or more raw observation runs that are
+ * close enough in time (gap < fixedTermDays) to represent a single continuing
+ * drawdown event rather than distinct re-entries. Presentational only; derived
+ * from observationRuns, never fed back into the engine.
+ */
+export interface ObservationEpisode {
+  startDate: string; // first FIXED_TERM step of the episode
+  endDate: string; // one data point past the last FIXED_TERM step (for chart band width)
+  strategyDrawdownPct: number; // running-peak max drawdown of priceIndex across the episode span (>= 0), seeded from the pre-episode launch level
+  runCount: number; // how many raw observation runs were merged into this episode
 }
 
 export interface BacktestResult {
@@ -80,10 +110,20 @@ export interface BacktestResult {
   seniorMaxDrawdown: number; // worst peak-to-trough of Senior index (>= 0)
   juniorMaxDrawdown: number;
   observationEvents: number; // count of PERPETUAL→FIXED_TERM entries
-  juniorLossEvents: number; // count of permanent Junior loss lock-ins (term elapse / exhaustion)
+  juniorLossEvents: number; // count of permanent Junior loss lock-ins (term elapse / exhaustion; narrow, kept for compatibility)
+  juniorLossRealizedEvents: number; // corrected count of permanent Junior loss lock-ins (term elapse, exhaustion, AND single-sync coverage-liquidation crashes)
+  juniorCapitalLost: number; // total Junior capital ($) permanently forfeited (outstanding IL erased) over the run
+  strategyMaxDrawdown: number; // worst peak-to-trough of the strategy price index (>= 0)
   seniorMarkdownEvents: number; // count of steps where Senior's share price fell
   juniorCapitalInjected: number; // total fresh Junior capital attracted over the run ($)
   calendar: CalendarRow[];
+  observationRuns: ObservationRun[]; // contiguous FIXED_TERM runs (presentational; one per observationEvents entry)
+  observationEpisodes: ObservationEpisode[]; // merged observation runs (presentational; collapses re-entries within one fixed term into a single drawdown episode)
+  nonObservationPct: number; // fraction of steps NOT inObservation, ×100 (overall)
+  maxObservationPeriodDays: number; // longest single contiguous FIXED_TERM run duration, in days
+  seniorLossEvents: number; // count of steps where seniorMarkedDown is true (alias of seniorMarkdownEvents)
+  perYear: PerYearRow[]; // per-calendar-year strategy/senior/junior returns, non-observation %, and observation entries
+  juniorIfKept: number[]; // per-step counterfactual: Junior's index if erased coverage IL had instead been kept (added back cumulatively)
 }
 
 const YEAR_SECONDS = 365.25 * 24 * 60 * 60;
@@ -175,6 +215,8 @@ export function runBacktest(params: BacktestParams): BacktestResult {
 
     const backToPerpetual = prevState === "FIXED_TERM" && r.marketState === "PERPETUAL";
     const juniorLossLocked = backToPerpetual && prevIL > 0n && p.price < series[0].price;
+    const ilErased = r.jtCoverageImpermanentLossErased;
+    const juniorLossRealized = ilErased > 0n;
     const seniorMarkedDown = stIndex < prevStIndex - 1e-9;
 
     // --- Junior replenishment (the intended product model) ---
@@ -210,12 +252,14 @@ export function runBacktest(params: BacktestParams): BacktestResult {
       stEff: r.stEffectiveNAV,
       jtEff: r.jtEffectiveNAV,
       il: r.jtCoverageIL,
+      ilErased,
       coverageUtilWad: r.coverageUtilWad,
       marketState: r.marketState,
       stIndex,
       jtIndex,
       inObservation: r.marketState === "FIXED_TERM",
       juniorLossLocked,
+      juniorLossRealized,
       seniorMarkedDown,
       juniorReplenished,
     });
@@ -227,10 +271,12 @@ export function runBacktest(params: BacktestParams): BacktestResult {
     prevPriceWad = priceWad;
   }
 
-  return summarize(steps, series);
+  const fixedTermDays = Number(config.fixedTermDurationSeconds) / 86400;
+  return summarize(steps, series, fixedTermDays);
 }
 
-function summarize(steps: BacktestStep[], series: PricePoint[]): BacktestResult {
+function summarize(steps: BacktestStep[], series: PricePoint[], fixedTermDays = 30): BacktestResult {
+  if (!Number.isFinite(fixedTermDays) || fixedTermDays <= 0) fixedTermDays = 30;
   const last = steps[steps.length - 1];
   const totalSeconds = Number(secondsBetween(series[0].date, series[series.length - 1].date));
   const years = totalSeconds > 0 ? totalSeconds / YEAR_SECONDS : 0;
@@ -244,12 +290,16 @@ function summarize(steps: BacktestStep[], series: PricePoint[]): BacktestResult 
   // Observation + junior-loss + senior-markdown + injected-capital tallies.
   let observationEvents = 0;
   let juniorLossEvents = 0;
+  let juniorLossRealizedEvents = 0;
+  let juniorCapitalLost = 0;
   let seniorMarkdownEvents = 0;
   let juniorCapitalInjected = 0;
   let prevObs = false;
   for (const s of steps) {
     if (s.inObservation && !prevObs) observationEvents++;
     if (s.juniorLossLocked) juniorLossEvents++;
+    if (s.juniorLossRealized) juniorLossRealizedEvents++;
+    juniorCapitalLost += toNum(s.ilErased);
     if (s.seniorMarkedDown) seniorMarkdownEvents++;
     juniorCapitalInjected += s.juniorReplenished;
     prevObs = s.inObservation;
@@ -257,6 +307,123 @@ function summarize(steps: BacktestStep[], series: PricePoint[]): BacktestResult 
 
   // Calendar (per-year) returns, indexed off the first step of each year.
   const calendar = buildCalendar(steps);
+
+  // Contiguous FIXED_TERM runs (one per observationEvents entry), with a
+  // presentational strategy drawdown computed peak-to-trough over the run.
+  const observationRuns: ObservationRun[] = [];
+  const runRanges: { startIdx: number; lastObsIdx: number }[] = [];
+  {
+    let startIdx: number | null = null;
+    let lastObsIdx: number | null = null;
+    const closeRun = () => {
+      if (startIdx === null || lastObsIdx === null) return;
+      const endIdx = Math.min(lastObsIdx + 1, steps.length - 1);
+      const peak = startIdx > 0 ? steps[startIdx - 1].priceIndex : steps[startIdx].priceIndex;
+      let trough = Infinity;
+      for (let j = startIdx; j <= lastObsIdx; j++) {
+        if (steps[j].priceIndex < trough) trough = steps[j].priceIndex;
+      }
+      const strategyDrawdownPct = peak > 0 ? Math.max(0, ((peak - trough) / peak) * 100) : 0;
+      observationRuns.push({
+        startDate: steps[startIdx].date,
+        endDate: steps[endIdx].date,
+        strategyDrawdownPct,
+      });
+      runRanges.push({ startIdx, lastObsIdx });
+      startIdx = null;
+      lastObsIdx = null;
+    };
+    for (let i = 0; i < steps.length; i++) {
+      if (steps[i].inObservation) {
+        if (startIdx === null) startIdx = i;
+        lastObsIdx = i;
+      } else {
+        closeRun();
+      }
+    }
+    closeRun();
+  }
+
+  // Merge contiguous runs whose gap is short (< fixedTermDays) into a single
+  // "episode" — a real drawdown window, rather than a fragment created by
+  // daily price noise flipping PERPETUAL<->FIXED_TERM repeatedly.
+  const observationEpisodes: ObservationEpisode[] = [];
+  {
+    let groupStart: { startIdx: number; lastObsIdx: number } | null = null;
+    let groupLastObsIdx: number | null = null;
+    let runCount = 0;
+    const closeEpisode = () => {
+      if (groupStart === null || groupLastObsIdx === null) return;
+      const i0 = groupStart.startIdx;
+      const i1 = groupLastObsIdx;
+      const endIdx = Math.min(i1 + 1, steps.length - 1);
+      let peak = i0 > 0 ? steps[i0 - 1].priceIndex : steps[i0].priceIndex;
+      let dd = 0;
+      for (let j = i0; j <= i1; j++) {
+        peak = Math.max(peak, steps[j].priceIndex);
+        if (peak > 0) dd = Math.max(dd, ((peak - steps[j].priceIndex) / peak) * 100);
+      }
+      observationEpisodes.push({
+        startDate: steps[i0].date,
+        endDate: steps[endIdx].date,
+        strategyDrawdownPct: dd,
+        runCount,
+      });
+      groupStart = null;
+      groupLastObsIdx = null;
+      runCount = 0;
+    };
+    for (const range of runRanges) {
+      if (groupStart === null) {
+        groupStart = range;
+        groupLastObsIdx = range.lastObsIdx;
+        runCount = 1;
+        continue;
+      }
+      const gapDays =
+        Number(secondsBetween(steps[groupLastObsIdx!].date, steps[range.startIdx].date)) / 86400;
+      if (gapDays < fixedTermDays) {
+        groupLastObsIdx = range.lastObsIdx;
+        runCount++;
+      } else {
+        closeEpisode();
+        groupStart = range;
+        groupLastObsIdx = range.lastObsIdx;
+        runCount = 1;
+      }
+    }
+    closeEpisode();
+  }
+
+  // Non-observation % (overall) and longest contiguous FIXED_TERM run.
+  const nonObservationPct = steps.length > 0
+    ? (steps.filter((s) => !s.inObservation).length / steps.length) * 100
+    : 0;
+  let maxObservationPeriodDays = 0;
+  for (const run of observationRuns) {
+    const d = Number(secondsBetween(run.startDate, run.endDate)) / 86400;
+    if (d > maxObservationPeriodDays) maxObservationPeriodDays = d;
+  }
+
+  // seniorLossEvents: alias of seniorMarkdownEvents (count of steps where
+  // Senior's share price fell), exposed under the reporting name too.
+  const seniorLossEvents = seniorMarkdownEvents;
+
+  // Per-calendar-year reporting rows (extends `calendar` with non-obs % and
+  // observation-entry counts, keyed the same way as buildCalendar).
+  const perYear = buildPerYear(steps);
+
+  // Junior "if kept" counterfactual: add back cumulatively-erased coverage IL
+  // (in $ terms) to Junior's NAV before indexing, using the same per-step
+  // index scale factor jtIndex already applies (jtIndex = k * toNum(jtEff)).
+  let cumulativeErasedUsd = 0;
+  const juniorIfKept: number[] = steps.map((s) => {
+    cumulativeErasedUsd += toNum(s.ilErased);
+    const jtEffUsd = toNum(s.jtEff);
+    if (jtEffUsd === 0) return s.jtIndex;
+    const k = s.jtIndex / jtEffUsd;
+    return s.jtIndex + k * cumulativeErasedUsd;
+  });
 
   return {
     steps,
@@ -271,10 +438,64 @@ function summarize(steps: BacktestStep[], series: PricePoint[]): BacktestResult 
     juniorMaxDrawdown: maxDrawdown(steps.map((s) => s.jtIndex)),
     observationEvents,
     juniorLossEvents,
+    juniorLossRealizedEvents,
+    juniorCapitalLost,
+    strategyMaxDrawdown: maxDrawdown(steps.map((s) => s.priceIndex)),
     seniorMarkdownEvents,
     juniorCapitalInjected,
     calendar,
+    observationRuns,
+    observationEpisodes,
+    nonObservationPct,
+    maxObservationPeriodDays,
+    seniorLossEvents,
+    perYear,
+    juniorIfKept,
   };
+}
+
+/** Per-calendar-year strategy/senior/junior returns, non-observation %, and observation entries. */
+function buildPerYear(steps: BacktestStep[]): PerYearRow[] {
+  const byYear = new Map<string, BacktestStep[]>();
+  for (const s of steps) {
+    const y = s.date.slice(0, 4);
+    if (!byYear.has(y)) byYear.set(y, []);
+    byYear.get(y)!.push(s);
+  }
+  const rows: PerYearRow[] = [];
+  let prevSt = 100,
+    prevJt = 100,
+    prevStrat = 100;
+  let firstYear = true;
+  let prevObsAcrossYears = false;
+  for (const [year, ys] of [...byYear.entries()].sort()) {
+    const end = ys[ys.length - 1];
+    const startSt = firstYear ? 100 : prevSt;
+    const startJt = firstYear ? 100 : prevJt;
+    const startStrat = firstYear ? 100 : prevStrat;
+    let obsEvents = 0;
+    let nonObsCount = 0;
+    let prevObs: boolean = prevObsAcrossYears;
+    for (const s of ys) {
+      if (s.inObservation && !prevObs) obsEvents++;
+      if (!s.inObservation) nonObsCount++;
+      prevObs = s.inObservation;
+    }
+    prevObsAcrossYears = prevObs;
+    rows.push({
+      year,
+      baseReturn: end.priceIndex / startStrat - 1,
+      seniorReturn: end.stIndex / startSt - 1,
+      juniorReturn: end.jtIndex / startJt - 1,
+      nonObsPct: ys.length > 0 ? (nonObsCount / ys.length) * 100 : 0,
+      obsEvents,
+    });
+    prevSt = end.stIndex;
+    prevJt = end.jtIndex;
+    prevStrat = end.priceIndex;
+    firstYear = false;
+  }
+  return rows;
 }
 
 function buildCalendar(steps: BacktestStep[]): CalendarRow[] {
@@ -335,8 +556,18 @@ function emptyResult(): BacktestResult {
     juniorMaxDrawdown: 0,
     observationEvents: 0,
     juniorLossEvents: 0,
+    juniorLossRealizedEvents: 0,
+    juniorCapitalLost: 0,
+    strategyMaxDrawdown: 0,
     seniorMarkdownEvents: 0,
     juniorCapitalInjected: 0,
     calendar: [],
+    observationRuns: [],
+    observationEpisodes: [],
+    nonObservationPct: 0,
+    maxObservationPeriodDays: 0,
+    seniorLossEvents: 0,
+    perYear: [],
+    juniorIfKept: [],
   };
 }
