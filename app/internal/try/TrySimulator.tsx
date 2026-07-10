@@ -124,6 +124,12 @@ export default function TrySimulator() {
     [hoverDate, result.observationRuns],
   );
 
+  // Length in days of the hovered observation period (same calc as
+  // maxObservationPeriodDays, so the two agree).
+  const activeRunDays = activeRun
+    ? Math.max(1, Math.round((Date.parse(activeRun.endDate) - Date.parse(activeRun.startDate)) / 86400000))
+    : null;
+
   const representedYears = useMemo(() => {
     const counts: Record<string, number> = {};
     for (const s of result.steps) {
@@ -502,6 +508,22 @@ export default function TrySimulator() {
                 />
                 observation period
               </span>
+            </div>
+
+            {/* Hover readout: observation period length in days */}
+            <div className="mb-3" style={{ fontSize: 12, minHeight: 18 }}>
+              {activeRun ? (
+                <span style={{ color: C.muted }}>
+                  Observation period:{' '}
+                  <strong style={{ color: C.accent, fontFamily: MONO }}>{activeRunDays}d</strong>
+                  {' · '}
+                  {activeRun.startDate} → {activeRun.endDate}
+                  {' · '}
+                  {activeRun.strategyDrawdownPct.toFixed(1)}% strategy drawdown
+                </span>
+              ) : (
+                <span style={{ color: C.kpiLabel }}>Hover a shaded band to see its observation-period length.</span>
+              )}
             </div>
 
             <div style={{ width: '100%', height: 360 }}>
