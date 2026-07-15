@@ -667,7 +667,7 @@ export default function HybondSimulator() {
                 Underlying (composite proxy)
               </LegendSwatch>
               <span className="flex items-center gap-2">
-                <span style={{ color: C.danger }}>▼</span> Junior loss locked
+                <span style={{ color: C.danger }}>●</span> Junior loss locked
               </span>
               <span className="flex items-center gap-2">
                 <span
