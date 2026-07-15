@@ -1,9 +1,10 @@
 'use client';
 
 // ---------------------------------------------------------------------------
-// HybondSimulator — tenbin-style vertical market simulator for the srHYBond
-// senior/junior tranche market (BNY Mellon Global Short-Dated High Yield Bond
-// Fund). Every tranche-accounting number rendered here comes from
+// HybondSimulator — tenbin-style vertical market simulator for a hypothetical
+// srHYBond senior/junior tranche market over the BNY Mellon and Insight Global
+// Short-Dated High Yield Bond strategy (a composite proxy, not HYBOND's own
+// history). Every tranche-accounting number rendered here comes from
 // runBacktest() (which bridges to the validated engine, reused unchanged from
 // lib/try). This component performs NO tranche accounting itself; the only
 // local computation is presentational (indexing already-computed values,
@@ -145,6 +146,29 @@ export default function HybondSimulator() {
     ? exposedResult.steps[exposedResult.steps.length - 1].stIndex
     : 100;
 
+  // Counterfactual: the same path with MAINTAINED Junior coverage (the
+  // intended-product assumption), used when the checkbox is off to show what
+  // the replenished case would have looked like for comparison.
+  const maintainedResult = useMemo(
+    () =>
+      safeBacktest(() =>
+        runBacktest({
+          config: buildConfig(params),
+          depositST: params.depositST,
+          depositJT: params.depositJT,
+          series: getScenario(scenarioId).points,
+          maintainJuniorCoverage: true,
+        }),
+      ).result,
+    [params, scenarioId],
+  );
+  const maintainedSeniorEnd = maintainedResult.steps.length
+    ? maintainedResult.steps[maintainedResult.steps.length - 1].stIndex
+    : 100;
+  const maintainedJuniorEnd = maintainedResult.steps.length
+    ? maintainedResult.steps[maintainedResult.steps.length - 1].jtIndex
+    : 100;
+
   // Which preset (if any) exactly matches current params — for active styling.
   const activePreset = useMemo(
     () =>
@@ -204,6 +228,28 @@ export default function HybondSimulator() {
     ? result.steps[result.steps.length - 1].stIndex
     : 100;
 
+  // Junior's minimum effective NAV over the run ($), and whether it ever came
+  // close to full exhaustion against its own deposit, both computed from the
+  // engine's own step output (never hardcoded) so the disclaimer text below
+  // stays truthful across scenarios and parameter changes.
+  const juniorMinEffNav = useMemo(
+    () =>
+      result.steps.length
+        ? Math.min(...result.steps.map((s) => Number(s.jtEff) / 1e18))
+        : params.depositJT,
+    [result.steps, params.depositJT],
+  );
+  const juniorEverNearExhaustion = juniorMinEffNav < params.depositJT * 0.1;
+  const seniorDivergesUnderExposure = Math.abs(exposedSeniorEnd - seniorEnd) >= 0.01;
+  const juniorEnd = result.steps.length
+    ? result.steps[result.steps.length - 1].jtIndex
+    : 100;
+  // Fixed Junior vs. maintained-coverage Junior, compared on the SAME (fixed)
+  // path's own end value against the maintained-coverage counterfactual, for
+  // the checkbox-off branch of the disclaimer below.
+  const seniorSameWhenFixed = Math.abs(seniorEnd - maintainedSeniorEnd) < 0.01;
+  const juniorHigherWhenFixed = juniorEnd > maintainedJuniorEnd + 0.01;
+
   const updateParam = (patch: Partial<HybondParams>) =>
     setParams((p) => ({ ...p, ...patch }));
 
@@ -253,11 +299,12 @@ export default function HybondSimulator() {
           HYBond Sim
         </h1>
         <p className="mt-3 max-w-3xl" style={{ color: C.muted, fontSize: 14, lineHeight: 1.6 }}>
-          HYBond tracks the BNY Mellon Global Short-Dated High Yield Bond Fund, a USD portfolio
-          of short-maturity high-yield credit yielding about 7.6% with a 2.4 year weighted
-          average maturity. This market splits it so Senior is shielded by Junior&apos;s
-          first-loss buffer, and Junior earns a share of Senior&apos;s yield for absorbing
-          that risk.
+          HYBond Sim models a hypothetical Royco senior and junior market over the BNY Mellon
+          and Insight Global Short-Dated High Yield Bond strategy, the portfolio behind
+          OpenEden&apos;s tokenized HYBOND. Senior is shielded by Junior&apos;s first-loss
+          buffer, and Junior earns a share of Senior&apos;s yield for absorbing that risk. The
+          strategy reported a 7.52% average yield to expected redemption and a 2.35 year
+          average expected maturity, per Insight as at 31 March 2025.
         </p>
       </section>
 
@@ -302,6 +349,32 @@ export default function HybondSimulator() {
         >
           Copy link
         </button>
+      </section>
+
+      {/* ================= 2b. PROVENANCE DISCLOSURE ================= */}
+      <section
+        style={{ background: C.cardBg, border: `1px solid ${C.border}`, borderRadius: 0 }}
+        className="p-6"
+      >
+        <Eyebrow>What this is, and what it is not</Eyebrow>
+        <p className="mt-3" style={{ color: C.text, fontSize: 14, lineHeight: 1.7 }}>
+          This is a counterfactual, not a track record. HYBOND launched on 1 April 2026 and has
+          no multi-year history. The underlying series here is a proxy built from Insight&apos;s
+          Global Short-Dated High Yield Bond composite, gross of fees, as reported by Insight as
+          at 30 June 2025. A composite aggregates accounts following the strategy, it is not the
+          NAV of any share class, and gross of fees is not what a holder receives. HYBOND&apos;s
+          1.00% management fee and the fund&apos;s own charges would reduce these returns.
+        </p>
+        <p className="mt-3" style={{ color: C.text, fontSize: 14, lineHeight: 1.7 }}>
+          Only five annual checkpoints, June to June, come from published data. The month to
+          month path between them is synthetic, so every drawdown date, observation period, and
+          Junior loss lock-in shown here is an artifact of that sequencing rather than observed
+          history.
+        </p>
+        <p className="mt-3" style={{ color: C.text, fontSize: 14, lineHeight: 1.7 }}>
+          No Royco market over HYBOND has been announced. This is an illustration of the
+          mechanism, not a product.
+        </p>
       </section>
 
       {/* ================= 3. OVERVIEW ================= */}
@@ -516,7 +589,7 @@ export default function HybondSimulator() {
               Chart, metrics, and mechanics.
             </h2>
             <p className="mt-2" style={{ color: C.muted, fontSize: 14, lineHeight: 1.6 }}>
-              How the tranches tracked the fund across the selected history.
+              How the tranches tracked the underlying composite proxy across the selected history.
             </p>
           </div>
           <button
@@ -546,7 +619,7 @@ export default function HybondSimulator() {
               <LegendSwatch color={C.seniorLine}>Senior share price</LegendSwatch>
               <LegendSwatch color={C.juniorLine}>Junior share price</LegendSwatch>
               <LegendSwatch color={C.strategyLine} dashed>
-                Base fund
+                Underlying (composite proxy)
               </LegendSwatch>
               <span className="flex items-center gap-2">
                 <span style={{ color: C.danger }}>▼</span> Junior loss locked
@@ -608,7 +681,7 @@ export default function HybondSimulator() {
                   <Line
                     type="monotone"
                     dataKey="strategy"
-                    name="Fund"
+                    name="Underlying"
                     stroke={C.strategyLine}
                     strokeDasharray="5 4"
                     dot={false}
@@ -658,7 +731,7 @@ export default function HybondSimulator() {
                     className="text-left"
                   >
                     <th className="py-2 pr-4 font-semibold">Year</th>
-                    <th className="py-2 pr-4 font-semibold text-right">Fund</th>
+                    <th className="py-2 pr-4 font-semibold text-right">Underlying</th>
                     <th className="py-2 pr-4 font-semibold text-right">Senior</th>
                     <th className="py-2 pr-4 font-semibold text-right">Junior</th>
                     <th className="py-2 font-semibold text-right">Senior end $100</th>
@@ -746,27 +819,85 @@ export default function HybondSimulator() {
               {fmtUsd(result.juniorCapitalInjected)}
             </span>{' '}
             of fresh Junior capital and {result.seniorMarkdownEvents} Senior mark-down
-            {result.seniorMarkdownEvents === 1 ? '' : 's'} over the horizon.{' '}
-            <strong>Senior&apos;s protection depends on that replenishment.</strong> If Junior
-            capital were not available in a crisis, Senior would be exposed once Junior is
-            exhausted and would track the fund down, in this scenario that takes Senior to{' '}
-            <span style={{ fontFamily: MONO, fontWeight: 600, color: C.danger }}>
-              {fmtUsd(exposedSeniorEnd)}
-            </span>{' '}
-            instead of {fmtUsd(seniorEnd)} (uncheck the box to see the exposed case). Even with
-            replenishment, a single drawdown that exceeds the entire buffer within one
-            observation period still marks Senior down.
+            {result.seniorMarkdownEvents === 1 ? '' : 's'}, with {result.juniorLossEvents} Junior
+            loss lock-in{result.juniorLossEvents === 1 ? '' : 's'}, over the horizon.{' '}
+            <strong>Senior&apos;s protection depends on that replenishment.</strong>{' '}
+            {seniorDivergesUnderExposure ? (
+              <>
+                If Junior capital were not available in a crisis, Senior would be exposed once
+                Junior is exhausted and would track the underlying down, in this scenario that
+                takes Senior to{' '}
+                <span style={{ fontFamily: MONO, fontWeight: 600, color: C.danger }}>
+                  {fmtUsd(exposedSeniorEnd)}
+                </span>{' '}
+                instead of {fmtUsd(seniorEnd)} (uncheck the box to see the exposed case).
+              </>
+            ) : (
+              <>
+                On this path, replenishment did not change Senior&apos;s outcome. Senior ends at{' '}
+                <span style={{ fontFamily: MONO, fontWeight: 600 }}>{fmtUsd(seniorEnd)}</span>{' '}
+                either way (uncheck the box to compare), because Junior&apos;s buffer was never
+                close to exhausted.
+              </>
+            )}{' '}
+            {juniorEverNearExhaustion ? (
+              <>
+                Junior&apos;s effective NAV did fall as low as{' '}
+                <span style={{ fontFamily: MONO, fontWeight: 600 }}>
+                  {fmtUsd(juniorMinEffNav)}
+                </span>{' '}
+                against a {fmtUsd0(params.depositJT)} deposit on this path.
+              </>
+            ) : (
+              <>
+                Junior&apos;s effective NAV never dropped below{' '}
+                <span style={{ fontFamily: MONO, fontWeight: 600 }}>
+                  {fmtUsd(juniorMinEffNav)}
+                </span>{' '}
+                against a {fmtUsd0(params.depositJT)} deposit, so this run does not test what
+                happens when Senior&apos;s protection actually fails.
+              </>
+            )}{' '}
+            Senior&apos;s protection still depends on Junior capital being available, and a
+            drawdown exceeding the entire buffer within one observation period would still mark
+            Senior down. This series contains no such event, so the run does not demonstrate
+            that case.
           </p>
         ) : (
           <p className="mt-3" style={{ color: C.text, fontSize: 14, lineHeight: 1.7 }}>
             <strong>Fixed Junior capital, no replenishment.</strong> Once a crash exhausts
-            Junior there is no buffer left, so Senior tracks the fund down and ends at{' '}
-            <span style={{ fontFamily: MONO, fontWeight: 600, color: C.danger }}>
-              {fmtUsd(seniorEnd)}
-            </span>
-            . This is the raw on-chain accountant result with a fixed Junior tranche. The
+            Junior there is no buffer left, so Senior would track the underlying down. On this
+            path, {juniorEverNearExhaustion ? (
+              <>Junior was exhausted and Senior ends at{' '}
+                <span style={{ fontFamily: MONO, fontWeight: 600, color: C.danger }}>
+                  {fmtUsd(seniorEnd)}
+                </span>
+                .</>
+            ) : (
+              <>Junior was never close to exhausted, so fixed Junior survives, and Senior ends
+                {seniorSameWhenFixed ? ' at the same ' : ' at '}
+                <span style={{ fontFamily: MONO, fontWeight: 600 }}>{fmtUsd(seniorEnd)}</span>{' '}
+                {seniorSameWhenFixed
+                  ? 'as the maintained-coverage case'
+                  : `versus ${fmtUsd(maintainedSeniorEnd)} with replenishment`}
+                {juniorHigherWhenFixed ? (
+                  <>
+                    . Junior itself ends slightly higher here,{' '}
+                    <span style={{ fontFamily: MONO, fontWeight: 600 }}>
+                      {fmtUsd(juniorEnd)}
+                    </span>{' '}
+                    versus{' '}
+                    <span style={{ fontFamily: MONO, fontWeight: 600 }}>
+                      {fmtUsd(maintainedJuniorEnd)}
+                    </span>{' '}
+                    with replenishment, because fewer shares split the same premiums
+                  </>
+                ) : null}
+                .</>
+            )}{' '}
+            This is the raw on-chain accountant result with a fixed Junior tranche. The
             intended product (checkbox on) continuously refills Junior, which is what protects
-            Senior.
+            Senior when a buffer actually runs low.
           </p>
         )}
 
@@ -781,9 +912,10 @@ export default function HybondSimulator() {
       <footer style={{ color: C.kpiLabel, fontSize: 11, lineHeight: 1.6 }} className="pb-8">
         Backtest math is the Royco Day accountant, proven wei-exact (52/52
         vectors). Parameters illustrative pending accountant sign-off (OPEN-QUESTIONS).
-        HYBond series derived from BNY Mellon Global Short-Dated High Yield Bond Fund
-        published rolling 12-month returns, Jun 2020 to Jun 2025. Parameters illustrative,
-        pending accountant sign-off.
+        Underlying series is a proxy built from Insight&apos;s Global Short-Dated High Yield
+        Bond composite, total return, gross of fees, per Insight as at 30 June 2025. Only the
+        five annual June checkpoints are published data, monthly sequencing is synthetic.
+        Parameters illustrative, pending accountant sign-off.
       </footer>
     </div>
   );

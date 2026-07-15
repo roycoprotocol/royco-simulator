@@ -48,14 +48,25 @@ export const PRESETS: Preset[] = [
   },
 ];
 
-// --- HYBond monthly total-return NAV series ------------------------------------
+// --- HYBond monthly "underlying" NAV series (composite proxy) ------------------
 //
-// BNY Mellon Global Short-Dated High Yield Bond Fund, USD X (Acc.), ISIN
-// IE00BD5CVM01. Built from published rolling 12-month (Jun→Jun) returns.
-// Method: for each Jul→Jun window, take realistic raw monthly returns, then
+// This is NOT HYBOND's own NAV, and NOT the NAV of any BNY Mellon / Insight
+// share class (e.g. IE00BD5CVM01). It is a proxy built from Insight's
+// "Global short dated high yield bond composite" published rolling 12-month
+// (Jun→Jun) total returns, income reinvested, GROSS OF FEES, per Insight as
+// at 30 June 2025. A composite aggregates accounts following the strategy;
+// it is not any single fund's or share class's track record, and gross of
+// fees is not what a holder receives (HYBOND's 1.00% management fee and the
+// underlying fund's own charges are not reflected here).
+//
+// Only the five annual Jun→Jun checkpoints below are real, published data.
+// Method: for each Jul→Jun window, take invented raw monthly returns, then
 // apply a geometric correction factor f = (target / prod(1+r_i))^(1/12) to
 // every month in the window so the window compounds to EXACTLY the published
-// 12-month return, while preserving each month's shape/sign (f ≈ 1).
+// 12-month return, while preserving each month's shape/sign (f ≈ 1). The
+// resulting monthly path, and every drawdown date, observation period, and
+// Junior loss lock-in derived from it, is therefore SYNTHETIC, an artifact
+// of this sequencing choice, not observed history.
 
 interface ReturnWindow {
   targetPct: number; // published Jun→Jun total return, %
@@ -136,21 +147,21 @@ export const SCENARIOS: HistoricalScenario[] = [
   {
     id: "since2020",
     label: "Since 2020",
-    note: "HYBond compounds about 42% from Jun 2020 to Jun 2025, through the 2022 high-yield drawdown.",
+    note: "The composite proxy compounds about 42% gross of fees from Jun 2020 to Jun 2025, through the 2022 high yield drawdown.",
     cadence: "monthly",
     points: HYBOND_NAV_SERIES,
   },
   {
     id: "stress2022",
     label: "2022 drawdown",
-    note: "The 2022 rate and spread selloff, the fund's deepest short-dated high-yield drawdown.",
+    note: "The 2022 rate and spread selloff, the strategy's deepest drawdown in this window. Monthly timing is synthetic.",
     cadence: "monthly",
     points: slice("2021-06", "2023-12"),
   },
   {
     id: "recent",
     label: "Recent (2023 to 2025)",
-    note: "The calm, high-carry regime after the 2022 reset.",
+    note: "The calm, high carry regime after the 2022 reset. Monthly timing is synthetic.",
     cadence: "monthly",
     points: slice("2023-06", "2025-06"),
   },
