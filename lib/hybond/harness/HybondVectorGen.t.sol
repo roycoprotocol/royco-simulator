@@ -2,6 +2,7 @@
 pragma solidity ^0.8.28;
 
 import { Test, console2 } from "../../lib/forge-std/src/Test.sol";
+import { Vm } from "../../lib/forge-std/src/Vm.sol";
 
 import { RoycoDayAccountant } from "../../src/accountant/RoycoDayAccountant.sol";
 import { IRoycoDayAccountant } from "../../src/interfaces/IRoycoDayAccountant.sol";
@@ -141,10 +142,15 @@ contract HybondVectorGenTest is Test {
             uint256 stRaw = ST_NAV0 * prices[i] / price0;
             uint256 jtRaw = i == 0 ? JT_NAV0 : jtCarry * prices[i] / prevPrice;
 
+            // Capture the accountant's OWN IL-erasure signal for this sync. The contract emits
+            // JuniorTrancheCoverageImpermanentLossReset (RoycoDayAccountant.sol:189) only when it
+            // actually erased outstanding coverage IL, so absence of the event == 0 erased.
+            vm.recordLogs();
             vm.prank(kernel);
             SyncedAccountingState memory s = acct.preOpSyncTrancheAccounting(toNAVUnits(stRaw), toNAVUnits(jtRaw));
+            uint256 ilErased = _ilErasedFromLogs();
 
-            _record("F", string.concat("F_hybond_", vm.toString(i + 1)), stRaw, jtRaw, prices[i], dtSec, s);
+            _record("F", string.concat("F_hybond_", vm.toString(i + 1)), stRaw, jtRaw, prices[i], dtSec, s, ilErased);
             _checkConservation(s, string.concat("F_hybond_", vm.toString(i + 1)));
 
             jtCarry = NAV_UNIT.unwrap(s.jtRawNAV);
@@ -154,6 +160,22 @@ contract HybondVectorGenTest is Test {
         string memory out = string.concat("[", json, "]");
         vm.writeFile("output/hybond-vectors-out.json", out);
         console2.log("=== WROTE output/hybond-vectors-out.json ===");
+    }
+
+    /// Scans the logs emitted by the last sync for JuniorTrancheCoverageImpermanentLossReset and
+    /// returns the erased amount (0 if the accountant erased nothing). Reverts if the event fires
+    /// more than once in a single sync, which would make the per-step signal ambiguous.
+    function _ilErasedFromLogs() internal returns (uint256 ilErased) {
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        bytes32 sig = keccak256("JuniorTrancheCoverageImpermanentLossReset(uint256)");
+        bool seen;
+        for (uint256 j = 0; j < logs.length; j++) {
+            if (logs[j].topics.length > 0 && logs[j].topics[0] == sig) {
+                if (seen) revert("DUPLICATE IL RESET EVENT IN ONE SYNC");
+                seen = true;
+                ilErased = abi.decode(logs[j].data, (uint256));
+            }
+        }
     }
 
     function _marketStateStr(MarketState ms) internal pure returns (string memory) {
@@ -167,7 +189,8 @@ contract HybondVectorGenTest is Test {
         uint256 jtRawIn,
         uint256 priceWad,
         uint256 dtSec,
-        SyncedAccountingState memory s
+        SyncedAccountingState memory s,
+        uint256 ilErased
     ) internal {
         uint256 stEff = NAV_UNIT.unwrap(s.stEffectiveNAV);
         uint256 jtEff = NAV_UNIT.unwrap(s.jtEffectiveNAV);
@@ -184,6 +207,7 @@ contract HybondVectorGenTest is Test {
         console2.log("  IL     ", il);
         console2.log("  U(WAD) ", u);
         console2.log("  state  ", ms);
+        console2.log("  ilErase", ilErased);
 
         string memory obj = string.concat(
             "{\"group\":\"", group, "\",\"label\":\"", label, "\",",
@@ -191,7 +215,7 @@ contract HybondVectorGenTest is Test {
             "\",\"priceWad\":\"", vm.toString(priceWad), "\",\"dtSec\":\"", vm.toString(dtSec), "\"},",
             "\"outputs\":{\"stEff\":\"", vm.toString(stEff), "\",\"jtEff\":\"", vm.toString(jtEff),
             "\",\"il\":\"", vm.toString(il), "\",\"coverageUtilWad\":\"", vm.toString(u),
-            "\",\"marketState\":\"", ms, "\"}}"
+            "\",\"marketState\":\"", ms, "\",\"ilErased\":\"", vm.toString(ilErased), "\"}}"
         );
         if (bytes(json).length == 0) json = obj;
         else json = string.concat(json, ",", obj);

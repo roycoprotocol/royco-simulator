@@ -29,7 +29,16 @@ interface Vector {
   group: string;
   label: string;
   inputs: { stRaw: string; jtRaw: string; priceWad: string; dtSec: string };
-  outputs: { stEff: string; jtEff: string; il: string; coverageUtilWad: string; marketState: string };
+  outputs: {
+    stEff: string;
+    jtEff: string;
+    il: string;
+    coverageUtilWad: string;
+    marketState: string;
+    /** Coverage IL the REAL accountant erased on this sync, captured from its
+     *  JuniorTrancheCoverageImpermanentLossReset event (absent event == "0"). */
+    ilErased: string;
+  };
 }
 
 const vectors: Vector[] = JSON.parse(readFileSync(join(__dirname, "vectors.golden.json"), "utf8"));
@@ -101,6 +110,8 @@ for (let i = 0; i < series.length; i++) {
   cmp("stEff", r.stEffectiveNAV, v.outputs.stEff);
   cmp("jtEff", r.jtEffectiveNAV, v.outputs.jtEff);
   cmp("il", r.jtCoverageIL, v.outputs.il);
+  // The junior-loss lock-in signal the simulator counts: must be wei-exact vs the contract.
+  cmp("ilErased", r.jtCoverageILErased, v.outputs.ilErased);
   cmp("coverageUtilWad", r.coverageUtilWad, v.outputs.coverageUtilWad);
   cmp("marketState", r.marketState, v.outputs.marketState);
 

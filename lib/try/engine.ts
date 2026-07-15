@@ -95,6 +95,14 @@ export interface SyncResult {
   stEffectiveNAV: bigint;
   jtEffectiveNAV: bigint;
   jtCoverageIL: bigint;
+  /**
+   * Coverage IL the accountant ERASED on this sync (RoycoDayAccountant.sol:668, surfaced
+   * on-chain as the JuniorTrancheCoverageImpermanentLossReset event). Non-zero only when the
+   * market resolves to PERPETUAL while IL was outstanding — i.e. Junior permanently ate the
+   * covered loss. Distinct from `jtCoverageIL` falling to 0, which also happens when Senior
+   * gains recover the IL.
+   */
+  jtCoverageILErased: bigint;
   coverageUtilWad: bigint;
   ltLiquidityPremium: bigint;
   stProtocolFee: bigint;
@@ -531,6 +539,7 @@ export function sync(state: MarketState_Internal, newStRawNAV: bigint, newJtRawN
     stEffectiveNAV: r.stEffectiveNAV,
     jtEffectiveNAV: r.jtEffectiveNAV,
     jtCoverageIL: r.jtCoverageImpermanentLoss,
+    jtCoverageILErased: r.jtCoverageImpermanentLossErased,
     coverageUtilWad: r.coverageUtilizationWAD,
     ltLiquidityPremium: r.ltLiquidityPremium,
     stProtocolFee: r.stProtocolFee,

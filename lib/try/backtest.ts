@@ -148,8 +148,6 @@ export function runBacktest(params: BacktestParams): BacktestResult {
   let jtRawCarry = jtNav0; // Junior raw NAV at the previous step's price
   let prevPriceWad = priceWad0;
 
-  let prevState: MarketState = "PERPETUAL";
-  let prevIL = 0n;
   let prevStIndex = 100;
 
   for (let i = 0; i < series.length; i++) {
@@ -173,16 +171,21 @@ export function runBacktest(params: BacktestParams): BacktestResult {
     const jtSharePrice = toNum(r.jtEffectiveNAV) / toNum(jtShares);
     const jtIndex = jtSharePrice / (toNum(jtBase) / toNum(jtNav0)) * 100;
 
-    const backToPerpetual = prevState === "FIXED_TERM" && r.marketState === "PERPETUAL";
-    const juniorLossLocked = backToPerpetual && prevIL > 0n && p.price < series[0].price;
+    // A junior loss lock-in is exactly when the accountant ERASED outstanding coverage IL
+    // (RoycoDayAccountant.sol:668): the term elapsed / coverage liquidated / Junior was wiped
+    // while IL was still outstanding, so Junior permanently ate the covered loss. IL merely
+    // reaching 0 is NOT a lock-in — that also happens when Senior gains recover it.
+    const juniorLossLocked = r.jtCoverageILErased > 0n;
     const seniorMarkedDown = stIndex < prevStIndex - 1e-9;
 
     // --- Junior replenishment (the intended product model) ---
     // When PERPETUAL and Junior has drained below target, attract fresh Junior
     // capital to restore coverage to the target, re-protecting Senior.
+    // Never at i === 0: genesis Junior is exactly what the user deposited, and no
+    // time has passed for the buffer to have drained.
     let juniorReplenished = 0;
     let jtRawNext = r.jtRawNAV;
-    if (maintain && r.marketState === "PERPETUAL") {
+    if (maintain && i > 0 && r.marketState === "PERPETUAL") {
       // d solves: (stRaw + jtRaw + d)*minCov / (jtEff + d) = targetUtil.
       const t1 = mulDiv(r.stRawNAV + r.jtRawNAV, minCovWAD, WAD, Rounding.Floor);
       const t2 = mulDiv(r.jtEffectiveNAV, targetUtilWAD, WAD, Rounding.Floor);
@@ -220,8 +223,6 @@ export function runBacktest(params: BacktestParams): BacktestResult {
       juniorReplenished,
     });
 
-    prevState = r.marketState;
-    prevIL = r.jtCoverageIL;
     prevStIndex = stIndex;
     jtRawCarry = jtRawNext;
     prevPriceWad = priceWad;
