@@ -65,6 +65,8 @@ input[type=range]{width:100%;accent-color:var(--sen)}
 .stat .box{background:rgba(255,253,249,.78);border:1px solid var(--line);padding:9px 10px}
 .stat .box .t{font-size:9px;color:#A49B90;text-transform:uppercase;letter-spacing:.14em;font-weight:600}
 .stat .box .v{font-size:19px;font-weight:500;font-variant-numeric:tabular-nums;margin-top:2px;font-family:"SFMono-Regular",Consolas,monospace;letter-spacing:-.05em}
+.stat .box .v.warn{color:var(--red)}
+.stat .box .n{color:var(--mut);font-size:9.8px;line-height:1.32;margin-top:5px}
 .sr{color:var(--sen)}.jr{color:var(--jun)}.base{color:var(--mut)}
 .legend{display:flex;flex-wrap:wrap;gap:10px;font-size:11.5px;color:var(--ink);margin:0 2px 7px}
 .legend span{display:inline-flex;align-items:center;gap:6px}
@@ -84,6 +86,14 @@ input[type=range]{width:100%;accent-color:var(--sen)}
 .brushTicks span:before{content:"";position:absolute;left:50%;top:-4px;width:1px;height:4px;background:var(--line)}
 .brushReadout{display:flex;justify-content:space-between;gap:12px;color:var(--mut);font-size:10px;text-transform:uppercase;letter-spacing:.14em;font-weight:600}
 .brushReadout b{font-family:"SFMono-Regular",Consolas,monospace;color:var(--ink);letter-spacing:0;text-transform:none;font-weight:500}
+.scenarioWarn{color:var(--red);font-size:11px;line-height:1.4;border:1px solid rgba(143,77,66,.35);background:rgba(143,77,66,.06);padding:8px 10px;margin-top:-2px}
+.scenarioWarn:empty{display:none}
+.exitModelNote{font-size:11px;line-height:1.42;color:var(--mut);border:1px solid var(--line);background:rgba(150,119,86,.045);padding:9px 10px;margin-top:2px}
+.exitModelNote b{color:var(--ink)}
+.exitModelNote:empty{display:none}
+.rebaseNote{color:var(--mut);font-size:10.5px;line-height:1.4;margin-top:8px;padding-top:7px;border-top:1px dotted var(--line)}
+.rebaseWarn{color:var(--red);font-size:10.5px;line-height:1.4;margin-top:5px}
+.rebaseWarn:empty{display:none}
 .yr{margin-top:10px;overflow-x:auto;max-width:100%}
 .yr table{width:100%;min-width:560px;border-collapse:collapse;font-size:11.8px;font-variant-numeric:tabular-nums;font-family:"SFMono-Regular",Consolas,monospace}
 .yr th,.yr td{padding:6px 7px;text-align:center;border-bottom:1px solid var(--line)}
@@ -151,7 +161,7 @@ details[open]>.setupSummary:after{content:"-"}
   <section class="recommendation card" aria-label="Current projection overview">
     <div class="recLead">
       <div>
-        <div class="eyebrow">Overview</div>
+        <div class="eyebrow" id="overviewEyebrow">Overview · full history</div>
         <h2 id="sumHeadline">stMXN Current Projections</h2>
         <p class="plain" id="marketDescriptor">Current outputs based on the loaded market data and selected terms.</p>
       </div>
@@ -179,10 +189,11 @@ details[open]>.setupSummary:after{content:"-"}
           <button data-p="Aggressive" class="on">Aggressive<small id="pa"></small></button>
         </div>
       </div>
+      <div class="scenarioWarn" id="scenarioWarn"></div>
       <div class="builderGrid">
         <div class="ctl">
           <label>First-loss protection <b><span id="covv">18</span>%</b></label>
-          <input type="range" id="cov" min="8" max="65" step="1" value="18">
+          <input type="range" id="cov" min="3" max="65" step="1" value="18">
           <div class="hint" id="covHint">Junior capital reserved before Senior can lose money.</div>
         </div>
         <div class="ctl">
@@ -206,7 +217,9 @@ details[open]>.setupSummary:after{content:"-"}
           <div class="hint" id="selfLiqBonusHint">Paid only to Seniors who actually exit after the threshold is hit.</div>
         </div>
       </div>
+      <div class="exitModelNote" id="exitModelNote"></div>
       <div class="guardrails" id="guardrailList" aria-label="Parameter guardrails"></div>
+      <div class="hint" style="margin-top:7px">Guardrails and the deploy handoff always read the full history, whatever timeframe the chart is set to — a calm window must not mask a Senior loss elsewhere in the record.</div>
     </div>
   </details>
 </div>
@@ -245,6 +258,8 @@ details[open]>.setupSummary:after{content:"-"}
             <span>Start <b id="timeStartLabel">—</b></span>
             <span>End <b id="timeEndLabel">—</b></span>
           </div>
+          <div class="rebaseNote" id="rebaseNote"></div>
+          <div class="rebaseWarn" id="rebaseWarn"></div>
         </div>
       </div>
       <div class="yr">
@@ -262,6 +277,8 @@ details[open]>.setupSummary:after{content:"-"}
           <div class="row"><span class="dot" style="background:var(--sen)"></span><div>Senior is the protected side: losses reach Senior only after the Junior first-loss cushion is used first.</div></div>
           <div class="row"><span class="dot" style="background:var(--jun)"></span><div>Junior receives extra yield for taking first losses and can give up recoveries when the observation period expires before the strategy recovers.</div></div>
           <div class="row"><span class="dot" style="background:var(--mut)"></span><div>Loaded model inputs: Senior and Junior follow the same strategy path, beta is 1.00, and Junior starts with a modest extra cushion.</div></div>
+          <div class="row"><span class="dot" style="background:var(--red)"></span><div><b>No new Junior capital (worst case).</b> This model seals both tranches at day one. Once Junior is wiped out, its only way back is earning its yield share on later Senior gains — no new Junior deposits are modelled. A live market would likely recapitalize faster, since Junior deposits reopen whenever the market is perpetual. Read depleted-Junior stretches as a floor, not a forecast.</div></div>
+          <div class="row"><span class="dot" style="background:var(--sen)"></span><div><b>Observation periods measure Junior solvency, not risk.</b> One can only start when Junior has capital to cover a Senior loss, so an exhausted Junior produces <em>fewer</em> periods while Senior absorbs losses directly. Raising the Senior yield share keeps Junior solvent and raises the count, until Junior stops depleting and the count goes flat. Always read it next to Senior loss events and days Junior exhausted.</div></div>
           <div class="sourceNote">Illustrative daily model, not a contract-exact implementation. Base strategy = net-of-fee value series. Sources: FRED DEXMXUS/DEXBZUS, BCB Selic, Banxico target, royco-dawn.</div>
         </div>
         <div class="notes">
@@ -269,7 +286,7 @@ details[open]>.setupSummary:after{content:"-"}
           <div class="row"><span class="dot" style="background:var(--green)"></span><div><b>Conservative</b> — larger Junior cushion and more recovery time. Lower Junior upside, fewer erased recovery claims.</div></div>
           <div class="row"><span class="dot" style="background:var(--sen)"></span><div><b>Balanced</b> — middle setting: Senior stays protected historically, while Junior still gets meaningful upside.</div></div>
           <div class="row"><span class="dot" style="background:var(--jun)"></span><div><b>Aggressive</b> — smaller Junior cushion and shorter recovery time. Higher Junior upside, more erased recovery claims.</div></div>
-          <div class="sourceNote">Scenarios keep Senior near a 7% annualized target and vary how much risk Junior takes. They are screened for no historical Senior loss events in this model.</div>
+          <div class="sourceNote">Scenarios keep Senior near a 7% annualized target and vary how much risk Junior takes. They are screened for no historical Senior loss events <b>at the default 5% Senior-exit buffer only</b>. The exit buffer and bonus are separate controls that persist when you switch scenario — raising the buffer far above the default trips the Senior exit continuously and will lose Senior money on every scenario. The banner by the scenario chooser flags this when it happens.</div>
         </div>
       </div>
       </div>
@@ -307,12 +324,22 @@ const MARKET_META={
 };
 const DEFAULT_MARKET='stMXN', DEFAULT_PRESET='Aggressive';
 const EXIT_BUFFER_MIN=1, EXIT_BUFFER_DEFAULT=5, EXIT_BUFFER_MAX=99.91;
+/* Deployed royco-dawn markets (script/config/MarketDeploymentConfig.sol, 21 markets) set
+   liquidationUtilizationWAD between 1.0009009e18 and 6.6667e18 — i.e. buffer 99.91% down to 15.00%,
+   median 90% (1.1111e18). Higher buffer = the Senior exit unlocks EARLIER = Senior better protected.
+   The 5% default above is later than every deployed market; see exitModelNote for why it is kept. */
+const DEPLOYED_BUFFER_MIN=15, DEPLOYED_BUFFER_MAX=99.91, DEPLOYED_BUFFER_MEDIAN=90;
+/* Coverage bounds. Deployed markets run 3%-20% (STCUSD, SYRUP_USDC and AA_FALCONX_USDC sit at 3%),
+   so the floor is 3 to keep every real market expressible. Junior is coverage/TARGET_UTIL of the
+   pool, so a 3% floor means Junior can be as thin as 3.3% of the pool — roughly 30x leverage. */
+const COV_MIN=3, COV_MAX=65;
 let TARGET_UTIL=0.90, LIQ_UTIL=utilizationPctFromBufferPct(EXIT_BUFFER_DEFAULT)/100, EXIT_BONUS=0.25;
-let MKT=DEFAULT_MARKET, PRESET=DEFAULT_PRESET, S=null, hoverI=null, hoverMouse=null, viewA=0, viewB=null;
+let MKT=DEFAULT_MARKET, PRESET=DEFAULT_PRESET, S=null, CTX=null, hoverI=null, hoverMouse=null, viewA=0, viewB=null;
 const cache={};
-function prep(m){ if(cache[m])return cache[m]; const d=DATA[m]; const start=new Date(d.start+'T00:00:00');
-  const X=[],DS=[]; for(const o of d.off){ const dt=new Date(start); dt.setDate(dt.getDate()+o);
-    const y=dt.getFullYear(); const s=new Date(y,0,1), e=new Date(y+1,0,1); X.push(y+(dt-s)/(e-s));
+function prep(m){ if(cache[m])return cache[m]; const d=DATA[m];
+  const [y0,m0,d0]=d.start.split('-').map(Number), startMs=Date.UTC(y0,m0-1,d0);
+  const X=[],DS=[]; for(const o of d.off){ const ms=startMs+o*86400000, dt=new Date(ms);
+    const y=dt.getUTCFullYear(); const s=Date.UTC(y,0,1), e=Date.UTC(y+1,0,1); X.push(y+(ms-s)/(e-s));
     DS.push(dt.toISOString().slice(0,10)); }
   cache[m]={P:d.P,off:d.off,X,DS,coupon:d.coupon,carry:d.carry}; return cache[m]; }
 
@@ -322,7 +349,7 @@ function simFT(P,off,coverage,jtYieldShare,dur,noReal,exitBonusPct=0){
   let lastSTRaw=S0, lastJTRaw=J0, stEffective=S0, jtEffective=J0, stIL=0, jtIL=0;
   const Sa=[stEffective],Ja=[jtEffective],Ua=[coverage*(lastSTRaw+lastJTRaw)/Math.max(jtEffective,1e-9)];
   let state='PERP',obsStart=null, wasLiq=false, exitBonusPaid=0, exitBonusMax=0, exitEvents=0; const ev=[],obs=[],stHit=[];
-  const closeObs=(i,expired)=>{ if(obsStart!=null) obs.push({a:obsStart,b:i,expired}); obsStart=null; };
+  const closeObs=(i,cause)=>{ if(obsStart!=null) obs.push({a:obsStart,b:i,cause,expired:cause==='expired'}); obsStart=null; };
   const attrDelta=(delta,claim,lastRaw)=> (delta===0||claim<=0||lastRaw<=0) ? 0 : delta*claim/lastRaw;
   const seniorExitBonusCap=(stEff,jtEff,stRawNow,jtRawNow)=>{
     const desired=Math.max(stEff,0)*(Math.max(exitBonusPct,0)/100), jtCap=Math.max(jtEff,0);
@@ -330,16 +357,16 @@ function simFT(P,off,coverage,jtYieldShare,dur,noReal,exitBonusPct=0){
     const neutralCap=denom>1e-9 ? Math.max(stEff,0)*jtCap/denom : jtCap;
     return Math.max(0,Math.min(desired,jtCap,Math.max(neutralCap,0)));
   };
-  const forcePerpetual=(i,type,record=true,stRawNow=lastSTRaw,jtRawNow=lastJTRaw)=>{
-    if(record&&type==='liquidation'){
+  const forcePerpetual=(i,type,newTrigger=true,stRawNow=lastSTRaw,jtRawNow=lastJTRaw)=>{
+    if(newTrigger&&type==='liquidation'){
       exitEvents++;
       const bonus=seniorExitBonusCap(stEffective,jtEffective,stRawNow,jtRawNow);
       if(bonus>0) exitBonusPaid+=bonus;
       exitBonusMax=Math.max(exitBonusMax,bonus);
     }
-    if(record&&jtIL>1e-9) ev.push({i,type,loss:jtIL/J0*100});
+    if(jtIL>1e-9) ev.push({i,type,loss:jtIL/J0*100});
     jtIL=0;
-    if(state==='OBS') closeObs(i,true);
+    if(state==='OBS') closeObs(i,type);
     state='PERP';
   };
   for(let i=1;i<n;i++){
@@ -381,47 +408,61 @@ function simFT(P,off,coverage,jtYieldShare,dur,noReal,exitBonusPct=0){
     else if(!noReal && initialState==='OBS' && (off[i]-off[obsStart])>=dur) forcePerpetual(i,'expired');
     else if(stIL>1e-9) forcePerpetual(i,'st-il');
     else if(jtIL>1e-9){ if(initialState==='PERP') obsStart=i; state='OBS'; }
-    else { if(initialState==='OBS') closeObs(i,false); state='PERP'; }
+    else { if(initialState==='OBS') closeObs(i,'recovered'); state='PERP'; }
     wasLiq=liqNow;
 
     lastSTRaw=stRaw; lastJTRaw=jtRaw;
     Sa.push(stEffective); Ja.push(Math.max(jtEffective,0)); Ua.push(utilization);
   }
-  if(state==='OBS') closeObs(n-1,false);
+  if(state==='OBS') closeObs(n-1,'ongoing');
   return {sen:Sa.map(x=>x/S0*100), jun:Ja.map(x=>x/J0*100), senAbs:Sa, junAbs:Ja, util:Ua, ev, obs, stHit, jrShare, exitBonusPaid, exitBonusMax, exitEvents}; }
 
 function cagr(nav,off){ const y=(off[off.length-1]-off[0])/365.25; return (Math.pow(nav[nav.length-1]/100,1/y)-1)*100; }
 function mdd(nav){ let pk=-1e9,d=0; for(const v of nav){pk=Math.max(pk,v);d=Math.min(d,v/pk-1);} return d*100; }
 function maxObsDays(obs,off){ let m=0; for(const o of obs) m=Math.max(m,off[o.b]-off[o.a]); return m; }
+/* Days Junior effective NAV sits at zero. While Junior is exhausted it cannot cover a Senior loss,
+   so no observation period can start and losses land on Senior directly. This is the number that
+   explains why the observation-period count falls as the yield share falls. */
+function juniorExhaustedDays(junAbs,off){ let d=0;
+  for(let i=1;i<junAbs.length;i++) if(junAbs[i]<=1e-9) d+=off[i]-off[i-1];
+  return d; }
 function liqBreaches(util){ let n=0,prev=false; for(const u of util){ const on=u>=LIQ_UTIL; if(on&&!prev)n++; prev=on; } return n; }
+const YEARS=[2021,2022,2023,2024,2025,2026];
+/* Calendar-year returns over whatever slice is passed in. The first year present is measured from
+   nav[0], so a windowed (or partial) first year is based off the window start rather than a year
+   boundary that lies outside the data. Returns are ratios, so they are unaffected by rebasing. */
 function yearly(nav,DS){ const idx={}; for(let i=0;i<DS.length;i++){ idx[+DS[i].slice(0,4)]=i; }
-  const a={}; for(const y of [2021,2022,2023,2024,2025]) if(idx[y]!==undefined) a[y]=nav[idx[y]];
-  const out={};
-  out[2021]= idx[2021]!==undefined? nav[idx[2021]]/nav[0]-1 : null;
-  for(const y of [2022,2023,2024,2025]) out[y]= (a[y]!==undefined&&a[y-1]!==undefined)? a[y]/a[y-1]-1 : null;
-  out[2026]= a[2025]!==undefined? nav[nav.length-1]/a[2025]-1 : null;
+  const present=YEARS.filter(y=>idx[y]!==undefined), out={};
+  for(const y of YEARS) out[y]=null;
+  // A percentage return off a zero base is undefined: report null ("—") rather than Infinity/NaN.
+  const ret=(now,base)=> (!(base>0)||now===undefined) ? null : now/base-1;
+  present.forEach((y,k)=>{ out[y]=ret(nav[idx[y]], k===0?nav[0]:nav[idx[present[k-1]]]); });
   out.end=nav[nav.length-1]; return out; }
 function dayNum(ds){ const [y,m,d]=ds.split('-').map(Number); return Date.UTC(y,m-1,d)/86400000; }
-function yearlyObsDays(obs,off,DS){
-  const start=dayNum(DS[0]), end=dayNum(DS[DS.length-1]), out={};
-  for(const y of [2021,2022,2023,2024,2025,2026]){
-    const ya=Math.max(dayNum(y+'-01-01'),start), yb=Math.min(dayNum((y+1)+'-01-01'),end);
+/* Observation days per calendar year, clipped to the selected window [a,b].
+   With a=0 and b=last this is identical to full-history behaviour. */
+function yearlyObsDays(obs,off,DS,a=0,b=DS.length-1){
+  const day0=dayNum(DS[0]), winA=day0+off[a], winB=day0+off[b], out={};
+  for(const y of YEARS){
+    const ya=Math.max(dayNum(y+'-01-01'),winA), yb=Math.min(dayNum((y+1)+'-01-01'),winB);
     const total=Math.max(0,yb-ya); let od=0;
     for(const o of obs){
-      const a=start+off[o.a], b=start+off[o.b];
-      od+=Math.max(0,Math.min(b,yb)-Math.max(a,ya));
+      const oa=Math.max(day0+off[o.a],winA), ob=Math.min(day0+off[o.b],winB);
+      od+=Math.max(0,Math.min(ob,yb)-Math.max(oa,ya));
     }
     out[y]={obs:Math.round(od),non:Math.round(Math.max(0,total-od)),total:Math.round(total)};
   }
-  out.end={obs:[2021,2022,2023,2024,2025,2026].reduce((s,y)=>s+out[y].obs,0),
-           non:[2021,2022,2023,2024,2025,2026].reduce((s,y)=>s+out[y].non,0),
-           total:[2021,2022,2023,2024,2025,2026].reduce((s,y)=>s+out[y].total,0)};
+  out.end={obs:YEARS.reduce((s,y)=>s+out[y].obs,0),
+           non:YEARS.reduce((s,y)=>s+out[y].non,0),
+           total:YEARS.reduce((s,y)=>s+out[y].total,0)};
   return out;
 }
-function yearlyObsTriggers(obs,DS){
-  const out={}; for(const y of [2021,2022,2023,2024,2025,2026]) out[y]=0;
-  for(const o of obs){ const y=+DS[o.a].slice(0,4); if(out[y]!==undefined) out[y]++; }
-  out.end=[2021,2022,2023,2024,2025,2026].reduce((s,y)=>s+out[y],0);
+function yearlyObsTriggers(obs,DS,a=0,b=DS.length-1){
+  // Years the window does not touch are absent (null -> "—"), not zero.
+  const y0=+DS[a].slice(0,4), y1=+DS[b].slice(0,4), out={};
+  for(const y of YEARS) out[y]=(y<y0||y>y1)?null:0;
+  for(const o of obs){ if(o.a<a||o.a>b) continue; const y=+DS[o.a].slice(0,4); if(out[y]!==null&&out[y]!==undefined) out[y]++; }
+  out.end=YEARS.reduce((s,y)=>s+(out[y]||0),0);
   return out;
 }
 function nonObsBands(bands,off,DS){
@@ -454,9 +495,19 @@ function guardrailSummary(r,srAnn,srDD,obs){
   return {ready,seniorProtected,seniorYieldOk,deploySafe,exitUsable,actions};
 }
 function seniorPass(r){ return r.stHit.length===0&&mdd(r.sen)>-0.05; }
+/* The preset ladder is screened at the DEFAULT Senior-exit settings only. The exit buffer/bonus are
+   separate controls that persist across preset changes, and a high buffer trips the liquidation
+   threshold constantly — which erases Junior's recovery claim, drains Junior, and pushes losses onto
+   Senior. Re-run the current terms at the default exit settings to tell the two causes apart. */
+function seniorPassAtDefaultExit(c,coverage,obs,jtYieldShare){
+  const savedLiq=LIQ_UTIL;
+  LIQ_UTIL=utilizationPctFromBufferPct(EXIT_BUFFER_DEFAULT)/100;
+  try{ return seniorPass(simFT(c.P,c.off,coverage,jtYieldShare,obs,false,0.25)); }
+  finally{ LIQ_UTIL=savedLiq; }
+}
 function nearbySeniorFixes(c,coverage,obs,jtYieldShare){
-  const fixes=[], covPct=coverage*100, startCov=Math.max(8,Math.floor(covPct)+1);
-  for(let cp=startCov;cp<=65;cp++){
+  const fixes=[], covPct=coverage*100, startCov=Math.max(COV_MIN,Math.floor(covPct)+1);
+  for(let cp=startCov;cp<=COV_MAX;cp++){
     if(seniorPass(simFT(c.P,c.off,cp/100,jtYieldShare,obs,false,EXIT_BONUS))){ fixes.push('increase first-loss protection to '+cp+'%'); break; }
   }
   for(let d=obs+1;d<=194;d++){
@@ -505,6 +556,12 @@ function erasureCause(type){
   if(type==='expired') return 'observation period ended';
   if(type==='st-il') return 'Senior loss event';
   return 'recovery claim erased';
+}
+function bandEndNote(cause){
+  if(cause==='liquidation') return ' — cut short: protected Senior exit opened';
+  if(cause==='st-il') return ' — cut short: Senior loss event';
+  if(cause==='ongoing') return ' — still open at end of data';
+  return '';
 }
 function visibleYmax(a,b){ let ym=0;
   for(const arr of [S.pool,S.junR,S.junW,S.sen]) for(let i=a;i<=b;i++) ym=Math.max(ym,arr[i]||0);
@@ -555,7 +612,7 @@ function draw(){ if(!S)return; const box=chart.parentElement, w=box.clientWidth,
   parts.push(svgText(Math.min(PX(S.X[view.b])+4,pl.x+pl.w-28),PY(S.junR[view.b]),'Jr '+S.junR[view.b].toFixed(0),'fill="'+CHART.jun+'" font-size="11" font-weight="600" dominant-baseline="middle"'));
   parts.push(svgText(Math.min(PX(S.X[view.b])+4,pl.x+pl.w-28),PY(S.sen[view.b]),'Sr '+S.sen[view.b].toFixed(0),'fill="'+CHART.sen+'" font-size="11" font-weight="600" dominant-baseline="middle"'));
   if(hoverBand){ const hb=clippedBand(hoverBand,view.a,view.b), xa=PX(S.X[hb.a]), xb=PX(S.X[hb.b]), cx=(xa+xb)/2,
-    label='Observation period '+(hoverBand.expired&&hoverBand.targetDays&&hoverBand.days!==hoverBand.targetDays ? hoverBand.targetDays+'d target / '+hoverBand.days+'d observed' : hoverBand.days+'d');
+    label='Observation period '+(hoverBand.expired&&hoverBand.targetDays&&hoverBand.days!==hoverBand.targetDays ? hoverBand.targetDays+'d target / '+hoverBand.days+'d observed' : hoverBand.days+'d')+bandEndNote(hoverBand.cause);
     const tw=estimateText(label)+16, th=20, tx=Math.min(Math.max(cx-tw/2,pl.x+4),pl.x+pl.w-tw-4), ty=pl.y+6;
     parts.push('<rect x="'+num(tx)+'" y="'+num(ty)+'" width="'+num(tw)+'" height="'+num(th)+'" rx="0" fill="rgba(255,253,249,.96)" stroke="'+CHART.obs+'"/>');
     parts.push(svgText(tx+tw/2,ty+th/2+.5,label,'fill="'+CHART.obs+'" font-size="11" font-weight="600" text-anchor="middle" dominant-baseline="middle"')); }
@@ -570,10 +627,10 @@ function draw(){ if(!S)return; const box=chart.parentElement, w=box.clientWidth,
     let wm=estimateText(S.DS[i]); for(const p of pts) wm=Math.max(wm,estimateText(p[0]+': '+p[1].toFixed(1)));
     const hoverEvent=S.events.find(e=>Math.abs(e.i-i)<=1);
     const hoverSeniorLoss=S.senLoss.find(e=>Math.abs(e.i-i)<=1);
-    const obsText=hoverBand?'Observation period: '+(hoverBand.expired&&hoverBand.targetDays&&hoverBand.days!==hoverBand.targetDays ? hoverBand.targetDays+'d target, next sample at '+hoverBand.days+'d' : hoverBand.days+'d')+' ('+hoverBand.start+' -> '+hoverBand.end+')':null;
+    const obsText=hoverBand?'Observation period: '+(hoverBand.expired&&hoverBand.targetDays&&hoverBand.days!==hoverBand.targetDays ? hoverBand.targetDays+'d target, next sample at '+hoverBand.days+'d' : hoverBand.days+'d')+bandEndNote(hoverBand.cause)+' ('+hoverBand.start+' -> '+hoverBand.end+')':null;
     const freeText=hoverFree?'Non-observation period: '+hoverFree.days+'d ('+hoverFree.start+' -> '+hoverFree.end+')':null;
-    const forfeitText=hoverEvent?'Junior recovery erased ('+erasureCause(hoverEvent.type)+'): '+hoverEvent.forfeit.toFixed(1)+'% of starting Junior capital':null;
-    const seniorLossText=hoverSeniorLoss?'Senior loss event: '+hoverSeniorLoss.loss.toFixed(2)+'% of starting Senior capital':null;
+    const forfeitText=hoverEvent?'Junior recovery erased ('+erasureCause(hoverEvent.type)+'): '+hoverEvent.forfeit.toFixed(1)+'% '+(S.junBasis||'of starting Junior capital'):null;
+    const seniorLossText=hoverSeniorLoss?'Senior loss event: '+hoverSeniorLoss.loss.toFixed(2)+'% '+(S.senBasis||'of starting Senior capital'):null;
     if(obsText) wm=Math.max(wm,estimateText(obsText)); if(freeText) wm=Math.max(wm,estimateText(freeText)); if(forfeitText) wm=Math.max(wm,estimateText(forfeitText)); if(seniorLossText) wm=Math.max(wm,estimateText(seniorLossText));
     const bw=wm+26, bh=(pts.length+1+(obsText?1:0)+(freeText?1:0)+(forfeitText?1:0)+(seniorLossText?1:0))*16+8, tip=hoverMouse||{x,y:pl.y+4};
     let bx=tip.x+14, by=tip.y+14; if(bx+bw>pl.x+pl.w) bx=tip.x-bw-14; if(by+bh>pl.y+pl.h) by=tip.y-bh-14;
@@ -609,7 +666,8 @@ function setViewRange(a,b){ if(!S)return; const max=S.X.length-1;
   a=clamp(Math.round(a),0,max); b=clamp(Math.round(b),0,max);
   if(b<a){ const t=a; a=b; b=t; }
   if(b-a<5){ if(a<=max-5) b=a+5; else a=Math.max(0,b-5); }
-  viewA=a; viewB=b; hoverI=null; syncTimeControls(); draw();
+  if(a===viewA&&b===viewB) return;
+  viewA=a; viewB=b; hoverI=null; syncTimeControls(); renderWindow();
 }
 function yearTickIndex(y){ if(!S)return null;
   for(let i=0;i<S.DS.length;i++) if(+S.DS[i].slice(0,4)>=y) return i;
@@ -630,10 +688,13 @@ function miniPath(arr,xs,ys){ let d='';
   for(let i=0;i<arr.length;i++) d+=(i?'L':'M')+num(xs(i))+' '+num(ys(arr[i]))+' ';
   return d.trim();
 }
+/* The brush is a full-history overview, so it always draws the raw (unindexed) series —
+   otherwise the overview would rescale itself every time the window moved. */
 function drawBrushOverview(){ if(!S||!brushSvg_)return;
+  const RAW=S.raw||{pool:S.pool,sen:S.sen,junR:S.junR};
   const box=brushTrack_||brushSvg_.parentElement, w=Math.max(1,Math.round(box.clientWidth||1000)), h=Math.max(1,Math.round(box.clientHeight||54));
   const pad={x:0,y:7}, vals=[], xr=brushXRange(), spanX=Math.max(xr.max-xr.min,1e-9);
-  for(const arr of [S.pool,S.sen,S.junR]) for(const v of arr) vals.push(v);
+  for(const arr of [RAW.pool,RAW.sen,RAW.junR]) for(const v of arr) vals.push(v);
   let lo=Math.min(...vals), hi=Math.max(...vals); const span=Math.max(hi-lo,1); lo-=span*.12; hi+=span*.08;
   brushSvg_.setAttribute('viewBox','0 0 '+w+' '+h);
   brushSvg_.setAttribute('preserveAspectRatio','none');
@@ -643,10 +704,10 @@ function drawBrushOverview(){ if(!S||!brushSvg_)return;
     parts.push('<rect x="'+num(x)+'" y="0" width="'+num(ww)+'" height="'+h+'" fill="rgba(244,199,123,.18)"/>'); }
   for(const y of [2022,2023,2024,2025,2026]){ const i=yearTickIndex(y), x=X(i);
     parts.push('<line x1="'+num(x)+'" y1="0" x2="'+num(x)+'" y2="'+h+'" stroke="'+CHART.year+'" stroke-dasharray="3 4"/>'); }
-  parts.push('<path d="'+miniPath(S.pool,X,Y)+'" fill="none" stroke="'+CHART.base+'" stroke-width="1.8" opacity=".75"/>');
-  parts.push('<path d="'+miniPath(S.sen,X,Y)+'" fill="none" stroke="'+CHART.sen+'" stroke-width="2.2"/>');
-  parts.push('<path d="'+miniPath(S.junR,X,Y)+'" fill="none" stroke="'+CHART.jun+'" stroke-width="2.2"/>');
-  for(const e of S.senLoss){ const x=X(e.i), y=Y(S.sen[e.i]);
+  parts.push('<path d="'+miniPath(RAW.pool,X,Y)+'" fill="none" stroke="'+CHART.base+'" stroke-width="1.8" opacity=".75"/>');
+  parts.push('<path d="'+miniPath(RAW.sen,X,Y)+'" fill="none" stroke="'+CHART.sen+'" stroke-width="2.2"/>');
+  parts.push('<path d="'+miniPath(RAW.junR,X,Y)+'" fill="none" stroke="'+CHART.jun+'" stroke-width="2.2"/>');
+  for(const e of S.senLoss){ const x=X(e.i), y=Y(RAW.sen[e.i]);
     parts.push('<circle cx="'+num(x)+'" cy="'+num(y)+'" r="2.8" fill="'+CHART.senLoss+'" stroke="#FFFDF9" stroke-width=".8"/>'); }
   brushSvg_.innerHTML=parts.join('');
 }
@@ -676,24 +737,26 @@ function beginBrush(side,ev){ if(!S)return; activeBrushSide=side; ev.preventDefa
   moveBrushSide(side,brushIndexFromEvent(ev));
 }
 
+/* render() runs the simulation and everything that must NOT depend on the chart timeframe:
+   the Senior guardrails, the deploy handoff, and the overview descriptor. Those are deployment
+   safety screens — windowing them would let a calm window mask a config that loses Senior money
+   elsewhere in history. renderWindow() handles everything that DOES follow the timeframe. */
 function render(){ readMarketConfig(); const c=prep(MKT), meta=MARKET_META[MKT]; const coverage=+cov_.value/100, obs=+obs_.value, jtYieldShare=+ys_.value/100;
   if(TARGET_UTIL<=coverage) TARGET_UTIL=Math.min(.99,coverage+.01);
   const r=simFT(c.P,c.off,coverage,jtYieldShare,obs,false,EXIT_BONUS), w=simFT(c.P,c.off,coverage,jtYieldShare,obs,true,EXIT_BONUS);
-  let ym=0; for(const a of [c.P,r.jun,w.jun,r.sen]) for(const v of a) ym=Math.max(ym,v);
-  for(const e of r.ev) ym=Math.max(ym,r.jun[e.i]+e.loss);
-  ym=Math.ceil(ym*1.04/50)*50;
-  const bands=r.obs.map(o=>({a:o.a,b:o.b,days:c.off[o.b]-c.off[o.a],targetDays:o.expired?obs:null,start:c.DS[o.a],end:c.DS[o.b],expired:o.expired}));
-  S={X:c.X,DS:c.DS,pool:c.P,junR:r.jun,junW:w.jun,sen:r.sen,
+  const bands=r.obs.map(o=>({a:o.a,b:o.b,days:c.off[o.b]-c.off[o.a],targetDays:o.expired?obs:null,start:c.DS[o.a],end:c.DS[o.b],expired:o.expired,cause:o.cause}));
+  CTX={c,r,w,meta,coverage,obs,jtYieldShare};
+  S={X:c.X,DS:c.DS,raw:{pool:c.P,junR:r.jun,junW:w.jun,sen:r.sen},
+    pool:c.P,junR:r.jun,junW:w.jun,sen:r.sen,
     events:r.ev.map(e=>({...e,forfeit:e.loss,top:r.jun[e.i]+e.loss})),
     senLoss:r.stHit.map(e=>({...e,loss:e.loss||0})),
-    bands,freeBands:nonObsBands(bands,c.off,c.DS),
-    ymax:Math.max(ym,250)};
-  syncTimeControls();
-  draw();
-  const jrShare=r.jrShare, gap=Math.max(0,w.jun[w.jun.length-1]-r.jun[r.jun.length-1]);
+    bands,freeBands:nonObsBands(bands,c.off,c.DS)};
+
+  /* ---- full-history reads: guardrails, overview, deploy handoff ---- */
+  const jrShare=r.jrShare, gapAll=Math.max(0,w.jun[w.jun.length-1]-r.jun[r.jun.length-1]);
   const srAnn=cagr(r.sen,c.off), jrAnn=cagr(r.jun,c.off), srDD=mdd(r.sen), jrDD=mdd(r.jun);
-  const yb=yearly(c.P,c.DS), yj=yearly(r.jun,c.DS), ysn=yearly(r.sen,c.DS), yd=yearlyObsDays(r.obs,c.off,c.DS), yt=yearlyObsTriggers(r.obs,c.DS);
-  yb.ann=cagr(c.P,c.off); yj.ann=jrAnn; ysn.ann=srAnn;
+  const exDaysAll=juniorExhaustedDays(r.junAbs,c.off);
+  const ydAll=yearlyObsDays(r.obs,c.off,c.DS);
   const g=guardrailSummary(r,srAnn,srDD,obs), preset=scenarioName();
   const recEl=document.querySelector('.recommendation');
   if(recEl) recEl.classList.toggle('fail',!g.seniorProtected);
@@ -703,22 +766,96 @@ function render(){ readMarketConfig(); const c=prep(MKT), meta=MARKET_META[MKT];
     ? 'Current '+preset+' terms pass the Senior hard guardrail: no historical Senior loss events with '+cov_.value+'% first-loss protection, '+obs+'d observation period, and '+ys_.value+'% of Senior yield paid to Junior.'
     : 'Fails Senior hard guardrail: '+r.stHit.length+' historical Senior loss events, first on '+firstSeniorLoss+', with '+srDD.toFixed(1)+'% worst Senior drawdown. Try '+nearbySeniorFixes(c,coverage,obs,jtYieldShare).join(' or ')+'.';
   setText('marketDescriptor',descriptor);
+  /* Heads-up: name the real culprit. If these terms are screened safe at the default exit settings
+     but lose Senior money now, it is the exit controls that broke them, not the scenario. */
+  const bufNow=inputNum(liqUtilInput_,EXIT_BUFFER_DEFAULT,EXIT_BUFFER_MIN,EXIT_BUFFER_MAX);
+  const exitIsCulprit=!g.seniorProtected&&seniorPassAtDefaultExit(c,coverage,obs,jtYieldShare);
+  /* The Senior-exit threshold is the one control whose realistic values this model handles badly.
+     Say so plainly rather than letting the safe-looking 5% default imply it is the realistic choice. */
+  setHtml('exitModelNote',
+    '<b>About the Senior-exit buffer.</b> Higher buffer = the Senior exit unlocks <em>earlier</em> = Senior is better protected. '+
+    'Deployed Dawn markets sit between '+DEPLOYED_BUFFER_MIN+'% and '+DEPLOYED_BUFFER_MAX+'% buffer (median '+DEPLOYED_BUFFER_MEDIAN+'%); '+
+    'this tool defaults to '+EXIT_BUFFER_DEFAULT+'%, which is later than any of them. '+
+    'That default is kept because <b>this model does not simulate Senior exiting, YDM adaptation, or Junior recapitalisation</b> — '+
+    'it only applies the punitive half of a threshold breach (erasing Junior\'s recovery claim), so exit buffers near deployed values '+
+    'overstate Senior losses here. Treat the buffer as a modelling choice in this tool, not as a deploy recommendation: '+
+    'take the real value from the market you are copying.');
+  setHtml('scenarioWarn', !g.seniorProtected
+    ? (exitIsCulprit
+        ? '<b>Heads up — at this Senior-exit setting, these terms would lead to Senior losses.</b> The '+preset+' terms show none at the default '+EXIT_BUFFER_DEFAULT+'% exit buffer, but at '+fmtPct(bufNow,1)+'% buffer they produce '+r.stHit.length+' Senior loss events ('+srDD.toFixed(1)+'% worst Senior drawdown). A higher buffer opens the Senior exit earlier, and this model erases Junior\'s recovery claim every time that threshold is crossed — draining Junior until losses reach Senior. Return the buffer to '+EXIT_BUFFER_DEFAULT+'% to restore the screened result.'
+        : '<b>Heads up — these terms would lead to Senior losses.</b> '+r.stHit.length+' Senior loss events across full history ('+srDD.toFixed(1)+'% worst Senior drawdown). Senior is the protected tranche, so these terms do not deliver what Senior is being sold.')
+    : '');
   setText('sumSenior',srAnn.toFixed(1)+'%/yr');
   setText('sumSeniorNote',r.stHit.length>0?'Do not use: '+r.stHit.length+' Senior loss events.':'No historical Senior loss events.');
   setText('sumJunior',jrAnn.toFixed(1)+'%/yr');
-  setText('sumJuniorNote','$'+r.jun[r.jun.length-1].toFixed(0)+' ending value; erased recoveries $'+gap.toFixed(0));
-  setText('covHint','Junior first-loss reserve. '+cov_.value+'% means about $'+cov_.value+' of protection per $100 of market exposure before Senior can lose money.');
+  setText('sumJuniorNote','$'+r.jun[r.jun.length-1].toFixed(0)+' ending value; erased recoveries $'+gapAll.toFixed(0));
+  setText('covHint','Junior first-loss reserve. '+cov_.value+'% means about $'+cov_.value+' of protection per $100 of market exposure before Senior can lose money. '+
+    'It also sets Junior\'s leverage: Junior is '+(jrShare*100).toFixed(1)+'% of the pool but absorbs all of its swings, so Junior moves about '+(1/jrShare).toFixed(1)+'x the base strategy. Deployed Dawn markets run 3%-20%.');
   setText('obsHint','Junior has '+obs+' days to recover before the recovery claim is erased. Longer helps Junior, but keeps Senior waiting longer.');
-  setText('ysHint','Projection assumption: Junior receives '+ys_.value+'% of Senior yield here. Live markets price this through supply/demand and the YDM curve.');
-  renderGuardrails(g,r,srAnn,jrAnn,srDD,jrDD,gap,obs,yd);
-  renderSetup(c,r,coverage,obs,jtYieldShare,jrShare,srAnn,jrAnn,srDD,jrDD,gap,yd);
-  const box=(t,v,cl)=>'<div class="box"><div class="t">'+t+'</div><div class="v '+cl+'">'+v+'</div></div>';
+  setText('ysHint','Projection assumption: Junior receives '+ys_.value+'% of Senior yield here. Live markets price this through supply/demand and the YDM curve.'+
+    (exDaysAll>0?' At this share Junior is exhausted for '+exDaysAll+'d — that is why the observation-period count drops and Senior takes losses directly.':''));
+  renderGuardrails(g,r,srAnn,jrAnn,srDD,jrDD,gapAll,obs,ydAll);
+  renderSetup(c,r,coverage,obs,jtYieldShare,jrShare,srAnn,jrAnn,srDD,jrDD,gapAll,ydAll);
+
+  syncTimeControls();
+  renderWindow(); }
+
+/* Rebase every series to 100 at the window start and recompute the chart, outcome metrics and
+   calendar-year table over the window only. On full history the window starts at index 0 where
+   each series already equals 100, so rebasing is a no-op and results match the unwindowed model. */
+function renderWindow(){ if(!S||!CTX) return;
+  const {c,r,w,obs}=CTX, view=currentView(), a=view.a, b=view.b, windowed=!view.all;
+  const scale=(arr)=>{ const base=arr[a]; return base>1e-9 ? {arr:arr.map(v=>v/base*100),base} : {arr,base:0}; };
+  const P=scale(c.P), SEN=scale(r.sen);
+  /* The two Junior lines are compared against each other (the gap between them IS the erased-recovery
+     figure), so they must share a basis: index BOTH or neither. Indexing only the survivor when the
+     other starts at $0 would subtract incomparable numbers and draw them on different scales. */
+  let JR=scale(r.jun), JW=scale(w.jun);
+  if(!(JR.base>1e-9)||!(JW.base>1e-9)){ JR={arr:r.jun,base:0}; JW={arr:w.jun,base:0}; }
+  S.pool=P.arr; S.sen=SEN.arr; S.junR=JR.arr; S.junW=JW.arr;
+  // Erasure bars live in Junior's charted space; express the label against that same base.
+  const jb=JR.base>1e-9?JR.base:100;
+  S.events=r.ev.map(e=>({...e,forfeit:e.loss/jb*100,top:(r.jun[e.i]+e.loss)/jb*100}));
+  const sb=SEN.base>1e-9?SEN.base:100;
+  S.senLoss=r.stHit.map(e=>({...e,loss:(e.loss||0)/sb*100}));
+  // Tooltips must name the basis the numbers are actually expressed in.
+  S.junBasis=JR.base>1e-9&&windowed?'of Junior value at window start':'of starting Junior capital';
+  S.senBasis=SEN.base>1e-9&&windowed?'of Senior value at window start':'of starting Senior capital';
+  draw();
+
+  const sl=arr=>arr.slice(a,b+1), offW=sl(c.off), dsW=sl(c.DS);
+  const srAnn=cagr(sl(S.sen),offW), jrAnn=cagr(sl(S.junR),offW);
+  const srDD=mdd(sl(S.sen)), jrDD=mdd(sl(S.junR));
+  const gap=Math.max(0,S.junW[b]-S.junR[b]);
+  const exDays=juniorExhaustedDays(sl(r.junAbs),offW);
+  const evW=r.ev.filter(e=>e.i>=a&&e.i<=b), stW=r.stHit.filter(e=>e.i>=a&&e.i<=b);
+  const obsW=r.obs.filter(o=>o.b>=a&&o.a<=b).map(o=>({...o,a:Math.max(o.a,a),b:Math.min(o.b,b)}));
+  const yb_=yearly(sl(S.pool),dsW), yj=yearly(sl(S.junR),dsW), ysn=yearly(sl(S.sen),dsW);
+  const yd=yearlyObsDays(r.obs,c.off,c.DS,a,b), yt=yearlyObsTriggers(r.obs,c.DS,a,b);
+  yb_.ann=cagr(sl(S.pool),offW); yj.ann=jrAnn; ysn.ann=srAnn;
+
+  setText('overviewEyebrow', windowed
+    ? 'Overview · full history (not the '+c.DS[a]+' → '+c.DS[b]+' chart timeframe)'
+    : 'Overview · full history');
+  setText('rebaseNote', windowed
+    ? 'Indexed to 100 at '+c.DS[a]+'. Returns, metrics and the table below cover '+c.DS[a]+' → '+c.DS[b]+' only — the reading of an LP who entered at the window start. Senior guardrails and the deploy handoff stay on full history.'
+    : 'Full history, indexed to 100 at '+c.DS[0]+'. Drag the timeframe handles to re-index to any start date.');
+  const zeroBase=[['Junior',JR.base],['Senior',SEN.base]].filter(x=>!(x[1]>1e-9)).map(x=>x[0]);
+  setHtml('rebaseWarn', zeroBase.length
+    ? '<b>Cannot index from zero.</b> '+zeroBase.join(' and ')+' NAV is $0 on '+c.DS[a]+', so there is no base to index off. That series is shown unindexed; move the start handle to a date where it has value.'
+    : '');
+
+  const box=(t,v,cl,note)=>'<div class="box"><div class="t">'+t+'</div><div class="v '+cl+'">'+v+'</div>'+(note?'<div class="n">'+note+'</div>':'')+'</div>';
   document.getElementById('stat').innerHTML=
     box('Senior worst drop',srDD.toFixed(0)+'%','sr')+box('Junior worst drop',jrDD.toFixed(0)+'%','jr')+
-    box('Max observed observation period',maxObsDays(r.obs,c.off)+'d','sr')+box('Claims erased',r.ev.length,'jr')+
-    box('Claims value erased','$'+gap.toFixed(0),'jr')+box('Senior loss events',r.stHit.length,'sr');
-  document.getElementById('yrbody').innerHTML=yrRow('Base strategy',yb,'base')+yrRow('Junior return',yj,'jr')+
-    yrRow('Senior return',ysn,'sr')+nonObsPctRow('Non-observation %',yd,'base')+obsTriggerRow('Observation periods triggered',yt,'base'); }
+    box('Max observed observation period',maxObsDays(obsW,c.off)+'d','sr')+box('Claims erased',evW.length,'jr')+
+    box('Claims value erased','$'+gap.toFixed(0),'jr')+box('Senior loss events',stW.length,'sr')+
+    box('Days Junior exhausted',exDays+'d',exDays>0?'jr warn':'jr',
+      exDays>0?'Junior NAV at $0. It cannot cover Senior losses on these days, so no observation period can start and Senior absorbs losses directly.'
+              :'Junior always had capital available to cover Senior losses.');
+  document.getElementById('yrbody').innerHTML=yrRow('Base strategy',yb_,'base')+yrRow('Junior return',yj,'jr')+
+    yrRow('Senior return',ysn,'sr')+nonObsPctRow('Non-observation %',yd,'base')+obsTriggerRow('Observation periods triggered',yt,'base')+
+    obsTriggerNote(exDays,stW.length); }
 
 function pct(x){ if(x===null||x===undefined) return '—'; const s=(x>=0?'+':'−')+Math.abs(x*100).toFixed(1)+'%';
   return '<span style="color:'+(x<0?'#8F4D42':'#171511')+'">'+s+'</span>'; }
@@ -730,8 +867,18 @@ function nonObsPctRow(lab,o,cl){ const fmt=v=>v.total?((v.non/v.total)*100).toFi
   ['2021','2022','2023','2024','2025','2026'].map(y=>'<td>'+fmt(o[y])+'</td>').join('')+
   '<td><b>'+fmt(o.end)+'</b></td></tr>'; }
 function obsTriggerRow(lab,o,cl){ return '<tr><td class="lab '+cl+'">'+lab+'</td>'+
-  ['2021','2022','2023','2024','2025','2026'].map(y=>'<td>'+o[y]+'</td>').join('')+
+  ['2021','2022','2023','2024','2025','2026'].map(y=>'<td>'+(o[y]===null||o[y]===undefined?'—':o[y])+'</td>').join('')+
   '<td><b>'+o.end+'</b> <span style="color:#9E968A;font-size:11px;white-space:nowrap">total</span></td></tr>'; }
+/* Read alongside the trigger count: a low count is not automatically good. */
+function obsTriggerNote(exDays,senHits){
+  return exDays>0
+    ? '<tr><td class="lab base" colspan="8" style="text-align:left;font-family:inherit;color:#8F4D42;font-size:11px;line-height:1.4;padding:7px 7px 9px">'+
+      '<b>Read this row with care.</b> Junior was exhausted for '+exDays+'d, and an observation period can only start when Junior has capital to cover a Senior loss. '+
+      'A low count here means Junior was empty and Senior took '+senHits+' loss events directly — not that the market was calm. Raising the Senior yield share keeps Junior solvent, which raises this count.</td></tr>'
+    : '<tr><td class="lab base" colspan="8" style="text-align:left;font-family:inherit;color:#6D6860;font-size:11px;line-height:1.4;padding:7px 7px 9px">'+
+      'Junior stayed solvent throughout, so it was able to cover every Senior loss. This count measures how often Junior absorbed a loss, not how risky the market was; '+
+      'once Junior never depletes, the count stops changing with the yield share.</td></tr>';
+}
 function inputNum(el,fallback,min,max){ const v=el?Number(el.value):NaN; return clamp(Number.isFinite(v)?v:fallback,min,max); }
 function fmtPct(v,dec=2){ return Number(v).toFixed(dec).replace(/\.?0+$/,''); }
 function utilizationPctFromBufferPct(v){ return 10000/Math.max(v,0.01); }
@@ -756,7 +903,21 @@ function deployText(c,r,coverage,obs,jtYieldShare,jrShare,srAnn,jrAnn,srDD,jrDD,
   const betaWAD=wadFromPercent(100), juniorCapitalPct=jrShare*100, seniorCapitalPct=100-juniorCapitalPct;
   const erasedByType=['expired','liquidation','st-il'].map(type=>type+': '+r.ev.filter(e=>e.type===type).length).join(', ');
   const guardrailOk=r.stHit.length===0&&srDD>-0.05;
-  return [
+  // Anyone copying this must see the warning before the parameters, not 40 lines below them.
+  const banner=guardrailOk?[]:[
+    '####################################################################',
+    '## HEADS UP: THIS CONFIGURATION WOULD LEAD TO SENIOR LOSSES       ##',
+    '####################################################################',
+    '## '+r.stHit.length+' Senior loss events across full history'+(r.stHit.length?', first on '+c.DS[r.stHit[0].i]:'')+'.',
+    '## Worst Senior drawdown: '+srDD.toFixed(2)+'%. Senior is the protected tranche.',
+    '## Suggested fixes: '+nearbySeniorFixes(c,coverage,obs,jtYieldShare).join(' or ')+'.',
+    '## '+(seniorPassAtDefaultExit(c,coverage,obs,jtYieldShare)
+            ? 'NOTE: these terms show no Senior losses at the default '+EXIT_BUFFER_DEFAULT+'% Senior-exit buffer. The current exit buffer ('+fmtPct(bufferLeft,1)+'%) is what produces them here.'
+            : 'These terms lead to Senior losses at the default exit buffer too.'),
+    '####################################################################',
+    ''
+  ];
+  return banner.concat([
     'Dawn market-design parameter handoff',
     'Generated by Dawn Market Builder',
     'Loaded market: '+MARKET_META[MKT].label+' ('+MARKET_META[MKT].name+')',
@@ -773,7 +934,10 @@ function deployText(c,r,coverage,obs,jtYieldShare,jrShare,srAnn,jrAnn,srDD,jrDD,
     'MarketConfig fields resolved by this tool',
     'coverageWAD: '+coverageWAD+'   // '+coveragePct.toFixed(0)+'% first-loss protection',
     'fixedTermDurationSeconds: '+fixedTermSeconds+'   // '+obs+' days',
-    'liquidationUtilizationWAD: '+liquidationWAD+'   // opens Senior exit at '+fmtPct(bufferLeft,1)+'% Junior buffer remaining',
+    'liquidationUtilizationWAD: '+liquidationWAD+'   // opens Senior exit at '+fmtPct(bufferLeft,1)+'% Junior buffer remaining'+
+      (bufferLeft<DEPLOYED_BUFFER_MIN
+        ? '  <-- REVIEW: later than every deployed Dawn market ('+DEPLOYED_BUFFER_MIN+'%-'+DEPLOYED_BUFFER_MAX+'% buffer, median '+DEPLOYED_BUFFER_MEDIAN+'%). Take this from the market you are copying.'
+        : ''),
     'stSelfLiquidationBonusWAD: '+exitBonusWAD+'   // '+EXIT_BONUS.toFixed(2)+'%',
     'betaWAD: '+betaWAD+'   // beta = 1.00 in this model',
     'ydmType: DeployScript.YDMType.StaticCurve',
@@ -806,6 +970,7 @@ function deployText(c,r,coverage,obs,jtYieldShare,jrShare,srAnn,jrAnn,srDD,jrDD,
     'seniorWorstDrawdown: '+srDD.toFixed(0)+'%',
     'juniorWorstDrawdown: '+jrDD.toFixed(0)+'%',
     'seniorLossEvents: '+r.stHit.length,
+    'daysJuniorExhausted: '+juniorExhaustedDays(r.junAbs,c.off)+'   // Junior NAV at $0; it cannot cover Senior losses on these days',
     'exitTriggerHits: '+r.exitEvents,
     'maxSingleSeniorExitBonusIfSeniorRedeemsPer100Market: $'+r.exitBonusMax.toFixed(2),
     'recoveryClaimsErasedEvents: '+r.ev.length+'   // '+erasedByType,
@@ -814,12 +979,15 @@ function deployText(c,r,coverage,obs,jtYieldShare,jrShare,srAnn,jrAnn,srDD,jrDD,
     'maxObservedObservationPeriod: '+maxObsDays(r.obs,c.off)+' days   // historical samples can land after the exact '+obs+'d deploy expiry',
     '',
     'Notes',
+    '- Observation-period counts measure Junior solvency, not risk: a period can only start when Junior has capital to cover a Senior loss, so an exhausted Junior yields FEWER periods while Senior takes losses directly. Read the count next to seniorLossEvents and daysJuniorExhausted.',
+    '- Worst case by construction: no new Junior deposits are modelled. A wiped Junior recovers only by earning its yield share on later Senior gains, so depleted stretches are a floor, not a forecast.',
     '- These are finalized market-design parameters, not a complete deploy transaction.',
     '- Deploy.s.sol builds RoycoAccountantInitParams and ydmInitializationData from MarketConfig; do not paste ydmInitializationData directly into MarketConfig.',
     '- The simulator uses a flat yield-share projection. Live market pricing can move with supply, demand, and the deployed YDM curve.',
+    '- Senior-exit buffer: this model does not simulate Senior exiting, YDM adaptation, or Junior recapitalization. On a threshold breach it only erases Junior\'s recovery claim, so buffers near deployed values ('+DEPLOYED_BUFFER_MIN+'%-'+DEPLOYED_BUFFER_MAX+'%, median '+DEPLOYED_BUFFER_MEDIAN+'%) overstate Senior losses here. The '+EXIT_BUFFER_DEFAULT+'% default is a modelling convenience, not a deploy recommendation - source liquidationUtilizationWAD from the market you are copying.',
     '- Senior exit bonus is not included in annualized Senior/Junior return rows; it only applies when Senior redeems after the threshold is hit.',
     '- Concrete assets, oracle/quoter wiring, authority, fee policy, whitelist policy, and deployed contract addresses must come from the production integration.'
-  ].join('\n');
+  ]).join('\n');
 }
 function readMarketConfig(){
   TARGET_UTIL=0.90;
@@ -829,9 +997,12 @@ function readMarketConfig(){
 function bufferLeftPct(v){ return 10000/Math.max(v,1); }
 function exitThresholdNote(v){
   const util=fmtPct(utilizationPctFromBufferPct(v),2)+'% on-chain liquidation utilization';
-  if(v>=90) return 'Earlier exit: Senior can leave while Junior still has about '+fmtPct(v,1)+'% of required buffer remaining ('+util+').';
-  if(v<=50) return 'Later exit: Senior waits until Junior buffer is much more depleted ('+util+').';
-  return 'Middle setting: Senior can leave at about '+fmtPct(v,1)+'% Junior buffer remaining ('+util+').';
+  const where = v<DEPLOYED_BUFFER_MIN
+    ? ' Later than every deployed Dawn market (they span '+DEPLOYED_BUFFER_MIN+'%-'+DEPLOYED_BUFFER_MAX+'%, median '+DEPLOYED_BUFFER_MEDIAN+'%).'
+    : ' Deployed Dawn markets span '+DEPLOYED_BUFFER_MIN+'%-'+DEPLOYED_BUFFER_MAX+'% (median '+DEPLOYED_BUFFER_MEDIAN+'%).';
+  if(v>=90) return 'Earlier exit: Senior can leave while Junior still has about '+fmtPct(v,1)+'% of required buffer remaining ('+util+').'+where;
+  if(v<=50) return 'Later exit: Senior waits until Junior buffer is much more depleted ('+util+').'+where;
+  return 'Middle setting: Senior can leave at about '+fmtPct(v,1)+'% Junior buffer remaining ('+util+').'+where;
 }
 function exitBonusNote(v){
   if(v<=0) return 'No exit bonus. Historical return rows do not include any redemption bonus.';
