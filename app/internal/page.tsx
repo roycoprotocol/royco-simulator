@@ -96,6 +96,69 @@ export default function InternalPage() {
               Public-facing redesigned Day simulator — dark / Inter UI, stacked &amp; sidebar layouts.
             </p>
           </Link>
+
+          {/* Try card */}
+          <Link
+            href="/internal/try"
+            className="group block bg-[#0a0c10] border border-[#1f242c] rounded-lg p-6 hover:border-[#9b8cff] transition-colors"
+          >
+            <div className="flex items-start justify-between mb-3">
+              <span className="text-[10px] tracking-widest uppercase text-[#9b8cff]">
+                try
+              </span>
+              <span className="text-[#9b8cff] text-sm opacity-0 group-hover:opacity-100 transition-opacity">
+                →
+              </span>
+            </div>
+            <h2 className="text-base font-medium text-[#e5e7eb] mb-1">
+              srwiTRY Market Builder
+            </h2>
+            <p className="text-xs text-[#6b7280]">
+              Fast path for market creators — pick Senior/Junior terms and check the historical tradeoff.
+            </p>
+          </Link>
+
+          {/* Tenbin card — route handler, not a page, so a plain anchor */}
+          <a
+            href="/tenbin-sims"
+            className="group block bg-[#0a0c10] border border-[#1f242c] rounded-lg p-6 hover:border-[#6bb3f0] transition-colors"
+          >
+            <div className="flex items-start justify-between mb-3">
+              <span className="text-[10px] tracking-widest uppercase text-[#6bb3f0]">
+                tenbin
+              </span>
+              <span className="text-[#6bb3f0] text-sm opacity-0 group-hover:opacity-100 transition-opacity">
+                →
+              </span>
+            </div>
+            <h2 className="text-base font-medium text-[#e5e7eb] mb-1">
+              Dawn Market Builder
+            </h2>
+            <p className="text-xs text-[#6b7280]">
+              Historical Senior/Junior tradeoff across market terms — observation periods, erased claims &amp; loss events.
+            </p>
+          </a>
+
+          {/* Market Intake card — route handler, not a page, so a plain anchor */}
+          <a
+            href="/internal/intake"
+            className="group block bg-[#0a0c10] border border-[#1f242c] rounded-lg p-6 hover:border-[#FF7A33] transition-colors"
+          >
+            <div className="flex items-start justify-between mb-3">
+              <span className="text-[10px] tracking-widest uppercase text-[#FF7A33]">
+                intake
+              </span>
+              <span className="text-[#FF7A33] text-sm opacity-0 group-hover:opacity-100 transition-opacity">
+                →
+              </span>
+            </div>
+            <h2 className="text-base font-medium text-[#e5e7eb] mb-1">
+              New Market Setup
+            </h2>
+            <p className="text-xs text-[#6b7280]">
+              Partner-facing intake form — curve, coverage &amp; recovery terms, exported as a pool config.
+            </p>
+          </a>
         </div>
       </main>
     </div>
