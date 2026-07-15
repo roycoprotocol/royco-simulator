@@ -1,6 +1,5 @@
 'use client';
 
-import Link from 'next/link';
 import TrySimulator from './TrySimulator';
 
 export default function TryPage() {
@@ -15,16 +14,7 @@ export default function TryPage() {
       }}
     >
       <div className="max-w-[1120px] mx-auto px-6 py-8">
-        <Link
-          href="/internal"
-          className="hover:underline"
-          style={{ color: '#967756', fontSize: 11 }}
-        >
-          ← Internal
-        </Link>
-        <div className="mt-6">
-          <TrySimulator />
-        </div>
+        <TrySimulator />
       </div>
     </div>
   );

@@ -1,6 +1,5 @@
 "use client";
 import { useState } from "react";
-import Link from "next/link";
 import { C } from "./theme";
 import Simulator from "./Simulator";
 import Comparison from "./Comparison";
@@ -16,7 +15,6 @@ export default function DayPage() {
         {/* Header */}
         <div className="flex items-center justify-center gap-3 mb-3">
           <span className="text-[11px] tracking-wide uppercase text-[#0a0a0a] bg-[#eef0f4] border border-[#e5e5e0] rounded-full px-3 py-1">Internal · Day</span>
-          <Link href="/internal" className="text-[11px] tracking-wide uppercase text-[#666666] bg-white border border-[#e5e5e0] rounded-full px-3 py-1 hover:bg-[#f4f4f0] transition-colors">← Internal</Link>
         </div>
         <h1 className="text-4xl md:text-5xl font-semibold text-[#0a0a0a] mb-3 tracking-tight text-center">Royco Day Simulator</h1>
         <p className="text-lg text-[#666666] max-w-2xl mx-auto text-center mb-8">Liquidity tranche dynamics across market scenarios</p>
