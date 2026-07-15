@@ -821,9 +821,9 @@ export default function HybondSimulator() {
             of fresh Junior capital and {result.seniorMarkdownEvents} Senior mark-down
             {result.seniorMarkdownEvents === 1 ? '' : 's'}, with {result.juniorLossEvents} Junior
             loss lock-in{result.juniorLossEvents === 1 ? '' : 's'}, over the horizon.{' '}
-            <strong>Senior&apos;s protection depends on that replenishment.</strong>{' '}
             {seniorDivergesUnderExposure ? (
               <>
+                <strong>Senior&apos;s protection depends on that replenishment.</strong>{' '}
                 If Junior capital were not available in a crisis, Senior would be exposed once
                 Junior is exhausted and would track the underlying down, in this scenario that
                 takes Senior to{' '}
@@ -902,7 +902,7 @@ export default function HybondSimulator() {
         )}
 
         <p className="mt-4" style={{ color: C.kpiLabel, fontSize: 11, lineHeight: 1.6 }}>
-          Backtest math is the Royco Day accountant, proven wei-exact (52/52 vectors).
+          Backtest math is the Royco Day accountant, proven wei-exact against the contract on this series (61/61 vectors).
           Parameters are illustrative and pending accountant sign-off. Projections, not
           promises. This is not an offer or investment advice.
         </p>
@@ -910,12 +910,12 @@ export default function HybondSimulator() {
 
       {/* ================= FOOTER ================= */}
       <footer style={{ color: C.kpiLabel, fontSize: 11, lineHeight: 1.6 }} className="pb-8">
-        Backtest math is the Royco Day accountant, proven wei-exact (52/52
-        vectors). Parameters illustrative pending accountant sign-off (OPEN-QUESTIONS).
-        Underlying series is a proxy built from Insight&apos;s Global Short-Dated High Yield
-        Bond composite, total return, gross of fees, per Insight as at 30 June 2025. Only the
-        five annual June checkpoints are published data, monthly sequencing is synthetic.
-        Parameters illustrative, pending accountant sign-off.
+        Backtest math is the Royco Day accountant, proven wei-exact against the contract on
+        this series (61/61 vectors). Underlying series is a proxy built from Insight&apos;s
+        Global Short-Dated High Yield Bond composite, total return, gross of fees, per Insight
+        as at 30 June 2025. Only the five annual June checkpoints are published data, monthly
+        sequencing is synthetic. Parameters illustrative, pending accountant sign-off
+        (OPEN-QUESTIONS).
       </footer>
     </div>
   );
