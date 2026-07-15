@@ -14,6 +14,7 @@
 
 import { useCallback, useMemo, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
+import { useSearchParams } from 'next/navigation';
 import {
   LineChart,
   Line,
@@ -25,12 +26,16 @@ import {
   ReferenceDot,
 } from 'recharts';
 
-import { runBacktest, type BacktestResult } from '@/lib/try/backtest';
+import { runBacktest, type BacktestResult, type ErasureReason } from '@/lib/try/backtest';
 import {
   HYBOND_DEFAULT_PARAMS,
   HYBOND_NAV_SERIES,
+  OBSERVATION_DAYS_MAX,
+  OBSERVATION_DAYS_MIN,
   PRESETS,
-  buildConfig,
+  buildHybondConfig,
+  juniorFromFirstLossPct,
+  screenPresets,
   type HybondParams,
 } from '@/lib/hybond/scenarios';
 import {
@@ -49,11 +54,16 @@ import {
 // would take the page down. safeBacktest falls back to this and surfaces the reason
 // inline instead.
 const EMPTY_RESULT: BacktestResult = runBacktest({
-  config: buildConfig(HYBOND_DEFAULT_PARAMS),
+  config: buildHybondConfig(HYBOND_DEFAULT_PARAMS),
   depositST: HYBOND_DEFAULT_PARAMS.depositST,
   depositJT: HYBOND_DEFAULT_PARAMS.depositJT,
   series: [],
 });
+
+// A fixed term long enough (10 years) to outlast the whole series, so no observation
+// period can ever expire and no coverage recovery is ever erased. Differencing this
+// against the same run at the real term isolates exactly what expiry cost Junior.
+const NO_EXPIRY_TERM_SECONDS = 315_360_000n;
 
 function safeBacktest(
   run: () => BacktestResult,
@@ -121,46 +131,190 @@ const MONO = "ui-monospace, 'SF Mono', SFMono-Regular, monospace";
 // Sign-aware color for returns/drawdowns.
 const signColor = (frac: number): string => (frac < 0 ? C.danger : C.text);
 
+// Port of tenbin-sims/index.html:736 fmtPct — fixed decimals with trailing zeros trimmed.
+const fmtTrim = (v: number, dec = 2): string =>
+  Number(v).toFixed(dec).replace(/\.?0+$/, '');
+
+// Port of tenbin-sims/index.html:737. Presentational twin of scenarios.ts's
+// utilWadFromBufferPct (which is the same ratio scaled into WAD).
+const utilizationPctFromBufferPct = (v: number): number => 10000 / Math.max(v, 0.01);
+
+/** Port of tenbin-sims/index.html:830-835 — pure function of the buffer setting. */
+function exitThresholdNote(v: number): string {
+  const util = `${fmtTrim(utilizationPctFromBufferPct(v), 2)}% on-chain liquidation utilization`;
+  if (v >= 90) {
+    return `Earlier exit: Senior can leave while Junior still has about ${fmtTrim(v, 1)}% of required buffer remaining (${util}).`;
+  }
+  if (v <= 50) {
+    return `Later exit: Senior waits until Junior buffer is much more depleted (${util}).`;
+  }
+  return `Middle setting: Senior can leave at about ${fmtTrim(v, 1)}% Junior buffer remaining (${util}).`;
+}
+
+// The series starts mid-2020 and ends mid-2025, so the first and last calendar rows
+// are partial. Label them rather than letting them read as full years.
+const yearLabel = (year: string, i: number, n: number): string => {
+  if (i === 0 && n > 1) return `${year}½`;
+  if (i === n - 1 && n > 1) return `${year} YTD`;
+  return year;
+};
+
+const clamp = (v: number, lo: number, hi: number): number =>
+  Math.min(hi, Math.max(lo, v));
+
+/**
+ * Port of tenbin-sims/index.html:916-935: execCommand first (it works from a user
+ * gesture without a permission prompt), navigator.clipboard as the fallback.
+ */
+/** The minimal read surface shared by URLSearchParams and Next's ReadonlyURLSearchParams. */
+interface Query {
+  get(key: string): string | null;
+}
+
+/**
+ * Permalink → state. Every value is clamped to its control's own range, so a
+ * hand-edited URL can never push the engine outside a configuration the UI can express.
+ */
+function stateFromQuery(q: Query): { params: HybondParams; maintain: boolean } {
+  const preset = PRESETS.find((p) => p.id === q.get('preset'));
+  let params: HybondParams = preset ? { ...preset.params } : { ...HYBOND_DEFAULT_PARAMS };
+
+  const num = (key: string): number | null => {
+    const raw = q.get(key);
+    if (raw === null) return null;
+    const n = Number(raw);
+    return Number.isFinite(n) ? n : null;
+  };
+
+  const coverage = num('coverage');
+  if (coverage !== null) params.minCoveragePct = clamp(Math.round(coverage), 8, 65);
+  const obs = num('obs');
+  if (obs !== null) {
+    params.observationDays = clamp(Math.round(obs), OBSERVATION_DAYS_MIN, OBSERVATION_DAYS_MAX);
+  }
+  const yieldShare = num('yieldShare');
+  if (yieldShare !== null) params.seniorShareToJuniorPct = clamp(Math.round(yieldShare), 20, 80);
+  const exitBuffer = num('exitBuffer');
+  if (exitBuffer !== null) params.exitBufferPct = clamp(exitBuffer, 1, 99.91);
+
+  // A URL-supplied first-loss % only resizes Junior while the link is on; presets carry
+  // a hand-set Junior and stay unlinked.
+  if (params.linkJuniorToFirstLoss) {
+    params = { ...params, depositJT: juniorFromFirstLossPct(params.depositST, params.minCoveragePct) };
+  }
+
+  return { params, maintain: q.get('maintain') !== '0' };
+}
+
+async function writeClipboardText(txt: string): Promise<boolean> {
+  if (typeof document === 'undefined') return false;
+  const area = document.createElement('textarea');
+  area.value = txt;
+  area.setAttribute('readonly', '');
+  area.style.position = 'fixed';
+  area.style.left = '-9999px';
+  area.style.top = '0';
+  document.body.appendChild(area);
+  area.focus();
+  area.select();
+  let ok = false;
+  try {
+    ok = document.execCommand('copy');
+  } catch {
+    ok = false;
+  }
+  document.body.removeChild(area);
+  if (ok) return true;
+  try {
+    await navigator.clipboard.writeText(txt);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export default function HybondSimulator() {
-  const [params, setParams] = useState<HybondParams>(HYBOND_DEFAULT_PARAMS);
+  // useSearchParams (rather than reading window.location in an effect) so the permalink
+  // is applied in the FIRST render: state is seeded from it, never patched after mount.
+  // The page wraps this component in Suspense, which is what this hook requires.
+  const searchParams = useSearchParams();
+  const initial = useMemo(() => stateFromQuery(searchParams), [searchParams]);
+
+  const [params, setParams] = useState<HybondParams>(initial.params);
   const [showAdvanced, setShowAdvanced] = useState(false);
-  const [maintainCoverage, setMaintainCoverage] = useState(true);
+  const [maintainCoverage, setMaintainCoverage] = useState(initial.maintain);
   const [showHistory, setShowHistory] = useState(true);
+
+  const config = useMemo(() => buildHybondConfig(params), [params]);
 
   const run = useMemo(
     () =>
       safeBacktest(() =>
         runBacktest({
-          config: buildConfig(params),
+          config,
           depositST: params.depositST,
           depositJT: params.depositJT,
           series: HYBOND_NAV_SERIES,
           maintainJuniorCoverage: maintainCoverage,
         }),
       ),
-    [params, maintainCoverage],
+    [config, params.depositST, params.depositJT, maintainCoverage],
   );
   const result = run.result;
 
   // Counterfactual: the same path with FIXED Junior (no replenishment), used to
   // show — in the disclaimer — what Senior's exposure looks like without the
-  // maintained-coverage assumption.
+  // maintained-coverage assumption. This is also the baseline leg of the erased-
+  // recoveries gap below.
   const exposedResult = useMemo(
     () =>
       safeBacktest(() =>
         runBacktest({
-          config: buildConfig(params),
+          config,
           depositST: params.depositST,
           depositJT: params.depositJT,
           series: HYBOND_NAV_SERIES,
           maintainJuniorCoverage: false,
         }),
       ).result,
-    [params],
+    [config, params.depositST, params.depositJT],
   );
   const exposedSeniorEnd = exposedResult.steps.length
     ? exposedResult.steps[exposedResult.steps.length - 1].stIndex
     : 100;
+
+  // Counterfactual: the same path with a term too long to ever expire, so Junior keeps
+  // every coverage recovery. `gap` is what expiry permanently cost Junior, in $ per $100
+  // of Junior.
+  //
+  // BOTH legs run with maintainJuniorCoverage:false regardless of the checkbox. With
+  // replenishment on, the difference also picks up the recoveries a replenished Junior
+  // would have earned, which conflates erasure with forgone replenishment (11.86 vs the
+  // clean 9.13 at the defaults). The comparison must vary the term and nothing else.
+  const noExpiryResult = useMemo(
+    () =>
+      safeBacktest(() =>
+        runBacktest({
+          config: { ...config, fixedTermDurationSeconds: NO_EXPIRY_TERM_SECONDS },
+          depositST: params.depositST,
+          depositJT: params.depositJT,
+          series: HYBOND_NAV_SERIES,
+          maintainJuniorCoverage: false,
+        }),
+      ).result,
+    [config, params.depositST, params.depositJT],
+  );
+
+  const lastIndex = <T,>(arr: T[]): T | null => (arr.length ? arr[arr.length - 1] : null);
+
+  // Junior's ending share price with and without expiry. Phase 2b charts the full
+  // no-expiry path; 2a only needs the endpoint difference.
+  const gap = useMemo(() => {
+    const withRecoveries = lastIndex(noExpiryResult.steps)?.jtIndex;
+    const asRun = lastIndex(exposedResult.steps)?.jtIndex;
+    if (withRecoveries === undefined || asRun === undefined) return 0;
+    return Math.max(0, withRecoveries - asRun);
+  }, [noExpiryResult.steps, exposedResult.steps]);
 
   // Counterfactual: the same path with MAINTAINED Junior coverage (the
   // intended-product assumption), used when the checkbox is off to show what
@@ -169,14 +323,14 @@ export default function HybondSimulator() {
     () =>
       safeBacktest(() =>
         runBacktest({
-          config: buildConfig(params),
+          config,
           depositST: params.depositST,
           depositJT: params.depositJT,
           series: HYBOND_NAV_SERIES,
           maintainJuniorCoverage: true,
         }),
       ).result,
-    [params],
+    [config, params.depositST, params.depositJT],
   );
   const maintainedSeniorEnd = maintainedResult.steps.length
     ? maintainedResult.steps[maintainedResult.steps.length - 1].stIndex
@@ -194,7 +348,8 @@ export default function HybondSimulator() {
           p.params.depositJT === params.depositJT &&
           p.params.seniorShareToJuniorPct === params.seniorShareToJuniorPct &&
           p.params.observationDays === params.observationDays &&
-          p.params.minCoveragePct === params.minCoveragePct,
+          p.params.minCoveragePct === params.minCoveragePct &&
+          p.params.exitBufferPct === params.exitBufferPct,
       ),
     [params],
   );
@@ -203,6 +358,40 @@ export default function HybondSimulator() {
     params.depositST + params.depositJT > 0
       ? (params.depositJT / (params.depositST + params.depositJT)) * 100
       : 0;
+
+  // Every preset run through the real engine: the UI shows a computed pass/fail badge
+  // rather than asserting the screen in prose the way Tenbin does (:272).
+  const presetScreen = useMemo(() => screenPresets(), []);
+
+  // The Senior hard guardrail. `seniorMaxDrawdown` is a float reduction over the whole
+  // path, so it is tested against a dust threshold rather than exact zero.
+  const seniorProtected =
+    result.seniorMarkdownEvents === 0 && result.seniorMaxDrawdown < 0.0005;
+
+  const strategyEnd = lastIndex(result.steps)?.priceIndex ?? 100;
+  const genesisUtilPct = result.steps.length
+    ? (Number(result.steps[0].coverageUtilWad) / 1e18) * 100
+    : 0;
+  const firstSeniorLoss = result.seniorLossEvents[0] ?? null;
+  // Peak coverage utilization actually reached. The exit threshold is 100/bufferPct, so
+  // this is what decides whether ANY buffer setting could open the protected exit.
+  const maxCoverageUtil = useMemo(
+    () =>
+      result.steps.length
+        ? Math.max(...result.steps.map((s) => Number(s.coverageUtilWad) / 1e18))
+        : 0,
+    [result.steps],
+  );
+  // Senior's share of the underlying's return. Engine-derived on both sides: there is
+  // no imported yield target here.
+  const seniorCapturePct =
+    result.strategyAvgYr !== 0 ? (result.seniorAvgYr / result.strategyAvgYr) * 100 : NaN;
+
+  const deployRangeOk =
+    params.observationDays >= OBSERVATION_DAYS_MIN &&
+    params.observationDays <= OBSERVATION_DAYS_MAX;
+
+  const activeScenarioName = activePreset?.label ?? 'Custom';
 
   // --- Chart timeframe brush (VIEW ONLY) ------------------------------------
   // The brush zooms the chart. It never re-runs the backtest: KPIs, secondary
@@ -317,12 +506,123 @@ export default function HybondSimulator() {
   const seniorSameWhenFixed = Math.abs(seniorEnd - maintainedSeniorEnd) < 0.01;
   const juniorHigherWhenFixed = juniorEnd > maintainedJuniorEnd + 0.01;
 
+  // Every param change flows through here. When Junior is linked to the first-loss %,
+  // any patch touching either side of that relation re-derives Junior.
   const updateParam = (patch: Partial<HybondParams>) =>
-    setParams((p) => ({ ...p, ...patch }));
+    setParams((p) => {
+      const next = { ...p, ...patch };
+      const relinked =
+        next.linkJuniorToFirstLoss &&
+        (patch.minCoveragePct !== undefined || patch.depositST !== undefined);
+      if (!relinked) return next;
+      return { ...next, depositJT: juniorFromFirstLossPct(next.depositST, next.minCoveragePct) };
+    });
 
-  const copyLink = () => {
-    if (typeof window !== 'undefined' && navigator?.clipboard) {
-      navigator.clipboard.writeText(window.location.href).catch(() => {});
+  const permalink = (): string => {
+    if (typeof window === 'undefined') return '';
+    const q = new URLSearchParams({
+      preset: activePreset?.id ?? 'custom',
+      coverage: String(params.minCoveragePct),
+      obs: String(params.observationDays),
+      yieldShare: String(params.seniorShareToJuniorPct),
+      exitBuffer: String(params.exitBufferPct),
+      maintain: maintainCoverage ? '1' : '0',
+    });
+    return `${window.location.origin}${window.location.pathname}?${q.toString()}`;
+  };
+
+  const [copyLinkLabel, setCopyLinkLabel] = useState('Copy link');
+  const copyLink = async () => {
+    const ok = await writeClipboardText(permalink());
+    setCopyLinkLabel(ok ? 'Copied link' : 'Copy failed');
+    setTimeout(() => setCopyLinkLabel('Copy link'), ok ? 1200 : 1600);
+  };
+
+  // --- Deploy handoff (tenbin-sims/index.html:751-823) -----------------------
+  // Emits the REAL bigints off the MarketConfig the backtest just ran, so the handoff
+  // cannot drift from the simulated numbers the way a re-derivation could.
+  const deployText = useMemo(() => {
+    const thresholdUtilPct = utilizationPctFromBufferPct(params.exitBufferPct);
+    const erasedByReason = (['expired', 'liquidation', 'juniorWiped', 'noTerm'] as ErasureReason[])
+      .map((reason) => `${reason}: ${result.erasureEvents.filter((e) => e.reason === reason).length}`)
+      .join(', ');
+    const maxObs = result.maxObservedObservationDays;
+    return [
+      'Dawn market-design parameter handoff',
+      'Generated by HYBond Sim',
+      'Loaded market: srHYBond (BNY Mellon / Insight Global Short-Dated High Yield Bond composite proxy)',
+      `Scenario: ${activeScenarioName}`,
+      '',
+      'Chosen market terms',
+      `firstLossProtection: ${params.minCoveragePct}%`,
+      `observationPeriod: ${params.observationDays} days`,
+      `seniorYieldSharePaidToJunior: ${params.seniorShareToJuniorPct}%`,
+      `seniorExitTrigger: ${fmtTrim(params.exitBufferPct, 2)}% Junior buffer remaining`,
+      `initialFundingRead: ${jtPct.toFixed(1)}% Junior / ${(100 - jtPct).toFixed(1)}% Senior at 90% target utilization`,
+      '',
+      'MarketConfig fields resolved by this tool',
+      `minCoverageWAD: ${config.minCoverageWAD.toString()}   // ${params.minCoveragePct}% first-loss protection`,
+      `fixedTermDurationSeconds: ${config.fixedTermDurationSeconds.toString()}   // ${params.observationDays} days`,
+      `coverageLiquidationUtilizationWAD: ${config.coverageLiquidationUtilizationWAD.toString()}   // opens Senior exit at ${fmtTrim(params.exitBufferPct, 1)}% Junior buffer remaining (${fmtTrim(thresholdUtilPct, 2)}% utilization)`,
+      `jtCoinvested: ${config.jtCoinvested}   // Junior follows the same strategy path as Senior`,
+      'ydmType: DeployScript.YDMType.StaticCurve',
+      'ydmSpecificParams: abi.encode(DeployScript.StaticCurveYDMParams({',
+      `  jtYieldShareAtZeroUtilWAD: ${config.jtYDM.yieldShareAtZeroUtilWAD.toString()},`,
+      `  jtYieldShareAtTargetUtilWAD: ${config.jtYDM.yieldShareAtTargetWAD.toString()},`,
+      `  jtYieldShareAtFullUtilWAD: ${config.jtYDM.yieldShareAtFullUtilWAD.toString()},`,
+      `  targetUtilizationWAD: ${config.jtYDM.targetUtilizationWAD.toString()}`,
+      '}))',
+      '',
+      'Suggested labels',
+      'seniorTrancheName: Royco-ST HYBOND Senior',
+      'seniorTrancheSymbol: ST-HYBOND',
+      'juniorTrancheName: Royco-JT HYBOND Junior',
+      'juniorTrancheSymbol: JT-HYBOND',
+      '',
+      'Still needed from deploy engineer',
+      'marketName: SET_FINAL_MARKET_NAME',
+      'chainId: SET_CHAIN_ID',
+      'seniorAsset / juniorAsset: SET_BY_MARKET_ASSET',
+      'stSelfLiquidationBonusWAD: SET_BY_DEPLOY_POLICY',
+      'stDustTolerance / jtDustTolerance: SET_FROM_QUOTER_INTEGRATION',
+      'kernelType / kernelSpecificParams: SET_BY_HYBOND_INTEGRATION',
+      'oracle or quoter wiring: SET_BY_HYBOND_INTEGRATION',
+      'transferAgentAddress and whitelist policy: SET_BY_COMPLIANCE_REQUIREMENTS',
+      'fee policy fields: SET_BY_PROTOCOL_APPROVED_DEPLOY_POLICY',
+      '',
+      'Historical simulator read',
+      `guardrailStatus: ${seniorProtected ? 'READY - no historical Senior loss events' : 'NEEDS_REVIEW - Senior hard guardrail fails'}`,
+      `seniorAvgAnnualized: ${(result.seniorAvgYr * 100).toFixed(2)}%`,
+      `juniorAvgAnnualized: ${(result.juniorAvgYr * 100).toFixed(2)}%`,
+      `seniorWorstDrawdown: ${(-result.seniorMaxDrawdown * 100).toFixed(2)}%`,
+      `juniorWorstDrawdown: ${(-result.juniorMaxDrawdown * 100).toFixed(2)}%`,
+      `seniorLossEvents: ${result.seniorLossEvents.length}`,
+      `exitTriggerHits: ${result.exitTriggerHits}`,
+      `recoveryClaimsErasedEvents: ${result.erasureEvents.length}   // ${erasedByReason}`,
+      `recoveryClaimsErasedValuePer100Junior: $${gap.toFixed(2)}`,
+      `outsideObservation: ${result.outsideObservationPct.toFixed(1)}%`,
+      `maxObservedObservationPeriod: ${maxObs} days   // historical samples can land after the exact ${params.observationDays}d deploy expiry`,
+      '',
+      'Notes',
+      '- These are finalized market-design parameters, not a complete deploy transaction.',
+      '- Deploy.s.sol builds RoycoAccountantInitParams and ydmInitializationData from MarketConfig; do not paste ydmInitializationData directly into MarketConfig.',
+      '- The simulator uses a flat yield-share projection. Live market pricing can move with supply, demand, and the deployed YDM curve.',
+      '- The underlying series is sampled MONTHLY, so an observation period is only ever observed closing at a month end. Historical samples can land well after the exact deploy expiry, and the observed maximum above overstates the configured term for that reason.',
+      '- Concrete assets, oracle/quoter wiring, authority, fee policy, whitelist policy, and deployed contract addresses must come from the production integration.',
+    ].join('\n');
+  }, [config, params, result, gap, jtPct, seniorProtected, activeScenarioName]);
+
+  const [copyDeployLabel, setCopyDeployLabel] = useState('Copy');
+  const deployRef = useRef<HTMLTextAreaElement>(null);
+  const copyDeploy = async () => {
+    if (await writeClipboardText(deployText)) {
+      setCopyDeployLabel('Copied');
+      setTimeout(() => setCopyDeployLabel('Copy'), 1200);
+    } else {
+      deployRef.current?.focus();
+      deployRef.current?.select();
+      setCopyDeployLabel('Select text');
+      setTimeout(() => setCopyDeployLabel('Copy'), 1600);
     }
   };
 
@@ -391,7 +691,7 @@ export default function HybondSimulator() {
             background: 'transparent',
           }}
         >
-          Copy link
+          {copyLinkLabel}
         </button>
       </section>
 
@@ -423,42 +723,69 @@ export default function HybondSimulator() {
 
       {/* ================= 3. OVERVIEW ================= */}
       <section
-        style={{ background: C.cardBg, border: `1px solid ${C.border}`, borderRadius: 0 }}
+        style={{
+          background: seniorProtected ? C.cardBg : 'rgba(255,249,246,.95)',
+          border: `1px solid ${seniorProtected ? C.border : 'rgba(143,77,66,.45)'}`,
+          borderRadius: 0,
+        }}
         className="p-6"
       >
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
           {/* left: description */}
           <div>
             <Eyebrow>Overview</Eyebrow>
-            <h2 className="mt-2" style={{ fontFamily: SERIF, fontWeight: 400, fontSize: 24, color: C.text }}>
+            <h2
+              className="mt-2"
+              style={{
+                fontFamily: SERIF,
+                fontWeight: 400,
+                fontSize: 24,
+                color: seniorProtected ? C.text : C.danger,
+              }}
+            >
               {rangeTitle}
             </h2>
+            {/* Descriptor, port of tenbin-sims/index.html:702-704. */}
             <p className="mt-3" style={{ color: C.muted, fontSize: 14, lineHeight: 1.6 }}>
-              Senior stays inside a {fmtSignedPct(result.seniorAvgYr, 1)}/yr band with{' '}
-              {result.observationEvents} observation periods over {result.years.toFixed(1)} years.
+              {seniorProtected ? (
+                <>
+                  Current {activeScenarioName} terms pass the Senior hard guardrail: no historical
+                  Senior loss events with {params.minCoveragePct}% first-loss protection,{' '}
+                  {params.observationDays}d observation period, and {params.seniorShareToJuniorPct}%
+                  of Senior yield paid to Junior.
+                </>
+              ) : (
+                <>
+                  Fails Senior hard guardrail: {result.seniorLossEvents.length} historical Senior
+                  loss events
+                  {firstSeniorLoss ? `, first on ${monthLabel(firstSeniorLoss.date)}` : ''}, with{' '}
+                  {fmtPct(result.seniorMaxDrawdown, 1)} worst Senior drawdown.
+                </>
+              )}
             </p>
 
-            {/* secondary stat row (keeps all six metrics visible) */}
-            <div className="mt-5 grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-4">
-              <SecondaryStat label="Strategy avg/yr" value={`${fmtSignedPct(result.strategyAvgYr, 1)}/yr`} />
-              <SecondaryStat
-                label="Senior max drawdown"
-                value={fmtPct(result.seniorMaxDrawdown)}
-                color={result.seniorMaxDrawdown > 0 ? C.danger : C.text}
-              />
-              <SecondaryStat label="Observation periods" value={String(result.observationEvents)} />
-              <SecondaryStat
-                label="Junior loss lock-ins"
-                value={String(result.juniorLossEvents)}
-                color={result.juniorLossEvents > 0 ? C.danger : C.text}
-              />
-            </div>
           </div>
 
-          {/* right: two KPI cards */}
+          {/* right: two KPI cards. Both notes render ALWAYS. Tenbin CSS-hides the
+              Senior note unless the guardrail fails (:46-47), which buries the pass
+              case; at 0 loss events the note is the reassurance, not noise. */}
           <div className="grid grid-cols-2 gap-4">
-            <Kpi label="Senior avg/yr" value={`${fmtSignedPct(result.seniorAvgYr, 1)}/yr`} />
-            <Kpi label="Junior avg/yr" value={`${fmtSignedPct(result.juniorAvgYr, 1)}/yr`} />
+            <Kpi
+              label="Senior avg/yr"
+              value={`${fmtSignedPct(result.seniorAvgYr, 1)}/yr`}
+              valueColor={seniorProtected ? C.accent : C.danger}
+              note={
+                result.seniorLossEvents.length > 0
+                  ? `Do not use: ${result.seniorLossEvents.length} Senior loss events.`
+                  : 'No historical Senior loss events.'
+              }
+              noteColor={result.seniorLossEvents.length > 0 ? C.danger : C.kpiLabel}
+            />
+            <Kpi
+              label="Junior avg/yr"
+              value={`${fmtSignedPct(result.juniorAvgYr, 1)}/yr`}
+              note={`${fmtUsd(juniorEnd)} ending value; erased recoveries ${fmtUsd(gap)}`}
+            />
           </div>
         </div>
       </section>
@@ -506,10 +833,13 @@ export default function HybondSimulator() {
               <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3">
                 {PRESETS.map((p) => {
                   const active = activePreset?.id === p.id;
+                  const screen = presetScreen.find((s) => s.id === p.id);
                   return (
                     <button
                       key={p.id}
                       type="button"
+                      // Presets carry linkJuniorToFirstLoss:false and a hand-set Junior,
+                      // so selecting one must NOT re-derive it from the first-loss %.
                       onClick={() => setParams({ ...p.params })}
                       style={{
                         textAlign: 'left',
@@ -519,7 +849,10 @@ export default function HybondSimulator() {
                         background: C.cardBg,
                       }}
                     >
-                      <div style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{p.label}</div>
+                      <div className="flex items-center justify-between gap-2">
+                        <span style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{p.label}</span>
+                        {screen && <ScreenBadge pass={screen.pass} />}
+                      </div>
                       <div style={{ fontSize: 11, color: C.muted, marginTop: 4 }}>
                         Junior {fmtUsd0(p.params.depositJT)}, {p.params.observationDays}-day
                         observation, {p.params.seniorShareToJuniorPct}% share
@@ -528,10 +861,43 @@ export default function HybondSimulator() {
                   );
                 })}
               </div>
+              <p className="mt-2" style={{ color: C.kpiLabel, fontSize: 11, lineHeight: 1.6 }}>
+                Presets set Junior by hand rather than deriving it from the first-loss
+                slider, so selecting one leaves that link off. Each badge is the live
+                screen result: every preset is re-run through the accountant and passes
+                only if it produces no historical Senior loss events.
+              </p>
             </div>
 
             {/* Controls */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
+              {/* Primary control, port of tenbin-sims/index.html:183-187. */}
+              <SliderControl
+                label="First-loss protection (%)"
+                value={params.minCoveragePct}
+                min={8}
+                max={65}
+                step={1}
+                display={`${params.minCoveragePct}%`}
+                desc={`Junior first-loss reserve. ${params.minCoveragePct}% means about $${params.minCoveragePct} of protection per $100 of market exposure before Senior can lose money.`}
+                onChange={(v) => updateParam({ minCoveragePct: v })}
+              >
+                {params.linkJuniorToFirstLoss ? (
+                  <p className="mt-1.5" style={{ color: C.kpiLabel, fontSize: 11, lineHeight: 1.5 }}>
+                    Junior deposit derived:{' '}
+                    <b style={{ fontFamily: MONO, color: C.text, fontWeight: 600 }}>
+                      {fmtUsd0(params.depositJT)}
+                    </b>
+                    . Genesis utilization {genesisUtilPct.toFixed(0)}%, the curve&apos;s target.
+                  </p>
+                ) : (
+                  <p className="mt-1.5" style={{ color: C.kpiLabel, fontSize: 11, lineHeight: 1.5 }}>
+                    Junior is set by hand, so this only sets the coverage floor rebuilt when
+                    deposits reopen.
+                  </p>
+                )}
+              </SliderControl>
+
               <SliderControl
                 label="Senior deposit ($)"
                 value={params.depositST}
@@ -539,49 +905,123 @@ export default function HybondSimulator() {
                 max={10000}
                 step={100}
                 display={fmtUsd0(params.depositST)}
-                desc="Protected capital that Junior shields from losses."
+                desc="Market size. Protected capital that Junior shields from losses."
                 onChange={(v) => updateParam({ depositST: v })}
               />
-              <SliderControl
-                label="Junior deposit ($)"
-                value={params.depositJT}
-                min={50}
-                max={10000}
-                step={50}
-                display={fmtUsd0(params.depositJT)}
-                desc="First-loss buffer that absorbs drawdowns for Senior."
-                onChange={(v) => updateParam({ depositJT: v })}
-              />
+
               <SliderControl
                 label="Senior yield share to Junior (%)"
                 value={params.seniorShareToJuniorPct}
-                min={0}
-                max={100}
+                min={20}
+                max={80}
                 step={1}
                 display={`${params.seniorShareToJuniorPct}%`}
-                desc="Portion of Senior yield paid to Junior for taking risk."
+                desc={`Projection assumption: Junior receives ${params.seniorShareToJuniorPct}% of Senior yield here. Projection assumption only. Live markets price this through supply/demand and the YDM curve.`}
                 onChange={(v) => updateParam({ seniorShareToJuniorPct: v })}
-              />
+              >
+                <p className="mt-1.5" style={{ color: C.kpiLabel, fontSize: 11, lineHeight: 1.5 }}>
+                  This run models the curve as genuinely flat: the same share applies at every
+                  utilization, so nothing here reprices it.
+                </p>
+              </SliderControl>
+
               <SliderControl
                 label="Observation period (days)"
                 value={params.observationDays}
-                min={1}
-                max={120}
+                min={OBSERVATION_DAYS_MIN}
+                max={OBSERVATION_DAYS_MAX}
                 step={1}
                 display={`${params.observationDays} days`}
-                desc="Window during which deposits and redemptions freeze."
+                desc={`Junior has ${params.observationDays} days to recover before the recovery claim is erased. Longer helps Junior, but keeps Senior waiting longer.`}
                 onChange={(v) => updateParam({ observationDays: v })}
-              />
+              >
+                <p className="mt-1.5" style={{ color: C.kpiLabel, fontSize: 11, lineHeight: 1.5 }}>
+                  Resolution limit: this series samples monthly, so a term under about 30 days
+                  cannot resolve before the next month end. Settings of 1, 15, 29, and 30 days
+                  produce byte-identical output here. The {OBSERVATION_DAYS_MAX}-day ceiling is the
+                  accountant&apos;s uint24 limit on the term.
+                </p>
+              </SliderControl>
+
+              {/* Port of tenbin-sims/index.html:198-202. */}
               <SliderControl
-                label="Min coverage (%)"
-                value={params.minCoveragePct}
-                min={0}
-                max={100}
-                step={1}
-                display={`${params.minCoveragePct}%`}
-                desc="Minimum Junior buffer rebuilt when deposits reopen."
-                onChange={(v) => updateParam({ minCoveragePct: v })}
-              />
+                label="Junior buffer remaining for Senior exit (%)"
+                value={params.exitBufferPct}
+                min={1}
+                max={99.91}
+                step={0.01}
+                display={`${fmtTrim(params.exitBufferPct, 2)}% buffer`}
+                desc={exitThresholdNote(params.exitBufferPct)}
+                onChange={(v) => updateParam({ exitBufferPct: v })}
+              >
+                <p className="mt-1.5" style={{ color: C.kpiLabel, fontSize: 11, lineHeight: 1.5 }}>
+                  Derived read: {result.exitTriggerHits} exit trigger hits on this path. Coverage
+                  utilization peaks at {maxCoverageUtil.toFixed(4)} here, and even the most
+                  aggressive legal setting (99.91% buffer) only lowers the threshold to 1.0009, so
+                  Junior&apos;s buffer never depletes far enough to open the protected exit at any
+                  setting of this slider. It does not move the outcome on this series.
+                </p>
+              </SliderControl>
+            </div>
+
+            {/* Junior deposit: an advanced override, not a primary control. Linked, it is
+                a function of the first-loss % and the design point holds at U = 0.90. */}
+            <div style={{ border: `1px solid ${C.border}`, padding: '14px 16px', background: C.cardBg }}>
+              <div className="flex items-start justify-between gap-4 flex-wrap">
+                <div>
+                  <Eyebrow>Advanced override</Eyebrow>
+                  <p className="mt-1.5" style={{ color: C.muted, fontSize: 12, lineHeight: 1.5 }}>
+                    {params.linkJuniorToFirstLoss
+                      ? 'Junior deposit is derived from the first-loss protection above, which holds genesis utilization at the curve target. Unlink to set it directly.'
+                      : 'Junior deposit is set directly. The first-loss slider no longer sizes it.'}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() =>
+                    updateParam({ linkJuniorToFirstLoss: !params.linkJuniorToFirstLoss })
+                  }
+                  style={{
+                    border: `1px solid ${C.border}`,
+                    borderRadius: 0,
+                    color: C.accent,
+                    textTransform: 'uppercase',
+                    fontSize: 10,
+                    letterSpacing: 1,
+                    padding: '7px 12px',
+                    background: 'transparent',
+                    flexShrink: 0,
+                  }}
+                >
+                  {params.linkJuniorToFirstLoss ? 'Unlink Junior' : 'Relink to first-loss'}
+                </button>
+              </div>
+
+              <div className="mt-4">
+                <SliderControl
+                  label="Junior deposit ($)"
+                  value={params.depositJT}
+                  min={50}
+                  max={10000}
+                  step={50}
+                  disabled={params.linkJuniorToFirstLoss}
+                  display={fmtUsd0(params.depositJT)}
+                  desc="First-loss buffer that absorbs drawdowns for Senior."
+                  onChange={(v) => updateParam({ depositJT: v })}
+                >
+                  {!params.linkJuniorToFirstLoss && (
+                    <p className="mt-1.5" style={{ color: C.kpiLabel, fontSize: 11, lineHeight: 1.5 }}>
+                      Genesis utilization is{' '}
+                      <b style={{ fontFamily: MONO, color: C.text, fontWeight: 600 }}>
+                        {genesisUtilPct.toFixed(2)}%
+                      </b>
+                      {Math.abs(genesisUtilPct - 90) > 0.005
+                        ? `, off the 90% design point the curve targets. Junior ≈ ${jtPct.toFixed(0)}% of the pool.`
+                        : `, still on the 90% design point. Junior ≈ ${jtPct.toFixed(0)}% of the pool.`}
+                    </p>
+                  )}
+                </SliderControl>
+              </div>
             </div>
 
             {/* Engine rejected this configuration — report it instead of crashing. */}
@@ -602,19 +1042,38 @@ export default function HybondSimulator() {
               </div>
             )}
 
-            {/* Summary chips */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-              <SummaryChip
+            {/* Guardrail tiles, port of tenbin-sims/index.html:209, 473-477. */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <Guardrail
                 label="Senior protection"
-                body={`${result.seniorMarkdownEvents} markdowns, ${fmtPct(result.seniorMaxDrawdown)} max drawdown`}
+                ok={seniorProtected}
+                body={
+                  seniorProtected
+                    ? `${fmtPct(result.seniorMaxDrawdown)} Senior drawdown and no Senior loss events.`
+                    : `Senior protection fails: ${result.seniorLossEvents.length} Senior loss events and ${fmtPct(result.seniorMaxDrawdown)} worst drawdown.`
+                }
               />
-              <SummaryChip
+              {/* Tenbin's second tile checks a 6.8-7.4% band (:470), which is an
+                  stMXN/stBRL calibration with no meaning for this fund. Replaced with
+                  Senior's capture of the underlying, derived entirely from this run. */}
+              <Guardrail
+                label="Senior vs underlying"
+                ok
+                body={`Senior captures ${fmtSignedPct(result.seniorAvgYr, 1)}/yr of the underlying's ${fmtSignedPct(result.strategyAvgYr, 1)}/yr (${Number.isFinite(seniorCapturePct) ? seniorCapturePct.toFixed(0) : '—'}%); Junior takes ${fmtSignedPct(result.juniorAvgYr, 1)}/yr for the first-loss.`}
+              />
+              <Guardrail
                 label="Junior tradeoff"
-                body={`${fmtSignedPct(result.juniorAvgYr)}/yr, ${result.juniorLossEvents} loss lock-ins`}
+                ok
+                body={`Junior gets ${fmtSignedPct(result.juniorAvgYr, 1)}/yr, worst drawdown ${fmtPct(result.juniorMaxDrawdown, 1)}, erased recoveries ${fmtUsd(gap)} per $100 of Junior.`}
               />
-              <SummaryChip
-                label="Coverage"
-                body={`Junior ≈ ${jtPct.toFixed(0)}% of pool, ${fmtUsd0(result.juniorCapitalInjected)} attracted`}
+              <Guardrail
+                label="Deploy range"
+                ok={deployRangeOk}
+                body={
+                  deployRangeOk
+                    ? `Observation period ${params.observationDays}d is inside the deploy-safe ${OBSERVATION_DAYS_MIN}-${OBSERVATION_DAYS_MAX}d range.`
+                    : `Observation period ${params.observationDays}d is outside the deploy-safe ${OBSERVATION_DAYS_MIN}-${OBSERVATION_DAYS_MAX}d range.`
+                }
               />
             </div>
           </div>
@@ -772,7 +1231,8 @@ export default function HybondSimulator() {
               onChange={setRange}
             />
 
-            {/* Calendar returns table */}
+            {/* Calendar table, transposed to Tenbin's row layout (:250-254, :720-734):
+                rows are series, columns are years. */}
             <div className="mt-6 overflow-x-auto">
               <table className="w-full text-sm" style={{ fontVariantNumeric: 'tabular-nums' }}>
                 <thead>
@@ -785,47 +1245,221 @@ export default function HybondSimulator() {
                     }}
                     className="text-left"
                   >
-                    <th className="py-2 pr-4 font-semibold">Year</th>
-                    <th className="py-2 pr-4 font-semibold text-right">Underlying</th>
-                    <th className="py-2 pr-4 font-semibold text-right">Senior</th>
-                    <th className="py-2 pr-4 font-semibold text-right">Junior</th>
-                    <th className="py-2 font-semibold text-right">Senior end $100</th>
+                    <th className="py-2 pr-4 font-semibold">
+                      Calendar-year return / observation stats
+                    </th>
+                    {result.calendar.map((row, i) => (
+                      <th key={row.year} className="py-2 pr-4 font-semibold text-right">
+                        {yearLabel(row.year, i, result.calendar.length)}
+                      </th>
+                    ))}
+                    <th className="py-2 font-semibold text-right">end $100 → avg/yr</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {result.calendar.map((row) => (
-                    <tr key={row.year} style={{ borderTop: `1px solid ${C.border}` }}>
-                      <td className="py-2 pr-4" style={{ color: C.text, fontFamily: MONO }}>
-                        {row.year}
-                      </td>
-                      <td
-                        className="py-2 pr-4 text-right"
-                        style={{ color: signColor(row.strategyReturn), fontFamily: MONO }}
-                      >
-                        {fmtSignedPct(row.strategyReturn)}
-                      </td>
-                      <td
-                        className="py-2 pr-4 text-right"
-                        style={{ color: signColor(row.seniorReturn), fontFamily: MONO }}
-                      >
-                        {fmtSignedPct(row.seniorReturn)}
-                      </td>
-                      <td
-                        className="py-2 pr-4 text-right"
-                        style={{ color: signColor(row.juniorReturn), fontFamily: MONO }}
-                      >
-                        {fmtSignedPct(row.juniorReturn)}
-                      </td>
-                      <td className="py-2 text-right" style={{ color: C.text, fontFamily: MONO }}>
-                        {fmtUsd(row.seniorEnd100)}
-                      </td>
-                    </tr>
-                  ))}
+                  <ReturnRow
+                    label="Base strategy"
+                    values={result.calendar.map((r) => r.strategyReturn)}
+                    end={strategyEnd}
+                    ann={result.strategyAvgYr}
+                  />
+                  <ReturnRow
+                    label="Junior return"
+                    values={result.calendar.map((r) => r.juniorReturn)}
+                    end={juniorEnd}
+                    ann={result.juniorAvgYr}
+                  />
+                  <ReturnRow
+                    label="Senior return"
+                    values={result.calendar.map((r) => r.seniorReturn)}
+                    end={seniorEnd}
+                    ann={result.seniorAvgYr}
+                  />
+                  <StatRow
+                    label="Non-observation %"
+                    cells={result.calendar.map((r) => {
+                      const d = result.yearlyObservationDays[r.year];
+                      return d && d.total ? `${((d.non / d.total) * 100).toFixed(1)}%` : '—';
+                    })}
+                    end={`${result.outsideObservationPct.toFixed(1)}%`}
+                  />
+                  <StatRow
+                    label="Observation periods triggered"
+                    cells={result.calendar.map((r) =>
+                      String(result.yearlyObservationTriggers[r.year] ?? 0),
+                    )}
+                    end={String(result.observationEvents)}
+                    endSuffix="total"
+                  />
                 </tbody>
               </table>
             </div>
+
+            {/* Additional outcome metrics (:716-719) */}
+            <div className="mt-8">
+              <Eyebrow>Additional outcome metrics</Eyebrow>
+              <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-4">
+                <SecondaryStat
+                  label="Senior worst drop"
+                  value={fmtSignedPct(-result.seniorMaxDrawdown)}
+                  color={result.seniorMaxDrawdown > 0 ? C.danger : C.text}
+                />
+                <SecondaryStat
+                  label="Junior worst drop"
+                  value={fmtSignedPct(-result.juniorMaxDrawdown)}
+                  color={result.juniorMaxDrawdown > 0 ? C.danger : C.text}
+                />
+                {/* Target and observed are split deliberately: at monthly cadence the
+                    observed length is bounded by the sampling, not the term. */}
+                <SecondaryStat
+                  label="Max observed observation period"
+                  value={`${result.maxObservedObservationDays}d`}
+                  note={`${params.observationDays}d target`}
+                />
+                <SecondaryStat label="Claims erased" value={String(result.juniorLossEvents)} />
+                <SecondaryStat
+                  label="Claims value erased"
+                  value={fmtUsd(gap)}
+                  note="per $100 of Junior"
+                />
+                <SecondaryStat
+                  label="Senior loss events"
+                  value={String(result.seniorLossEvents.length)}
+                  color={result.seniorLossEvents.length > 0 ? C.danger : C.text}
+                />
+                <SecondaryStat
+                  label="Strategy avg/yr"
+                  value={`${fmtSignedPct(result.strategyAvgYr, 1)}/yr`}
+                />
+                <SecondaryStat label="Observation periods" value={String(result.observationEvents)} />
+              </div>
+            </div>
+
+            {/* Prose panels (:261-265, :268-272) */}
+            <div className="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <div style={{ border: `1px solid ${C.border}`, padding: '14px 16px' }}>
+                <p style={{ fontWeight: 600, color: C.text, fontSize: 13, marginBottom: 8 }}>
+                  Protocol mechanics
+                </p>
+                <ProseRow color={C.seniorLine}>
+                  Senior is the protected side: losses reach Senior only after the Junior
+                  first-loss cushion is used first.
+                </ProseRow>
+                <ProseRow color={C.juniorLine}>
+                  Junior receives extra yield for taking first losses and can give up recoveries
+                  when the observation period expires before the strategy recovers.
+                </ProseRow>
+                {/* Tenbin's third bullet claims "Junior starts with a modest extra
+                    cushion". False here: genesis utilization is exactly the curve's
+                    target, so Junior starts with no cushion beyond what it is sized for. */}
+                <ProseRow color={C.strategyLine}>
+                  Loaded model inputs: Senior and Junior follow the same strategy path with no
+                  leverage between them, and Junior starts sized exactly to its coverage
+                  requirement, at {genesisUtilPct.toFixed(0)}% utilization, with no extra cushion
+                  beyond it.
+                </ProseRow>
+              </div>
+              <div style={{ border: `1px solid ${C.border}`, padding: '14px 16px' }}>
+                <p style={{ fontWeight: 600, color: C.text, fontSize: 13, marginBottom: 8 }}>
+                  Preset ladder
+                </p>
+                <ProseRow color={C.olive}>
+                  <b>Conservative</b>, larger Junior cushion and more recovery time. Lower Junior
+                  upside, fewer erased recovery claims.
+                </ProseRow>
+                <ProseRow color={C.seniorLine}>
+                  <b>Balanced</b>, middle setting: Senior stays protected historically, while
+                  Junior still gets meaningful upside.
+                </ProseRow>
+                <ProseRow color={C.juniorLine}>
+                  <b>Aggressive</b>, smaller Junior cushion and shorter recovery time. Higher
+                  Junior upside, more erased recovery claims.
+                </ProseRow>
+                <div className="mt-3 flex flex-col gap-1.5">
+                  {presetScreen.map((s) => (
+                    <div key={s.id} className="flex items-center gap-2" style={{ fontSize: 11, color: C.muted }}>
+                      <ScreenBadge pass={s.pass} />
+                      <span>
+                        {s.label}: {s.seniorMarkdownEvents} Senior loss events,{' '}
+                        {fmtPct(s.seniorMaxDrawdown)} worst Senior drawdown
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                <p className="mt-2" style={{ color: C.kpiLabel, fontSize: 11, lineHeight: 1.6 }}>
+                  Scenarios vary how much risk Junior takes. The badges above are computed live by
+                  re-running each preset through the accountant on this series, not asserted.
+                </p>
+              </div>
+            </div>
           </div>
         )}
+      </section>
+
+      {/* ================= 5b. DEPLOY HANDOFF ================= */}
+      <section
+        style={{ background: C.cardBg, border: `1px solid ${C.border}`, borderRadius: 0 }}
+        className="p-6"
+      >
+        <details>
+          <summary className="cursor-pointer">
+            <Eyebrow>Deploy handoff</Eyebrow>
+            <h2 className="mt-2" style={{ fontFamily: SERIF, fontWeight: 400, fontSize: 24, color: C.text }}>
+              Copy final market-design parameters.
+            </h2>
+            <p className="mt-2" style={{ color: C.muted, fontSize: 14, lineHeight: 1.6 }}>
+              This is the finalized parameter handoff, not the full integration package.
+            </p>
+          </summary>
+
+          <div className="mt-5">
+            <div className="flex items-start justify-between gap-4 flex-wrap">
+              <p style={{ color: C.muted, fontSize: 13, lineHeight: 1.6 }}>
+                <StatusPill ok={seniorProtected}>
+                  {seniorProtected ? 'Ready' : 'Needs review'}
+                </StatusPill>{' '}
+                Includes chosen terms, MarketConfig fields, and integration placeholders.
+              </p>
+              <button
+                type="button"
+                onClick={copyDeploy}
+                style={{
+                  border: `1px solid ${C.border}`,
+                  borderRadius: 0,
+                  color: C.accent,
+                  textTransform: 'uppercase',
+                  fontSize: 10,
+                  letterSpacing: 1,
+                  padding: '7px 12px',
+                  background: 'transparent',
+                  flexShrink: 0,
+                }}
+              >
+                {copyDeployLabel}
+              </button>
+            </div>
+            <textarea
+              ref={deployRef}
+              readOnly
+              spellCheck={false}
+              aria-label="Deploy handoff"
+              value={deployText}
+              className="mt-3 w-full"
+              style={{
+                border: `1px solid ${C.border}`,
+                borderRadius: 0,
+                background: C.pageBg,
+                color: C.text,
+                fontFamily: MONO,
+                fontSize: 11.5,
+                lineHeight: 1.6,
+                padding: '12px 14px',
+                height: 340,
+                resize: 'vertical',
+              }}
+            />
+          </div>
+        </details>
       </section>
 
       {/* ================= 6. DISCLAIMER ================= */}
@@ -1297,7 +1931,19 @@ function Eyebrow({ children }: { children: React.ReactNode }) {
   );
 }
 
-function Kpi({ label, value }: { label: string; value: string }) {
+function Kpi({
+  label,
+  value,
+  note,
+  valueColor = C.accent,
+  noteColor = C.kpiLabel,
+}: {
+  label: string;
+  value: string;
+  note?: string;
+  valueColor?: string;
+  noteColor?: string;
+}) {
   return (
     <div style={{ background: C.cardBg, border: `1px solid ${C.border}`, borderRadius: 0, padding: '12px 14px' }}>
       <p style={{ color: C.kpiLabel, textTransform: 'uppercase', fontSize: 10, letterSpacing: 1 }}>
@@ -1305,15 +1951,30 @@ function Kpi({ label, value }: { label: string; value: string }) {
       </p>
       <p
         className="mt-2"
-        style={{ color: C.accent, fontFamily: MONO, fontWeight: 600, letterSpacing: '-0.04em', fontSize: 26 }}
+        style={{ color: valueColor, fontFamily: MONO, fontWeight: 600, letterSpacing: '-0.04em', fontSize: 26 }}
       >
         {value}
       </p>
+      {note && (
+        <p className="mt-2" style={{ color: noteColor, fontSize: 11, lineHeight: 1.5 }}>
+          {note}
+        </p>
+      )}
     </div>
   );
 }
 
-function SecondaryStat({ label, value, color = C.text }: { label: string; value: string; color?: string }) {
+function SecondaryStat({
+  label,
+  value,
+  note,
+  color = C.text,
+}: {
+  label: string;
+  value: string;
+  note?: string;
+  color?: string;
+}) {
   return (
     <div>
       <p style={{ color: C.kpiLabel, textTransform: 'uppercase', fontSize: 9.5, letterSpacing: 1 }}>
@@ -1322,20 +1983,145 @@ function SecondaryStat({ label, value, color = C.text }: { label: string; value:
       <p className="mt-1" style={{ color, fontFamily: MONO, fontWeight: 600, letterSpacing: '-0.04em', fontSize: 15 }}>
         {value}
       </p>
+      {note && (
+        <p className="mt-0.5" style={{ color: C.kpiLabel, fontSize: 10.5, lineHeight: 1.4 }}>
+          {note}
+        </p>
+      )}
     </div>
   );
 }
 
-function SummaryChip({ label, body }: { label: string; body: string }) {
+/** A guardrail tile. `ok` drives the ok/warn styling Tenbin applies at :473-477. */
+function Guardrail({ label, ok, body }: { label: string; ok: boolean; body: string }) {
   return (
-    <div style={{ border: `1px solid ${C.border}`, borderRadius: 0, padding: '12px 14px', background: C.cardBg }}>
-      <p style={{ color: C.olive, textTransform: 'uppercase', fontSize: 9.5, letterSpacing: 1, fontWeight: 600 }}>
+    <div
+      style={{
+        border: `1px solid ${ok ? C.border : 'rgba(143,77,66,.45)'}`,
+        borderLeft: `3px solid ${ok ? C.olive : C.danger}`,
+        borderRadius: 0,
+        padding: '12px 14px',
+        background: ok ? C.cardBg : 'rgba(255,249,246,.95)',
+      }}
+    >
+      <p style={{ color: ok ? C.olive : C.danger, textTransform: 'uppercase', fontSize: 9.5, letterSpacing: 1, fontWeight: 600 }}>
         {label}
       </p>
       <p className="mt-1.5" style={{ color: C.text, fontSize: 13, lineHeight: 1.5 }}>
         {body}
       </p>
     </div>
+  );
+}
+
+function StatusPill({ ok, children }: { ok: boolean; children: React.ReactNode }) {
+  return (
+    <span
+      style={{
+        border: `1px solid ${ok ? C.olive : C.danger}`,
+        color: ok ? C.olive : C.danger,
+        textTransform: 'uppercase',
+        fontSize: 9.5,
+        letterSpacing: 1,
+        fontWeight: 600,
+        padding: '2px 7px',
+        whiteSpace: 'nowrap',
+      }}
+    >
+      {children}
+    </span>
+  );
+}
+
+/** Live preset screening result. Computed, never asserted. */
+function ScreenBadge({ pass }: { pass: boolean }) {
+  return <StatusPill ok={pass}>{pass ? 'Pass' : 'Fail'}</StatusPill>;
+}
+
+function ProseRow({ color, children }: { color: string; children: React.ReactNode }) {
+  return (
+    <div className="flex items-start gap-2.5 mt-2">
+      <span
+        style={{
+          width: 6,
+          height: 6,
+          borderRadius: 9999,
+          background: color,
+          display: 'inline-block',
+          flexShrink: 0,
+          marginTop: 6,
+        }}
+      />
+      <p style={{ color: C.text, fontSize: 12.5, lineHeight: 1.6 }}>{children}</p>
+    </div>
+  );
+}
+
+/** One transposed calendar row of yearly returns, plus the end-value/annualized cell. */
+function ReturnRow({
+  label,
+  values,
+  end,
+  ann,
+}: {
+  label: string;
+  values: number[];
+  end: number;
+  ann: number;
+}) {
+  return (
+    <tr style={{ borderTop: `1px solid ${C.border}` }}>
+      <td className="py-2 pr-4" style={{ color: C.text, fontSize: 12.5 }}>
+        {label}
+      </td>
+      {values.map((v, i) => (
+        <td
+          key={i}
+          className="py-2 pr-4 text-right"
+          style={{ color: signColor(v), fontFamily: MONO }}
+        >
+          {fmtSignedPct(v, 1)}
+        </td>
+      ))}
+      <td className="py-2 text-right" style={{ color: C.text, fontFamily: MONO }}>
+        <b>{fmtUsd(end, 0)}</b>{' '}
+        <span style={{ color: C.kpiLabel, fontSize: 11, whiteSpace: 'nowrap' }}>
+          {fmtSignedPct(ann, 1)} ann.
+        </span>
+      </td>
+    </tr>
+  );
+}
+
+/** A transposed calendar row of non-return stats (already formatted). */
+function StatRow({
+  label,
+  cells,
+  end,
+  endSuffix,
+}: {
+  label: string;
+  cells: string[];
+  end: string;
+  endSuffix?: string;
+}) {
+  return (
+    <tr style={{ borderTop: `1px solid ${C.border}` }}>
+      <td className="py-2 pr-4" style={{ color: C.text, fontSize: 12.5 }}>
+        {label}
+      </td>
+      {cells.map((c, i) => (
+        <td key={i} className="py-2 pr-4 text-right" style={{ color: C.text, fontFamily: MONO }}>
+          {c}
+        </td>
+      ))}
+      <td className="py-2 text-right" style={{ color: C.text, fontFamily: MONO }}>
+        <b>{end}</b>
+        {endSuffix && (
+          <span style={{ color: C.kpiLabel, fontSize: 11, whiteSpace: 'nowrap' }}> {endSuffix}</span>
+        )}
+      </td>
+    </tr>
   );
 }
 
@@ -1364,6 +2150,8 @@ function SliderControl({
   display,
   desc,
   onChange,
+  disabled = false,
+  children,
 }: {
   label: string;
   value: number;
@@ -1373,13 +2161,15 @@ function SliderControl({
   display: string;
   desc: string;
   onChange: (v: number) => void;
+  disabled?: boolean;
+  children?: React.ReactNode;
 }) {
   const handle = (raw: string) => {
     const n = Number(raw);
     if (Number.isFinite(n)) onChange(n);
   };
   return (
-    <div>
+    <div style={{ opacity: disabled ? 0.55 : 1 }}>
       <div className="flex items-center justify-between mb-2">
         <label
           style={{ color: C.eyebrow, textTransform: 'uppercase', fontSize: 10, letterSpacing: 1, fontWeight: 600 }}
@@ -1394,6 +2184,7 @@ function SliderControl({
         min={min}
         max={max}
         step={step}
+        disabled={disabled}
         onChange={(e) => handle(e.target.value)}
         className="w-full"
         style={{ accentColor: C.accent }}
@@ -1401,6 +2192,7 @@ function SliderControl({
       <p className="mt-1.5" style={{ color: C.muted, fontSize: 12, lineHeight: 1.5 }}>
         {desc}
       </p>
+      {children}
     </div>
   );
 }

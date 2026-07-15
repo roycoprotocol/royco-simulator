@@ -1,3 +1,4 @@
+import { Suspense } from 'react';
 import type { Metadata } from 'next';
 import HybondSimulator from './HybondSimulator';
 
@@ -18,7 +19,11 @@ export default function HybondSimPage() {
     >
       <div className="max-w-[1120px] mx-auto px-6 py-8">
         <div className="mt-6">
-          <HybondSimulator />
+          {/* HybondSimulator seeds its state from the permalink via useSearchParams,
+              which requires a Suspense boundary. */}
+          <Suspense fallback={null}>
+            <HybondSimulator />
+          </Suspense>
         </div>
       </div>
     </div>
