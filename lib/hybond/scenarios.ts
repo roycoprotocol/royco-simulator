@@ -6,17 +6,80 @@
 // differ from lib/try/scenarios.ts. Config semantics (deposits, yield share,
 // observation window, min coverage) are IDENTICAL to TRY.
 // ---------------------------------------------------------------------------
-import type { PricePoint } from "@/lib/try/backtest";
+import { runBacktest, type PricePoint } from "@/lib/try/backtest";
+import type { MarketConfig } from "@/lib/try/engine";
+import { WAD } from "@/lib/try/engine";
 import { buildConfig, TRY_DEFAULT_PARAMS, type TryParams } from "@/lib/try/scenarios";
 
 export { buildConfig };
 export type { PricePoint };
 
-// HYBond reuses the exact same params/config shape as TRY (buildConfig and
-// runBacktest work unchanged on this alias).
-export type HybondParams = TryParams;
+// --- Exit buffer (HYBond-local) ---------------------------------------------
+//
+// Tenbin exposes the coverage liquidation threshold as an "exit buffer %" — the
+// headroom Junior has before coverage is force-liquidated — rather than as a raw
+// utilization. Port of tenbin-sims/index.html:737
+// (utilizationPctFromBufferPct(v) = 10000 / max(v, 0.01)), then / 100 into WAD.
+//
+// Deliberately NOT added to TryParams/buildConfig: that would change the config
+// /internal/try and lib/try/parity.ts are pinned to. HYBond layers it on top.
 
-export const HYBOND_DEFAULT_PARAMS: HybondParams = { ...TRY_DEFAULT_PARAMS };
+/** Exit buffer % → coverageLiquidationUtilizationWAD. 5% → 20e18. */
+export const utilWadFromBufferPct = (b: number): bigint =>
+  (BigInt(Math.round((100 / Math.max(b, 0.01)) * 1e6)) * WAD) / 1_000_000n;
+
+/** Inverse of utilWadFromBufferPct. */
+export const bufferPctFromUtilWad = (w: bigint): number => 100 / (Number(w) / 1e18);
+
+/**
+ * 0.9 = flatCurve's hardcoded targetUtilizationWAD (lib/try/scenarios.ts:24). At genesis
+ * the market sits exactly at target utilization, so first-loss % and Junior's share of the
+ * pool are locked together by: jr = minCoverage / target; depositJT = depositST * jr/(1-jr).
+ * At minCov 30 / ST 1000 this gives exactly 500 (Junior = 33.3% of a 1500 pool, U = 0.9).
+ */
+const GENESIS_TARGET_UTIL_PCT = 90; // 0.9e18, as a percent (exact in binary float; 0.9 is not)
+
+/**
+ * Junior deposit implied by a first-loss-protection %, given the Senior deposit.
+ *
+ * Algebraically identical to depositST * jr/(1-jr) with jr = minCoveragePct/100/0.9, but
+ * folded to a single ratio: jr/(1-jr) = minCov/(90-minCov). The unfolded form rounds
+ * (30/100/0.9 is not representable) and returns 499.99999999999994 at the defaults; this
+ * form returns exactly 500.
+ */
+export function juniorFromFirstLossPct(depositST: number, minCoveragePct: number): number {
+  const denom = GENESIS_TARGET_UTIL_PCT - minCoveragePct;
+  if (denom <= 0) return Infinity; // first loss >= target utilization: no finite Junior satisfies it
+  return (depositST * minCoveragePct) / denom;
+}
+
+/**
+ * `fixedTermDurationSeconds` is a uint24 in the real accountant, so the hard ceiling is
+ * 16,777,215s = 194.18 days. Min mirrors Tenbin's 7.
+ */
+export const OBSERVATION_DAYS_MIN = 7;
+export const OBSERVATION_DAYS_MAX = 194;
+
+export interface HybondParams extends TryParams {
+  /** Junior's headroom before coverage is force-liquidated, %. */
+  exitBufferPct: number;
+  /** When true, depositJT is derived from minCoveragePct via juniorFromFirstLossPct. */
+  linkJuniorToFirstLoss: boolean;
+}
+
+export const HYBOND_DEFAULT_PARAMS: HybondParams = {
+  ...TRY_DEFAULT_PARAMS,
+  exitBufferPct: 5, // Tenbin's default → 20e18
+  linkJuniorToFirstLoss: true,
+};
+
+/** TRY's config plus HYBond's exit-buffer-derived liquidation threshold. */
+export function buildHybondConfig(p: HybondParams): MarketConfig {
+  return {
+    ...buildConfig(p),
+    coverageLiquidationUtilizationWAD: utilWadFromBufferPct(p.exitBufferPct),
+  };
+}
 
 // --- Presets (identical mechanism params to TRY's ladder) -------------------
 
@@ -32,7 +95,13 @@ export const PRESETS: Preset[] = [
     id: "conservative",
     label: "Conservative",
     note: "Larger Junior cushion, longer 60-day observation.",
-    params: { depositST: 1000, depositJT: 750, seniorShareToJuniorPct: 53, observationDays: 60, minCoveragePct: 30 },
+    params: {
+      ...HYBOND_DEFAULT_PARAMS,
+      depositST: 1000,
+      depositJT: 750,
+      observationDays: 60,
+      linkJuniorToFirstLoss: false,
+    },
   },
   {
     id: "balanced",
@@ -42,11 +111,51 @@ export const PRESETS: Preset[] = [
   },
   {
     id: "aggressive",
+    // 15 days was a fiction on this monthly series: obs of 1/15/29/30 all resolve to
+    // byte-identical output, so the preset was indistinguishable from Balanced. 120 is
+    // a genuinely distinct breakpoint AND is directionally aggressive: a longer term
+    // keeps Junior's capital committed across more of the horizon.
     label: "Aggressive",
-    note: "Smaller Junior cushion, shorter 15-day observation.",
-    params: { depositST: 1000, depositJT: 300, seniorShareToJuniorPct: 53, observationDays: 15, minCoveragePct: 30 },
+    note: "Smaller Junior cushion, longer 120-day observation.",
+    params: {
+      ...HYBOND_DEFAULT_PARAMS,
+      depositST: 1000,
+      depositJT: 300,
+      observationDays: 120,
+      linkJuniorToFirstLoss: false,
+    },
   },
 ];
+
+/**
+ * Run every preset through the real engine and check the claim the UI makes about them:
+ * Senior is never marked down. This makes the assertion falsifiable rather than prose.
+ */
+export interface PresetScreenRow {
+  id: Preset["id"];
+  label: string;
+  pass: boolean;
+  seniorMarkdownEvents: number;
+  seniorMaxDrawdown: number;
+}
+
+export function screenPresets(series: PricePoint[] = HYBOND_NAV_SERIES): PresetScreenRow[] {
+  return PRESETS.map((p) => {
+    const r = runBacktest({
+      config: buildHybondConfig(p.params),
+      depositST: p.params.depositST,
+      depositJT: p.params.depositJT,
+      series,
+    });
+    return {
+      id: p.id,
+      label: p.label,
+      pass: r.seniorMarkdownEvents === 0 && r.seniorMaxDrawdown < 0.0005,
+      seniorMarkdownEvents: r.seniorMarkdownEvents,
+      seniorMaxDrawdown: r.seniorMaxDrawdown,
+    };
+  });
+}
 
 // --- HYBond monthly "underlying" NAV series (composite proxy) ------------------
 //

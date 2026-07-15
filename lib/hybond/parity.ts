@@ -21,7 +21,7 @@ import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import { dirname, join } from "node:path";
 import { createMarket, deposit, sync, mulDiv, Rounding, WAD, type MarketState_Internal } from "../try/engine";
-import { buildConfig, HYBOND_DEFAULT_PARAMS, HYBOND_NAV_SERIES } from "./scenarios";
+import { buildHybondConfig, HYBOND_DEFAULT_PARAMS, HYBOND_NAV_SERIES } from "./scenarios";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
@@ -58,7 +58,7 @@ const stNav0 = toNav(HYBOND_DEFAULT_PARAMS.depositST);
 const jtNav0 = toNav(HYBOND_DEFAULT_PARAMS.depositJT);
 
 function newGenesisMarket(): MarketState_Internal {
-  const m = createMarket(buildConfig(HYBOND_DEFAULT_PARAMS));
+  const m = createMarket(buildHybondConfig(HYBOND_DEFAULT_PARAMS));
   deposit(m, "JT", 0n, jtNav0);
   deposit(m, "ST", stNav0, jtNav0);
   return m;

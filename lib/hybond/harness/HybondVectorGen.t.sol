@@ -51,7 +51,7 @@ contract HybondVectorGenTest is Test {
 
         IRoycoDayAccountant.RoycoDayAccountantInitParams memory p = IRoycoDayAccountant.RoycoDayAccountantInitParams({
             minCoverageWAD: uint64(0.3e18), // minCoveragePct 30
-            coverageLiquidationUtilizationWAD: 2e18,
+            coverageLiquidationUtilizationWAD: 20e18,
             minLiquidityWAD: 0,
             jtYDM: address(jtYDM),
             jtYDMInitializationData: abi.encodeCall(
