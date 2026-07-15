@@ -127,46 +127,9 @@ export function buildHybondNavSeries(): PricePoint[] {
   return points;
 }
 
+/**
+ * The single full-history series: 61 monthly points, 2020-06 through 2025-06.
+ * There are no history windows, the UI's "Chart timeframe" brush zooms this
+ * series for display while every metric stays computed over the full range.
+ */
 export const HYBOND_NAV_SERIES: PricePoint[] = buildHybondNavSeries();
-
-// --- Historical scenarios -----------------------------------------------------
-
-export interface HistoricalScenario {
-  id: "since2020" | "stress2022" | "recent";
-  label: string;
-  note: string;
-  cadence: "monthly" | "daily";
-  points: PricePoint[];
-}
-
-function slice(fromDate: string, toDate: string): PricePoint[] {
-  return HYBOND_NAV_SERIES.filter((p) => p.date >= fromDate && p.date <= toDate);
-}
-
-export const SCENARIOS: HistoricalScenario[] = [
-  {
-    id: "since2020",
-    label: "Since 2020",
-    note: "The composite proxy compounds about 42% gross of fees from Jun 2020 to Jun 2025, through the 2022 high yield drawdown.",
-    cadence: "monthly",
-    points: HYBOND_NAV_SERIES,
-  },
-  {
-    id: "stress2022",
-    label: "2022 drawdown",
-    note: "The 2022 rate and spread selloff, the strategy's deepest drawdown in this window. Monthly timing is synthetic.",
-    cadence: "monthly",
-    points: slice("2021-06", "2023-12"),
-  },
-  {
-    id: "recent",
-    label: "Recent (2023 to 2025)",
-    note: "The calm, high carry regime after the 2022 reset. Monthly timing is synthetic.",
-    cadence: "monthly",
-    points: slice("2023-06", "2025-06"),
-  },
-];
-
-export function getScenario(id: HistoricalScenario["id"]): HistoricalScenario {
-  return SCENARIOS.find((s) => s.id === id) ?? SCENARIOS[0];
-}

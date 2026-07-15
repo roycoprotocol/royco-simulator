@@ -12,7 +12,7 @@
 // Junior pool-share %).
 // ---------------------------------------------------------------------------
 
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
 import {
   LineChart,
@@ -28,13 +28,21 @@ import {
 import { runBacktest, type BacktestResult } from '@/lib/try/backtest';
 import {
   HYBOND_DEFAULT_PARAMS,
+  HYBOND_NAV_SERIES,
   PRESETS,
-  SCENARIOS,
   buildConfig,
-  getScenario,
   type HybondParams,
-  type HistoricalScenario,
 } from '@/lib/hybond/scenarios';
+import {
+  indexFromFraction,
+  isFullRange,
+  moveHandle,
+  nearestSide,
+  normalizeRange,
+  panRange,
+  pctOf,
+  type IndexRange,
+} from '@/lib/hybond/timeframe';
 
 // Neutral zero-step result. The engine rejects some configurations outright (e.g. a
 // $0 Junior tranche), and runBacktest runs inside a render-time useMemo, so a throw
@@ -78,6 +86,17 @@ const fmtUsd = (n: number, digits = 2): string => {
 };
 const fmtUsd0 = (n: number): string => fmtUsd(n, 0);
 
+const MONTH_NAMES = [
+  'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
+  'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
+];
+/** "2020-06" → "Jun 2020". Falls back to the raw key if it is not YYYY-MM. */
+const monthLabel = (key: string): string => {
+  const [y, m] = key.split('-');
+  const name = MONTH_NAMES[Number(m) - 1];
+  return name && y ? `${name} ${y}` : key;
+};
+
 // --- tenbin design tokens ---------------------------------------------------
 const C = {
   pageBg: '#FBFAF7',
@@ -104,12 +123,9 @@ const signColor = (frac: number): string => (frac < 0 ? C.danger : C.text);
 
 export default function HybondSimulator() {
   const [params, setParams] = useState<HybondParams>(HYBOND_DEFAULT_PARAMS);
-  const [scenarioId, setScenarioId] = useState<HistoricalScenario['id']>('since2020');
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [maintainCoverage, setMaintainCoverage] = useState(true);
   const [showHistory, setShowHistory] = useState(true);
-
-  const scenario = getScenario(scenarioId);
 
   const run = useMemo(
     () =>
@@ -118,11 +134,11 @@ export default function HybondSimulator() {
           config: buildConfig(params),
           depositST: params.depositST,
           depositJT: params.depositJT,
-          series: getScenario(scenarioId).points,
+          series: HYBOND_NAV_SERIES,
           maintainJuniorCoverage: maintainCoverage,
         }),
       ),
-    [params, scenarioId, maintainCoverage],
+    [params, maintainCoverage],
   );
   const result = run.result;
 
@@ -136,11 +152,11 @@ export default function HybondSimulator() {
           config: buildConfig(params),
           depositST: params.depositST,
           depositJT: params.depositJT,
-          series: getScenario(scenarioId).points,
+          series: HYBOND_NAV_SERIES,
           maintainJuniorCoverage: false,
         }),
       ).result,
-    [params, scenarioId],
+    [params],
   );
   const exposedSeniorEnd = exposedResult.steps.length
     ? exposedResult.steps[exposedResult.steps.length - 1].stIndex
@@ -156,11 +172,11 @@ export default function HybondSimulator() {
           config: buildConfig(params),
           depositST: params.depositST,
           depositJT: params.depositJT,
-          series: getScenario(scenarioId).points,
+          series: HYBOND_NAV_SERIES,
           maintainJuniorCoverage: true,
         }),
       ).result,
-    [params, scenarioId],
+    [params],
   );
   const maintainedSeniorEnd = maintainedResult.steps.length
     ? maintainedResult.steps[maintainedResult.steps.length - 1].stIndex
@@ -188,12 +204,31 @@ export default function HybondSimulator() {
       ? (params.depositJT / (params.depositST + params.depositJT)) * 100
       : 0;
 
+  // --- Chart timeframe brush (VIEW ONLY) ------------------------------------
+  // The brush zooms the chart. It never re-runs the backtest: KPIs, secondary
+  // stats, summary chips, and the calendar table all stay computed over the
+  // full history above, exactly as before.
+  const maxIndex = Math.max(0, result.steps.length - 1);
+  const [range, setRange] = useState<IndexRange>(() => ({
+    a: 0,
+    b: HYBOND_NAV_SERIES.length - 1,
+  }));
+  const view = useMemo(() => normalizeRange(range.a, range.b, maxIndex), [range, maxIndex]);
+  const viewIsFull = isFullRange(view, maxIndex);
+
+  // Only the steps inside the selected window reach the chart. Deriving the
+  // shading and markers from this same slice clips them to the view for free.
+  const visibleSteps = useMemo(
+    () => result.steps.slice(view.a, view.b + 1),
+    [result.steps, view.a, view.b],
+  );
+
   // Contiguous observation runs → ReferenceArea shading (presentational).
   const observationRuns = useMemo(() => {
     const runs: { x1: string; x2: string }[] = [];
     let start: string | null = null;
     let prev: string | null = null;
-    for (const s of result.steps) {
+    for (const s of visibleSteps) {
       if (s.inObservation) {
         if (start === null) start = s.date;
         prev = s.date;
@@ -205,24 +240,56 @@ export default function HybondSimulator() {
     }
     if (start !== null) runs.push({ x1: start, x2: prev ?? start });
     return runs;
-  }, [result.steps]);
+  }, [visibleSteps]);
 
   const lossMarkers = useMemo(
-    () => result.steps.filter((s) => s.juniorLossLocked),
-    [result.steps],
+    () => visibleSteps.filter((s) => s.juniorLossLocked),
+    [visibleSteps],
   );
 
   const chartData = useMemo(
     () =>
-      result.steps.map((s) => ({
+      visibleSteps.map((s) => ({
         date: s.date,
         strategy: s.priceIndex,
         senior: s.stIndex,
         junior: s.jtIndex,
         marketState: s.marketState,
       })),
+    [visibleSteps],
+  );
+
+  // Full-history observation bands for the brush's mini preview (index runs).
+  const brushBands = useMemo(() => {
+    const bands: { a: number; b: number }[] = [];
+    let start: number | null = null;
+    result.steps.forEach((s, i) => {
+      if (s.inObservation) {
+        if (start === null) start = i;
+      } else if (start !== null) {
+        bands.push({ a: start, b: i - 1 });
+        start = null;
+      }
+    });
+    if (start !== null) bands.push({ a: start, b: result.steps.length - 1 });
+    return bands;
+  }, [result.steps]);
+
+  const brushSeries = useMemo(
+    () => ({
+      strategy: result.steps.map((s) => s.priceIndex),
+      senior: result.steps.map((s) => s.stIndex),
+      junior: result.steps.map((s) => s.jtIndex),
+    }),
     [result.steps],
   );
+
+  const dates = useMemo(() => result.steps.map((s) => s.date), [result.steps]);
+
+  // Title derived from the series itself rather than a hardcoded label.
+  const rangeTitle = dates.length
+    ? `${monthLabel(dates[0])} to ${monthLabel(dates[dates.length - 1])} projection`
+    : 'Projection';
 
   const seniorEnd = result.steps.length
     ? result.steps[result.steps.length - 1].stIndex
@@ -308,31 +375,8 @@ export default function HybondSimulator() {
         </p>
       </section>
 
-      {/* ================= 2. TABS ROW ================= */}
-      <section className="flex items-end justify-between flex-wrap gap-4">
-        <div className="flex items-center gap-6" style={{ borderBottom: `1px solid ${C.border}` }}>
-          {SCENARIOS.map((s) => {
-            const active = s.id === scenarioId;
-            return (
-              <button
-                key={s.id}
-                type="button"
-                onClick={() => setScenarioId(s.id)}
-                style={{
-                  padding: '0 0 10px',
-                  fontSize: 13,
-                  fontWeight: active ? 600 : 400,
-                  color: active ? C.text : C.muted,
-                  borderBottom: `2px solid ${active ? C.accent : 'transparent'}`,
-                  marginBottom: -1,
-                  background: 'transparent',
-                }}
-              >
-                {s.label}
-              </button>
-            );
-          })}
-        </div>
+      {/* ================= 2. ACTIONS ROW ================= */}
+      <section className="flex items-end justify-end flex-wrap gap-4">
         <button
           type="button"
           onClick={copyLink}
@@ -387,7 +431,7 @@ export default function HybondSimulator() {
           <div>
             <Eyebrow>Overview</Eyebrow>
             <h2 className="mt-2" style={{ fontFamily: SERIF, fontWeight: 400, fontSize: 24, color: C.text }}>
-              {scenario.label} projection
+              {rangeTitle}
             </h2>
             <p className="mt-3" style={{ color: C.muted, fontSize: 14, lineHeight: 1.6 }}>
               Senior stays inside a {fmtSignedPct(result.seniorAvgYr, 1)}/yr band with{' '}
@@ -589,7 +633,8 @@ export default function HybondSimulator() {
               Chart, metrics, and mechanics.
             </h2>
             <p className="mt-2" style={{ color: C.muted, fontSize: 14, lineHeight: 1.6 }}>
-              How the tranches tracked the underlying composite proxy across the selected history.
+              How the tranches tracked the underlying composite proxy across the full history.
+              Metrics below cover every month, the timeframe control zooms the chart only.
             </p>
           </div>
           <button
@@ -716,6 +761,16 @@ export default function HybondSimulator() {
                 </LineChart>
               </ResponsiveContainerNoSSR>
             </div>
+
+            {/* Chart timeframe brush (view-only zoom over the full series) */}
+            <TimeframeBrush
+              dates={dates}
+              series={brushSeries}
+              bands={brushBands}
+              view={view}
+              isFull={viewIsFull}
+              onChange={setRange}
+            />
 
             {/* Calendar returns table */}
             <div className="mt-6 overflow-x-auto">
@@ -917,6 +972,309 @@ export default function HybondSimulator() {
         sequencing is synthetic. Parameters illustrative, pending accountant sign-off
         (OPEN-QUESTIONS).
       </footer>
+    </div>
+  );
+}
+
+// --- Chart timeframe brush --------------------------------------------------
+
+// The brush's own drag state. `pan` remembers where the grab started and the
+// window it started from, so sliding preserves the window width exactly.
+type DragMode =
+  | { kind: 'handle'; side: 'start' | 'end' }
+  | { kind: 'pan'; grabIndex: number; origin: IndexRange };
+
+const BRUSH_TRACK_H = 54;
+// The mini preview is drawn in a fixed viewBox and stretched with
+// preserveAspectRatio="none", so it needs no width measurement to be correct.
+const BRUSH_VB_W = 1000;
+
+function TimeframeBrush({
+  dates,
+  series,
+  bands,
+  view,
+  isFull,
+  onChange,
+}: {
+  dates: string[];
+  series: { strategy: number[]; senior: number[]; junior: number[] };
+  bands: { a: number; b: number }[];
+  view: IndexRange;
+  isFull: boolean;
+  onChange: (r: IndexRange) => void;
+}) {
+  const trackRef = useRef<HTMLDivElement>(null);
+  const dragRef = useRef<DragMode | null>(null);
+  const max = Math.max(0, dates.length - 1);
+
+  const indexFromEvent = useCallback(
+    (clientX: number) => {
+      const el = trackRef.current;
+      if (!el) return 0;
+      const r = el.getBoundingClientRect();
+      return indexFromFraction((clientX - r.left) / Math.max(r.width, 1), max);
+    },
+    [max],
+  );
+
+  // All drags capture the pointer on the TRACK, so moves keep arriving through
+  // React's handlers even when the cursor leaves the element. React detaches
+  // these on unmount, so there is nothing to clean up by hand.
+  const begin = (mode: DragMode, e: React.PointerEvent) => {
+    e.preventDefault();
+    e.stopPropagation();
+    trackRef.current?.setPointerCapture(e.pointerId);
+    dragRef.current = mode;
+  };
+
+  const onPointerMove = (e: React.PointerEvent) => {
+    const drag = dragRef.current;
+    if (!drag) return;
+    const i = indexFromEvent(e.clientX);
+    if (drag.kind === 'handle') onChange(moveHandle(view, drag.side, i, max));
+    else onChange(panRange(drag.origin, i - drag.grabIndex, max));
+  };
+
+  const endDrag = (e: React.PointerEvent) => {
+    dragRef.current = null;
+    if (trackRef.current?.hasPointerCapture(e.pointerId)) {
+      trackRef.current.releasePointerCapture(e.pointerId);
+    }
+  };
+
+  // Click bare track: grab whichever handle is nearer and send it here.
+  const onTrackDown = (e: React.PointerEvent) => {
+    const i = indexFromEvent(e.clientX);
+    const side = nearestSide(view, i);
+    begin({ kind: 'handle', side }, e);
+    onChange(moveHandle(view, side, i, max));
+  };
+
+  // Arrow = 1 month, Shift+Arrow = 12 months.
+  const onHandleKey = (side: 'start' | 'end') => (e: React.KeyboardEvent) => {
+    const dir = e.key === 'ArrowLeft' ? -1 : e.key === 'ArrowRight' ? 1 : 0;
+    if (!dir) return;
+    e.preventDefault();
+    const step = dir * (e.shiftKey ? 12 : 1);
+    onChange(moveHandle(view, side, (side === 'start' ? view.a : view.b) + step, max));
+  };
+
+  const leftPct = pctOf(view.a, max);
+  const rightPct = pctOf(view.b, max);
+
+  // Year gridline/tick positions: first point in each calendar year.
+  const years = useMemo(() => {
+    const out: { year: number; pct: number }[] = [];
+    if (!dates.length) return out;
+    const first = Number(dates[0].slice(0, 4));
+    const last = Number(dates[dates.length - 1].slice(0, 4));
+    for (let y = first; y <= last; y++) {
+      const i = dates.findIndex((d) => Number(d.slice(0, 4)) >= y);
+      out.push({ year: y, pct: pctOf(i < 0 ? max : i, max) });
+    }
+    return out;
+  }, [dates, max]);
+
+  // Mini preview paths, sharing one scale across all three lines.
+  const preview = useMemo(() => {
+    const all = [...series.strategy, ...series.senior, ...series.junior];
+    if (!all.length || max <= 0) return null;
+    let lo = Math.min(...all);
+    let hi = Math.max(...all);
+    const span = Math.max(hi - lo, 1);
+    lo -= span * 0.12;
+    hi += span * 0.08;
+    const padY = 7;
+    const X = (i: number) => (i / max) * BRUSH_VB_W;
+    const Y = (v: number) =>
+      BRUSH_TRACK_H - padY - ((v - lo) / (hi - lo)) * (BRUSH_TRACK_H - padY * 2);
+    const path = (arr: number[]) =>
+      arr.map((v, i) => `${i ? 'L' : 'M'}${X(i).toFixed(2)} ${Y(v).toFixed(2)}`).join(' ');
+    return {
+      strategy: path(series.strategy),
+      senior: path(series.senior),
+      junior: path(series.junior),
+      bands: bands.map((b) => ({ x: X(b.a), w: Math.max(X(b.b) - X(b.a), 1.5) })),
+    };
+  }, [series, bands, max]);
+
+  if (!dates.length) return null;
+
+  const handleStyle: React.CSSProperties = {
+    position: 'absolute',
+    top: '50%',
+    width: 20,
+    height: 30,
+    borderRadius: 2,
+    border: '1px solid rgba(23,21,17,.22)',
+    background: C.cardBg,
+    boxShadow: '0 2px 8px rgba(60,45,28,.13)',
+    transform: 'translate(-50%,-50%)',
+    cursor: 'ew-resize',
+    padding: 0,
+    touchAction: 'none',
+  };
+  const gripStyle: React.CSSProperties = {
+    position: 'absolute',
+    left: '50%',
+    top: 7,
+    width: 1,
+    height: 14,
+    background: C.eyebrow,
+    boxShadow: `-4px 0 0 ${C.eyebrow}, 4px 0 0 ${C.eyebrow}`,
+    transform: 'translateX(-50%)',
+  };
+
+  return (
+    <div
+      aria-label="Chart timeframe controls"
+      style={{
+        borderTop: `1px solid ${C.border}`,
+        borderBottom: `1px solid ${C.border}`,
+        padding: '10px 0 11px',
+        marginTop: 14,
+        display: 'grid',
+        gap: 8,
+      }}
+    >
+      <div
+        className="flex items-center justify-between gap-3"
+        style={{
+          fontSize: 10,
+          textTransform: 'uppercase',
+          letterSpacing: '0.16em',
+          color: C.kpiLabel,
+          fontWeight: 600,
+        }}
+      >
+        <span>Chart timeframe</span>
+        <span style={{ fontFamily: MONO, color: C.text, fontSize: 10.5, letterSpacing: 0, textTransform: 'none', fontWeight: 500 }}>
+          {isFull ? 'Full history' : `${dates[view.a]} → ${dates[view.b]}`}
+        </span>
+      </div>
+
+      <div style={{ padding: '2px 4px 0' }}>
+        <div
+          ref={trackRef}
+          onPointerDown={onTrackDown}
+          onPointerMove={onPointerMove}
+          onPointerUp={endDrag}
+          onPointerCancel={endDrag}
+          style={{
+            position: 'relative',
+            height: BRUSH_TRACK_H,
+            border: `1px solid ${C.border}`,
+            background: C.cardBg,
+            cursor: 'crosshair',
+            touchAction: 'none',
+            overflow: 'hidden',
+          }}
+        >
+          {preview && (
+            <svg
+              viewBox={`0 0 ${BRUSH_VB_W} ${BRUSH_TRACK_H}`}
+              preserveAspectRatio="none"
+              role="img"
+              aria-label="Full history overview for chart timeframe"
+              style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', display: 'block' }}
+            >
+              {preview.bands.map((b, i) => (
+                <rect key={`bb-${i}`} x={b.x} y={0} width={b.w} height={BRUSH_TRACK_H} fill={C.obsFill} fillOpacity={0.18} />
+              ))}
+              {years.map((y) => (
+                <line
+                  key={`by-${y.year}`}
+                  x1={(y.pct / 100) * BRUSH_VB_W}
+                  y1={0}
+                  x2={(y.pct / 100) * BRUSH_VB_W}
+                  y2={BRUSH_TRACK_H}
+                  stroke={C.border}
+                  strokeDasharray="3 4"
+                />
+              ))}
+              <path d={preview.strategy} fill="none" stroke={C.strategyLine} strokeWidth={1.8} opacity={0.75} vectorEffect="non-scaling-stroke" />
+              <path d={preview.senior} fill="none" stroke={C.seniorLine} strokeWidth={2} vectorEffect="non-scaling-stroke" />
+              <path d={preview.junior} fill="none" stroke={C.juniorLine} strokeWidth={2} vectorEffect="non-scaling-stroke" />
+            </svg>
+          )}
+
+          {/* Selected window. The huge outer shadow dims everything outside it. */}
+          <div
+            onPointerDown={(e) => begin({ kind: 'pan', grabIndex: indexFromEvent(e.clientX), origin: view }, e)}
+            style={{
+              position: 'absolute',
+              top: 0,
+              bottom: 0,
+              left: `${leftPct}%`,
+              width: `${Math.max(rightPct - leftPct, 0)}%`,
+              background: 'rgba(150,119,86,.14)',
+              borderLeft: `2px solid ${C.eyebrow}`,
+              borderRight: `2px solid ${C.eyebrow}`,
+              boxShadow: '0 0 0 999px rgba(255,253,249,.62)',
+              cursor: 'grab',
+              touchAction: 'none',
+            }}
+          />
+
+          <button
+            type="button"
+            onPointerDown={(e) => begin({ kind: 'handle', side: 'start' }, e)}
+            onKeyDown={onHandleKey('start')}
+            aria-label={`Timeframe start, ${monthLabel(dates[view.a])}`}
+            style={{ ...handleStyle, left: `${leftPct}%` }}
+          >
+            <span style={gripStyle} />
+          </button>
+          <button
+            type="button"
+            onPointerDown={(e) => begin({ kind: 'handle', side: 'end' }, e)}
+            onKeyDown={onHandleKey('end')}
+            aria-label={`Timeframe end, ${monthLabel(dates[view.b])}`}
+            style={{ ...handleStyle, left: `${rightPct}%` }}
+          >
+            <span style={gripStyle} />
+          </button>
+        </div>
+
+        <div style={{ position: 'relative', height: 18, marginTop: 2 }}>
+          {years.map((y) => (
+            <span
+              key={`t-${y.year}`}
+              style={{
+                position: 'absolute',
+                top: 1,
+                left: `${y.pct}%`,
+                transform: 'translateX(-50%)',
+                fontSize: 9.5,
+                color: C.kpiLabel,
+                fontFamily: MONO,
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {y.year}
+            </span>
+          ))}
+        </div>
+
+        <div
+          className="flex items-center justify-between gap-3"
+          style={{ color: C.muted, fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.14em', fontWeight: 600 }}
+        >
+          <span>
+            Start{' '}
+            <b style={{ fontFamily: MONO, color: C.text, letterSpacing: 0, textTransform: 'none', fontWeight: 500 }}>
+              {monthLabel(dates[view.a])}
+            </b>
+          </span>
+          <span>
+            End{' '}
+            <b style={{ fontFamily: MONO, color: C.text, letterSpacing: 0, textTransform: 'none', fontWeight: 500 }}>
+              {monthLabel(dates[view.b])}
+            </b>
+          </span>
+        </div>
+      </div>
     </div>
   );
 }
