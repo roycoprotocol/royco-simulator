@@ -50,7 +50,8 @@ export const bufferPctFromUtilWad = (w: bigint): number => 100 / (Number(w) / 1e
  * 0.9 = flatCurve's hardcoded targetUtilizationWAD (lib/try/scenarios.ts:24). At genesis
  * the market sits exactly at target utilization, so first-loss % and Junior's share of the
  * pool are locked together by: jr = minCoverage / target; depositJT = depositST * jr/(1-jr).
- * At minCov 30 / ST 1000 this gives exactly 500 (Junior = 33.3% of a 1500 pool, U = 0.9).
+ * At the Balanced minCov 20 / ST 1000 this gives 285.714286 after NAV input rounding
+ * (Junior = 22.22% of the pool, U = 0.9).
  */
 const GENESIS_TARGET_UTIL_PCT = 90; // 0.9e18, as a percent (exact in binary float; 0.9 is not)
 
@@ -58,9 +59,8 @@ const GENESIS_TARGET_UTIL_PCT = 90; // 0.9e18, as a percent (exact in binary flo
  * Junior deposit implied by a first-loss-protection %, given the Senior deposit.
  *
  * Algebraically identical to depositST * jr/(1-jr) with jr = minCoveragePct/100/0.9, but
- * folded to a single ratio: jr/(1-jr) = minCov/(90-minCov). The unfolded form rounds
- * (30/100/0.9 is not representable) and returns 499.99999999999994 at the defaults; this
- * form returns exactly 500.
+ * folded to a single ratio: jr/(1-jr) = minCov/(90-minCov). The folded form avoids an
+ * avoidable intermediate floating-point rounding before NAV inputs are rounded to 6 decimals.
  */
 export function juniorFromFirstLossPct(depositST: number, minCoveragePct: number): number {
   const denom = GENESIS_TARGET_UTIL_PCT - minCoveragePct;
@@ -97,10 +97,10 @@ export const HYBOND_DEFAULT_PARAMS: HybondParams = {
   depositST: 1000,
   exitBufferPct: 5, // Tenbin's default → 20e18
   linkJuniorToFirstLoss: true,
-  minCoveragePct: 30,
+  minCoveragePct: 20,
   observationDays: 45,
-  seniorShareToJuniorPct: 62,
-  depositJT: juniorFromFirstLossPct(1000, 30),
+  seniorShareToJuniorPct: 47,
+  depositJT: juniorFromFirstLossPct(1000, 20),
 };
 
 /** TRY's config plus HYBond's exit-buffer-derived liquidation threshold. */
@@ -173,13 +173,17 @@ const rung = (
  *
  * The series is now REAL daily NAV, so observation terms resolve at daily resolution: 7 to
  * 194 days are all distinct, and Aggressive's 16-day observation is a genuine 16-day term
- * (no longer rounded up to the next month end). cov (34/30/18 → Junior 607.14/500/250), obs
- * (60/45/16), and ys (61/62/75) all separate the three runs, verified through the accountant.
+ * (no longer rounded up to the next month end). The new ladder is centered on the calibrated
+ * Balanced target: cov (24/20/18 → Junior 363.64/285.71/250), obs (60/45/16), and ys
+ * (34/47/59). The wider yield-share ladder offsets the smaller Junior cushion and shorter
+ * recovery term so Junior's historical average return rises with risk (6.35%/7.10%/7.97%)
+ * instead of falling. Balanced still gives Senior about 5.05%/yr, and every historical
+ * restart remains Senior-loss-free at both replenishment settings on all three rungs.
  */
 export const PRESETS: Preset[] = [
-  rung("conservative", "Conservative", 34, 60, 61),
-  rung("balanced", "Balanced", 30, 45, 62),
-  rung("aggressive", "Aggressive", 18, 16, 75),
+  rung("conservative", "Conservative", 24, 60, 34),
+  rung("balanced", "Balanced", 20, 45, 47),
+  rung("aggressive", "Aggressive", 18, 16, 59),
 ];
 
 /**

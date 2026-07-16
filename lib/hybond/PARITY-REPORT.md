@@ -18,7 +18,7 @@ The existing 52 TRY vectors prove the engine on TRY-flavored inputs. They do **n
 
 `lib/hybond/harness/HybondVectorGen.t.sol` (group **F**, labels `F_hybond_<i+1>`) drives the **real compiled** `RoycoDayAccountant` (behind an ERC1967 proxy) via `preOpSyncTrancheAccounting(stRaw, jtRaw)` pranked as the kernel, on a monotonic `vm.warp` clock, over the full 2,394-point daily series with HYBond's **DEFAULT (Balanced)** params:
 
-- **Params** (`HYBOND_DEFAULT_PARAMS`): depositST 1000, depositJT 500 (derived from first-loss 30%), seniorShareToJuniorPct 62 (`jtYDM` 0.62e18), observationDays 45 (`fixedTermDurationSeconds` 3,888,000), minCoveragePct 30 (`minCoverageWAD` 0.3e18), `coverageLiquidationUtilizationWAD` 20e18. These are the **Balanced** preset's knobs; the page lands on that rung, so what is certified is the config the page actually runs on first paint.
+- **Params** (`HYBOND_DEFAULT_PARAMS`): depositST 1000, depositJT 285.714286 (derived from minimum coverage 20%, giving 22.22% actual genesis first-loss capital), seniorShareToJuniorPct 47 (`jtYDM` 0.47e18), observationDays 45 (`fixedTermDurationSeconds` 3,888,000), minCoveragePct 20 (`minCoverageWAD` 0.2e18), `coverageLiquidationUtilizationWAD` 20e18. These are the **Balanced** preset's knobs; the page lands on that rung, so what is certified is the config the page actually runs on first paint.
 - **Genesis:** JT_DEPOSIT then ST_DEPOSIT at price 1.0, mirroring `runBacktest`'s `deposit(m,"JT",0,jtNav0); deposit(m,"ST",stNav0,jtNav0)`.
 - **Driving (replicates `lib/try/backtest.ts` exactly):** Senior is fixed capital, `stRaw_i = floor(stNav0 * price_i / price_0)` (price indexed off the FIRST point). Junior is carried: `jtRaw_0 = jtNav0`, `jtRaw_i = floor(jtCarry * price_i / price_{i-1})` with `jtCarry` = the accountant's returned `jtRawNAV`. `dt` is the **REAL per-step day gap in seconds** (1-day, 3-day weekends, holiday gaps), computed exactly like `backtest.ts`'s `secondsBetween(date_{i-1}, date_i)`, NOT a fixed step.
 
@@ -38,7 +38,7 @@ so **all transitions and all erasures are covered**. The union is **698 vectors 
 
 ## What the path exercises
 
-Not a happy path. Over the real 9.6-year daily history the mechanism repeatedly enters coverage: **451 PERPETUAL<->FIXED_TERM transitions** and **11 IL-erasure steps** (2020-03 COVID, the 2022 selloff, and later single-day dips), all captured in the sample. The remaining steps exercise the gain waterfall (Senior keeps 38%, Junior takes the 62% yield share) and time-weighted JT premium accrual across real, variable day-gap `dt`s.
+Not a happy path. Over the real 9.6-year daily history the mechanism repeatedly enters coverage: **451 PERPETUAL<->FIXED_TERM transitions** and **11 IL-erasure steps** (2020-03 COVID, the 2022 selloff, and later single-day dips), all captured in the sample. The remaining steps exercise the gain waterfall (Senior keeps 53%, Junior takes the 47% yield share) and time-weighted JT premium accrual across real, variable day-gap `dt`s.
 
 ## Scope boundary: what IS and ISN'T covered
 

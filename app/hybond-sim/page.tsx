@@ -34,7 +34,7 @@ export default async function HybondSimPage({
       }}
     >
       <div className="mx-auto" style={{ maxWidth: 1180, padding: '18px 20px 48px' }}>
-        <div className="mt-6">
+        <div>
           <HybondSimulator initialQuery={sp} />
         </div>
       </div>

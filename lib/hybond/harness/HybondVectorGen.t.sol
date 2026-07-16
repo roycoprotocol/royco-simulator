@@ -14,8 +14,11 @@ import { ERC1967Proxy } from "../../lib/openzeppelin-contracts/contracts/proxy/E
 /// @dev HYBond vector generator (group "F"). Drives the REAL RoycoDayAccountant over the
 /// srHYBond simulator's ACTUAL REAL daily NAV series (BNY Global Short-Dated High Yield Bond
 /// Fund, 2394 business days, 2016-11-30 = 1.0 .. 2026-07-02 ~= 1.7318) using HYBond's DEFAULT
-/// (Balanced) params: depositST 1000, depositJT 500, seniorShareToJuniorPct 62, observationDays
-/// 45, minCoveragePct 30 (see lib/hybond/scenarios.ts / lib/try/scenarios.ts).
+/// (Balanced) params: depositST 1000, depositJT
+/// 285.714286, seniorShareToJuniorPct
+/// 47, observationDays
+/// 45, minCoveragePct
+/// 20 (see lib/hybond/scenarios.ts / lib/try/scenarios.ts).
 ///
 /// The raw-NAV driving replicates lib/try/backtest.ts EXACTLY:
 ///   stRaw_i = floor(stNav0 * price_i / price_0)              (Senior: fixed capital)
@@ -43,8 +46,8 @@ contract HybondVectorGenTest is Test {
     StaticCurveYDM internal jtYDM;
     StaticCurveYDM internal ltYDM;
 
-    uint256 internal constant ST_NAV0 = 1000e18; // depositST 1000
-    uint256 internal constant JT_NAV0 = 500e18; // depositJT 500
+    uint256 internal constant ST_NAV0 = 1000000000000000000000; // depositST 1000
+    uint256 internal constant JT_NAV0 = 285714286000000000000; // depositJT 285.714286
     uint256 internal constant N = 2394;
     string internal constant OUT = "output/hybond-vectors-out.json";
 
@@ -87,18 +90,19 @@ contract HybondVectorGenTest is Test {
         RoycoDayAccountant impl = new RoycoDayAccountant(kernel, true);
 
         IRoycoDayAccountant.RoycoDayAccountantInitParams memory p = IRoycoDayAccountant.RoycoDayAccountantInitParams({
-            minCoverageWAD: uint64(0.3e18), // minCoveragePct 30
-            coverageLiquidationUtilizationWAD: 20e18,
+            minCoverageWAD: uint64(200000000000000000), // minCoveragePct 20
+            coverageLiquidationUtilizationWAD: 20000000000000000000,
             minLiquidityWAD: 0,
             jtYDM: address(jtYDM),
             jtYDMInitializationData: abi.encodeCall(
-                StaticCurveYDM.initializeYDMForMarket, (uint64(0.62e18), uint64(0.62e18), uint64(0.62e18))
+                StaticCurveYDM.initializeYDMForMarket,
+                (uint64(470000000000000000), uint64(470000000000000000), uint64(470000000000000000))
             ),
             ltYDM: address(ltYDM),
             ltYDMInitializationData: abi.encodeCall(StaticCurveYDM.initializeYDMForMarket, (uint64(1), uint64(1), uint64(1))),
             maxJTYieldShareWAD: uint64(1e18),
             maxLTYieldShareWAD: 0,
-            fixedTermDurationSeconds: uint24(3_888_000), // observationDays 45
+            fixedTermDurationSeconds: uint24(3888000), // observationDays 45
             stNAVDustTolerance: toNAVUnits(uint256(0)),
             jtNAVDustTolerance: toNAVUnits(uint256(0)),
             stProtocolFeeWAD: 0,

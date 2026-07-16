@@ -233,10 +233,14 @@ console.log("\n9. Every legal window restarts a runnable market");
     s0.stIndex === 100 && s0.jtIndex === 100 && s0.priceIndex === 100,
     `st=${s0.stIndex} jt=${s0.jtIndex} px=${s0.priceIndex}`,
   );
+  const targetUtilWad = buildHybondConfig(HYBOND_DEFAULT_PARAMS).jtYDM.targetUtilizationWAD;
+  const targetUtilDeltaWad = s0.coverageUtilWad >= targetUtilWad
+    ? s0.coverageUtilWad - targetUtilWad
+    : targetUtilWad - s0.coverageUtilWad;
   check(
-    "the restarted run starts at the genesis coverage utilization (0.9e18, the curve target)",
-    s0.coverageUtilWad === 900000000000000000n,
-    `util=${s0.coverageUtilWad}`,
+    "the restarted run starts at the curve target, within six-decimal NAV rounding",
+    targetUtilDeltaWad <= 1_000_000_000n,
+    `util=${s0.coverageUtilWad} target=${targetUtilWad} delta=${targetUtilDeltaWad}`,
   );
   check("a restarted run carries in no impairment (no loss locked at genesis)", s0.juniorLossLocked === false);
 

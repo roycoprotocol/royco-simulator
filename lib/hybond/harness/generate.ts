@@ -22,7 +22,8 @@ const series = HYBOND_NAV_SERIES;
 const N = series.length;
 const stNav0 = toNav(HYBOND_DEFAULT_PARAMS.depositST);
 const jtNav0 = toNav(HYBOND_DEFAULT_PARAMS.depositJT);
-const m: MarketState_Internal = createMarket(buildHybondConfig(HYBOND_DEFAULT_PARAMS));
+const defaultConfig = buildHybondConfig(HYBOND_DEFAULT_PARAMS);
+const m: MarketState_Internal = createMarket(defaultConfig);
 deposit(m, "JT", 0n, jtNav0);
 deposit(m, "ST", stNav0, jtNav0);
 const priceWad0 = toPriceWad(series[0].price);
@@ -79,8 +80,11 @@ import { ERC1967Proxy } from "../../lib/openzeppelin-contracts/contracts/proxy/E
 /// @dev HYBond vector generator (group "F"). Drives the REAL RoycoDayAccountant over the
 /// srHYBond simulator's ACTUAL REAL daily NAV series (BNY Global Short-Dated High Yield Bond
 /// Fund, ${N} business days, 2016-11-30 = 1.0 .. 2026-07-02 ~= 1.7318) using HYBond's DEFAULT
-/// (Balanced) params: depositST 1000, depositJT 500, seniorShareToJuniorPct 62, observationDays
-/// 45, minCoveragePct 30 (see lib/hybond/scenarios.ts / lib/try/scenarios.ts).
+/// (Balanced) params: depositST ${HYBOND_DEFAULT_PARAMS.depositST}, depositJT
+/// ${HYBOND_DEFAULT_PARAMS.depositJT.toFixed(6)}, seniorShareToJuniorPct
+/// ${HYBOND_DEFAULT_PARAMS.seniorShareToJuniorPct}, observationDays
+/// ${HYBOND_DEFAULT_PARAMS.observationDays}, minCoveragePct
+/// ${HYBOND_DEFAULT_PARAMS.minCoveragePct} (see lib/hybond/scenarios.ts / lib/try/scenarios.ts).
 ///
 /// The raw-NAV driving replicates lib/try/backtest.ts EXACTLY:
 ///   stRaw_i = floor(stNav0 * price_i / price_0)              (Senior: fixed capital)
@@ -108,8 +112,8 @@ contract HybondVectorGenTest is Test {
     StaticCurveYDM internal jtYDM;
     StaticCurveYDM internal ltYDM;
 
-    uint256 internal constant ST_NAV0 = 1000e18; // depositST 1000
-    uint256 internal constant JT_NAV0 = 500e18; // depositJT 500
+    uint256 internal constant ST_NAV0 = ${stNav0}; // depositST ${HYBOND_DEFAULT_PARAMS.depositST}
+    uint256 internal constant JT_NAV0 = ${jtNav0}; // depositJT ${HYBOND_DEFAULT_PARAMS.depositJT.toFixed(6)}
     uint256 internal constant N = ${N};
     string internal constant OUT = "output/hybond-vectors-out.json";
 
@@ -152,18 +156,19 @@ contract HybondVectorGenTest is Test {
         RoycoDayAccountant impl = new RoycoDayAccountant(kernel, true);
 
         IRoycoDayAccountant.RoycoDayAccountantInitParams memory p = IRoycoDayAccountant.RoycoDayAccountantInitParams({
-            minCoverageWAD: uint64(0.3e18), // minCoveragePct 30
-            coverageLiquidationUtilizationWAD: 20e18,
+            minCoverageWAD: uint64(${defaultConfig.minCoverageWAD}), // minCoveragePct ${HYBOND_DEFAULT_PARAMS.minCoveragePct}
+            coverageLiquidationUtilizationWAD: ${defaultConfig.coverageLiquidationUtilizationWAD},
             minLiquidityWAD: 0,
             jtYDM: address(jtYDM),
             jtYDMInitializationData: abi.encodeCall(
-                StaticCurveYDM.initializeYDMForMarket, (uint64(0.62e18), uint64(0.62e18), uint64(0.62e18))
+                StaticCurveYDM.initializeYDMForMarket,
+                (uint64(${defaultConfig.jtYDM.yieldShareAtZeroUtilWAD}), uint64(${defaultConfig.jtYDM.yieldShareAtTargetWAD}), uint64(${defaultConfig.jtYDM.yieldShareAtFullUtilWAD}))
             ),
             ltYDM: address(ltYDM),
             ltYDMInitializationData: abi.encodeCall(StaticCurveYDM.initializeYDMForMarket, (uint64(1), uint64(1), uint64(1))),
             maxJTYieldShareWAD: uint64(1e18),
             maxLTYieldShareWAD: 0,
-            fixedTermDurationSeconds: uint24(3_888_000), // observationDays 45
+            fixedTermDurationSeconds: uint24(${defaultConfig.fixedTermDurationSeconds}), // observationDays ${HYBOND_DEFAULT_PARAMS.observationDays}
             stNAVDustTolerance: toNAVUnits(uint256(0)),
             jtNAVDustTolerance: toNAVUnits(uint256(0)),
             stProtocolFeeWAD: 0,

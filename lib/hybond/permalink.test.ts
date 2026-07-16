@@ -151,7 +151,7 @@ console.log("\n4. Hand-edited URLs clamp to what the controls can express");
   const cases: [string, (p: HybondParams) => boolean, string][] = [
     ["preset=custom&link=0&st=999999&jt=999999", (p) => p.depositST === 10000 && p.depositJT === 10000, "clamps to the max"],
     ["preset=custom&link=0&st=-5&jt=-5", (p) => p.depositST === 100 && p.depositJT === 50, "clamps to the min"],
-    ["preset=custom&link=0&st=abc&jt=abc", (p) => p.depositST === 1000 && p.depositJT === 500, "non-numeric falls back to the default"],
+    ["preset=custom&link=0&st=abc&jt=abc", (p) => p.depositST === 1000 && p.depositJT === 300, "non-numeric falls back to the nearest manual-control step"],
     ["preset=custom&link=0&st=1250&jt=1275", (p) => p.depositST === 1300 && p.depositJT === 1300, "snaps to the control step"],
     ["preset=custom&link=0&st=1000&jt=0", (p) => p.depositJT === 50, "a $0 Junior (which the engine rejects) is clamped out"],
     ["preset=custom&coverage=9999", (p) => p.minCoveragePct === 65, "coverage clamps"],
@@ -170,7 +170,12 @@ console.log("\n4. Hand-edited URLs clamp to what the controls can express");
       for (const link of ["0", "1"]) {
         const p = readQuery(`preset=custom&link=${link}&st=${st}&jt=${jt}`).params;
         if (!(p.depositST >= 100 && p.depositST <= 10000)) violations++;
-        if (!(Number.isFinite(p.depositJT) && p.depositJT >= 50)) violations++;
+        if (link === "1") {
+          const derivedJT = juniorFromFirstLossPct(p.depositST, p.minCoveragePct);
+          if (!(Number.isFinite(p.depositJT) && p.depositJT > 0 && Math.abs(p.depositJT - derivedJT) < 1e-9)) violations++;
+        } else if (!(Number.isFinite(p.depositJT) && p.depositJT >= 50 && p.depositJT <= 10000 && p.depositJT % 50 === 0)) {
+          violations++;
+        }
       }
     }
   }

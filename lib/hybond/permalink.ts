@@ -102,7 +102,10 @@ export function stateFromQuery(q: Query): PermalinkState {
     };
   } else {
     const jt = num("jt");
-    if (jt !== null) params.depositJT = snap(jt, JT_STEP, JT_MIN, JT_MAX);
+    // Once Junior is manually controlled, even a missing or malformed value must fall
+    // on the slider's range/step. The linked default can be fractional because it is a
+    // derived read-only value, not a value selected by that control.
+    params.depositJT = snap(jt ?? params.depositJT, JT_STEP, JT_MIN, JT_MAX);
   }
 
   const indexForDate = (date: string | null, fallback: number): number => {

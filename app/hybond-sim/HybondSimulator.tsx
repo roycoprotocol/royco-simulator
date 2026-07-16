@@ -709,7 +709,7 @@ export default function HybondSimulator({ initialQuery }: { initialQuery: Initia
         label: r.label,
         // e.g. "20% actual first-loss (18% minimum coverage, the smallest cushion,
         // Junior $250), the shortest 16-day
-        // observation, and the largest 75% share of Senior yield to Junior."
+        // observation, and the largest share of Senior yield to Junior."
         setup: `${fmtTrim(r.genesisFirstLossPct, 2)}% actual first-loss (${r.minCoveragePct}% minimum coverage, ${cushion} cushion, Junior ${fmtUsd0(r.depositJT)}), ${term} ${r.observationDays}-day observation, and ${share} ${r.seniorShareToJuniorPct}% share of Senior yield to Junior.`,
         // e.g. "Junior ends at 264.96 (+21.5%/yr), the highest of the three, with 4 erased
         // recovery claims, the most of the three. Senior is untouched."
@@ -737,7 +737,7 @@ export default function HybondSimulator({ initialQuery }: { initialQuery: Initia
   // whole pool, i.e. dollars absorbed per $100 of market exposure. This is a DIFFERENT
   // quantity from minCoveragePct, which is the contractual FLOOR the coverage ratio is held
   // to (engine.ts:182 — utilization <= 1 iff jtEff >= minCoverage * exposure). At the linked
-  // defaults they read 33.33% vs 30%; once Junior is unlinked they decouple entirely. The
+  // defaults they read 22.22% vs 20%; once Junior is unlinked they decouple entirely. The
   // hint below states both rather than asserting the floor as if it were the protection.
   const genesisFirstLossPct = useMemo(() => {
     const s0 = result.steps[0];
@@ -1046,7 +1046,7 @@ export default function HybondSimulator({ initialQuery }: { initialQuery: Initia
       '',
       'Chosen market terms',
       // The MINIMUM coverage ratio, not the protection actually posted at genesis: those are
-      // different quantities (33.33% vs 30% at the defaults) and diverge once Junior is
+      // different quantities (22.22% vs 20% at the defaults) and diverge once Junior is
       // unlinked, so both are emitted, each named for what it is.
       `minCoverageRatio: ${params.minCoveragePct}%   // contractual floor: minCoverageWAD`,
       `genesisFirstLossProtection: ${genesisFirstLossPct.toFixed(2)}%   // actual, Junior effective NAV / market exposure at genesis`,
@@ -1220,9 +1220,12 @@ export default function HybondSimulator({ initialQuery }: { initialQuery: Initia
           boxShadow: '0 34px 70px rgba(60,45,28,.045)',
         }}
       >
-        <div className="grid grid-cols-1 lg:grid-cols-2" style={{ gap: 10 }}>
+        <div
+          className="grid grid-cols-1 min-[621px]:grid-cols-2 min-[981px]:grid-cols-[minmax(0,1fr)_minmax(185px,220px)_minmax(185px,220px)]"
+          style={{ gap: 10 }}
+        >
           {/* left: description */}
-          <div>
+          <div className="min-[621px]:col-span-2 min-[981px]:col-span-1">
             <Eyebrow>Overview</Eyebrow>
             <h2
               className="mt-2"
@@ -1237,7 +1240,7 @@ export default function HybondSimulator({ initialQuery }: { initialQuery: Initia
               {rangeTitle}
             </h2>
             {/* Descriptor, port of tenbin-sims/index.html:702-704. */}
-            <p className="mt-3" style={{ color: C.muted, fontSize: 14, lineHeight: 1.6 }}>
+            <p className="mt-2" style={{ color: C.muted, fontSize: 12.5, lineHeight: 1.38 }}>
               {seniorProtected ? (
                 <>
                   Current {activeScenarioName} terms pass the Senior hard guardrail: no historical
@@ -1258,27 +1261,24 @@ export default function HybondSimulator({ initialQuery }: { initialQuery: Initia
 
           </div>
 
-          {/* right: two KPI cards. Both notes render ALWAYS. Tenbin CSS-hides the
-              Senior note unless the guardrail fails (:46-47), which buries the pass
-              case; at 0 loss events the note is the reassurance, not noise. */}
-          <div className="grid grid-cols-2" style={{ gap: 10 }}>
-            <Kpi
-              label="Senior avg/yr"
-              value={`${fmtSignedPct(result.seniorAvgYr, 1)}/yr`}
-              valueColor={seniorProtected ? C.accent : C.danger}
-              note={
-                result.seniorLossEvents.length > 0
-                  ? `Do not use: ${result.seniorLossEvents.length} Senior loss events.`
-                  : 'No historical Senior loss events.'
-              }
-              noteColor={result.seniorLossEvents.length > 0 ? C.danger : C.kpiLabel}
-            />
-            <Kpi
-              label="Junior avg/yr"
-              value={`${fmtSignedPct(result.juniorAvgYr, 1)}/yr`}
-              note={`${fmtUsd(juniorEnd)} ending value; erased recoveries ${fmtUsd(gap)}`}
-            />
-          </div>
+          {/* Match Tenbin's compact overview: success details stay in the descriptor and
+              diagnostics below; only a failed Senior guardrail adds a tile note. */}
+          <Kpi
+            label="Senior avg/yr"
+            value={`${fmtSignedPct(result.seniorAvgYr, 1)}/yr`}
+            valueColor={seniorProtected ? C.accent : C.danger}
+            note={
+              result.seniorLossEvents.length > 0
+                ? `Do not use: ${result.seniorLossEvents.length} Senior loss events.`
+                : undefined
+            }
+            noteColor={C.danger}
+          />
+          <Kpi
+            label="Junior avg/yr"
+            value={`${fmtSignedPct(result.juniorAvgYr, 1)}/yr`}
+            valueColor={C.text}
+          />
         </div>
       </section>
 
@@ -1463,8 +1463,8 @@ export default function HybondSimulator({ initialQuery }: { initialQuery: Initia
                 {/* Every claim here is about THIS configuration and comes from this run. An
                     earlier version generalised the default path's peak utilization into a claim
                     that the exit could never open "at any setting of this slider", which other
-                    configurations falsify outright (Aggressive with fixed Junior peaks at 1.3963
-                    and does open the exit). One path cannot support a global claim. */}
+                    configurations falsify outright (an aggressive fixed-Junior configuration can
+                    open the exit). One path cannot support a global claim. */}
                 <p className="mt-1.5" style={{ color: C.kpiLabel, fontSize: 11, lineHeight: 1.5 }}>
                   Derived read, for this configuration: coverage utilization{' '}
                   {coverageUtilUnbounded ? (
