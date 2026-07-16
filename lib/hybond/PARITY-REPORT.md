@@ -49,6 +49,21 @@ published checkpoint. Every drawdown date, coverage-IL step, and market-state tr
 exercised in Group F above is therefore an artifact of that sequencing choice, not observed
 history.
 
+**Checkpoint source.** All five (+9.69, -5.68, +12.22, +12.03, +9.33) are read from a single
+published row:
+
+- BNY "Global Short-Dated High Yield Bond" strategy overview PDF:
+  <https://www.bny.com/assets/investments/imemea/pdfs/bny-mellon-global-short-dated-high-yield-bond-strategy-overview-sept-2026.pdf>
+- Table **"12-month returns (%)"**, row **"Global short dated high yield bond composite"**.
+- Footnote: *"Source: Insight as at 30 June 2025. Performance calculated as total return,
+  income reinvested, gross of fees, in USD."*
+
+No management-fee figure is quoted in this repo. An earlier "1.00% management fee" claim in
+`scenarios.ts` and the simulator footer was single-sourced from OpenEden docs, could not be
+corroborated against a primary source, and was removed rather than cited. The qualitative
+statement that HYBOND's management fee and the fund's own charges would reduce these
+gross-of-fees returns stands without a specific number attached.
+
 HYBOND itself launched 1 April 2026 and has no multi-year NAV history to compare against. No
 Royco market over HYBOND has been announced; `/hybond-sim` is an illustration of the tranche
 mechanism applied to a HYBOND-like underlying, not a real or announced product. None of this
