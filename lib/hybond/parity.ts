@@ -5,12 +5,20 @@
  * Run: npx tsx lib/hybond/parity.ts
  *
  * The golden vectors are emitted by lib/hybond/harness/HybondVectorGen.t.sol, which drives the
- * REAL RoycoDayAccountant (~/royco-day, commit e6955e8) over HYBond's ACTUAL 61-point monthly
- * NAV series with HYBond's DEFAULT params. This runner mirrors that harness exactly: same
- * config (built from HYBOND_DEFAULT_PARAMS via the app's own buildConfig, not a hand-copy),
- * same genesis seeding (JT_DEPOSIT then ST_DEPOSIT), and the same raw-NAV driving as
- * lib/try/backtest.ts (Senior fixed capital indexed off price[0]; Junior carried and scaled
- * step-to-step), with maintainJuniorCoverage disabled so the RAW engine sync path is proven.
+ * REAL RoycoDayAccountant (~/royco-day, commit e6955e8) over HYBond's ACTUAL REAL daily NAV
+ * series (2,394 business days) with HYBond's DEFAULT (Balanced) params. This runner mirrors
+ * that harness exactly: same config (built from HYBOND_DEFAULT_PARAMS via the app's own
+ * buildConfig, not a hand-copy), same genesis seeding (JT_DEPOSIT then ST_DEPOSIT), and the
+ * same raw-NAV driving as lib/try/backtest.ts (Senior fixed capital indexed off price[0];
+ * Junior carried and scaled step-to-step), with maintainJuniorCoverage disabled so the RAW
+ * engine sync path is proven.
+ *
+ * SAMPLED EMISSION (see PARITY-REPORT.md): the harness syncs the accountant on ALL 2,394 daily
+ * steps, so its path/state is bit-identical to the full daily backtest, but emits a golden
+ * vector only on a documented SAMPLE (every 8th business day PLUS every IL-erasure step and
+ * every PERPETUAL<->FIXED_TERM transition -> 698 vectors). This runner therefore steps the
+ * engine over the FULL daily series and compares ONLY at the sampled indices (matched by the
+ * F_hybond_<i+1> label), like-for-like against the contract.
  *
  * Inputs are recomputed independently here from HYBOND_NAV_SERIES and asserted against the
  * inputs recorded in the golden file, so a driving drift between Solidity and TypeScript
@@ -75,24 +83,30 @@ const byLabel = new Map<string, Vector>();
 for (const v of vectors) byLabel.set(v.label, v);
 
 const series = HYBOND_NAV_SERIES;
-if (series.length !== vectors.length) {
-  throw new Error(`series/vector length mismatch: ${series.length} points vs ${vectors.length} vectors`);
-}
 
 const m = newGenesisMarket();
 const priceWad0 = toPriceWad(series[0].price);
 let jtRawCarry = jtNav0;
 let prevPriceWad = priceWad0;
 
+// Step the engine over the FULL daily series (so the path/state is bit-identical to the
+// contract, which syncs every step), and compare ONLY at the sampled indices the golden
+// actually emitted a vector for (matched by label). Every emitted vector must be hit.
 for (let i = 0; i < series.length; i++) {
   const label = `F_hybond_${i + 1}`;
   const v = byLabel.get(label);
-  if (!v) throw new Error(`missing golden vector: ${label}`);
 
   const priceWad = toPriceWad(series[i].price);
   const stRaw = mulDiv(stNav0, priceWad, priceWad0, Rounding.Floor);
   const jtRaw = i === 0 ? jtNav0 : mulDiv(jtRawCarry, priceWad, prevPriceWad, Rounding.Floor);
   const dt = i === 0 ? 0n : secondsBetween(series[i - 1].date, series[i].date);
+
+  const r = sync(m, stRaw, jtRaw, dt);
+
+  jtRawCarry = r.jtRawNAV;
+  prevPriceWad = priceWad;
+
+  if (!v) continue; // this daily step was not sampled into the golden
 
   const fails: string[] = [];
   const cmp = (name: string, got: bigint | string, want: string) => {
@@ -105,8 +119,6 @@ for (let i = 0; i < series.length; i++) {
   cmp("input.priceWad", priceWad, v.inputs.priceWad);
   cmp("input.dtSec", dt, v.inputs.dtSec);
 
-  const r = sync(m, stRaw, jtRaw, dt);
-
   cmp("stEff", r.stEffectiveNAV, v.outputs.stEff);
   cmp("jtEff", r.jtEffectiveNAV, v.outputs.jtEff);
   cmp("il", r.jtCoverageIL, v.outputs.il);
@@ -116,9 +128,10 @@ for (let i = 0; i < series.length; i++) {
   cmp("marketState", r.marketState, v.outputs.marketState);
 
   rows.push({ label, pass: fails.length === 0, fails });
+}
 
-  jtRawCarry = r.jtRawNAV;
-  prevPriceWad = priceWad;
+if (rows.length !== vectors.length) {
+  throw new Error(`matched ${rows.length} of ${vectors.length} golden vectors (some labels never hit)`);
 }
 
 // ---- Report ----
