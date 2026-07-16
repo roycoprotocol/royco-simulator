@@ -1,15 +1,32 @@
 // ---------------------------------------------------------------------------
-// scenarios.ts — srHYBond market presets, config builder, and historical
-// NAV-series fixtures for the backtest. The senior/junior tranche accounting
+// scenarios.ts — srHYBond market presets, config builder, and the historical
+// NAV series for the backtest. The senior/junior tranche accounting
 // (lib/try/engine.ts, lib/try/backtest.ts) is fund-agnostic, so this module
 // reuses it as-is via import: only the underlying fund data and UI copy
 // differ from lib/try/scenarios.ts. Config semantics (deposits, yield share,
 // observation window, min coverage) are IDENTICAL to TRY.
+//
+// Data provenance (HYBOND_NAV_SERIES): the underlying is the REAL daily NAV
+// history of the BNY Global Short-Dated High Yield Bond Fund, 2,394 business-day
+// points from inception 2016-11-30 (rebased to 1.0000) through 2026-07-02, loaded
+// verbatim from lib/hybond/data/nav-daily.json. It reconciles with Insight's
+// published composite June-to-June total returns to within 0.3%, so the path IS
+// this fund's observed daily NAV. Every drawdown date, observation period, and
+// Junior loss lock-in derived from it is therefore driven by real history: the
+// COVID Feb-Mar 2020 selloff (real max drawdown -17.45%, 2020-02-20 to 2020-03-24)
+// and the 2022 rate/high-yield selloff are events the mechanism actually sees.
+//
+// Caveats that remain true: HYBOND the token launched 1 April 2026 and has no
+// multi-year history of its own, so applying a multi-year backtest to it is
+// illustrative; no Royco market over HYBOND has been announced, so this is a
+// mechanism illustration, not a product; and HYBOND's own management fee and the
+// fund's charges would reduce these returns (no specific fee figure is asserted).
 // ---------------------------------------------------------------------------
 import { runBacktest, type PricePoint } from "@/lib/try/backtest";
 import type { MarketConfig } from "@/lib/try/engine";
 import { WAD } from "@/lib/try/engine";
 import { buildConfig } from "@/lib/try/scenarios";
+import navDaily from "./data/nav-daily.json";
 export type { PricePoint };
 
 // --- Exit buffer (HYBond-local) ---------------------------------------------
@@ -154,11 +171,10 @@ const rung = (
  * all rungs (so it did not differentiate them at all), and Aggressive carried the LONGEST
  * observation (120d) rather than the shortest.
  *
- * Known resolution limit, and why the rungs still differ: this series is sampled MONTHLY, so
- * an observation term under ~30 days cannot resolve before the next month end (obs 1/15/29/30
- * are byte-identical here). Aggressive's 16d therefore BEHAVES as ~30d. That is expected and
- * is not a collapse: cov (34/30/18 → Junior 607.14/500/250) and ys (61/62/75) still separate
- * the three runs, which were verified distinct through the accountant.
+ * The series is now REAL daily NAV, so observation terms resolve at daily resolution: 7 to
+ * 194 days are all distinct, and Aggressive's 16-day observation is a genuine 16-day term
+ * (no longer rounded up to the next month end). cov (34/30/18 → Junior 607.14/500/250), obs
+ * (60/45/16), and ys (61/62/75) all separate the three runs, verified through the accountant.
  */
 export const PRESETS: Preset[] = [
   rung("conservative", "Conservative", 34, 60, 61),
@@ -250,103 +266,30 @@ export function screenPresets(series: PricePoint[] = HYBOND_NAV_SERIES): PresetS
   });
 }
 
-// --- HYBond monthly "underlying" NAV series (composite proxy) ------------------
+// --- HYBond underlying NAV series (REAL daily NAV) -----------------------------
 //
-// This is NOT HYBOND's own NAV, and NOT the NAV of any BNY Mellon / Insight
-// share class (e.g. IE00BD5CVM01). It is a proxy built from Insight's
-// "Global short dated high yield bond composite" published rolling 12-month
-// (Jun→Jun) total returns, income reinvested, GROSS OF FEES, per Insight as
-// at 30 June 2025. A composite aggregates accounts following the strategy;
-// it is not any single fund's or share class's track record, and gross of
-// fees is not what a holder receives (HYBOND's management fee and the
-// underlying fund's own charges are not reflected here).
-//
-// No specific management-fee figure is quoted anywhere in this repo: the "1.00%"
-// this comment and the UI footer used to assert was single-sourced from OpenEden
-// docs and could not be corroborated, so it was removed rather than cited. The
-// qualitative claim (fees reduce these returns) stands on its own.
-//
-// SOURCE for the five checkpoints below (+9.69, -5.68, +12.22, +12.03, +9.33):
-//   BNY "Global Short-Dated High Yield Bond" strategy overview PDF,
-//   https://www.bny.com/assets/investments/imemea/pdfs/bny-mellon-global-short-dated-high-yield-bond-strategy-overview-sept-2026.pdf
-//   Table "12-month returns (%)", row "Global short dated high yield bond composite".
-//   Footnote: "Source: Insight as at 30 June 2025. Performance calculated as total
-//   return, income reinvested, gross of fees, in USD."
-// All five come from that single row; none are computed or inferred here.
-//
-// Only the five annual Jun→Jun checkpoints below are real, published data.
-// Method: for each Jul→Jun window, take invented raw monthly returns, then
-// apply a geometric correction factor f = (target / prod(1+r_i))^(1/12) to
-// every month in the window so the window compounds to EXACTLY the published
-// 12-month return, while preserving each month's shape/sign (f ≈ 1). The
-// resulting monthly path, and every drawdown date, observation period, and
-// Junior loss lock-in derived from it, is therefore SYNTHETIC, an artifact
-// of this sequencing choice, not observed history.
+// The REAL daily NAV history of the BNY Global Short-Dated High Yield Bond Fund,
+// loaded verbatim from lib/hybond/data/nav-daily.json: 2,394 business-day points,
+// {date:"YYYY-MM-DD", price:number}, ascending, from inception 2016-11-30 (rebased
+// to 1.0000) through 2026-07-02 (1.7318). Weekdays only; weekend/holiday gaps are
+// handled by the engine and backtest.ts (variable dt between points), exactly as
+// /internal/try runs on real daily data. The path reconciles with Insight's
+// published composite June-to-June total returns to within 0.3%, so it genuinely
+// IS this fund's observed daily NAV, not a reconstruction (see the header comment
+// for provenance and remaining caveats).
 
-interface ReturnWindow {
-  targetPct: number; // published Jun→Jun total return, %
-  rawMonthlyPct: number[]; // 12 raw monthly returns, %, Jul..Jun order
-}
-
-const RETURN_WINDOWS: ReturnWindow[] = [
-  // Jul 2020 – Jun 2021 (target +9.69%)
-  { targetPct: 9.69, rawMonthlyPct: [1.5, 1.2, 0.4, 0.3, 2.0, 1.2, 0.6, 0.5, 0.4, 0.8, 0.5, 0.4] },
-  // Jul 2021 – Jun 2022 (target -5.68%) — the 2022 rate + HY-spread selloff
-  { targetPct: -5.68, rawMonthlyPct: [0.4, 0.5, 0.2, 0.3, -0.4, 0.6, -1.2, -1.5, -0.8, -1.8, -1.0, -2.5] },
-  // Jul 2022 – Jun 2023 (target +12.22%)
-  { targetPct: 12.22, rawMonthlyPct: [2.5, 0.3, -1.5, 1.2, 1.5, 0.4, 2.0, 0.2, 0.5, 1.0, 0.6, 1.2] },
-  // Jul 2023 – Jun 2024 (target +12.03%)
-  { targetPct: 12.03, rawMonthlyPct: [1.2, 0.6, 0.2, 0.3, 1.8, 1.5, 0.8, 0.7, 0.9, 0.4, 0.9, 0.7] },
-  // Jul 2024 – Jun 2025 (target +9.33%)
-  { targetPct: 9.33, rawMonthlyPct: [1.0, 0.9, 0.9, 0.5, 0.7, 0.4, 0.9, 0.6, 0.3, -0.5, 1.0, 0.8] },
-];
-
-/** Month-end dates 2020-07 .. 2025-06, "YYYY-MM", matching RETURN_WINDOWS order. */
-function buildDates(): string[] {
-  const dates: string[] = [];
-  let year = 2020;
-  let month = 7; // July
-  for (let i = 0; i < 60; i++) {
-    dates.push(`${year}-${String(month).padStart(2, "0")}`);
-    month++;
-    if (month > 12) {
-      month = 1;
-      year++;
-    }
-  }
-  return dates;
+interface NavDailyFile {
+  points: { date: string; price: number }[];
 }
 
 /**
- * Build the deterministic monthly HYBond NAV index (base 100 at 2020-06), by
- * geometrically correcting each Jul→Jun window's raw monthly returns so it
- * compounds exactly to the window's published 12-month total return.
+ * The single full-history series: 2,394 real daily NAV points, 2016-11-30 through
+ * 2026-07-02. The UI's "Backtest window" brush SLICES this series and re-runs the
+ * market over the slice, so the window start is a real new genesis (deposits happen
+ * there, and every metric on the page recomputes over the window). This array is the
+ * full history the brush selects from, and the brush's own preview always shows all
+ * of it.
  */
-export function buildHybondNavSeries(): PricePoint[] {
-  const dates = buildDates();
-  const points: PricePoint[] = [{ date: "2020-06", price: 100 }];
-
-  let nav = 100;
-  let dateIdx = 0;
-  for (const w of RETURN_WINDOWS) {
-    const grossMonthly = w.rawMonthlyPct.map((r) => 1 + r / 100);
-    const windowGrossProduct = grossMonthly.reduce((a, b) => a * b, 1);
-    const targetGross = 1 + w.targetPct / 100;
-    const f = Math.pow(targetGross / windowGrossProduct, 1 / 12);
-    for (const g of grossMonthly) {
-      nav = nav * g * f;
-      points.push({ date: dates[dateIdx], price: nav });
-      dateIdx++;
-    }
-  }
-  return points;
-}
-
-/**
- * The single full-history series: 61 monthly points, 2020-06 through 2025-06.
- * The UI's "Backtest window" brush SLICES this series and re-runs the market over
- * the slice, so the window start is a real new genesis (deposits happen there, and
- * every metric on the page recomputes over the window). This array is the full
- * history the brush selects from, and the brush's own preview always shows all of it.
- */
-export const HYBOND_NAV_SERIES: PricePoint[] = buildHybondNavSeries();
+export const HYBOND_NAV_SERIES: PricePoint[] = (navDaily as NavDailyFile).points.map(
+  (p): PricePoint => ({ date: p.date, price: p.price }),
+);
