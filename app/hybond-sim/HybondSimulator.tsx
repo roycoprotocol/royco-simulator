@@ -1110,32 +1110,6 @@ export default function HybondSimulator({ initialQuery }: { initialQuery: Initia
         </button>
       </section>
 
-      {/* ================= 2b. PROVENANCE DISCLOSURE ================= */}
-      <section
-        style={{ background: C.cardBg, border: `1px solid ${C.border}`, borderRadius: 0 }}
-        className="p-6"
-      >
-        <Eyebrow>What this is, and what it is not</Eyebrow>
-        <p className="mt-3" style={{ color: C.text, fontSize: 14, lineHeight: 1.7 }}>
-          This is a counterfactual, not a track record. HYBOND launched on 1 April 2026 and has
-          no multi-year history. The underlying series here is a proxy built from Insight&apos;s
-          Global Short-Dated High Yield Bond composite, gross of fees, as reported by Insight as
-          at 30 June 2025. A composite aggregates accounts following the strategy, it is not the
-          NAV of any share class, and gross of fees is not what a holder receives. HYBOND&apos;s
-          1.00% management fee and the fund&apos;s own charges would reduce these returns.
-        </p>
-        <p className="mt-3" style={{ color: C.text, fontSize: 14, lineHeight: 1.7 }}>
-          Only five annual checkpoints, June to June, come from published data. The month to
-          month path between them is synthetic, so every drawdown date, observation period, and
-          Junior loss lock-in shown here is an artifact of that sequencing rather than observed
-          history.
-        </p>
-        <p className="mt-3" style={{ color: C.text, fontSize: 14, lineHeight: 1.7 }}>
-          No Royco market over HYBOND has been announced. This is an illustration of the
-          mechanism, not a product.
-        </p>
-      </section>
-
       {/* ================= 3. OVERVIEW ================= */}
       <section
         style={{
@@ -2160,13 +2134,34 @@ export default function HybondSimulator({ initialQuery }: { initialQuery: Initia
       </section>
 
       {/* ================= FOOTER ================= */}
-      <footer style={{ color: C.kpiLabel, fontSize: 11, lineHeight: 1.6 }} className="pb-8">
-        Backtest math is the Royco Day accountant, proven wei-exact against the contract on
-        this series (61/61 vectors). Underlying series is a proxy built from Insight&apos;s
-        Global Short-Dated High Yield Bond composite, total return, gross of fees, per Insight
-        as at 30 June 2025. Only the five annual June checkpoints are published data, monthly
-        sequencing is synthetic. Parameters illustrative, pending accountant sign-off
-        (OPEN-QUESTIONS).
+      {/* Provenance lives here as small print rather than as a card above the fold. The
+          substance is unchanged: what the series is, what it is not, and what it cannot
+          show. */}
+      <footer
+        style={{ color: C.kpiLabel, fontSize: 11, lineHeight: 1.6 }}
+        className="pb-8 border-t pt-4"
+      >
+        <p style={{ borderColor: C.border }}>
+          <strong style={{ fontWeight: 600 }}>What this is, and what it is not.</strong> This is
+          a counterfactual, not a track record. HYBOND launched on 1 April 2026 and has no
+          multi-year history. The underlying series is a proxy built from Insight&apos;s Global
+          Short-Dated High Yield Bond composite, total return, gross of fees, per Insight as at
+          30 June 2025. A composite aggregates accounts following the strategy, it is not the
+          NAV of any share class, and gross of fees is not what a holder receives. HYBOND&apos;s
+          1.00% management fee and the fund&apos;s own charges would reduce these returns.
+        </p>
+        <p className="mt-2">
+          Only five annual checkpoints, June to June, come from published data. The month to
+          month path between them is synthetic, so every drawdown date, observation period, and
+          Junior loss lock-in shown here is an artifact of that sequencing rather than observed
+          history. No Royco market over HYBOND has been announced. This is an illustration of
+          the mechanism, not a product.
+        </p>
+        <p className="mt-2">
+          Backtest math is the Royco Day accountant, proven wei-exact against the contract on
+          this series (61/61 vectors). Parameters illustrative, pending accountant sign-off
+          (OPEN-QUESTIONS).
+        </p>
       </footer>
     </div>
   );
