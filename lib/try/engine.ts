@@ -103,6 +103,8 @@ export interface SyncResult {
    * gains recover the IL.
    */
   jtCoverageILErased: bigint;
+  /** Compatibility name used by the current TRY reporting layer. */
+  jtCoverageImpermanentLossErased: bigint;
   coverageUtilWad: bigint;
   ltLiquidityPremium: bigint;
   stProtocolFee: bigint;
@@ -540,6 +542,7 @@ export function sync(state: MarketState_Internal, newStRawNAV: bigint, newJtRawN
     jtEffectiveNAV: r.jtEffectiveNAV,
     jtCoverageIL: r.jtCoverageImpermanentLoss,
     jtCoverageILErased: r.jtCoverageImpermanentLossErased,
+    jtCoverageImpermanentLossErased: r.jtCoverageImpermanentLossErased,
     coverageUtilWad: r.coverageUtilizationWAD,
     ltLiquidityPremium: r.ltLiquidityPremium,
     stProtocolFee: r.stProtocolFee,

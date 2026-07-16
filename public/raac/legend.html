@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Dawn Market Builder — Plain-language legend</title>
+<style>
+:root{--sen:#8E7355;--jun:#1B1A17;--ink:#171511;--mut:#6D6860;--line:#E8E2D8;--bg:#FBFAF7;--panel:#FFFDF9;--accent:#967756;--green:#319C61;--red:#8F4D42}
+*{box-sizing:border-box}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--ink);
+background-color:var(--bg);background-image:linear-gradient(rgba(150,119,86,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(150,119,86,.05) 1px,transparent 1px);
+background-size:42px 42px;font-size:15px;line-height:1.55;border-top:6px solid #11100E}
+.wrap{max-width:820px;margin:0 auto;padding:26px 22px 70px}
+a.back{display:inline-block;font-size:12px;text-transform:uppercase;letter-spacing:.14em;color:var(--accent);font-weight:600;text-decoration:none;margin-bottom:16px}
+a.back:hover{text-decoration:underline}
+.topline{display:flex;align-items:center;gap:9px;color:var(--accent);font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.26em;margin-bottom:8px}
+.topline span{width:7px;height:7px;border-radius:50%;background:var(--green);display:inline-block}
+h1{font-family:Georgia,"Times New Roman",serif;font-weight:400;font-size:clamp(30px,4vw,42px);line-height:1.03;letter-spacing:-.02em;margin:0 0 8px}
+.lede{color:var(--mut);font-size:15.5px;max-width:640px;margin:0 0 26px}
+h2{font-family:Georgia,"Times New Roman",serif;font-weight:400;font-size:23px;margin:34px 0 4px;letter-spacing:-.01em}
+h2 .n{color:var(--accent);font-size:13px;font-family:-apple-system,sans-serif;font-weight:700;letter-spacing:.14em;text-transform:uppercase;display:block;margin-bottom:2px}
+.card{background:var(--panel);border:1px solid var(--line);padding:4px 18px;margin-top:12px;box-shadow:0 20px 44px rgba(60,45,28,.04)}
+.term{padding:14px 0;border-bottom:1px solid var(--line)}
+.term:last-child{border-bottom:0}
+.term b{font-size:15.5px;color:var(--ink)}
+.term .tag{display:inline-block;font-size:10px;text-transform:uppercase;letter-spacing:.1em;color:var(--accent);border:1px solid var(--line);padding:1px 6px;margin-left:8px;vertical-align:middle;border-radius:2px}
+.term p{margin:5px 0 0;color:var(--mut)}
+.term .eg{margin-top:6px;font-size:13.5px;color:var(--ink);background:rgba(150,119,86,.06);border-left:2px solid var(--accent);padding:6px 10px}
+.sr{color:var(--sen);font-weight:700}.jr{color:var(--jun);font-weight:700}
+.foot{margin-top:40px;color:var(--mut);font-size:12.5px;border-top:1px solid var(--line);padding-top:14px}
+</style></head><body>
+<div class="wrap">
+<a class="back" href="/raac">← Back to the simulator</a>
+<div class="topline"><span></span>Royco · Dawn Market Design</div>
+<h1>Plain-language legend</h1>
+<p class="lede">Every term in the simulator, explained as simply as possible. No finance background needed. If a word on the screen looks technical, it's explained here.</p>
+
+<h2><span class="n">Start here</span>The one big idea</h2>
+<div class="card">
+<div class="term"><b>Tranching (splitting risk)</b>
+<p>Take one investment and split it into two slices with different risk. One slice is made <b>safe</b>, the other takes the <b>hits first</b> but is paid extra for it. That's the whole product. In this tool the safe slice is the <span class="sr">Senior</span> and the risky slice is the <span class="jr">Junior</span>.</p></div>
+<div class="term"><b>Base strategy</b>
+<p>The underlying investment being split, before any slicing. Its value goes up and down over time. Everything the Senior and Junior earn or lose comes from this one line.</p>
+<div class="eg">Here the base strategy is a Curve liquidity-pool position: its value in dollars, day by day.</div></div>
+</div>
+
+<h2><span class="n">The two slices</span>Senior &amp; Junior</h2>
+<div class="card">
+<div class="term"><b class="sr">Senior tranche</b> <span class="tag">the safe side</span>
+<p>The protected slice. It only loses money <em>after</em> the Junior's cushion is completely used up. In exchange for that safety it earns a steadier, usually lower return. Think of it as the senior lender who gets paid first.</p></div>
+<div class="term"><b class="jr">Junior tranche</b> <span class="tag">the risky side</span>
+<p>The first-loss slice. If the base strategy drops, the Junior absorbs the loss first to shield the Senior. In return it earns <em>extra</em> yield. It can do very well or get wiped out. Think of it as the investor who takes the risk for a bigger reward.</p></div>
+<div class="term"><b>First-loss cushion / coverage</b> <span class="tag">a % you set</span>
+<p>How big the Junior's protective buffer is, as a share of the market. A 40% cushion means the base strategy can fall about 40% before the Senior feels anything — the Junior eats that first. Bigger cushion = safer Senior, but a thinner Junior that swings more.</p></div>
+</div>
+
+<h2><span class="n">The dials</span>Terms you choose</h2>
+<div class="card">
+<div class="term"><b>First-loss coverage (%)</b>
+<p>The size of the Junior cushion above. Higher = Senior better protected.</p></div>
+<div class="term"><b>Observation period (days)</b>
+<p>When the Junior falls behind, it gets a grace window to recover before the loss is locked in. Longer window = more chances for the Junior to bounce back, but the Senior waits longer to be sure it's safe.</p></div>
+<div class="term"><b>Yield share to Junior (%)</b>
+<p>What slice of the Senior's yield is handed to the Junior as its reward for taking the first losses. Higher = Junior earns more (and is more attractive to fill), Senior keeps less.</p></div>
+<div class="term"><b>Senior exit buffer</b>
+<p>A safety trip-wire: if the Junior cushion gets dangerously thin, the Senior is allowed to exit early to protect itself. The buffer is how much cushion must remain before that exit unlocks.</p></div>
+<div class="term"><b>Self-liquidation bonus</b>
+<p>A small extra reward paid to Seniors who actually take that early exit, to encourage an orderly unwind.</p></div>
+</div>
+
+<h2><span class="n">The yield</span>Where the return comes from</h2>
+<div class="card">
+<div class="term"><b>Yield</b>
+<p>The income the investment throws off over time (fees, rewards), separate from whether its price goes up or down.</p></div>
+<div class="term"><b>Amplified yield (Convex / StakeDAO)</b>
+<p>Convex and StakeDAO are services that sit on top of a Curve position and <em>boost</em> its yield with extra reward tokens — without changing the price risk. So the Junior can earn a much fatter return for taking the same drawdown. In this market that boost is the bulk of the yield.</p></div>
+<div class="term"><b>APY</b>
+<p>Annual Percentage Yield — the yield expressed as a per-year rate. 28% APY ≈ earning 28% over a year if it held.</p></div>
+</div>
+
+<h2><span class="n">The history chart</span>What the lines mean</h2>
+<div class="card">
+<div class="term"><b class="sr">Senior share price</b> &amp; <b class="jr">Junior share price</b>
+<p>What $100 put into each slice would be worth over time, given the historical ups and downs. The Senior line stays smoother; the Junior line swings much more.</p></div>
+<div class="term"><b>Base strategy line</b>
+<p>The underlying value before splitting — the raw material both slices are made from.</p></div>
+<div class="term"><b>Observation period (shaded band)</b>
+<p>A stretch where the Junior was behind and inside its grace window, trying to recover.</p></div>
+<div class="term"><b>Junior recovery erased</b>
+<p>The grace window ran out before the Junior fully recovered, so that pending recovery was written off. It's a realized cost to the Junior.</p></div>
+<div class="term"><b>Senior loss event</b> <span class="tag">the red flag</span>
+<p>A moment where losses were so deep the Junior cushion was fully used and the <span class="sr">Senior</span> itself took a hit. For the product to be sound, this should ideally <b>never</b> happen.</p></div>
+</div>
+
+<h2><span class="n">The scorecard</span>Outcome metrics</h2>
+<div class="card">
+<div class="term"><b>Drawdown / worst drop</b>
+<p>The biggest fall from a peak to a later low. "Junior worst drop −77%" means at some point the Junior was down 77% from its high.</p></div>
+<div class="term"><b>Claims erased / claims value erased</b>
+<p>How many Junior recoveries were written off (see "recovery erased"), and their total dollar value.</p></div>
+<div class="term"><b>Senior loss events</b>
+<p>How many times the Senior was hit. <b>0 is the goal.</b></p></div>
+<div class="term"><b>avg/yr &amp; total (CAGR)</b>
+<p>The return expressed as an average per year, and over the whole period. Over very short histories the per-year number can look extreme — read it with the total.</p></div>
+</div>
+
+<h2><span class="n">The crystal ball</span>Monte Carlo &amp; GO/NO-GO</h2>
+<div class="card">
+<div class="term"><b>Monte Carlo</b>
+<p>Instead of guessing one future, the tool rolls the dice thousands of times to draw thousands of <em>possible</em> futures, then looks at the whole spread of outcomes. It answers "what usually happens, and how bad can the bad cases get?"</p></div>
+<div class="term"><b>Price volatility</b>
+<p>How jumpy the price is, per year. Higher volatility = wider swings = more chance of a deep drawdown. A calm market might be 20%; a wild one 60%+.</p></div>
+<div class="term"><b>Normalized (ex-tails) vs Full history</b>
+<p>Two ways to set that volatility. <b>Normalized</b> strips out the handful of extreme "black-swan" days to estimate a calmer, everyday level. <b>Full history</b> keeps everything, including the crash. Use normalized if you think the crash was a one-off.</p></div>
+<div class="term"><b>Price drift</b>
+<p>Your assumption for the price's average <em>direction</em> over the horizon (yield aside). <b>0% = sideways</b> (goes nowhere on average, just wiggles). Positive = you expect it to rise; negative = to keep falling.</p></div>
+<div class="term"><b>Horizon</b>
+<p>How far into the future the simulation looks, in days. 365 = one year of possible futures.</p></div>
+<div class="term"><b>Fan chart &amp; 10–90% band</b>
+<p>The shaded fan shows the range of outcomes: the middle line is the typical (median) path, and the band covers the middle 80% of futures (10th to 90th). A wide band = very uncertain.</p></div>
+<div class="term"><b>P(Senior loss)</b>
+<p>The chance, across all those simulated futures, that the Senior takes any loss. Lower is better — the launch rule wants this under 5%.</p></div>
+<div class="term"><b>E[Junior] / Junior mean</b>
+<p>The average ending value of a $100 Junior across all futures. Above $100 means it's expected to make money.</p></div>
+<div class="term"><b>GO / NO-GO</b>
+<p>The bottom-line verdict on whether it's worth launching. <b style="color:var(--green)">GO</b> means it clears all the launch checks (Senior stays safe, Junior is expected to profit). <b style="color:var(--red)">NO-GO</b> means it fails at least one.</p></div>
+<div class="term"><b>Coverage scenarios table</b>
+<p>Runs the same simulation at several cushion sizes at once, so you can see the smallest cushion that turns the market into a GO.</p></div>
+</div>
+
+<div class="foot">Illustrative model for market design, not investment advice. Nothing here is a promise of returns.</div>
+</div>
+</body></html>

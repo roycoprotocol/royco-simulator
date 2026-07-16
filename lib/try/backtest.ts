@@ -132,6 +132,22 @@ export interface SeniorLossEvent {
   lossIndexPts: number;
 }
 
+/** Compatibility reporting shape used by the current TRY page. */
+export interface ObservationRun {
+  startDate: string;
+  endDate: string;
+  strategyDrawdownPct: number;
+}
+
+export interface PerYearRow {
+  year: string;
+  baseReturn: number;
+  seniorReturn: number;
+  juniorReturn: number;
+  nonObsPct: number;
+  obsEvents: number;
+}
+
 export interface BacktestResult {
   steps: BacktestStep[];
   years: number; // total horizon in years
@@ -166,6 +182,15 @@ export interface BacktestResult {
   seniorLossEvents: SeniorLossEvent[];
   /** Rising edges of coverageUtilWad crossing the liquidation threshold (edge-gated). */
   exitTriggerHits: number;
+  /** Current TRY-page reporting aliases, derived from the same certified steps. */
+  juniorLossRealizedEvents: number;
+  juniorCapitalLost: number;
+  strategyMaxDrawdown: number;
+  observationRuns: ObservationRun[];
+  nonObservationPct: number;
+  maxObservationPeriodDays: number;
+  perYear: PerYearRow[];
+  juniorIfKept: number[];
 }
 
 const YEAR_SECONDS = 365.25 * 24 * 60 * 60;
@@ -376,6 +401,24 @@ function summarize(steps: BacktestStep[], series: PricePoint[], config: MarketCo
     yearlyObservationTriggers[y] = (yearlyObservationTriggers[y] ?? 0) + 1;
   }
 
+  const erasureEvents = buildErasureEvents(steps);
+  const maxObservedObservationDays = observationPeriods.reduce((mx, p) => Math.max(mx, p.days), 0);
+  const observationRuns: ObservationRun[] = observationPeriods.map((period) => {
+    const launch = period.aIndex > 0 ? steps[period.aIndex - 1].priceIndex : steps[period.aIndex].priceIndex;
+    let trough = launch;
+    for (let i = period.aIndex; i <= period.bIndex; i++) trough = Math.min(trough, steps[i].priceIndex);
+    return {
+      startDate: period.startDate,
+      endDate: period.endDate,
+      strategyDrawdownPct: launch > 0 ? Math.max(0, ((launch - trough) / launch) * 100) : 0,
+    };
+  });
+  let cumulativeErased = 0;
+  const juniorIfKept = steps.map((step) => {
+    cumulativeErased += toNum(step.ilErased);
+    return step.jtIndex + (step.jtNavPerIndexPt > 0 ? cumulativeErased / step.jtNavPerIndexPt : 0);
+  });
+
   return {
     steps,
     years,
@@ -394,13 +437,21 @@ function summarize(steps: BacktestStep[], series: PricePoint[], config: MarketCo
     calendar,
     observationPeriods,
     nonObservationPeriods,
-    maxObservedObservationDays: observationPeriods.reduce((mx, p) => Math.max(mx, p.days), 0),
+    maxObservedObservationDays,
     yearlyObservationDays,
     yearlyObservationTriggers,
     outsideObservationPct,
-    erasureEvents: buildErasureEvents(steps),
+    erasureEvents,
     seniorLossEvents: buildSeniorLossEvents(steps),
     exitTriggerHits: countExitTriggerHits(steps, config),
+    juniorLossRealizedEvents: erasureEvents.length,
+    juniorCapitalLost: steps.reduce((sum, step) => sum + toNum(step.ilErased), 0),
+    strategyMaxDrawdown: maxDrawdown(steps.map((s) => s.priceIndex)),
+    observationRuns,
+    nonObservationPct: outsideObservationPct,
+    maxObservationPeriodDays: maxObservedObservationDays,
+    perYear: buildPerYear(steps),
+    juniorIfKept,
   };
 }
 
@@ -606,6 +657,42 @@ function buildCalendar(steps: BacktestStep[]): CalendarRow[] {
   return rows;
 }
 
+function buildPerYear(steps: BacktestStep[]): PerYearRow[] {
+  const byYear = new Map<string, BacktestStep[]>();
+  for (const step of steps) {
+    const year = step.date.slice(0, 4);
+    if (!byYear.has(year)) byYear.set(year, []);
+    byYear.get(year)!.push(step);
+  }
+  const rows: PerYearRow[] = [];
+  let prevSt = 100;
+  let prevJt = 100;
+  let prevStrategy = 100;
+  let previousInObservation = false;
+  for (const [year, yearSteps] of [...byYear.entries()].sort()) {
+    const end = yearSteps[yearSteps.length - 1];
+    let observationEntries = 0;
+    let nonObservationSteps = 0;
+    for (const step of yearSteps) {
+      if (step.inObservation && !previousInObservation) observationEntries++;
+      if (!step.inObservation) nonObservationSteps++;
+      previousInObservation = step.inObservation;
+    }
+    rows.push({
+      year,
+      baseReturn: end.priceIndex / prevStrategy - 1,
+      seniorReturn: end.stIndex / prevSt - 1,
+      juniorReturn: end.jtIndex / prevJt - 1,
+      nonObsPct: (nonObservationSteps / yearSteps.length) * 100,
+      obsEvents: observationEntries,
+    });
+    prevSt = end.stIndex;
+    prevJt = end.jtIndex;
+    prevStrategy = end.priceIndex;
+  }
+  return rows;
+}
+
 function maxDrawdown(series: number[]): number {
   let peak = -Infinity;
   let mdd = 0;
@@ -642,5 +729,13 @@ function emptyResult(): BacktestResult {
     erasureEvents: [],
     seniorLossEvents: [],
     exitTriggerHits: 0,
+    juniorLossRealizedEvents: 0,
+    juniorCapitalLost: 0,
+    strategyMaxDrawdown: 0,
+    observationRuns: [],
+    nonObservationPct: 0,
+    maxObservationPeriodDays: 0,
+    perYear: [],
+    juniorIfKept: [],
   };
 }

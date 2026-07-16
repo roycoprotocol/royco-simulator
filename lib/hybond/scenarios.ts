@@ -9,9 +9,7 @@
 import { runBacktest, type PricePoint } from "@/lib/try/backtest";
 import type { MarketConfig } from "@/lib/try/engine";
 import { WAD } from "@/lib/try/engine";
-import { buildConfig, TRY_DEFAULT_PARAMS, type TryParams } from "@/lib/try/scenarios";
-
-export { buildConfig };
+import { buildConfig } from "@/lib/try/scenarios";
 export type { PricePoint };
 
 // --- Exit buffer (HYBond-local) ---------------------------------------------
@@ -60,7 +58,12 @@ export function juniorFromFirstLossPct(depositST: number, minCoveragePct: number
 export const OBSERVATION_DAYS_MIN = 7;
 export const OBSERVATION_DAYS_MAX = 194;
 
-export interface HybondParams extends TryParams {
+export interface HybondParams {
+  depositST: number;
+  depositJT: number;
+  seniorShareToJuniorPct: number;
+  observationDays: number;
+  minCoveragePct: number;
   /** Junior's headroom before coverage is force-liquidated, %. */
   exitBufferPct: number;
   /** When true, depositJT is derived from minCoveragePct via juniorFromFirstLossPct. */
@@ -74,19 +77,25 @@ export interface HybondParams extends TryParams {
  * so it is computed here rather than hand-set.
  */
 export const HYBOND_DEFAULT_PARAMS: HybondParams = {
-  ...TRY_DEFAULT_PARAMS,
+  depositST: 1000,
   exitBufferPct: 5, // Tenbin's default → 20e18
   linkJuniorToFirstLoss: true,
   minCoveragePct: 30,
   observationDays: 45,
   seniorShareToJuniorPct: 62,
-  depositJT: juniorFromFirstLossPct(TRY_DEFAULT_PARAMS.depositST, 30),
+  depositJT: juniorFromFirstLossPct(1000, 30),
 };
 
 /** TRY's config plus HYBond's exit-buffer-derived liquidation threshold. */
 export function buildHybondConfig(p: HybondParams): MarketConfig {
   return {
-    ...buildConfig(p),
+    ...buildConfig({
+      firstLossPct: (p.depositJT / (p.depositST + p.depositJT)) * 100,
+      observationDays: p.observationDays,
+      seniorShareToJuniorPct: p.seniorShareToJuniorPct,
+      juniorBufferRemainingPct: p.minCoveragePct,
+      seniorExitBonusPct: 0.25,
+    }),
     coverageLiquidationUtilizationWAD: utilWadFromBufferPct(p.exitBufferPct),
   };
 }

@@ -1,0 +1,322 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Royco Dawn — New Market Setup</title>
+<style>
+  :root{
+    color-scheme:light;
+    --paper:#FBFBF8; --surface:#FFFFFF; --surface2:#F4F2EC;
+    --ink:#17160F; --ink2:#615E55; --faint:#9A968C; --line:#E7E3D9; --line2:#EFECE3;
+    --accent:#FF7A33; --accent2:#FFC25C; --accent-soft:#FFEFE4;
+    --senior:#1E7A6B; --senior-soft:#E2F1ED;
+    --junior:#E8590C; --junior-soft:#FCE9DC;
+    --good:#1E7A6B; --amber:#B5781F; --amber-soft:#FBF1DE; --bad:#D64545; --radius:12px;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--paper);color:var(--ink);
+    font:13px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased}
+  .app{max-width:900px;margin:0 auto}
+  .hd{padding:18px 22px 14px;border-bottom:1px solid var(--line);display:flex;align-items:flex-end;gap:14px;flex-wrap:wrap}
+  .mark{display:flex;align-items:center;gap:9px}
+  .sun{width:13px;height:13px;border-radius:50%;background:radial-gradient(circle at 32% 30%,#FFC25C,var(--accent));box-shadow:0 0 0 4px var(--accent-soft)}
+  h1{margin:0;font-size:17px;font-weight:700;letter-spacing:-.2px}
+  .hd .sub{color:var(--ink2);font-size:11.5px;max-width:440px;margin-left:auto}
+  .body{padding:16px 20px 24px;display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media(max-width:760px){.body{grid-template-columns:1fr}.hd .sub{margin-left:0}}
+  .full{grid-column:1/-1}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius)}
+  .card.hero-essentials{border-color:#F2C9A6;box-shadow:0 1px 0 rgba(255,122,51,.05)}
+  .card>h2{margin:0;padding:11px 14px;font-size:11px;text-transform:uppercase;letter-spacing:1.1px;color:var(--ink);
+    border-bottom:1px solid var(--line2);display:flex;gap:8px;align-items:center;font-weight:700}
+  .card>h2 small{margin-left:auto;text-transform:none;letter-spacing:0;color:var(--faint);font-size:10.5px;font-weight:500}
+  .story{font-size:13px;line-height:1.55;padding:13px 15px;border-bottom:1px solid var(--line2);color:var(--ink2)}
+  .story b{color:var(--ink)} .story b.jt{color:var(--junior)} .story b.st{color:var(--senior)} .story b.u{color:var(--accent)}
+  .chips{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;padding:13px 15px 6px}
+  .chip{border:1px solid var(--line);border-radius:10px;padding:10px 11px}
+  .chip.s{background:var(--senior-soft);border-color:#CDE6DF} .chip.j{background:var(--junior-soft);border-color:#F6D7C2}
+  .chip .k{font-size:9.5px;text-transform:uppercase;letter-spacing:.5px;color:var(--ink2)}
+  .chip .v{font-size:22px;font-weight:800;margin-top:2px;font-variant-numeric:tabular-nums;letter-spacing:-.5px}
+  .chip.s .v{color:var(--senior)} .chip.j .v{color:var(--junior)}
+  .chip .m{font-size:10px;color:var(--faint);margin-top:1px}
+  .splitwrap{padding:8px 15px 4px}
+  .splitwrap .cap{font-size:10.5px;color:var(--ink2);font-weight:600;margin-bottom:4px;display:flex}
+  .splitwrap .cap span{margin-left:auto;color:var(--faint);font-weight:500}
+  .seg{display:flex;height:24px;border-radius:7px;overflow:hidden;border:1px solid var(--line);background:var(--surface2)}
+  .seg div{display:flex;align-items:center;justify-content:center;font-size:10.5px;font-weight:700;color:#fff;white-space:nowrap}
+  .seg .sen{background:var(--senior)} .seg .jun{background:var(--junior)}
+  .legend{display:flex;gap:13px;padding:8px 15px 0;font-size:10.5px;color:var(--ink2);flex-wrap:wrap}
+  .legend span{display:inline-flex;align-items:center;gap:5px}
+  .dot{width:8px;height:8px;border-radius:2px;display:inline-block}
+  .chartwrap{padding:2px 10px 4px;min-height:30px}
+  .chartwrap svg{display:block;max-height:170px;width:100%}
+  .dynnote{padding:0 15px 12px;font-size:10.5px;color:var(--ink2);line-height:1.4}
+  .dynnote b{color:var(--ink)}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:11px 13px;padding:13px 14px}
+  .grid.three{grid-template-columns:repeat(3,1fr)}
+  .sec{padding:13px 14px;display:flex;flex-direction:column;gap:12px}
+  .row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .row3{display:grid;grid-template-columns:repeat(3,1fr);gap:11px}
+  .subhead{font-size:10.5px;font-weight:700;color:var(--ink);line-height:1.4;text-transform:uppercase;letter-spacing:.6px}
+  .subhead span{font-weight:400;color:var(--ink2);text-transform:none;letter-spacing:0}
+  .f{display:flex;flex-direction:column;gap:4px;min-width:0}
+  .f.span{grid-column:1/-1}
+  label{font-size:11.5px;font-weight:600;display:flex;align-items:baseline;gap:5px;color:var(--ink)}
+  label .u{color:var(--faint);font-weight:500;font-size:10px}
+  .hint{color:var(--ink2);font-size:10px;line-height:1.35}
+  .inp{position:relative;display:flex;align-items:center}
+  .inp .suf{position:absolute;right:9px;color:var(--faint);font-size:11px;pointer-events:none;font-weight:600}
+  input,select{background:var(--surface);border:1px solid var(--line);border-radius:8px;color:var(--ink);
+    padding:7px 9px;font:inherit;font-size:12.5px;width:100%;transition:border .12s,box-shadow .12s}
+  .inp input{padding-right:24px}
+  input:focus,select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+  input::placeholder{color:#C4C0B6}
+  input.bad{border-color:var(--bad);box-shadow:0 0 0 3px rgba(214,69,69,.12)}
+  input[type=number]{-moz-appearance:textfield}
+  input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+  .info{display:inline-flex;align-items:center;justify-content:center;width:13px;height:13px;border-radius:50%;
+    border:1px solid var(--faint);color:var(--faint);font-size:9px;font-weight:700;cursor:help;position:relative;font-style:normal;line-height:1;flex:none}
+  .info:hover,.info:focus{border-color:var(--accent);color:var(--accent);outline:none;z-index:61}
+  .info .tip{display:none;position:absolute;left:50%;bottom:150%;transform:translateX(-50%);width:210px;
+    background:var(--ink);color:#fff;font-weight:500;font-size:10.5px;line-height:1.5;padding:8px 10px;border-radius:8px;
+    z-index:60;box-shadow:0 8px 22px rgba(0,0,0,.20);text-transform:none;letter-spacing:0;text-align:left;white-space:normal}
+  .info .tip b{color:var(--accent2)} .info .tip em{color:#cfd8d4;font-style:normal}
+  .info .tip::after{content:"";position:absolute;top:100%;left:50%;transform:translateX(-50%);border:5px solid transparent;border-top-color:var(--ink)}
+  .info:hover .tip,.info:focus .tip{display:block}
+  details.adv>summary,details.notes>summary{padding:11px 14px;cursor:pointer;font-size:11.5px;font-weight:700;color:var(--ink);list-style:none;display:flex;align-items:center;gap:7px}
+  details.adv{border-top:none}
+  details.notes{border-top:1px solid var(--line2)}
+  details.adv[open]>summary{border-bottom:1px solid var(--line2)}
+  details>summary::-webkit-details-marker{display:none}
+  details>summary::before{content:"▸";color:var(--faint);font-size:10px}
+  details[open]>summary::before{content:"▾"}
+  details>summary small{margin-left:auto;color:var(--faint);font-weight:500;font-size:10px}
+  .kv{display:grid;grid-template-columns:1fr auto;gap:5px 14px;padding:0 16px 12px;font-size:11.5px}
+  .kv .k{color:var(--ink2)} .kv .v{font-variant-numeric:tabular-nums;font-weight:600}
+  .send{padding:13px 14px 4px}
+  .send .lead{font-size:11px;color:var(--ink2);margin-bottom:9px}
+  .btns{display:flex;flex-wrap:wrap;gap:9px;padding:0 14px 12px;align-items:center}
+  button{background:var(--accent);color:#fff;border:none;border-radius:9px;padding:8px 14px;font:inherit;font-weight:700;font-size:12.5px;cursor:pointer;transition:filter .12s,transform .08s}
+  button:hover{filter:brightness(.96)} button:active{transform:translateY(1px)}
+  button.sec2{background:var(--surface);color:var(--ink);border:1px solid var(--line)}
+  button.ghost{background:transparent;color:var(--ink2);border:1px solid var(--line)}
+  .pill{font-size:10px;font-weight:700;padding:3px 8px;border-radius:20px}
+  .ok{background:var(--senior-soft);color:var(--senior)} .warn{background:#FBE3E3;color:var(--bad)} .inc{background:var(--amber-soft);color:var(--amber)}
+  textarea{width:100%;min-height:120px;background:var(--surface2);border:1px solid var(--line);border-radius:9px;color:var(--ink);
+    font:11.5px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;padding:11px;resize:vertical}
+  .applybar{display:flex;gap:8px;align-items:center;padding:8px 14px 0}
+  .toast{position:fixed;bottom:20px;left:50%;transform:translateX(-50%) translateY(18px);background:var(--ink);color:#fff;padding:10px 18px;border-radius:9px;font-weight:700;font-size:12.5px;opacity:0;pointer-events:none;transition:.22s;z-index:50}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="hd">
+    <div class="mark"><span class="sun"></span><h1>Royco Dawn — New Market Setup</h1></div>
+    <div class="sub">Fill in the <b>Essentials</b> — that's the pressing set. Curve, adaptation &amp; recovery are optional under Advanced, pre-set to Dawn defaults. Hover any ⓘ for what live markets chose.</div>
+  </div>
+
+  <div class="body">
+
+    <!-- HEADLINE -->
+    <div class="card full">
+      <h2>What depositors earn <small id="atU">—</small></h2>
+      <div class="story" id="story">—</div>
+      <div class="chips">
+        <div class="chip"><div class="k">Underlying yield</div><div class="v" id="h_r">—</div><div class="m">native APY</div></div>
+        <div class="chip s"><div class="k">Senior</div><div class="v" id="h_st">—</div><div class="m" id="h_stm">protected</div></div>
+        <div class="chip j"><div class="k">Junior</div><div class="v" id="h_jt">—</div><div class="m" id="h_jtm">first-loss</div></div>
+      </div>
+      <div class="splitwrap">
+        <div class="cap">Capital split <span>thinner junior buffer = more junior leverage</span></div>
+        <div class="seg" id="split"></div>
+      </div>
+      <div class="legend"><span><i class="dot" style="background:var(--junior)"></i>Junior</span><span><i class="dot" style="background:var(--senior)"></i>Senior</span><span><i class="dot" style="background:var(--faint)"></i>Underlying</span><span><i class="dot" style="background:var(--accent)"></i>kink</span></div>
+      <div class="chartwrap"><div id="heroChart"></div></div>
+      <div class="dynnote">The yield share is <b>dynamic</b> — it moves along the utilization curve above, and the target (Y_T) adapts over time. These curves, not a single number, define the deal.</div>
+    </div>
+
+    <!-- ESSENTIALS -->
+    <div class="card full hero-essentials">
+      <h2>Essentials <small>the pressing inputs</small></h2>
+      <div class="sec">
+        <div class="subhead">Token &amp; deployment</div>
+        <div class="row2">
+          <div class="f span"><label>Market name</label><input id="o_market" placeholder="e.g. sUSN"><div class="hint">Usually the yield-bearing token symbol.</div></div>
+          <div class="f span"><label>GitHub <span class="u">deployed token</span></label><input id="o_github" placeholder="https://github.com/…" spellcheck="false"><div class="hint">Repo / source for the token contract.</div></div>
+          <div class="f span"><label>Contract address</label><input id="o_addr" placeholder="0x…" spellcheck="false"><div class="hint">The yield-bearing token's on-chain address.</div></div>
+          <div class="f span"><label>Chain</label><select id="o_chain"><option>Ethereum</option><option>Base</option><option>Arbitrum</option><option>Optimism</option><option>Plume</option><option>Solana</option><option>Other</option></select></div>
+        </div>
+        <div class="subhead">Terms</div>
+        <div class="row3">
+          <div class="f"><label>Underlying yield <span class="u">r</span><span class="info" tabindex="0">i<span class="tip"><b>Observed, not chosen</b><br>Your asset's own APY. Across the book it spans <em>3.5%–17%</em>.</span></span></label><div class="inp"><input id="r" type="number" step="0.1" min="0" placeholder="9"><span class="suf">%</span></div><div class="hint">Asset's native APY.</div></div>
+          <div class="f"><label>Minimum coverage<span class="info" tabindex="0">i<span class="tip"><b>Live book: 2%–25%, median 10%</b><br><em>syrupUSDC 2% · sNUSD 7% · ACRED 18% · sUSDat 25%</em></span></span></label><div class="inp"><input id="cov" type="number" step="1" min="0" max="100" placeholder="10"><span class="suf">%</span></div><div class="hint">Junior first-loss buffer. Lower = more leverage.</div></div>
+          <div class="f"><label>Observation period<span class="info" tabindex="0">i<span class="tip"><b>Live book: 0–31 days</b><br>Commonly 0 or 7. Longer (30–31) for <em>APYX, Saturn, AarcBTC, sUSDat</em>.</span></span></label><div class="inp"><input id="rec_obs" type="number" step="1" min="0" placeholder="7"><span class="suf">d</span></div><div class="hint">Recovery window before protected exit.</div></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ADVANCED -->
+    <div class="card full"><details class="adv"><summary>Advanced — curve, adaptation &amp; recovery <small>optional · Dawn defaults applied</small></summary>
+      <div class="sec">
+        <div class="subhead">Yield-share schedule <span>— dynamic: the redirect % moves along the utilization curve and Y_T adapts over time</span></div>
+        <div class="row3">
+          <div class="f"><label style="font-size:10.5px">Low <span class="u">Y_0</span><span class="info" tabindex="0">i<span class="tip"><b>Usually equals Y_T</b><br>Flat share below the kink in 25 of 26 markets.</span></span></label><div class="inp"><input id="y0" type="number" step="1" min="0" max="100"><span class="suf">%</span></div></div>
+          <div class="f"><label style="font-size:10.5px">Target <span class="u">Y_T</span><span class="info" tabindex="0">i<span class="tip"><b>Live book: 4%–35%, median 11%</b><br><em>syrupUSDC 7% · sUSDai 11% · APYX 15% · ACRED 22%</em></span></span></label><div class="inp"><input id="yt" type="number" step="1" min="0" max="100"><span class="suf">%</span></div></div>
+          <div class="f"><label style="font-size:10.5px">Full <span class="u">Y_100</span><span class="info" tabindex="0">i<span class="tip"><b>Live book: 11%–70%, median ~31%</b><br><em>syrupUSDC 11% · stable vaults 31% · ACRED 59% · ynRWAx 65%</em></span></span></label><div class="inp"><input id="y100" type="number" step="1" min="0" max="100"><span class="suf">%</span></div></div>
+        </div>
+        <div class="hint">Defaulted to the book's median curve (11 / 11 / 31). Review for your asset — coverage largely implies it.</div>
+        <div class="subhead">Curve dynamics</div>
+        <div class="row2">
+          <div class="f"><label>Utilization <span class="u">kink</span><span class="info" tabindex="0">i<span class="tip"><b>Always 90%</b><br>Every live market uses a 90% target-utilization kink.</span></span></label><div class="inp"><input id="util" type="number" step="1" min="1" max="100"><span class="suf">%</span></div><div class="hint">Curve elbow &amp; readout point.</div></div>
+          <div class="f"><label>Adaptation speed<span class="info" tabindex="0">i<span class="tip"><b>Usually 40</b><br>Lower (10): <em>Makina, Pareto</em>. Higher (50): <em>AarcBTC, Saturn</em>.</span></span></label><input id="adapt" type="number" step="1" min="0"><div class="hint" id="adaptHint">How fast Y_T re-targets toward its goal.</div></div>
+        </div>
+        <div class="subhead">Recovery</div>
+        <div class="row2">
+          <div class="f"><label>Protected exit threshold<span class="info" tabindex="0">i<span class="tip"><b>Discrepancy that activates the observation period</b><br>A size, not a time. Hard pegs ~0.01% (<em>siUSD, sUSDe</em>) · RWA ~2% (<em>ACRED, mf-ONE</em>) · volatile 5–12.5% (<em>Hyperliquid, sUSDat</em>)</span></span></label><div class="inp"><input id="rec_exit" type="number" step="0.5" min="0" max="100"><span class="suf">%</span></div><div class="hint">Coverage discrepancy that starts the observation clock.</div></div>
+          <div class="f"><label>Self-liquidation bonus <span class="u">senior</span><span class="info" tabindex="0">i<span class="tip"><b>Live book: 0–1%</b><br>Liquid stables 0% · <em>sNUSD/savUSD 0.5%</em> · <em>ACRED/mf-ONE/sUSDai 1%</em></span></span></label><div class="inp"><input id="rec_bonus" type="number" step="0.5" min="0" max="100"><span class="suf">%</span></div><div class="hint">Incentive for seniors to unwind in recovery.</div></div>
+        </div>
+      </div>
+    </details></div>
+
+    <!-- MODEL DETAILS -->
+    <div class="card full"><details class="notes"><summary>Show curve &amp; model details <small style="margin-left:auto;color:var(--faint);font-weight:500">AdaptiveCurveYDM V2</small></summary>
+      <div class="legend"><span><i class="dot" style="background:#7c83ff"></i>Yield-share Y(U)</span><span><i class="dot" style="background:var(--accent)"></i>kink</span></div>
+      <div class="chartwrap"><div id="shareChart"></div></div>
+      <div class="kv" id="kv"></div>
+    </details></div>
+
+    <!-- EXPORT / IMPORT -->
+    <div class="card full">
+      <h2>Config <small id="valpill" class="pill ok"></small></h2>
+      <div class="send">
+        <div class="lead">Save your pool config to a file, copy it, or load an existing one back in to keep editing.</div>
+      </div>
+      <div class="btns">
+        <button onclick="exportJSON()">⬇ Download JSON</button>
+        <button class="sec2" onclick="copyJSON()">⧉ Copy config</button>
+        <button class="sec2" onclick="importFile()">⬆ Import config</button>
+        <button class="ghost" onclick="loadExample()">See ACRED example</button>
+        <button class="ghost" onclick="resetAll()">Clear</button>
+        <input type="file" id="importfile" accept="application/json,.json" style="display:none">
+      </div>
+      <details class="notes"><summary>View / paste config</summary>
+        <div style="padding:0 14px 4px"><textarea id="payload" spellcheck="false"></textarea></div>
+        <div class="applybar"><button class="sec2" onclick="applyPasted()">Apply pasted JSON</button><span class="hint">Paste a config above and apply it to the fields.</span></div>
+        <div style="height:12px"></div>
+      </details>
+    </div>
+
+  </div>
+</div>
+<div class="toast" id="toast">Copied</div>
+
+<script>
+// Essentials (blank, partner-filled): market, github, chain, addr, r, cov, rec_obs.
+// Advanced (defaulted): curve Y_0/Y_T/Y_100, utilization, adaptation, protected exit, self-liq bonus.
+const DEFAULTS={o_market:'',o_github:'',o_chain:'Ethereum',o_addr:'',
+  r:'',cov:'',rec_obs:'',
+  y0:11,yt:11,y100:31,util:90,adapt:40,
+  rec_exit:2,rec_bonus:1};
+const EXAMPLE={...DEFAULTS,o_market:'ACRED',r:9,cov:18,rec_obs:7,y0:22,yt:22,y100:59};
+const pctF=['r','cov','y0','yt','y100','util','rec_exit','rec_bonus'];
+const numF=pctF.concat(['adapt','rec_obs']);
+const mathF=['r','cov','y0','yt','y100','util'];
+const $=id=>document.getElementById(id);
+const cv=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+const pct=(x,d=1)=>(x*100).toFixed(d)+'%',xf=(x,d=2)=>x.toFixed(d)+'×';
+
+function yieldShare(U,p){const FD=p.yt-p.y0,FP=p.y100-p.yt,k=p.util;return U<=k?p.yt+((U-k)/(k||1e-9))*FD:p.yt+((U-k)/((1-k)||1e-9))*FP;}
+function compute(p){const U=p.util,YU=yieldShare(U,p),so=U/(p.cov||1e-9)-1,jtP=1+YU*so,stP=1-YU;
+  return{YU,so,jtP,stP,jtY:p.r*jtP,stY:p.r*stP,FD:p.yt-p.y0,FP:p.y100-p.yt};}
+
+function read(){const ui={},p={};Object.keys(DEFAULTS).forEach(k=>{const el=$(k);if(!el)return;
+  if(numF.indexOf(k)>=0){const raw=el.value;const v=raw===''?NaN:parseFloat(raw);ui[k]=v;p[k]=pctF.indexOf(k)>=0?v/100:v;}
+  else{ui[k]=el.value;p[k]=el.value;}});return{p,ui};}
+function validate(ui){let bad=0,inc=0;const rg={cov:[.01,100],util:[1,100],y0:[0,100],yt:[0,100],y100:[0,100],r:[0,500]};
+  mathF.forEach(k=>{const el=$(k),v=ui[k],r=rg[k];
+    if(isNaN(v)){el.classList.remove('bad');inc++;}
+    else if(v<r[0]||v>r[1]){el.classList.add('bad');bad++;}
+    else el.classList.remove('bad');});
+  const pl=$('valpill');
+  if(bad>0){pl.className='pill warn';pl.textContent='⚠ '+bad+' to fix';}
+  else if(inc>0){pl.className='pill inc';pl.textContent=inc+' to fill';}
+  else{pl.className='pill ok';pl.textContent='✓ complete';}}
+
+function niceMax(v){if(!isFinite(v)||v<=0)return 1;if(v<=5)return Math.ceil(v);if(v<=20)return Math.ceil(v/2)*2;if(v<=50)return Math.ceil(v/5)*5;return Math.ceil(v/10)*10;}
+function svgChart(el,cfg){const W=560,H=190,pl=42,pr=12,pt=12,pb=28,ymax=cfg.ymax,X=x=>pl+x/100*(W-pl-pr),Y=y=>H-pb-(y/ymax)*(H-pt-pb);let g='';
+  for(let i=0;i<=4;i++){const val=ymax*i/4,py=Y(val);g+='<line x1="'+pl+'" y1="'+py+'" x2="'+(W-pr)+'" y2="'+py+'" stroke="rgba(0,0,0,.07)"/>';g+='<text x="'+(pl-6)+'" y="'+(py+3)+'" text-anchor="end" font-size="9.5" fill="'+cv('--faint')+'">'+val.toFixed(ymax<10?1:0)+'%</text>';}
+  [0,25,50,75,100].forEach(xt=>{g+='<text x="'+X(xt)+'" y="'+(H-pb+14)+'" text-anchor="middle" font-size="9.5" fill="'+cv('--faint')+'">'+xt+'</text>';});
+  g+='<text x="'+((pl+W-pr)/2)+'" y="'+(H-2)+'" text-anchor="middle" font-size="9.5" fill="'+cv('--faint')+'">Utilization %</text>';
+  (cfg.vlines||[]).forEach(v=>{const px=X(v.x);g+='<line x1="'+px+'" y1="'+pt+'" x2="'+px+'" y2="'+(H-pb)+'" stroke="'+v.c+'" stroke-dasharray="4 3" stroke-width="1"/>';});
+  cfg.series.forEach(s=>{const d=s.pts.map((p,i)=>(i?'L':'M')+X(p[0]).toFixed(1)+' '+Y(p[1]).toFixed(1)).join(' ');g+='<path d="'+d+'" fill="none" stroke="'+s.c+'" stroke-width="'+(s.w||2)+'" '+(s.dash?'stroke-dasharray="5 4"':'')+' stroke-linejoin="round"/>';});
+  (cfg.markers||[]).forEach(m=>{g+='<circle cx="'+X(m.x)+'" cy="'+Y(m.y)+'" r="4" fill="'+cv('--ink')+'" stroke="#fff" stroke-width="1.5"/>';});
+  el.innerHTML='<svg viewBox="0 0 '+W+' '+H+'" preserveAspectRatio="xMidYMid meet">'+g+'</svg>';}
+
+function render(){
+  ['y0','yt','y100'].forEach(k=>{const el=$(k);if(el&&el.value!==''){const v=parseFloat(el.value);if(isFinite(v)){if(v>100)el.value='100';else if(v<0)el.value='0';}}});
+  const _sp=parseFloat($('adapt').value),_ah=$('adaptHint');
+  if(_ah){if(isFinite(_sp)&&_sp>0){const dd=365*Math.LN2/_sp;_ah.innerHTML='Y_T doubles in <b>≈ '+(dd>=10?dd.toFixed(0):dd.toFixed(1))+' days</b> of sustained max deviation (higher = faster).';}else{_ah.textContent='How fast Y_T re-targets toward its goal.';}}
+  const {p,ui}=read();validate(ui);
+  const ready=[p.r,p.cov,p.yt,p.y100,p.util].every(isFinite)&&p.cov>0;
+  if(!ready){
+    $('atU').textContent='—';$('h_r').textContent='—';$('h_st').textContent='—';$('h_jt').textContent='—';
+    $('h_stm').textContent='protected';$('h_jtm').textContent='first-loss';
+    $('story').textContent='Fill in the underlying yield and minimum coverage to see what senior and junior depositors earn.';
+    $('split').innerHTML='';$('heroChart').innerHTML='';$('shareChart').innerHTML='';$('kv').innerHTML='';
+    buildPayload(p,ui,null);return;}
+  const c=compute(p);const uTxt=pct(p.util,0);
+  $('atU').textContent='at '+uTxt+' utilization';
+  $('h_r').textContent=pct(p.r);$('h_st').textContent=pct(c.stY);$('h_jt').textContent=pct(c.jtY);
+  $('h_stm').textContent=xf(c.stP)+' · protected';$('h_jtm').textContent=xf(c.jtP)+' · first-loss';
+  $('story').innerHTML='At <b class="u">'+uTxt+'</b> utilization, a <b>'+pct(p.r)+'</b> underlying yield becomes <b class="st">'+pct(c.stY)+'</b> for seniors ('+xf(c.stP)+', upside traded for protection) and <b class="jt">'+pct(c.jtY)+'</b> for juniors ('+xf(c.jtP)+', leveraged for taking first loss).';
+  const sen=c.so>0?c.so/(c.so+1):0,jun=1-sen;
+  $('split').innerHTML='<div class="sen" style="width:'+(sen*100).toFixed(0)+'%">Senior '+(sen*100).toFixed(0)+'%</div><div class="jun" style="width:'+(jun*100).toFixed(0)+'%">Junior '+(jun*100).toFixed(0)+'%</div>';
+  const jt=[],st=[],und=[],yu=[];for(let i=0;i<=100;i++){const U=i/100,Y=yieldShare(U,p),so=U/(p.cov||1e-9)-1;jt.push([i,p.r*(1+Y*so)*100]);st.push([i,p.r*(1-Y)*100]);und.push([i,p.r*100]);yu.push([i,Y*100]);}
+  const opU=p.util*100;
+  svgChart($('heroChart'),{ymax:niceMax(Math.max.apply(null,jt.map(d=>d[1]).concat([p.r*100]))*1.05),series:[{pts:und,c:cv('--faint'),w:1.5,dash:1},{pts:st,c:cv('--senior')},{pts:jt,c:cv('--junior')}],vlines:[{x:opU,c:cv('--accent')}],markers:[{x:opU,y:c.jtY*100},{x:opU,y:c.stY*100}]});
+  svgChart($('shareChart'),{ymax:niceMax(Math.max.apply(null,yu.map(d=>d[1]))*1.1),series:[{pts:yu,c:'#7c83ff'}],vlines:[{x:opU,c:cv('--accent')}],markers:[{x:opU,y:c.YU*100}]});
+  $('kv').innerHTML=[['Yield share @ kink',pct(c.YU)],['Lower slope FD_T',c.FD.toFixed(3)],['Upper slope FP_T',c.FP.toFixed(3)],['Senior : Junior',c.so.toFixed(2)+' : 1'],['JT premium',xf(c.jtP)],['ST premium',xf(c.stP)]].map(r=>'<div class="k">'+r[0]+'</div><div class="v">'+r[1]+'</div>').join('');
+  buildPayload(p,ui,c);}
+
+const r6=x=>isFinite(x)?+x.toFixed(6):null,r4=x=>isFinite(x)?+x.toFixed(4):null,orNull=x=>isNaN(x)?null:x;
+function buildPayload(p,ui,c){$('payload').value=JSON.stringify({
+  meta:{model:'AdaptiveCurveYDM V2'},
+  market:{name:p.o_market,github:p.o_github,chain:p.o_chain,contract_address:p.o_addr},
+  market_inputs:{underlying_yield:r6(p.r),min_coverage:r6(p.cov),observation_period_days:orNull(p.rec_obs),target_utilization:r6(p.util)},
+  yield_curve:{Y_0:r6(p.y0),Y_T:r6(p.yt),Y_100:r6(p.y100),adaptation_speed:orNull(p.adapt)},
+  recovery:{protected_exit_threshold:r6(p.rec_exit),self_liquidation_bonus:r6(p.rec_bonus)},
+  projected_at_kink:c?{senior_apy:r6(c.stY),junior_apy:r6(c.jtY),senior_premium:r4(c.stP),junior_premium:r4(c.jtP),yield_share:r6(c.YU)}:null
+},null,2);}
+
+function toast(m){const t=$('toast');t.textContent=m;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),1500);}
+function copyJSON(){navigator.clipboard.writeText($('payload').value).then(()=>toast('Config copied'));}
+function exportJSON(){const {p}=read(),n=(p.o_market||'pool').replace(/[^a-z0-9]/gi,'_'),b=new Blob([$('payload').value],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(b);a.download='royco_dawn_'+n+'_config.json';a.click();toast('Downloaded');}
+
+function applyImport(obj){if(!obj||typeof obj!=='object')throw new Error('bad');
+  const cur={};Object.keys(DEFAULTS).forEach(k=>{const el=$(k);cur[k]=el?el.value:DEFAULTS[k];});
+  const m=obj.market||{},mi=obj.market_inputs||{},yc=obj.yield_curve||{},rec=obj.recovery||{};
+  const setIf=(k,v)=>{if(v!==undefined&&v!==null&&!(typeof v==='number'&&isNaN(v)))cur[k]=v;};
+  const setPct=(k,v)=>{if(typeof v==='number'&&isFinite(v))cur[k]=+(v*100).toFixed(6);};
+  setIf('o_market',(m.name!==undefined&&m.name!=='')?m.name:m.yield_bearing_token);setIf('o_github',m.github);setIf('o_chain',m.chain);setIf('o_addr',m.contract_address);
+  setPct('r',mi.underlying_yield);setPct('cov',mi.min_coverage);setPct('util',mi.target_utilization);setIf('rec_obs',mi.observation_period_days!==undefined?mi.observation_period_days:rec.max_observation_days);
+  setPct('y0',yc.Y_0);setPct('yt',yc.Y_T);setPct('y100',yc.Y_100);setIf('adapt',yc.adaptation_speed);
+  setPct('rec_exit',rec.protected_exit_threshold);setPct('rec_bonus',rec.self_liquidation_bonus);
+  setAll(cur);}
+function importFile(){const inp=$('importfile');inp.value='';inp.click();}
+function applyPasted(){try{applyImport(JSON.parse($('payload').value));toast('Config applied');}catch(e){toast('Invalid JSON');}}
+
+function setAll(v){Object.keys(v).forEach(k=>{const el=$(k);if(el)el.value=v[k];});render();}
+function loadExample(){setAll(EXAMPLE);toast('ACRED example loaded');}
+function resetAll(){setAll(DEFAULTS);toast('Cleared');}
+
+function fromURL(base){const q=new URLSearchParams(location.search),o={...base};Object.keys(DEFAULTS).forEach(k=>{if(q.has(k))o[k]=q.get(k);});return o;}
+
+document.querySelectorAll('input,select').forEach(el=>el.addEventListener('input',render));
+$('importfile').addEventListener('change',e=>{const f=e.target.files[0];if(!f)return;const rd=new FileReader();
+  rd.onload=()=>{try{applyImport(JSON.parse(rd.result));toast('Config imported');}catch(err){toast('Invalid JSON file');}};rd.readAsText(f);});
+setAll(fromURL(DEFAULTS));
+</script>
+</body>
+</html>
