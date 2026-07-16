@@ -184,6 +184,8 @@ export interface PresetScreenRow {
   observationDays: number;
   minCoveragePct: number;
   seniorShareToJuniorPct: number;
+  /** Actual Junior share of total genesis capital; distinct from the minimum coverage input. */
+  genesisFirstLossPct: number;
   /** Outcomes on this series, as run with the product's maintained-coverage assumption. */
   juniorEnd: number; // Junior index at the end of the run (100 = genesis)
   seniorEnd: number;
@@ -209,6 +211,7 @@ export function screenPresets(series: PricePoint[] = HYBOND_NAV_SERIES): PresetS
       });
     const maintained = run(true);
     const exposed = run(false);
+    const first = maintained.steps[0];
     const last = maintained.steps[maintained.steps.length - 1];
     const seniorMarkdownEvents = Math.max(
       maintained.seniorMarkdownEvents,
@@ -225,6 +228,10 @@ export function screenPresets(series: PricePoint[] = HYBOND_NAV_SERIES): PresetS
       observationDays: p.params.observationDays,
       minCoveragePct: p.params.minCoveragePct,
       seniorShareToJuniorPct: p.params.seniorShareToJuniorPct,
+      genesisFirstLossPct:
+        ((first ? Number(first.jtEff) / 1e18 : p.params.depositJT) /
+          (p.params.depositST + p.params.depositJT)) *
+        100,
       juniorEnd: last ? last.jtIndex : 100,
       seniorEnd: last ? last.stIndex : 100,
       juniorAvgYr: maintained.juniorAvgYr,

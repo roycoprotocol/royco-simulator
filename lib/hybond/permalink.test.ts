@@ -12,11 +12,13 @@
 
 import {
   HYBOND_DEFAULT_PARAMS,
+  HYBOND_NAV_SERIES,
   PRESETS,
   juniorFromFirstLossPct,
   type HybondParams,
 } from "./scenarios";
 import { queryFromState, stateFromQuery } from "./permalink";
+import type { IndexRange } from "./timeframe";
 
 let passed = 0;
 let failed = 0;
@@ -32,17 +34,25 @@ function check(name: string, cond: boolean, detail = "") {
 }
 
 const readQuery = (qs: string) => stateFromQuery(new URLSearchParams(qs));
+const fullRange: IndexRange = { a: 0, b: HYBOND_NAV_SERIES.length - 1 };
 
 /** state -> query -> state must be a fixed point. */
-function roundTrip(label: string, params: HybondParams, maintain: boolean) {
-  const qs = queryFromState(params, maintain);
+function roundTrip(
+  label: string,
+  params: HybondParams,
+  maintain: boolean,
+  range: IndexRange = fullRange,
+) {
+  const qs = queryFromState(params, maintain, range);
   const back = readQuery(qs);
   const same =
-    JSON.stringify(params) === JSON.stringify(back.params) && back.maintain === maintain;
+    JSON.stringify(params) === JSON.stringify(back.params) &&
+    back.maintain === maintain &&
+    JSON.stringify(back.range) === JSON.stringify(range);
   check(
     `${label}  ?${qs}`,
     same,
-    `\n      sent: ${JSON.stringify(params)} maintain=${maintain}\n      got : ${JSON.stringify(back.params)} maintain=${back.maintain}`,
+    `\n      sent: ${JSON.stringify(params)} maintain=${maintain} range=${JSON.stringify(range)}\n      got : ${JSON.stringify(back.params)} maintain=${back.maintain} range=${JSON.stringify(back.range)}`,
   );
 }
 
@@ -90,6 +100,7 @@ console.log("\n1. Every expressible state round-trips");
   );
 
   roundTrip("maintain=false", { ...HYBOND_DEFAULT_PARAMS }, false);
+  roundTrip("selected backtest window", { ...HYBOND_DEFAULT_PARAMS }, true, { a: 24, b: 48 });
 }
 
 // ---------------------------------------------------------------------------
@@ -172,6 +183,37 @@ console.log("\n5. An empty query is the default state");
   const s = readQuery("");
   check("empty query yields the defaults", JSON.stringify(s.params) === JSON.stringify(HYBOND_DEFAULT_PARAMS));
   check("maintain defaults on", s.maintain === true);
+  check("empty query yields the full backtest window", JSON.stringify(s.range) === JSON.stringify(fullRange));
+}
+
+// ---------------------------------------------------------------------------
+console.log("\n6. Backtest-window dates survive shared links");
+{
+  const selected: IndexRange = { a: 24, b: 48 };
+  const qs = queryFromState(HYBOND_DEFAULT_PARAMS, true, selected);
+  const back = readQuery(qs);
+  check(
+    "the selected start date is present",
+    qs.includes(`from=${HYBOND_NAV_SERIES[selected.a].date}`),
+    qs,
+  );
+  check(
+    "the selected end date is present",
+    qs.includes(`to=${HYBOND_NAV_SERIES[selected.b].date}`),
+    qs,
+  );
+  check(
+    "the selected date range decodes to the same indices",
+    JSON.stringify(back.range) === JSON.stringify(selected),
+    `got ${JSON.stringify(back.range)}`,
+  );
+
+  const unknown = readQuery("from=1900-01&to=2999-12");
+  check(
+    "unknown dates safely fall back to the full window",
+    JSON.stringify(unknown.range) === JSON.stringify(fullRange),
+    `got ${JSON.stringify(unknown.range)}`,
+  );
 }
 
 // ---------------------------------------------------------------------------

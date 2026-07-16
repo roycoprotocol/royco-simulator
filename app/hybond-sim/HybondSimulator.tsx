@@ -543,7 +543,7 @@ export default function HybondSimulator({ initialQuery }: { initialQuery: Initia
   // it. maxIndex is taken from the series itself, never from a run: every run below is
   // a function of the window, so sizing the window from a run would be circular.
   const maxIndex = HYBOND_NAV_SERIES.length - 1;
-  const [range, setRange] = useState<IndexRange>(() => ({ a: 0, b: maxIndex }));
+  const [range, setRange] = useState<IndexRange>(() => initial.range);
   const view = useMemo(() => normalizeRange(range.a, range.b, maxIndex), [range, maxIndex]);
   const viewIsFull = isFullRange(view, maxIndex);
 
@@ -706,9 +706,10 @@ export default function HybondSimulator({ initialQuery }: { initialQuery: Initia
       return {
         id: r.id,
         label: r.label,
-        // e.g. "18% first-loss (the smallest cushion, Junior $250), the shortest 16-day
+        // e.g. "20% actual first-loss (18% minimum coverage, the smallest cushion,
+        // Junior $250), the shortest 16-day
         // observation, and the largest 75% share of Senior yield to Junior."
-        setup: `${r.minCoveragePct}% first-loss (${cushion} cushion, Junior ${fmtUsd0(r.depositJT)}), ${term} ${r.observationDays}-day observation, and ${share} ${r.seniorShareToJuniorPct}% share of Senior yield to Junior.`,
+        setup: `${fmtTrim(r.genesisFirstLossPct, 2)}% actual first-loss (${r.minCoveragePct}% minimum coverage, ${cushion} cushion, Junior ${fmtUsd0(r.depositJT)}), ${term} ${r.observationDays}-day observation, and ${share} ${r.seniorShareToJuniorPct}% share of Senior yield to Junior.`,
         // e.g. "Junior ends at 264.96 (+21.5%/yr), the highest of the three, with 4 erased
         // recovery claims, the most of the three. Senior is untouched."
         outcome: `Junior ends at ${r.juniorEnd.toFixed(2)} (${fmtSignedPct(r.juniorAvgYr, 1)}/yr)${r.id === bestJunior ? ', the highest of the three,' : ','} with ${r.erasedRecoveryClaims} erased recovery claim${r.erasedRecoveryClaims === 1 ? '' : 's'}${erasedTag}. ${
@@ -1009,7 +1010,7 @@ export default function HybondSimulator({ initialQuery }: { initialQuery: Initia
   // headlessly against the REAL implementation (lib/hybond/permalink.test.ts).
   const permalink = (): string => {
     if (typeof window === 'undefined') return '';
-    return `${window.location.origin}${window.location.pathname}?${queryFromState(params, maintainCoverage)}`;
+    return `${window.location.origin}${window.location.pathname}?${queryFromState(params, maintainCoverage, view)}`;
   };
 
   const [copyLinkLabel, setCopyLinkLabel] = useState('Copy link');
@@ -1040,7 +1041,7 @@ export default function HybondSimulator({ initialQuery }: { initialQuery: Initia
       // The MINIMUM coverage ratio, not the protection actually posted at genesis: those are
       // different quantities (33.33% vs 30% at the defaults) and diverge once Junior is
       // unlinked, so both are emitted, each named for what it is.
-      `minFirstLossProtection: ${params.minCoveragePct}%   // contractual floor: minCoverageWAD`,
+      `minCoverageRatio: ${params.minCoveragePct}%   // contractual floor: minCoverageWAD`,
       `genesisFirstLossProtection: ${genesisFirstLossPct.toFixed(2)}%   // actual, Junior effective NAV / market exposure at genesis`,
       `observationPeriod: ${params.observationDays} days`,
       `seniorYieldSharePaidToJunior: ${params.seniorShareToJuniorPct}%`,
@@ -1048,7 +1049,7 @@ export default function HybondSimulator({ initialQuery }: { initialQuery: Initia
       `initialFundingRead: ${jtPct.toFixed(1)}% Junior / ${(100 - jtPct).toFixed(1)}% Senior at 90% target utilization`,
       '',
       'MarketConfig fields resolved by this tool',
-      `minCoverageWAD: ${config.minCoverageWAD.toString()}   // ${params.minCoveragePct}% MINIMUM first-loss coverage ratio`,
+      `minCoverageWAD: ${config.minCoverageWAD.toString()}   // ${params.minCoveragePct}% contractual minimum coverage ratio`,
       `fixedTermDurationSeconds: ${config.fixedTermDurationSeconds.toString()}   // ${params.observationDays} days`,
       `coverageLiquidationUtilizationWAD: ${config.coverageLiquidationUtilizationWAD.toString()}   // opens Senior exit at ${fmtTrim(params.exitBufferPct, 1)}% Junior buffer remaining (${fmtTrim(thresholdUtilPct, 2)}% utilization)`,
       `jtCoinvested: ${config.jtCoinvested}   // Junior follows the same strategy path as Senior`,
@@ -1230,9 +1231,10 @@ export default function HybondSimulator({ initialQuery }: { initialQuery: Initia
               {seniorProtected ? (
                 <>
                   Current {activeScenarioName} terms pass the Senior hard guardrail: no historical
-                  Senior loss events with {params.minCoveragePct}% first-loss protection,{' '}
-                  {params.observationDays}d observation period, and {params.seniorShareToJuniorPct}%
-                  of Senior yield paid to Junior.
+                  Senior loss events with {fmtTrim(genesisFirstLossPct, 2)}% actual genesis
+                  first-loss protection ({params.minCoveragePct}% contractual minimum coverage),{' '}
+                  {params.observationDays}d observation period, and{' '}
+                  {params.seniorShareToJuniorPct}% of Senior yield paid to Junior.
                 </>
               ) : (
                 <>
@@ -1319,7 +1321,7 @@ export default function HybondSimulator({ initialQuery }: { initialQuery: Initia
                       key={p.id}
                       type="button"
                       // Presets carry linkJuniorToFirstLoss:true and a Junior already
-                      // DERIVED from their own first-loss %, so applying them wholesale
+                      // DERIVED from their own minimum coverage %, so applying them wholesale
                       // is exactly what the link would compute anyway.
                       onClick={() => setParams({ ...p.params })}
                       style={{
@@ -1337,20 +1339,21 @@ export default function HybondSimulator({ initialQuery }: { initialQuery: Initia
                       {/* Tenbin's own sublabel format (:302-303): the three knobs that
                           define a rung, in the order they ladder. */}
                       <div style={{ fontSize: 11, color: C.muted, marginTop: 4 }}>
-                        {p.params.minCoveragePct}% first-loss · {p.params.observationDays}d obs ·{' '}
-                        {p.params.seniorShareToJuniorPct}% to Junior
+                        {fmtTrim(screen?.genesisFirstLossPct ?? 0, 2)}% actual first-loss ·{' '}
+                        {p.params.minCoveragePct}% minimum coverage · {p.params.observationDays}d
+                        obs · {p.params.seniorShareToJuniorPct}% to Junior
                       </div>
                     </button>
                   );
                 })}
               </div>
               <p className="mt-2" style={{ color: C.kpiLabel, fontSize: 11, lineHeight: 1.6 }}>
-                Each rung takes more risk than the last: less first-loss protection, a
-                shorter observation period, and a larger share of Senior&apos;s yield to
-                Junior. Junior&apos;s deposit is derived from the first-loss %, so selecting
-                a preset leaves that link on. Each badge is the live screen result: every
-                preset is re-run through the accountant on the selected window, at both
-                replenishment settings, and passes only if Senior is never marked down in
+                Each rung takes more risk than the last: less actual first-loss capital and a lower
+                minimum coverage requirement, a shorter observation period, and a larger share of
+                Senior&apos;s yield to Junior. Junior&apos;s deposit is derived from the minimum
+                coverage %, so selecting a preset leaves that link on. Each badge is the live screen
+                result: every preset is re-run through the accountant on the selected window, at
+                both replenishment settings, and passes only if Senior is never marked down in
                 either.
               </p>
             </div>
@@ -1359,13 +1362,13 @@ export default function HybondSimulator({ initialQuery }: { initialQuery: Initia
             <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
               {/* Primary control, port of tenbin-sims/index.html:183-187. */}
               <SliderControl
-                label="First-loss protection (%)"
+                label="Minimum coverage ratio (%)"
                 value={params.minCoveragePct}
                 min={8}
                 max={65}
                 step={1}
                 display={`${params.minCoveragePct}%`}
-                desc={`Junior first-loss reserve. At genesis, Junior provides ${fmtUsd(genesisFirstLossPct)} of first-loss protection per $100 of market exposure, both computed from the run. The contractual minimum this slider sets is ${fmtUsd(params.minCoveragePct)} per $100: the floor coverage is held to, not the protection actually posted.`}
+                desc={`At genesis, Junior provides ${fmtTrim(genesisFirstLossPct, 2)}% of total market exposure as actual first-loss capital, computed from the run. This slider sets the ${params.minCoveragePct}% contractual minimum coverage ratio used to size and rebuild Junior; it is not the protection actually posted.`}
                 onChange={(v) => updateParam({ minCoveragePct: v })}
               >
                 {params.linkJuniorToFirstLoss ? (
@@ -1475,15 +1478,15 @@ export default function HybondSimulator({ initialQuery }: { initialQuery: Initia
             </div>
 
             {/* Junior deposit: an advanced override, not a primary control. Linked, it is
-                a function of the first-loss % and the design point holds at U = 0.90. */}
+                a function of minimum coverage and the design point holds at U = 0.90. */}
             <div style={{ border: `1px solid ${C.border}`, padding: '14px 16px', background: C.cardBg }}>
               <div className="flex items-start justify-between gap-4 flex-wrap">
                 <div>
                   <Eyebrow>Advanced override</Eyebrow>
                   <p className="mt-1.5" style={{ color: C.muted, fontSize: 12, lineHeight: 1.5 }}>
                     {params.linkJuniorToFirstLoss
-                      ? 'Junior deposit is derived from the first-loss protection above, which holds genesis utilization at the curve target. Unlink to set it directly.'
-                      : 'Junior deposit is set directly. The first-loss slider no longer sizes it.'}
+                      ? 'Junior deposit is derived from the minimum coverage ratio above, which holds genesis utilization at the curve target. Unlink to set it directly.'
+                      : 'Junior deposit is set directly. The minimum coverage slider no longer sizes it.'}
                   </p>
                 </div>
                 <button
@@ -1503,7 +1506,7 @@ export default function HybondSimulator({ initialQuery }: { initialQuery: Initia
                     flexShrink: 0,
                   }}
                 >
-                  {params.linkJuniorToFirstLoss ? 'Unlink Junior' : 'Relink to first-loss'}
+                  {params.linkJuniorToFirstLoss ? 'Unlink Junior' : 'Relink to coverage ratio'}
                 </button>
               </div>
 
@@ -2055,13 +2058,15 @@ export default function HybondSimulator({ initialQuery }: { initialQuery: Initia
                   ))}
                 </div>
                 <p className="mt-2" style={{ color: C.kpiLabel, fontSize: 11, lineHeight: 1.6 }}>
-                  Scenarios vary how much risk Junior takes: less first-loss, a shorter
-                  observation, and a bigger yield share as you go down the ladder. Both the
+                  Scenarios vary how much risk Junior takes: less actual first-loss capital and a
+                  lower minimum coverage requirement, a shorter observation, and a bigger yield
+                  share as you go down the ladder. Both the
                   descriptions and the badges above are computed live by re-running each preset
                   through the accountant on the selected window, not asserted. One honest caveat:
                   this series samples monthly, so any observation term under about 30 days
                   behaves as ~30 days here, and the shortest rung is separated from the others by
-                  its first-loss and yield share rather than by its term.
+                  its actual first-loss capital, minimum coverage, and yield share rather than by
+                  its term.
                 </p>
               </div>
             </div>

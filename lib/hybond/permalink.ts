@@ -13,12 +13,14 @@
 // ---------------------------------------------------------------------------
 import {
   HYBOND_DEFAULT_PARAMS,
+  HYBOND_NAV_SERIES,
   OBSERVATION_DAYS_MAX,
   OBSERVATION_DAYS_MIN,
   PRESETS,
   juniorFromFirstLossPct,
   type HybondParams,
 } from "./scenarios";
+import { normalizeRange, type IndexRange } from "./timeframe";
 
 /** The minimal read surface shared by URLSearchParams and Next's searchParams record. */
 export interface Query {
@@ -40,7 +42,10 @@ export const queryFromRecord = (record: InitialQuery): Query => ({
 export interface PermalinkState {
   params: HybondParams;
   maintain: boolean;
+  range: IndexRange;
 }
+
+const FULL_RANGE: IndexRange = { a: 0, b: HYBOND_NAV_SERIES.length - 1 };
 
 const clamp = (v: number, lo: number, hi: number): number => Math.min(hi, Math.max(lo, v));
 
@@ -100,7 +105,18 @@ export function stateFromQuery(q: Query): PermalinkState {
     if (jt !== null) params.depositJT = snap(jt, JT_STEP, JT_MIN, JT_MAX);
   }
 
-  return { params, maintain: q.get("maintain") !== "0" };
+  const indexForDate = (date: string | null, fallback: number): number => {
+    if (date === null) return fallback;
+    const index = HYBOND_NAV_SERIES.findIndex((point) => point.date === date);
+    return index >= 0 ? index : fallback;
+  };
+  const range = normalizeRange(
+    indexForDate(q.get("from"), FULL_RANGE.a),
+    indexForDate(q.get("to"), FULL_RANGE.b),
+    FULL_RANGE.b,
+  );
+
+  return { params, maintain: q.get("maintain") !== "0", range };
 }
 
 /** Which preset (if any) exactly matches these params. Also drives the ladder's active styling. */
@@ -117,7 +133,12 @@ export function findPreset(params: HybondParams) {
 }
 
 /** State → query string (no origin/path). The exact inverse of stateFromQuery. */
-export function queryFromState(params: HybondParams, maintain: boolean): string {
+export function queryFromState(
+  params: HybondParams,
+  maintain: boolean,
+  range: IndexRange = FULL_RANGE,
+): string {
+  const legalRange = normalizeRange(range.a, range.b, FULL_RANGE.b);
   const q = new URLSearchParams({
     preset: findPreset(params)?.id ?? "custom",
     coverage: String(params.minCoveragePct),
@@ -127,6 +148,8 @@ export function queryFromState(params: HybondParams, maintain: boolean): string 
     maintain: maintain ? "1" : "0",
     st: String(params.depositST),
     link: params.linkJuniorToFirstLoss ? "1" : "0",
+    from: HYBOND_NAV_SERIES[legalRange.a].date,
+    to: HYBOND_NAV_SERIES[legalRange.b].date,
   });
   // Junior is derived while the link is on, so emitting it would be redundant at best and
   // contradict `coverage` at worst. The reader re-derives it from the same inputs instead.
