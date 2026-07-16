@@ -56,7 +56,8 @@ function checkRange(name: string, got: IndexRange, want: IndexRange) {
   check(name, eq(got, want), `got ${show(got)}, want ${show(want)}`);
 }
 
-const MAX = 60; // a 61-point series, matching HYBOND_NAV_SERIES
+const MAX = 60; // a small abstract 61-index track for the range-math tests below (the brush
+// math is series-length agnostic); section 9 uses the real HYBOND_NAV_SERIES length instead.
 const MIN_SPAN = MIN_WINDOW_MONTHS - 1;
 
 // ---------------------------------------------------------------------------
@@ -200,7 +201,7 @@ console.log("\n8. Track helpers");
 console.log("\n9. Every legal window restarts a runnable market");
 {
   const N = HYBOND_NAV_SERIES.length;
-  check("the fixture is the 61-point full history", N === 61, `N=${N}`);
+  check("the fixture is the 2,394-point daily history", N === 2394, `N=${N}`);
 
   // No legal range, from any input, can slice fewer points than the minimum window.
   let tooShort = 0;
@@ -220,7 +221,8 @@ console.log("\n9. Every legal window restarts a runnable market");
       series: HYBOND_NAV_SERIES.slice(a, b + 1),
     });
 
-  // A minimum-width window, restarted mid-series (right before the 2022 drawdown).
+  // A minimum-width window, restarted mid-series (an arbitrary interior index; the genesis
+  // invariants checked below hold at any legal start).
   const minView = normalizeRange(24, 24, N - 1);
   const minRun = run(minView.a, minView.b);
   check("a minimum window runs and yields exactly MIN_WINDOW_MONTHS steps", minRun.steps.length === MIN_WINDOW_MONTHS, `steps=${minRun.steps.length}`);
@@ -245,8 +247,12 @@ console.log("\n9. Every legal window restarts a runnable market");
   check("a minimum window still spans a positive horizon", minRun.years > 0, `years=${minRun.years}`);
 
   // The restart must actually differ from the full history, otherwise the control does nothing.
+  // Restart on the first business day of June 2020 (into the COVID recovery), derived from the
+  // series rather than hardcoded so it stays valid on daily data.
   const full = run(0, N - 1);
-  const restarted = run(HYBOND_NAV_SERIES.findIndex((p) => p.date === "2022-06"), N - 1);
+  const startIdx = HYBOND_NAV_SERIES.findIndex((p) => p.date >= "2020-06-01");
+  const startDate = HYBOND_NAV_SERIES[startIdx].date;
+  const restarted = run(startIdx, N - 1);
   check(
     "a restarted window produces different headline numbers than the full history",
     full.seniorAvgYr !== restarted.seniorAvgYr && full.juniorAvgYr !== restarted.juniorAvgYr,
@@ -254,7 +260,7 @@ console.log("\n9. Every legal window restarts a runnable market");
   );
   check(
     "the restarted window's genesis is its OWN start date, not the series start",
-    restarted.steps[0].date === "2022-06" && restarted.steps[0].jtIndex === 100,
+    restarted.steps[0].date === startDate && restarted.steps[0].jtIndex === 100,
     `date=${restarted.steps[0].date} jt=${restarted.steps[0].jtIndex}`,
   );
 }
