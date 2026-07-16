@@ -73,6 +73,9 @@
   input:focus,select:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
   input::placeholder{color:#C4C0B6}
   input.bad{border-color:var(--bad);box-shadow:0 0 0 3px rgba(214,69,69,.12)}
+  .fixed{display:flex;align-items:center;background:var(--surface2);border:1px solid var(--line);border-radius:8px;
+    padding:7px 9px;font-size:12.5px;font-weight:600;color:var(--ink2);font-variant-numeric:tabular-nums}
+  .fixed .tag{margin-left:auto;font-size:9.5px;font-weight:700;color:var(--faint);text-transform:uppercase;letter-spacing:.6px}
   input[type=number]{-moz-appearance:textfield}
   input[type=number]::-webkit-outer-spin-button,input[type=number]::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
   .info{display:inline-flex;align-items:center;justify-content:center;width:13px;height:13px;border-radius:50%;
@@ -152,7 +155,7 @@
         <div class="row3">
           <div class="f"><label>Underlying yield <span class="u">r</span><span class="info" tabindex="0">i<span class="tip"><b>Observed, not chosen</b><br>Your asset's own APY. Across the book it spans <em>3.5%–17%</em>.</span></span></label><div class="inp"><input id="r" type="number" step="0.1" min="0" placeholder="9"><span class="suf">%</span></div><div class="hint">Asset's native APY.</div></div>
           <div class="f"><label>Minimum coverage<span class="info" tabindex="0">i<span class="tip"><b>Live book: 2%–25%, median 10%</b><br><em>syrupUSDC 2% · sNUSD 7% · ACRED 18% · sUSDat 25%</em></span></span></label><div class="inp"><input id="cov" type="number" step="1" min="0" max="100" placeholder="10"><span class="suf">%</span></div><div class="hint">Junior first-loss buffer. Lower = more leverage.</div></div>
-          <div class="f"><label>Observation period<span class="info" tabindex="0">i<span class="tip"><b>Live book: 0–31 days</b><br>Commonly 0 or 7. Longer (30–31) for <em>APYX, Saturn, AarcBTC, sUSDat</em>.</span></span></label><div class="inp"><input id="rec_obs" type="number" step="1" min="0" placeholder="7"><span class="suf">d</span></div><div class="hint">Recovery window before protected exit.</div></div>
+          <div class="f"><label>Observation period<span class="info" tabindex="0">i<span class="tip"><b>Live book: 0–31 days</b><br>Commonly 0 or 7. Longer (30–31) for <em>APYX, Saturn, AarcBTC, sUSDat</em>.</span></span></label><div class="inp"><input id="rec_obs" type="number" step="1" min="0" placeholder="7"><span class="suf">d</span></div><div class="hint">Senior redemptions pause while Junior's coverage recovers.</div></div>
         </div>
       </div>
     </div>
@@ -169,12 +172,12 @@
         <div class="hint">Defaulted to the book's median curve (11 / 11 / 31). Review for your asset — coverage largely implies it.</div>
         <div class="subhead">Curve dynamics</div>
         <div class="row2">
-          <div class="f"><label>Utilization <span class="u">kink</span><span class="info" tabindex="0">i<span class="tip"><b>Always 90%</b><br>Every live market uses a 90% target-utilization kink.</span></span></label><div class="inp"><input id="util" type="number" step="1" min="1" max="100"><span class="suf">%</span></div><div class="hint">Curve elbow &amp; readout point.</div></div>
+          <div class="f"><label>Utilization <span class="u">kink</span><span class="info" tabindex="0">i<span class="tip"><b>Fixed at 90%</b><br>Every live Dawn market uses a 90% target-utilization kink, so it is not configurable here.</span></span></label><div class="fixed">90%<span class="tag">fixed</span></div><div class="hint">Curve elbow &amp; readout point.</div></div>
           <div class="f"><label>Adaptation speed<span class="info" tabindex="0">i<span class="tip"><b>Usually 40</b><br>Lower (10): <em>Makina, Pareto</em>. Higher (50): <em>AarcBTC, Saturn</em>.</span></span></label><input id="adapt" type="number" step="1" min="0"><div class="hint" id="adaptHint">How fast Y_T re-targets toward its goal.</div></div>
         </div>
         <div class="subhead">Recovery</div>
         <div class="row2">
-          <div class="f"><label>Protected exit threshold<span class="info" tabindex="0">i<span class="tip"><b>Discrepancy that activates the observation period</b><br>A size, not a time. Hard pegs ~0.01% (<em>siUSD, sUSDe</em>) · RWA ~2% (<em>ACRED, mf-ONE</em>) · volatile 5–12.5% (<em>Hyperliquid, sUSDat</em>)</span></span></label><div class="inp"><input id="rec_exit" type="number" step="0.5" min="0" max="100"><span class="suf">%</span></div><div class="hint">Coverage discrepancy that starts the observation clock.</div></div>
+          <div class="f"><label>Protected exit threshold <span class="u">drawdown</span><span class="info" tabindex="0">i<span class="tip"><b>Live book: 0.01%–17.5%, median ~1%</b><br>How far the underlying may fall before Senior's exit unlocks. A size, not a time — scale it to the asset's volatility. Hard pegs 0.01% (<em>sNUSD, savUSD, stcUSD</em>) · 0.5–2% (<em>syrupUSDC, sUSDai, ACRED, autoUSD</em>) · wider 7.5–17.5% (<em>APYUSD, PT-cUSD, reUSD</em>)</span></span></label><div class="inp"><input id="rec_exit" type="number" step="0.01" min="0.01" max="100"><span class="suf">%</span></div><div class="hint" id="recExitHint">How far Junior's buffer may fall short of required coverage.</div></div>
           <div class="f"><label>Self-liquidation bonus <span class="u">senior</span><span class="info" tabindex="0">i<span class="tip"><b>Live book: 0–1%</b><br>Liquid stables 0% · <em>sNUSD/savUSD 0.5%</em> · <em>ACRED/mf-ONE/sUSDai 1%</em></span></span></label><div class="inp"><input id="rec_bonus" type="number" step="0.5" min="0" max="100"><span class="suf">%</span></div><div class="hint">Incentive for seniors to unwind in recovery.</div></div>
         </div>
       </div>
@@ -214,15 +217,19 @@
 
 <script>
 // Essentials (blank, partner-filled): market, github, chain, addr, r, cov, rec_obs.
-// Advanced (defaulted): curve Y_0/Y_T/Y_100, utilization, adaptation, protected exit, self-liq bonus.
+// Advanced (defaulted): curve Y_0/Y_T/Y_100, adaptation, protected exit, self-liq bonus.
+// Target utilization is fixed at 90% — every live Dawn market deploys the kink there.
+const UTIL=0.90;
 const DEFAULTS={o_market:'',o_github:'',o_chain:'Ethereum',o_addr:'',
   r:'',cov:'',rec_obs:'',
-  y0:11,yt:11,y100:31,util:90,adapt:40,
+  y0:11,yt:11,y100:31,adapt:40,
   rec_exit:2,rec_bonus:1};
+// ACRED as deployed (royco-dawn script/config/MarketDeploymentConfig.sol): coverage 18%, 7d fixed
+// term, rec_exit 2% -> liquidationUtilizationWAD 1.1025e18.
 const EXAMPLE={...DEFAULTS,o_market:'ACRED',r:9,cov:18,rec_obs:7,y0:22,yt:22,y100:59};
-const pctF=['r','cov','y0','yt','y100','util','rec_exit','rec_bonus'];
+const pctF=['r','cov','y0','yt','y100','rec_exit','rec_bonus'];
 const numF=pctF.concat(['adapt','rec_obs']);
-const mathF=['r','cov','y0','yt','y100','util'];
+const mathF=['r','cov','y0','yt','y100'];
 const $=id=>document.getElementById(id);
 const cv=v=>getComputedStyle(document.documentElement).getPropertyValue(v).trim();
 const pct=(x,d=1)=>(x*100).toFixed(d)+'%',xf=(x,d=2)=>x.toFixed(d)+'×';
@@ -233,8 +240,8 @@ function compute(p){const U=p.util,YU=yieldShare(U,p),so=U/(p.cov||1e-9)-1,jtP=1
 
 function read(){const ui={},p={};Object.keys(DEFAULTS).forEach(k=>{const el=$(k);if(!el)return;
   if(numF.indexOf(k)>=0){const raw=el.value;const v=raw===''?NaN:parseFloat(raw);ui[k]=v;p[k]=pctF.indexOf(k)>=0?v/100:v;}
-  else{ui[k]=el.value;p[k]=el.value;}});return{p,ui};}
-function validate(ui){let bad=0,inc=0;const rg={cov:[.01,100],util:[1,100],y0:[0,100],yt:[0,100],y100:[0,100],r:[0,500]};
+  else{ui[k]=el.value;p[k]=el.value;}});p.util=UTIL;return{p,ui};}
+function validate(ui){let bad=0,inc=0;const rg={cov:[.01,100],y0:[0,100],yt:[0,100],y100:[0,100],r:[0,500]};
   mathF.forEach(k=>{const el=$(k),v=ui[k],r=rg[k];
     if(isNaN(v)){el.classList.remove('bad');inc++;}
     else if(v<r[0]||v>r[1]){el.classList.add('bad');bad++;}
@@ -258,8 +265,22 @@ function render(){
   ['y0','yt','y100'].forEach(k=>{const el=$(k);if(el&&el.value!==''){const v=parseFloat(el.value);if(isFinite(v)){if(v>100)el.value='100';else if(v<0)el.value='0';}}});
   const _sp=parseFloat($('adapt').value),_ah=$('adaptHint');
   if(_ah){if(isFinite(_sp)&&_sp>0){const dd=365*Math.LN2/_sp;_ah.innerHTML='Y_T doubles in <b>≈ '+(dd>=10?dd.toFixed(0):dd.toFixed(1))+' days</b> of sustained max deviation (higher = faster).';}else{_ah.textContent='How fast Y_T re-targets toward its goal.';}}
+  // Deploy derives liquidationUtilizationWAD from this threshold and coverage: u = COV(1-d)/(COV-d).
+  // The threshold must stay under coverage — Junior cannot absorb a drawdown it does not cover.
+  const _xt=parseFloat($('rec_exit').value),_obs=parseFloat($('rec_obs').value),_cov=parseFloat($('cov').value),
+    _xh=$('recExitHint'),_xe=$('rec_exit');
+  if(_xh){
+    if(isFinite(_xt)&&_xt>0&&isFinite(_cov)&&_cov>0&&_xt>=_cov){_xe.classList.add('bad');
+      _xh.innerHTML='Must stay below minimum coverage (<b>'+_cov+'%</b>) — Junior cannot absorb a drawdown it does not cover.';}
+    else if(isFinite(_xt)&&_xt>0){_xe.classList.remove('bad');
+      const win=isFinite(_obs)&&_obs>0?'the <b>'+_obs+'-day</b> observation period':'the observation period';
+      let liq='';
+      if(isFinite(_cov)&&_cov>0){const c=_cov/100,x=_xt/100,u=c*(1-x)/(c-x);
+        if(isFinite(u)&&u>1)liq=' Deploys as liquidationUtilizationWAD ≈ <b>'+u.toFixed(4)+'e18</b>.';}
+      _xh.innerHTML='Junior absorbing a Senior loss opens '+win+', pausing Senior redemptions. If the underlying\'s drawdown reaches <b>'+_xt+'%</b>, Junior\'s buffer is spent to the liquidation point: that period ends early, Junior\'s recovery claim is erased, and Senior may exit with the bonus. Lower = exit opens sooner.'+liq;}
+    else{_xe.classList.remove('bad');_xh.textContent='How far the underlying may fall before Senior\'s protected exit unlocks.';}}
   const {p,ui}=read();validate(ui);
-  const ready=[p.r,p.cov,p.yt,p.y100,p.util].every(isFinite)&&p.cov>0;
+  const ready=[p.r,p.cov,p.yt,p.y100].every(isFinite)&&p.cov>0;
   if(!ready){
     $('atU').textContent='—';$('h_r').textContent='—';$('h_st').textContent='—';$('h_jt').textContent='—';
     $('h_stm').textContent='protected';$('h_jtm').textContent='first-loss';
@@ -300,7 +321,7 @@ function applyImport(obj){if(!obj||typeof obj!=='object')throw new Error('bad');
   const setIf=(k,v)=>{if(v!==undefined&&v!==null&&!(typeof v==='number'&&isNaN(v)))cur[k]=v;};
   const setPct=(k,v)=>{if(typeof v==='number'&&isFinite(v))cur[k]=+(v*100).toFixed(6);};
   setIf('o_market',(m.name!==undefined&&m.name!=='')?m.name:m.yield_bearing_token);setIf('o_github',m.github);setIf('o_chain',m.chain);setIf('o_addr',m.contract_address);
-  setPct('r',mi.underlying_yield);setPct('cov',mi.min_coverage);setPct('util',mi.target_utilization);setIf('rec_obs',mi.observation_period_days!==undefined?mi.observation_period_days:rec.max_observation_days);
+  setPct('r',mi.underlying_yield);setPct('cov',mi.min_coverage);setIf('rec_obs',mi.observation_period_days!==undefined?mi.observation_period_days:rec.max_observation_days);
   setPct('y0',yc.Y_0);setPct('yt',yc.Y_T);setPct('y100',yc.Y_100);setIf('adapt',yc.adaptation_speed);
   setPct('rec_exit',rec.protected_exit_threshold);setPct('rec_bonus',rec.self_liquidation_bonus);
   setAll(cur);}
