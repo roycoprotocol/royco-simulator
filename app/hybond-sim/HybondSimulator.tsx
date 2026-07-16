@@ -14,7 +14,6 @@
 
 import { useCallback, useMemo, useRef, useState } from 'react';
 import dynamic from 'next/dynamic';
-import { useSearchParams } from 'next/navigation';
 import {
   LineChart,
   Line,
@@ -478,10 +477,22 @@ const clamp = (v: number, lo: number, hi: number): number =>
  * Port of tenbin-sims/index.html:916-935: execCommand first (it works from a user
  * gesture without a permission prompt), navigator.clipboard as the fallback.
  */
-/** The minimal read surface shared by URLSearchParams and Next's ReadonlyURLSearchParams. */
+/** The minimal read surface shared by URLSearchParams and Next's searchParams record. */
 interface Query {
   get(key: string): string | null;
 }
+
+/** What a server page hands down from its own `searchParams`. */
+export type InitialQuery = Record<string, string | string[] | undefined>;
+
+/** Record → Query. Repeated keys (`?obs=1&obs=2`) read as the first one, as URLSearchParams does. */
+const queryFromRecord = (record: InitialQuery): Query => ({
+  get: (key) => {
+    const raw = record[key];
+    if (Array.isArray(raw)) return raw[0] ?? null;
+    return raw ?? null;
+  },
+});
 
 /**
  * Permalink → state. Every value is clamped to its control's own range, so a
@@ -545,12 +556,13 @@ async function writeClipboardText(txt: string): Promise<boolean> {
   }
 }
 
-export default function HybondSimulator() {
-  // useSearchParams (rather than reading window.location in an effect) so the permalink
-  // is applied in the FIRST render: state is seeded from it, never patched after mount.
-  // The page wraps this component in Suspense, which is what this hook requires.
-  const searchParams = useSearchParams();
-  const initial = useMemo(() => stateFromQuery(searchParams), [searchParams]);
+export default function HybondSimulator({ initialQuery }: { initialQuery: InitialQuery }) {
+  // The permalink arrives as a prop the server page read off its own `searchParams`,
+  // so it is applied in the FIRST render: state is seeded from it, never patched after
+  // mount. Deliberately NOT useSearchParams — that hook suspends on the client, and with
+  // a Suspense boundary here React would keep the server HTML and never attach fibers,
+  // leaving a pixel-perfect but completely dead page.
+  const initial = useMemo(() => stateFromQuery(queryFromRecord(initialQuery)), [initialQuery]);
 
   const [params, setParams] = useState<HybondParams>(initial.params);
   const [showAdvanced, setShowAdvanced] = useState(false);
