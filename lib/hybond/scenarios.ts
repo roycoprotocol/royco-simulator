@@ -83,10 +83,15 @@ export function buildHybondConfig(p: HybondParams): MarketConfig {
 
 // --- Presets (identical mechanism params to TRY's ladder) -------------------
 
+/**
+ * `note` was deliberately REMOVED rather than repopulated: it was never rendered (the ladder
+ * builds its copy from the live screen rows), so it was a second, silently-diverging
+ * description of each preset. The ladder's prose is derived from screenPresets() instead, so
+ * there is exactly one source of truth for what a preset is and what it does.
+ */
 export interface Preset {
   id: "conservative" | "balanced" | "aggressive";
   label: string;
-  note: string;
   params: HybondParams;
 }
 
@@ -94,7 +99,6 @@ export const PRESETS: Preset[] = [
   {
     id: "conservative",
     label: "Conservative",
-    note: "Larger Junior cushion, longer 60-day observation.",
     params: {
       ...HYBOND_DEFAULT_PARAMS,
       depositST: 1000,
@@ -106,7 +110,6 @@ export const PRESETS: Preset[] = [
   {
     id: "balanced",
     label: "Balanced",
-    note: "Junior ≈ 33% of the pool, 30-day observation. (matches the brief)",
     params: { ...HYBOND_DEFAULT_PARAMS },
   },
   {
@@ -116,7 +119,6 @@ export const PRESETS: Preset[] = [
     // a genuinely distinct breakpoint AND is directionally aggressive: a longer term
     // keeps Junior's capital committed across more of the horizon.
     label: "Aggressive",
-    note: "Smaller Junior cushion, longer 120-day observation.",
     params: {
       ...HYBOND_DEFAULT_PARAMS,
       depositST: 1000,
@@ -130,6 +132,12 @@ export const PRESETS: Preset[] = [
 /**
  * Run every preset through the real engine and check the claim the UI makes about them:
  * Senior is never marked down. This makes the assertion falsifiable rather than prose.
+ *
+ * The row also carries the inputs and outcomes the ladder's PROSE describes (cushion, term,
+ * Junior's end value, erased recovery claims), so that prose can be derived from the same
+ * runs instead of hand-written. Hand-written prose drifts: it claimed Aggressive had the
+ * "shorter recovery time" and "more erased recovery claims" when, after the preset was
+ * retuned, it had the LONGEST term (120d) and the FEWEST erasures (1 vs Balanced's 4).
  */
 export interface PresetScreenRow {
   id: Preset["id"];
@@ -137,6 +145,13 @@ export interface PresetScreenRow {
   pass: boolean;
   seniorMarkdownEvents: number;
   seniorMaxDrawdown: number;
+  /** Inputs, echoed so prose never has to reach back into PRESETS and desynchronise. */
+  depositJT: number;
+  observationDays: number;
+  /** Outcomes on this series. */
+  juniorEnd: number; // Junior index at the end of the run (100 = genesis)
+  seniorEnd: number;
+  erasedRecoveryClaims: number;
 }
 
 export function screenPresets(series: PricePoint[] = HYBOND_NAV_SERIES): PresetScreenRow[] {
@@ -147,12 +162,18 @@ export function screenPresets(series: PricePoint[] = HYBOND_NAV_SERIES): PresetS
       depositJT: p.params.depositJT,
       series,
     });
+    const last = r.steps[r.steps.length - 1];
     return {
       id: p.id,
       label: p.label,
       pass: r.seniorMarkdownEvents === 0 && r.seniorMaxDrawdown < 0.0005,
       seniorMarkdownEvents: r.seniorMarkdownEvents,
       seniorMaxDrawdown: r.seniorMaxDrawdown,
+      depositJT: p.params.depositJT,
+      observationDays: p.params.observationDays,
+      juniorEnd: last ? last.jtIndex : 100,
+      seniorEnd: last ? last.stIndex : 100,
+      erasedRecoveryClaims: r.erasureEvents.length,
     };
   });
 }
@@ -165,8 +186,21 @@ export function screenPresets(series: PricePoint[] = HYBOND_NAV_SERIES): PresetS
 // (Jun→Jun) total returns, income reinvested, GROSS OF FEES, per Insight as
 // at 30 June 2025. A composite aggregates accounts following the strategy;
 // it is not any single fund's or share class's track record, and gross of
-// fees is not what a holder receives (HYBOND's 1.00% management fee and the
+// fees is not what a holder receives (HYBOND's management fee and the
 // underlying fund's own charges are not reflected here).
+//
+// No specific management-fee figure is quoted anywhere in this repo: the "1.00%"
+// this comment and the UI footer used to assert was single-sourced from OpenEden
+// docs and could not be corroborated, so it was removed rather than cited. The
+// qualitative claim (fees reduce these returns) stands on its own.
+//
+// SOURCE for the five checkpoints below (+9.69, -5.68, +12.22, +12.03, +9.33):
+//   BNY "Global Short-Dated High Yield Bond" strategy overview PDF,
+//   https://www.bny.com/assets/investments/imemea/pdfs/bny-mellon-global-short-dated-high-yield-bond-strategy-overview-sept-2026.pdf
+//   Table "12-month returns (%)", row "Global short dated high yield bond composite".
+//   Footnote: "Source: Insight as at 30 June 2025. Performance calculated as total
+//   return, income reinvested, gross of fees, in USD."
+// All five come from that single row; none are computed or inferred here.
 //
 // Only the five annual Jun→Jun checkpoints below are real, published data.
 // Method: for each Jul→Jun window, take invented raw monthly returns, then

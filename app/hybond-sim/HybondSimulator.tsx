@@ -47,6 +47,13 @@ import {
   type HybondParams,
 } from '@/lib/hybond/scenarios';
 import {
+  findPreset,
+  queryFromRecord,
+  queryFromState,
+  stateFromQuery,
+  type InitialQuery,
+} from '@/lib/hybond/permalink';
+import {
   indexFromFraction,
   isFullRange,
   moveHandle,
@@ -56,6 +63,8 @@ import {
   pctOf,
   type IndexRange,
 } from '@/lib/hybond/timeframe';
+
+export type { InitialQuery };
 
 // Neutral zero-step result. The engine rejects some configurations outright (e.g. a
 // $0 Junior tranche), and runBacktest runs inside a render-time useMemo, so a throw
@@ -470,65 +479,10 @@ const yearLabel = (year: string, i: number, n: number): string => {
   return year;
 };
 
-const clamp = (v: number, lo: number, hi: number): number =>
-  Math.min(hi, Math.max(lo, v));
-
 /**
  * Port of tenbin-sims/index.html:916-935: execCommand first (it works from a user
  * gesture without a permission prompt), navigator.clipboard as the fallback.
  */
-/** The minimal read surface shared by URLSearchParams and Next's searchParams record. */
-interface Query {
-  get(key: string): string | null;
-}
-
-/** What a server page hands down from its own `searchParams`. */
-export type InitialQuery = Record<string, string | string[] | undefined>;
-
-/** Record → Query. Repeated keys (`?obs=1&obs=2`) read as the first one, as URLSearchParams does. */
-const queryFromRecord = (record: InitialQuery): Query => ({
-  get: (key) => {
-    const raw = record[key];
-    if (Array.isArray(raw)) return raw[0] ?? null;
-    return raw ?? null;
-  },
-});
-
-/**
- * Permalink → state. Every value is clamped to its control's own range, so a
- * hand-edited URL can never push the engine outside a configuration the UI can express.
- */
-function stateFromQuery(q: Query): { params: HybondParams; maintain: boolean } {
-  const preset = PRESETS.find((p) => p.id === q.get('preset'));
-  let params: HybondParams = preset ? { ...preset.params } : { ...HYBOND_DEFAULT_PARAMS };
-
-  const num = (key: string): number | null => {
-    const raw = q.get(key);
-    if (raw === null) return null;
-    const n = Number(raw);
-    return Number.isFinite(n) ? n : null;
-  };
-
-  const coverage = num('coverage');
-  if (coverage !== null) params.minCoveragePct = clamp(Math.round(coverage), 8, 65);
-  const obs = num('obs');
-  if (obs !== null) {
-    params.observationDays = clamp(Math.round(obs), OBSERVATION_DAYS_MIN, OBSERVATION_DAYS_MAX);
-  }
-  const yieldShare = num('yieldShare');
-  if (yieldShare !== null) params.seniorShareToJuniorPct = clamp(Math.round(yieldShare), 20, 80);
-  const exitBuffer = num('exitBuffer');
-  if (exitBuffer !== null) params.exitBufferPct = clamp(exitBuffer, 1, 99.91);
-
-  // A URL-supplied first-loss % only resizes Junior while the link is on; presets carry
-  // a hand-set Junior and stay unlinked.
-  if (params.linkJuniorToFirstLoss) {
-    params = { ...params, depositJT: juniorFromFirstLossPct(params.depositST, params.minCoveragePct) };
-  }
-
-  return { params, maintain: q.get('maintain') !== '0' };
-}
-
 async function writeClipboardText(txt: string): Promise<boolean> {
   if (typeof document === 'undefined') return false;
   const area = document.createElement('textarea');
@@ -663,20 +617,9 @@ export default function HybondSimulator({ initialQuery }: { initialQuery: Initia
     ? maintainedResult.steps[maintainedResult.steps.length - 1].jtIndex
     : 100;
 
-  // Which preset (if any) exactly matches current params — for active styling.
-  const activePreset = useMemo(
-    () =>
-      PRESETS.find(
-        (p) =>
-          p.params.depositST === params.depositST &&
-          p.params.depositJT === params.depositJT &&
-          p.params.seniorShareToJuniorPct === params.seniorShareToJuniorPct &&
-          p.params.observationDays === params.observationDays &&
-          p.params.minCoveragePct === params.minCoveragePct &&
-          p.params.exitBufferPct === params.exitBufferPct,
-      ),
-    [params],
-  );
+  // Which preset (if any) exactly matches current params — for active styling. Shared with
+  // the permalink codec so the emitted `preset` key can never disagree with the ladder.
+  const activePreset = useMemo(() => findPreset(params), [params]);
 
   const jtPct =
     params.depositST + params.depositJT > 0
@@ -686,6 +629,45 @@ export default function HybondSimulator({ initialQuery }: { initialQuery: Initia
   // Every preset run through the real engine: the UI shows a computed pass/fail badge
   // rather than asserting the screen in prose the way Tenbin does (:272).
   const presetScreen = useMemo(() => screenPresets(), []);
+
+  // Ladder prose, DERIVED from the live screen rows. Every comparative below ("the largest
+  // cushion", "the fewest erased claims") is computed by comparing the actual runs, so the
+  // copy cannot contradict them the way the previous hand-written version did — it described
+  // Aggressive as having the "shorter recovery time" and "more erased recovery claims" when
+  // it in fact has the longest term and the fewest erasures.
+  const presetProse = useMemo(() => {
+    // A superlative is only claimed when it is a UNIQUE extreme, so a tie never reads as one.
+    const uniqueExtreme = (pick: (r: (typeof presetScreen)[number]) => number, want: 'max' | 'min') => {
+      const vals = presetScreen.map(pick);
+      const target = want === 'max' ? Math.max(...vals) : Math.min(...vals);
+      const winners = presetScreen.filter((r) => pick(r) === target);
+      return winners.length === 1 ? winners[0].id : null;
+    };
+    const biggestCushion = uniqueExtreme((r) => r.depositJT, 'max');
+    const smallestCushion = uniqueExtreme((r) => r.depositJT, 'min');
+    const longestTerm = uniqueExtreme((r) => r.observationDays, 'max');
+    const shortestTerm = uniqueExtreme((r) => r.observationDays, 'min');
+    const bestJunior = uniqueExtreme((r) => r.juniorEnd, 'max');
+    const mostErased = uniqueExtreme((r) => r.erasedRecoveryClaims, 'max');
+    const fewestErased = uniqueExtreme((r) => r.erasedRecoveryClaims, 'min');
+
+    return presetScreen.map((r) => {
+      const cushion =
+        r.id === biggestCushion ? 'the largest' : r.id === smallestCushion ? 'the smallest' : 'a middle';
+      const term =
+        r.id === longestTerm ? 'the longest' : r.id === shortestTerm ? 'the shortest' : 'a middle';
+      const erasedTag =
+        r.id === fewestErased ? ', the fewest of the three' : r.id === mostErased ? ', the most of the three' : '';
+      return {
+        id: r.id,
+        label: r.label,
+        // e.g. "$300 Junior cushion (the smallest) and the longest 120-day observation."
+        setup: `${fmtUsd0(r.depositJT)} Junior cushion (${cushion}) and ${term} ${r.observationDays}-day observation.`,
+        // e.g. "Junior ends at 186.18, the highest of the three, with 1 erased recovery claim, the fewest of the three."
+        outcome: `Junior ends at ${r.juniorEnd.toFixed(2)}${r.id === bestJunior ? ', the highest of the three,' : ','} with ${r.erasedRecoveryClaims} erased recovery claim${r.erasedRecoveryClaims === 1 ? '' : 's'}${erasedTag}.`,
+      };
+    });
+  }, [presetScreen]);
 
   // The Senior hard guardrail. `seniorMaxDrawdown` is a float reduction over the whole
   // path, so it is tested against a dust threshold rather than exact zero.
@@ -697,15 +679,37 @@ export default function HybondSimulator({ initialQuery }: { initialQuery: Initia
     ? (Number(result.steps[0].coverageUtilWad) / 1e18) * 100
     : 0;
   const firstSeniorLoss = result.seniorLossEvents[0] ?? null;
-  // Peak coverage utilization actually reached. The exit threshold is 100/bufferPct, so
-  // this is what decides whether ANY buffer setting could open the protected exit.
-  const maxCoverageUtil = useMemo(
-    () =>
-      result.steps.length
-        ? Math.max(...result.steps.map((s) => Number(s.coverageUtilWad) / 1e18))
-        : 0,
+
+  // Junior's ACTUAL first-loss protection at genesis: its effective NAV as a share of the
+  // whole pool, i.e. dollars absorbed per $100 of market exposure. This is a DIFFERENT
+  // quantity from minCoveragePct, which is the contractual FLOOR the coverage ratio is held
+  // to (engine.ts:182 — utilization <= 1 iff jtEff >= minCoverage * exposure). At the linked
+  // defaults they read 33.33% vs 30%; once Junior is unlinked they decouple entirely. The
+  // hint below states both rather than asserting the floor as if it were the protection.
+  const genesisFirstLossPct = useMemo(() => {
+    const s0 = result.steps[0];
+    const pool = params.depositST + params.depositJT;
+    if (!s0 || pool <= 0) return NaN;
+    return ((Number(s0.jtEff) / 1e18) / pool) * 100;
+  }, [result.steps, params.depositST, params.depositJT]);
+  // Whether Junior was ever fully wiped on this path. The engine returns UINT256_MAX for
+  // coverage utilization when jtEff is 0 (engine.ts:181), so utilization is UNBOUNDED there
+  // rather than merely large, and reporting that sentinel as a number would be nonsense.
+  const coverageUtilUnbounded = useMemo(
+    () => result.steps.some((s) => s.jtEff === 0n),
     [result.steps],
   );
+  // Peak coverage utilization actually reached, over the steps where it is a finite quantity.
+  // The exit threshold is 100/bufferPct, so this is what decides whether the current buffer
+  // setting opens the protected exit on THIS path.
+  const maxCoverageUtil = useMemo(() => {
+    const finite = result.steps
+      .filter((s) => s.jtEff > 0n)
+      .map((s) => Number(s.coverageUtilWad) / 1e18);
+    return finite.length ? Math.max(...finite) : 0;
+  }, [result.steps]);
+  // The utilization at which THIS buffer setting opens the protected Senior exit.
+  const exitUtilThreshold = utilizationPctFromBufferPct(params.exitBufferPct) / 100;
   // Senior's share of the underlying's return. Engine-derived on both sides: there is
   // no imported yield target here.
   const seniorCapturePct =
@@ -910,7 +914,19 @@ export default function HybondSimulator({ initialQuery }: { initialQuery: Initia
         : params.depositJT,
     [result.steps, params.depositJT],
   );
-  const juniorEverNearExhaustion = juniorMinEffNav < params.depositJT * 0.1;
+  // Junior has THREE distinct end states on a path, and the copy below must not collapse
+  // them: "fell low but survived" is not "was exhausted". Exhaustion is an event the engine
+  // reports (a juniorWiped erasure, or effective NAV actually reaching 0), never an
+  // inference from a low balance — Junior bottoming at $4.40 of $50 with zero wipes was
+  // being described as "exhausted", which simply did not happen.
+  const juniorWiped = useMemo(
+    () =>
+      result.erasureEvents.some((e) => e.reason === 'juniorWiped') ||
+      result.steps.some((s) => s.jtEff === 0n),
+    [result.erasureEvents, result.steps],
+  );
+  // Survived, but drained to under a tenth of its deposit.
+  const juniorRanLow = !juniorWiped && juniorMinEffNav < params.depositJT * 0.1;
   const seniorDivergesUnderExposure = Math.abs(exposedSeniorEnd - seniorEnd) >= 0.01;
   const juniorEnd = result.steps.length
     ? result.steps[result.steps.length - 1].jtIndex
@@ -933,17 +949,11 @@ export default function HybondSimulator({ initialQuery }: { initialQuery: Initia
       return { ...next, depositJT: juniorFromFirstLossPct(next.depositST, next.minCoveragePct) };
     });
 
+  // The codec lives in lib/hybond/permalink.ts so the round-trip property is testable
+  // headlessly against the REAL implementation (lib/hybond/permalink.test.ts).
   const permalink = (): string => {
     if (typeof window === 'undefined') return '';
-    const q = new URLSearchParams({
-      preset: activePreset?.id ?? 'custom',
-      coverage: String(params.minCoveragePct),
-      obs: String(params.observationDays),
-      yieldShare: String(params.seniorShareToJuniorPct),
-      exitBuffer: String(params.exitBufferPct),
-      maintain: maintainCoverage ? '1' : '0',
-    });
-    return `${window.location.origin}${window.location.pathname}?${q.toString()}`;
+    return `${window.location.origin}${window.location.pathname}?${queryFromState(params, maintainCoverage)}`;
   };
 
   const [copyLinkLabel, setCopyLinkLabel] = useState('Copy link');
@@ -969,14 +979,18 @@ export default function HybondSimulator({ initialQuery }: { initialQuery: Initia
       `Scenario: ${activeScenarioName}`,
       '',
       'Chosen market terms',
-      `firstLossProtection: ${params.minCoveragePct}%`,
+      // The MINIMUM coverage ratio, not the protection actually posted at genesis: those are
+      // different quantities (33.33% vs 30% at the defaults) and diverge once Junior is
+      // unlinked, so both are emitted, each named for what it is.
+      `minFirstLossProtection: ${params.minCoveragePct}%   // contractual floor: minCoverageWAD`,
+      `genesisFirstLossProtection: ${genesisFirstLossPct.toFixed(2)}%   // actual, Junior effective NAV / market exposure at genesis`,
       `observationPeriod: ${params.observationDays} days`,
       `seniorYieldSharePaidToJunior: ${params.seniorShareToJuniorPct}%`,
       `seniorExitTrigger: ${fmtTrim(params.exitBufferPct, 2)}% Junior buffer remaining`,
       `initialFundingRead: ${jtPct.toFixed(1)}% Junior / ${(100 - jtPct).toFixed(1)}% Senior at 90% target utilization`,
       '',
       'MarketConfig fields resolved by this tool',
-      `minCoverageWAD: ${config.minCoverageWAD.toString()}   // ${params.minCoveragePct}% first-loss protection`,
+      `minCoverageWAD: ${config.minCoverageWAD.toString()}   // ${params.minCoveragePct}% MINIMUM first-loss coverage ratio`,
       `fixedTermDurationSeconds: ${config.fixedTermDurationSeconds.toString()}   // ${params.observationDays} days`,
       `coverageLiquidationUtilizationWAD: ${config.coverageLiquidationUtilizationWAD.toString()}   // opens Senior exit at ${fmtTrim(params.exitBufferPct, 1)}% Junior buffer remaining (${fmtTrim(thresholdUtilPct, 2)}% utilization)`,
       `jtCoinvested: ${config.jtCoinvested}   // Junior follows the same strategy path as Senior`,
@@ -1025,7 +1039,7 @@ export default function HybondSimulator({ initialQuery }: { initialQuery: Initia
       '- The underlying series is sampled MONTHLY, so an observation period is only ever observed closing at a month end. Historical samples can land well after the exact deploy expiry, and the observed maximum above overstates the configured term for that reason.',
       '- Concrete assets, oracle/quoter wiring, authority, fee policy, whitelist policy, and deployed contract addresses must come from the production integration.',
     ].join('\n');
-  }, [config, params, result, gap, jtPct, seniorProtected, activeScenarioName]);
+  }, [config, params, result, gap, jtPct, seniorProtected, activeScenarioName, genesisFirstLossPct]);
 
   const [copyDeployLabel, setCopyDeployLabel] = useState('Copy');
   const deployRef = useRef<HTMLTextAreaElement>(null);
@@ -1268,7 +1282,7 @@ export default function HybondSimulator({ initialQuery }: { initialQuery: Initia
                 max={65}
                 step={1}
                 display={`${params.minCoveragePct}%`}
-                desc={`Junior first-loss reserve. ${params.minCoveragePct}% means about $${params.minCoveragePct} of protection per $100 of market exposure before Senior can lose money.`}
+                desc={`Junior first-loss reserve. At genesis, Junior provides ${fmtUsd(genesisFirstLossPct)} of first-loss protection per $100 of market exposure, both computed from the run. The contractual minimum this slider sets is ${fmtUsd(params.minCoveragePct)} per $100: the floor coverage is held to, not the protection actually posted.`}
                 onChange={(v) => updateParam({ minCoveragePct: v })}
               >
                 {params.linkJuniorToFirstLoss ? (
@@ -1343,12 +1357,36 @@ export default function HybondSimulator({ initialQuery }: { initialQuery: Initia
                 desc={exitThresholdNote(params.exitBufferPct)}
                 onChange={(v) => updateParam({ exitBufferPct: v })}
               >
+                {/* Every claim here is about THIS configuration and comes from this run. An
+                    earlier version generalised the default path's peak utilization into a claim
+                    that the exit could never open "at any setting of this slider", which other
+                    configurations falsify outright (Aggressive with fixed Junior peaks at 1.3963
+                    and does open the exit). One path cannot support a global claim. */}
                 <p className="mt-1.5" style={{ color: C.kpiLabel, fontSize: 11, lineHeight: 1.5 }}>
-                  Derived read: {result.exitTriggerHits} exit trigger hits on this path. Coverage
-                  utilization peaks at {maxCoverageUtil.toFixed(4)} here, and even the most
-                  aggressive legal setting (99.91% buffer) only lowers the threshold to 1.0009, so
-                  Junior&apos;s buffer never depletes far enough to open the protected exit at any
-                  setting of this slider. It does not move the outcome on this series.
+                  Derived read, for this configuration: coverage utilization{' '}
+                  {coverageUtilUnbounded ? (
+                    <>
+                      is unbounded on this path, because Junior is fully wiped at least once and
+                      the accountant reports no finite coverage ratio against a $0 buffer (it
+                      peaks at {maxCoverageUtil.toFixed(4)} while Junior is still solvent)
+                    </>
+                  ) : (
+                    <>peaks at {maxCoverageUtil.toFixed(4)}</>
+                  )}
+                  , against the {exitUtilThreshold.toFixed(4)} threshold this{' '}
+                  {fmtTrim(params.exitBufferPct, 2)}% buffer sets.{' '}
+                  {result.exitTriggerHits > 0 ? (
+                    <>
+                      The protected exit opens {result.exitTriggerHits} time
+                      {result.exitTriggerHits === 1 ? '' : 's'} here, so this slider does move the
+                      outcome on this configuration.
+                    </>
+                  ) : (
+                    <>
+                      The protected exit never opens on this configuration. Other settings of this
+                      slider, and other parameters, can open it.
+                    </>
+                  )}
                 </p>
               </SliderControl>
             </div>
@@ -1899,18 +1937,19 @@ export default function HybondSimulator({ initialQuery }: { initialQuery: Initia
                 <p style={{ fontWeight: 600, color: C.text, fontSize: 13, marginBottom: 8 }}>
                   Preset ladder
                 </p>
-                <ProseRow color={C.olive}>
-                  <b>Conservative</b>, larger Junior cushion and more recovery time. Lower Junior
-                  upside, fewer erased recovery claims.
-                </ProseRow>
-                <ProseRow color={C.seniorLine}>
-                  <b>Balanced</b>, middle setting: Senior stays protected historically, while
-                  Junior still gets meaningful upside.
-                </ProseRow>
-                <ProseRow color={C.juniorLine}>
-                  <b>Aggressive</b>, smaller Junior cushion and shorter recovery time. Higher
-                  Junior upside, more erased recovery claims.
-                </ProseRow>
+                {/* Prose is derived from the same runs as the badges below (presetProse), so a
+                    retuned preset updates its own description instead of silently contradicting
+                    it. See the note on PresetScreenRow. */}
+                {presetProse.map((p) => (
+                  <ProseRow
+                    key={p.id}
+                    color={
+                      p.id === 'conservative' ? C.olive : p.id === 'balanced' ? C.seniorLine : C.juniorLine
+                    }
+                  >
+                    <b>{p.label}</b>, {p.setup} {p.outcome}
+                  </ProseRow>
+                ))}
                 <div className="mt-3 flex flex-col gap-1.5">
                   {presetScreen.map((s) => (
                     <div key={s.id} className="flex items-center gap-2" style={{ fontSize: 11, color: C.muted }}>
@@ -1923,8 +1962,9 @@ export default function HybondSimulator({ initialQuery }: { initialQuery: Initia
                   ))}
                 </div>
                 <p className="mt-2" style={{ color: C.kpiLabel, fontSize: 11, lineHeight: 1.6 }}>
-                  Scenarios vary how much risk Junior takes. The badges above are computed live by
-                  re-running each preset through the accountant on this series, not asserted.
+                  Scenarios vary how much risk Junior takes. Both the descriptions and the badges
+                  above are computed live by re-running each preset through the accountant on this
+                  series, not asserted.
                 </p>
               </div>
             </div>
@@ -2061,17 +2101,23 @@ export default function HybondSimulator({ initialQuery }: { initialQuery: Initia
               <>
                 On this path, replenishment did not change Senior&apos;s outcome. Senior ends at{' '}
                 <span style={{ fontFamily: MONO, fontWeight: 600 }}>{fmtUsd(seniorEnd)}</span>{' '}
-                either way (uncheck the box to compare), because Junior&apos;s buffer was never
-                close to exhausted.
+                either way (uncheck the box to compare).
               </>
             )}{' '}
-            {juniorEverNearExhaustion ? (
+            {juniorWiped ? (
+              <>
+                Junior&apos;s effective NAV was fully exhausted on this path, reaching{' '}
+                <span style={{ fontFamily: MONO, fontWeight: 600, color: C.danger }}>$0.00</span>{' '}
+                against a {fmtUsd0(params.depositJT)} deposit.
+              </>
+            ) : juniorRanLow ? (
               <>
                 Junior&apos;s effective NAV did fall as low as{' '}
                 <span style={{ fontFamily: MONO, fontWeight: 600 }}>
                   {fmtUsd(juniorMinEffNav)}
                 </span>{' '}
-                against a {fmtUsd0(params.depositJT)} deposit on this path.
+                of its {fmtUsd0(params.depositJT)} deposit on this path, but was never
+                exhausted.
               </>
             ) : (
               <>
@@ -2092,11 +2138,23 @@ export default function HybondSimulator({ initialQuery }: { initialQuery: Initia
           <p className="mt-3" style={{ color: C.text, fontSize: 14, lineHeight: 1.7 }}>
             <strong>Fixed Junior capital, no replenishment.</strong> Once a crash exhausts
             Junior there is no buffer left, so Senior would track the underlying down. On this
-            path, {juniorEverNearExhaustion ? (
+            path, {juniorWiped ? (
               <>Junior was exhausted and Senior ends at{' '}
                 <span style={{ fontFamily: MONO, fontWeight: 600, color: C.danger }}>
                   {fmtUsd(seniorEnd)}
                 </span>
+                .</>
+            ) : juniorRanLow ? (
+              <>Junior fell to{' '}
+                <span style={{ fontFamily: MONO, fontWeight: 600 }}>
+                  {fmtUsd(juniorMinEffNav)}
+                </span>{' '}
+                of its {fmtUsd0(params.depositJT)}, but was never exhausted, so fixed Junior
+                survives and Senior ends at{' '}
+                <span style={{ fontFamily: MONO, fontWeight: 600 }}>{fmtUsd(seniorEnd)}</span>
+                {seniorSameWhenFixed
+                  ? ', the same as the maintained-coverage case'
+                  : `, versus ${fmtUsd(maintainedSeniorEnd)} with replenishment`}
                 .</>
             ) : (
               <>Junior was never close to exhausted, so fixed Junior survives, and Senior ends
@@ -2147,8 +2205,9 @@ export default function HybondSimulator({ initialQuery }: { initialQuery: Initia
           multi-year history. The underlying series is a proxy built from Insight&apos;s Global
           Short-Dated High Yield Bond composite, total return, gross of fees, per Insight as at
           30 June 2025. A composite aggregates accounts following the strategy, it is not the
-          NAV of any share class, and gross of fees is not what a holder receives. HYBOND&apos;s
-          1.00% management fee and the fund&apos;s own charges would reduce these returns.
+          NAV of any share class, and gross of fees is not what a holder receives.
+          HYBOND&apos;s management fee and the fund&apos;s own charges would reduce these
+          returns.
         </p>
         <p className="mt-2">
           Only five annual checkpoints, June to June, come from published data. The month to
