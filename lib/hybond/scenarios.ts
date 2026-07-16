@@ -67,10 +67,20 @@ export interface HybondParams extends TryParams {
   linkJuniorToFirstLoss: boolean;
 }
 
+/**
+ * The page lands on the Balanced rung, so the ladder shows a named preset rather than
+ * "Custom" on first paint (tenbin likewise boots onto a preset). These three knobs are
+ * Balanced's, kept in sync with the `rung` call below; Junior derives from first-loss,
+ * so it is computed here rather than hand-set.
+ */
 export const HYBOND_DEFAULT_PARAMS: HybondParams = {
   ...TRY_DEFAULT_PARAMS,
   exitBufferPct: 5, // Tenbin's default → 20e18
   linkJuniorToFirstLoss: true,
+  minCoveragePct: 30,
+  observationDays: 45,
+  seniorShareToJuniorPct: 62,
+  depositJT: juniorFromFirstLossPct(TRY_DEFAULT_PARAMS.depositST, 30),
 };
 
 /** TRY's config plus HYBond's exit-buffer-derived liquidation threshold. */

@@ -15,7 +15,7 @@ The existing 52 vectors prove the engine on **TRY-flavored** inputs. They do **n
 `lib/hybond/harness/HybondVectorGen.t.sol` (group **F**, labels `F_hybond_1..61`) drives the **real compiled** `RoycoDayAccountant` (behind an ERC1967 proxy) via `preOpSyncTrancheAccounting(stRaw, jtRaw)` pranked as the kernel, on a monotonic `vm.warp` clock, over:
 
 - **Series:** `HYBOND_NAV_SERIES` from `lib/hybond/scenarios.ts` — 61 monthly points, 2020-06 = 100 → 2025-06 ≈ 142.20 (composite proxy, see "Data provenance and scope" below).
-- **Params:** HYBond defaults (`HYBOND_DEFAULT_PARAMS`, which alias `TRY_DEFAULT_PARAMS`): depositST 1000, depositJT 500, seniorShareToJuniorPct 53, observationDays 30 (→ `fixedTermDurationSeconds` 2,592,000), minCoveragePct 30.
+- **Params:** HYBond defaults (`HYBOND_DEFAULT_PARAMS`): depositST 1000, depositJT 500 (derived from first-loss 30%), seniorShareToJuniorPct 62, observationDays 45 (→ `fixedTermDurationSeconds` 3,888,000), minCoveragePct 30. These are the **Balanced** preset's knobs — the page lands on that rung, so what is certified below is the config the page actually runs on first paint.
 - **Genesis:** JT_DEPOSIT then ST_DEPOSIT at price 1.0, mirroring `runBacktest`'s `deposit(m,"JT",0,jtNav0); deposit(m,"ST",stNav0,jtNav0)`.
 - **Driving (replicates `lib/try/backtest.ts` exactly):** Senior is fixed capital, `stRaw_i = floor(stNav0 * price_i / price_0)` (price indexed off the FIRST point, i.e. 100.0 → `priceWad0` = 100e18 — not 1.0). Junior is carried: `jtRaw_0 = jtNav0`, `jtRaw_i = floor(jtCarry * price_i / price_{i-1})` with `jtCarry` = the accountant's returned `jtRawNAV`. `dt` = real seconds between month starts (hence 2,419,200 / 2,505,600 / 2,592,000 / 2,678,400 — genuine calendar months, not uniform 30d).
 
@@ -25,7 +25,7 @@ The harness's price/`dt` literals are **emitted from `lib/hybond/scenarios.ts`**
 
 ## What the path exercises
 
-Not a happy path: the 2022 high-yield selloff drives Senior underwater and Junior into coverage. **6 of 61 steps** book non-zero JT coverage IL and sit in **FIXED_TERM** (steps 18, 20, 22, 24, 28 — the 2021-11 → 2022-09 drawdown — and step 59, 2025-04), with PERPETUAL↔FIXED_TERM transitions, term elapse, and IL erasure in between. The remaining steps exercise the gain waterfall (Senior keeps 47%, Junior takes the 53% yield share) and time-weighted JT premium accrual across real calendar-month `dt`s.
+Not a happy path: the 2022 high-yield selloff drives Senior underwater and Junior into coverage. **8 of 61 steps** book non-zero JT coverage IL and sit in **FIXED_TERM** (steps 18, 20, 21, 23, 24, 28, 29 — the 2021-11 → 2022-09 drawdown — and step 59, 2025-04), with PERPETUAL↔FIXED_TERM transitions, term elapse, and IL erasure in between. Two steps (22 and 25) carry a contract-emitted non-zero `ilErased`. The remaining steps exercise the gain waterfall (Senior keeps 38%, Junior takes the 62% yield share) and time-weighted JT premium accrual across real calendar-month `dt`s.
 
 ## Scope boundary — what IS and ISN'T covered
 

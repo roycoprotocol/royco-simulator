@@ -14,7 +14,7 @@ import { ERC1967Proxy } from "../../lib/openzeppelin-contracts/contracts/proxy/E
 /// @dev HYBond vector generator (group "F"). Drives the REAL RoycoDayAccountant over the
 /// srHYBond simulator's ACTUAL 61-point monthly NAV series (BNY Mellon Global Short-Dated
 /// High Yield Bond Fund, 2020-06 = 100 .. 2025-06 ~= 142.20) using HYBond's DEFAULT params
-/// (depositST 1000, depositJT 500, seniorShareToJuniorPct 53, observationDays 30,
+/// (depositST 1000, depositJT 500, seniorShareToJuniorPct 62, observationDays 45,
 /// minCoveragePct 30 -- see lib/hybond/scenarios.ts / lib/try/scenarios.ts).
 ///
 /// The raw-NAV driving replicates lib/try/backtest.ts EXACTLY:
@@ -55,13 +55,13 @@ contract HybondVectorGenTest is Test {
             minLiquidityWAD: 0,
             jtYDM: address(jtYDM),
             jtYDMInitializationData: abi.encodeCall(
-                StaticCurveYDM.initializeYDMForMarket, (uint64(0.53e18), uint64(0.53e18), uint64(0.53e18))
+                StaticCurveYDM.initializeYDMForMarket, (uint64(0.62e18), uint64(0.62e18), uint64(0.62e18))
             ),
             ltYDM: address(ltYDM),
             ltYDMInitializationData: abi.encodeCall(StaticCurveYDM.initializeYDMForMarket, (uint64(1), uint64(1), uint64(1))),
             maxJTYieldShareWAD: uint64(1e18),
             maxLTYieldShareWAD: 0,
-            fixedTermDurationSeconds: uint24(2_592_000), // observationDays 30
+            fixedTermDurationSeconds: uint24(3_888_000), // observationDays 45
             stNAVDustTolerance: toNAVUnits(uint256(0)),
             jtNAVDustTolerance: toNAVUnits(uint256(0)),
             stProtocolFeeWAD: 0,
