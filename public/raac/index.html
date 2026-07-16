@@ -139,12 +139,30 @@ details[open]>.setupSummary:after{content:"-"}
   <div class="controlGroup">
     <span>Loaded market</span>
     <div class="seg" id="mkt"></div>
+    <button type="button" class="copyBtn shareBtn" id="addMktBtn" style="padding:8px 11px">+ Your market</button>
   </div>
   <div></div>
   <div style="display:flex;gap:8px;align-items:center">
     <a class="copyBtn shareBtn" href="/raac/legend.html" style="text-decoration:none">Legend</a>
     <button type="button" class="copyBtn shareBtn" id="copyPermalinkBtn">Copy link</button>
   </div>
+</div>
+<div id="addMktPanel" class="card" style="display:none;margin-bottom:12px;padding:15px">
+  <div class="eyebrow">Run the model on your own market</div>
+  <p class="plain" style="margin:4px 0 10px">Paste your market's <b>value history</b> — one row per day. We normalize it to a $100 start and run the whole tool (chart, terms, and the Monte Carlo) on it. The format is flexible: it reads plain numbers, or <code>date, value</code>, CSV, or tab-separated; it ignores headers, <code>$</code>, <code>%</code> and thousands commas.</p>
+  <div class="builderGrid" style="grid-template-columns:minmax(0,2fr) minmax(0,1fr);align-items:start;gap:14px">
+    <div>
+      <label class="hint" style="display:block;margin-bottom:4px"><b>Your data</b> — the daily value of the position (any unit; we rescale it)</label>
+      <textarea id="addMktData" rows="6" spellcheck="false" style="width:100%;font-family:'SFMono-Regular',Consolas,monospace;font-size:12px;border:1px solid var(--line);padding:8px;background:#fff" placeholder="2026-03-12, 100&#10;2026-03-13, 99.4&#10;2026-03-14, 101.2&#10;...&#10;&#10;(or just one value per line, no dates)"></textarea>
+    </div>
+    <div>
+      <div class="ctl" style="margin-bottom:10px"><label style="text-transform:none;letter-spacing:0;font-size:12px">Market name</label><input id="addMktName" type="text" value="My market" style="width:100%;border:1px solid var(--line);padding:8px;font-size:13px"><div class="hint">Shown on the tab.</div></div>
+      <div class="ctl" style="margin-bottom:10px"><label style="text-transform:none;letter-spacing:0;font-size:12px">Extra yield APY (%) — optional</label><input id="addMktYield" type="number" value="0" step="1" style="width:100%;border:1px solid var(--line);padding:8px;font-size:13px"><div class="hint">If your data is <b>price only</b> and the position also earns a reward yield (e.g. Convex/StakeDAO), put that annual % here and we add it on top. If your data already includes the yield, leave 0.</div></div>
+      <button type="button" class="copyBtn shareBtn" id="addMktLoad" style="width:100%">Load market</button>
+      <div id="addMktMsg" style="font-size:12px;margin-top:6px;line-height:1.4"></div>
+    </div>
+  </div>
+  <p class="hint" style="margin:10px 0 0">Tip: the more history the better. Under ~90 days the volatility is unreliable and the Monte Carlo will warn you. Your data stays in your browser — nothing is uploaded.</p>
 </div>
 
 <div class="decisionShell">
@@ -162,7 +180,7 @@ details[open]>.setupSummary:after{content:"-"}
     </div>
   </section>
 
-  <details class="infoDetails card" id="builderDetails" aria-label="Customize market terms">
+  <details class="infoDetails card" id="builderDetails" open aria-label="Customize market terms">
     <summary class="infoSummary">
       <div>
         <div class="eyebrow">Customize terms</div>
@@ -284,6 +302,7 @@ details[open]>.setupSummary:after{content:"-"}
       </summary>
       <div class="setupDropdown">
         <div id="mcGate">
+          <p class="plain" style="margin:0 0 8px"><b>🔒 Royco team only.</b> Enter the team password to unlock the forward Monte Carlo.</p>
           <div class="controlGroup">
             <input type="password" id="mcPw" placeholder="Team password" style="padding:10px 12px;border:1px solid var(--line);background:#fff;font-size:14px;max-width:220px;color:var(--ink)">
             <button type="button" class="copyBtn shareBtn" id="mcPwBtn">Unlock viability</button>
@@ -1042,11 +1061,51 @@ brushStart_.addEventListener('keydown',ev=>{ if(ev.key==='ArrowLeft'||ev.key==='
 brushEnd_.addEventListener('keydown',ev=>{ if(ev.key==='ArrowLeft'||ev.key==='ArrowRight'){ ev.preventDefault(); moveBrushSide('end',viewB+(ev.key==='ArrowRight'?1:-1)*(ev.shiftKey?21:5)); }});
 if(chartDetails_) chartDetails_.addEventListener('toggle',()=>{ if(chartDetails_.open){ syncTimeControls(); draw(); drawBrushOverview(); }});
 document.querySelectorAll('#presets button').forEach(b=>b.addEventListener('click',()=>setPreset(b.dataset.p)));
-buildMarketButtons();
-document.querySelectorAll('#mkt button').forEach(b=>b.addEventListener('click',()=>{
-  setMarketButton(b.dataset.m);
-  const nextPreset=PRESET||DEFAULT_PRESET; MKT=b.dataset.m;
-  refreshPresetLabels(); setPreset(nextPreset); if(typeof mcOnMarket==='function') mcOnMarket(); }));
+function wireMktButtons(){ document.querySelectorAll('#mkt button').forEach(b=>{ b.onclick=()=>{
+  setMarketButton(b.dataset.m); MKT=b.dataset.m; refreshPresetLabels();
+  setPreset(PRESET||DEFAULT_PRESET); if(typeof mcOnMarket==='function') mcOnMarket(); }; }); }
+buildMarketButtons(); wireMktButtons();
+
+/* ---------- Your market: paste a value history in (almost) any format ---------- */
+function mcParseDate(s){ s=s.trim();
+  if(/^\d{4}-\d{1,2}-\d{1,2}/.test(s)){ const t=Date.parse(s.slice(0,10)+'T00:00:00Z'); return Number.isFinite(t)?Math.round(t/864e5):null; }
+  if(/^\d{1,2}\/\d{1,2}\/\d{2,4}$/.test(s)){ const t=Date.parse(s); return Number.isFinite(t)?Math.round(t/864e5):null; }
+  return null; }
+function parseSeries(text){ const out=[];
+  const dateRe=/\d{4}-\d{1,2}-\d{1,2}|\d{1,2}\/\d{1,2}\/\d{2,4}/;
+  const numRe=/-?\d{1,3}(?:,\d{3})+(?:\.\d+)?|-?\d+(?:\.\d+)?|-?\.\d+/g; // supports 1,050.5 thousands
+  for(const raw of String(text).split(/\r?\n/)){ const line=raw.trim(); if(!line) continue;
+    const dm=line.match(dateRe); const date=dm?mcParseDate(dm[0]):null;
+    const rest=dm?line.replace(dm[0],' '):line;      // strip the date so it isn't read as a number
+    const nums=rest.match(numRe);                     // the value = last number on the line
+    if(!nums||!nums.length) continue;
+    const val=parseFloat(nums[nums.length-1].replace(/,/g,''));
+    if(Number.isFinite(val)) out.push({date,val}); }
+  return out; }
+function loadCustomMarket(){
+  const msg=document.getElementById('addMktMsg');
+  const rows=parseSeries(document.getElementById('addMktData').value||'');
+  if(rows.length<8){ msg.style.color='var(--red)'; msg.textContent='Need at least ~8 rows of numeric data.'; return; }
+  let off,start;
+  if(rows.every(r=>r.date!=null)){ rows.sort((a,b)=>a.date-b.date); const d0=rows[0].date; off=rows.map(r=>r.date-d0); start=new Date(d0*864e5).toISOString().slice(0,10); }
+  else { off=rows.map((_,i)=>i); start='2020-01-01'; }
+  const v0=rows[0].val; if(!(v0>0)){ msg.style.color='var(--red)'; msg.textContent='The first value must be a positive number.'; return; }
+  const yApy=(parseFloat(document.getElementById('addMktYield').value)||0)/100;
+  const P=rows.map((r,i)=>{ let p=r.val/v0*100; if(yApy) p*=Math.pow(1+yApy,off[i]/365); return +p.toFixed(4); });
+  let pk=-1e9,dd=0; for(const p of P){ pk=Math.max(pk,p); dd=Math.min(dd,p/pk-1); } const aDD=Math.abs(dd*100);
+  const cl=(v,lo,hi)=>Math.max(lo,Math.min(hi,Math.round(v))), key='__custom';
+  DATA[key]={start,off,P,coupon:yApy,carry:0,ccy:'USD'};
+  MARKET_META[key]={label:((document.getElementById('addMktName').value||'My market').slice(0,24)),name:'Your pasted market',desc:'Your own market data, run through the model.'};
+  PRESETS[key]={Conservative:{cov:cl(aDD*1.4+8,12,60),obs:60,ys:60},Moderate:{cov:cl(aDD+5,10,50),obs:45,ys:65},Aggressive:{cov:cl(aDD*0.6+3,6,40),obs:20,ys:75}};
+  delete cache[key];
+  buildMarketButtons(); wireMktButtons();
+  setMarketButton(key); MKT=key; refreshPresetLabels(); setPreset('Moderate');
+  if(typeof mcOnMarket==='function') mcOnMarket();
+  msg.style.color='var(--green)'; msg.textContent='Loaded '+P.length+' points spanning '+(off[off.length-1]+1)+' days. Switched to it — unlock the Monte Carlo to see viability.';
+}
+const addMktBtn_=document.getElementById('addMktBtn'), addMktPanel_=document.getElementById('addMktPanel');
+if(addMktBtn_) addMktBtn_.addEventListener('click',()=>{ addMktPanel_.style.display=addMktPanel_.style.display==='none'?'block':'none'; });
+const addMktLoad_=document.getElementById('addMktLoad'); if(addMktLoad_) addMktLoad_.addEventListener('click',loadCustomMarket);
 
 /* ---------- Monte Carlo: gated team unlock ---------- */
 let mcLoaded=false;
@@ -1073,5 +1132,6 @@ if(mcPwBtn){
 }
 
 hydrateFromPermalink();
-mcTryLoad(true);
+// The Monte Carlo never auto-loads: the team must enter the password every visit,
+// so it is never shown to a yield source (and a refresh re-locks it).
 </script></body></html>
