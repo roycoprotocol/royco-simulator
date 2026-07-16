@@ -130,12 +130,13 @@ const C = {
   cardBg: '#FFFDF9',
   border: '#E8E2D8',
   text: '#171511',
-  muted: '#6B6459',
+  muted: '#6D6860',
   eyebrow: '#967756',
   kpiLabel: '#A49B90',
-  accent: '#8E7355',
-  olive: '#5F7A3E',
-  danger: '#A6483C',
+  accent: '#967756',
+  olive: '#319C61',
+  danger: '#8F4D42',
+  faint: '#B9B1A5',
   seniorLine: '#8E7355',
   juniorLine: '#1B1A17',
   strategyLine: '#A7A39A',
@@ -147,7 +148,7 @@ const C = {
 };
 
 const SERIF = "Georgia, 'Times New Roman', serif";
-const MONO = "ui-monospace, 'SF Mono', SFMono-Regular, monospace";
+const MONO = '"SFMono-Regular", Consolas, monospace';
 
 // Sign-aware color for returns/drawdowns.
 const signColor = (frac: number): string => (frac < 0 ? C.danger : C.text);
@@ -1140,7 +1141,7 @@ export default function HybondSimulator({ initialQuery }: { initialQuery: Initia
   };
 
   return (
-    <div className="flex flex-col gap-10">
+    <div className="flex flex-col" style={{ gap: 10 }}>
       {/* ================= 1. HERO ================= */}
       <section>
         <div className="flex items-center gap-2">
@@ -1157,8 +1158,8 @@ export default function HybondSimulator({ initialQuery }: { initialQuery: Initia
             style={{
               color: C.eyebrow,
               textTransform: 'uppercase',
-              fontSize: 9.5,
-              letterSpacing: 2,
+              fontSize: 10.5,
+              letterSpacing: '0.28em',
               fontWeight: 600,
             }}
           >
@@ -1166,19 +1167,20 @@ export default function HybondSimulator({ initialQuery }: { initialQuery: Initia
           </span>
         </div>
         <h1
-          className="mt-3"
+          className="mt-3 max-w-3xl"
           style={{
             fontFamily: SERIF,
             fontWeight: 400,
-            fontSize: 42,
-            lineHeight: 1.05,
+            fontSize: 'clamp(32px,3.4vw,44px)',
+            lineHeight: 1,
             letterSpacing: '-0.02em',
+            margin: '12px 0 6px',
             color: C.text,
           }}
         >
           HYBond Sim
         </h1>
-        <p className="mt-3 max-w-3xl" style={{ color: C.muted, fontSize: 14, lineHeight: 1.6 }}>
+        <p className="max-w-3xl" style={{ color: C.muted, fontSize: 13, lineHeight: 1.42, margin: '0 0 14px' }}>
           HYBond Sim models a hypothetical Royco senior and junior market over the BNY Mellon
           and Insight Global Short-Dated High Yield Bond strategy, the portfolio behind
           OpenEden&apos;s tokenized HYBOND. Senior is shielded by Junior&apos;s first-loss
@@ -1200,7 +1202,7 @@ export default function HybondSimulator({ initialQuery }: { initialQuery: Initia
             textTransform: 'uppercase',
             fontSize: 10,
             letterSpacing: 1,
-            padding: '7px 12px',
+            padding: '9px 12px',
             background: 'transparent',
           }}
         >
@@ -1214,10 +1216,11 @@ export default function HybondSimulator({ initialQuery }: { initialQuery: Initia
           background: seniorProtected ? C.cardBg : 'rgba(255,249,246,.95)',
           border: `1px solid ${seniorProtected ? C.border : 'rgba(143,77,66,.45)'}`,
           borderRadius: 0,
+          padding: 16,
+          boxShadow: '0 34px 70px rgba(60,45,28,.045)',
         }}
-        className="p-6"
       >
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-2" style={{ gap: 10 }}>
           {/* left: description */}
           <div>
             <Eyebrow>Overview</Eyebrow>
@@ -1226,7 +1229,8 @@ export default function HybondSimulator({ initialQuery }: { initialQuery: Initia
               style={{
                 fontFamily: SERIF,
                 fontWeight: 400,
-                fontSize: 24,
+                fontSize: 22,
+                lineHeight: 1.08,
                 color: seniorProtected ? C.text : C.danger,
               }}
             >
@@ -1257,7 +1261,7 @@ export default function HybondSimulator({ initialQuery }: { initialQuery: Initia
           {/* right: two KPI cards. Both notes render ALWAYS. Tenbin CSS-hides the
               Senior note unless the guardrail fails (:46-47), which buries the pass
               case; at 0 loss events the note is the reassurance, not noise. */}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2" style={{ gap: 10 }}>
             <Kpi
               label="Senior avg/yr"
               value={`${fmtSignedPct(result.seniorAvgYr, 1)}/yr`}
@@ -1280,13 +1284,18 @@ export default function HybondSimulator({ initialQuery }: { initialQuery: Initia
 
       {/* ================= 4. CUSTOMIZE TERMS ================= */}
       <section
-        style={{ background: C.cardBg, border: `1px solid ${C.border}`, borderRadius: 0 }}
-        className="p-6"
+        style={{
+          background: C.cardBg,
+          border: `1px solid ${C.border}`,
+          borderRadius: 0,
+          padding: 14,
+          boxShadow: '0 34px 70px rgba(60,45,28,.045)',
+        }}
       >
         <div className="flex items-start justify-between gap-4">
           <div>
             <Eyebrow>Customize terms</Eyebrow>
-            <h2 className="mt-2" style={{ fontFamily: SERIF, fontWeight: 400, fontSize: 24, color: C.text }}>
+            <h2 className="mt-2" style={{ fontFamily: SERIF, fontWeight: 400, fontSize: 22, lineHeight: 1.08, color: C.text }}>
               Adjust the market terms.
             </h2>
             <p className="mt-2" style={{ color: C.muted, fontSize: 14, lineHeight: 1.6 }}>
@@ -1301,8 +1310,9 @@ export default function HybondSimulator({ initialQuery }: { initialQuery: Initia
               border: `1px solid ${C.border}`,
               borderRadius: 0,
               color: C.accent,
-              width: 32,
-              height: 32,
+              width: 28,
+              height: 28,
+              fontFamily: MONO,
               fontSize: 18,
               lineHeight: 1,
               background: 'transparent',
@@ -1318,7 +1328,7 @@ export default function HybondSimulator({ initialQuery }: { initialQuery: Initia
             {/* Preset ladder */}
             <div>
               <Eyebrow>Scenario</Eyebrow>
-              <div className="mt-3 grid grid-cols-1 sm:grid-cols-3 gap-3">
+              <div className="mt-3 grid grid-cols-1 sm:grid-cols-3" style={{ gap: 8 }}>
                 {PRESETS.map((p) => {
                   const active = activePreset?.id === p.id;
                   const screen = presetScreen.find((s) => s.id === p.id);
@@ -1332,10 +1342,11 @@ export default function HybondSimulator({ initialQuery }: { initialQuery: Initia
                       onClick={() => setParams({ ...p.params })}
                       style={{
                         textAlign: 'left',
-                        padding: '12px 14px',
+                        padding: '8px 11px',
                         borderRadius: 0,
                         border: `1px solid ${active ? C.accent : C.border}`,
                         background: C.cardBg,
+                        boxShadow: active ? `inset 0 -2px 0 ${C.accent}` : undefined,
                       }}
                     >
                       <div className="flex items-center justify-between gap-2">
@@ -1562,7 +1573,7 @@ export default function HybondSimulator({ initialQuery }: { initialQuery: Initia
             )}
 
             {/* Guardrail tiles, port of tenbin-sims/index.html:209, 473-477. */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2" style={{ gap: 7, marginTop: 12 }}>
               <Guardrail
                 label="Senior protection"
                 ok={seniorProtected}
@@ -1601,13 +1612,18 @@ export default function HybondSimulator({ initialQuery }: { initialQuery: Initia
 
       {/* ================= 5. REVIEW HISTORY ================= */}
       <section
-        style={{ background: C.cardBg, border: `1px solid ${C.border}`, borderRadius: 0 }}
-        className="p-6"
+        style={{
+          background: C.cardBg,
+          border: `1px solid ${C.border}`,
+          borderRadius: 0,
+          padding: 14,
+          boxShadow: '0 34px 70px rgba(60,45,28,.045)',
+        }}
       >
         <div className="flex items-start justify-between gap-4">
           <div>
             <Eyebrow>Review history</Eyebrow>
-            <h2 className="mt-2" style={{ fontFamily: SERIF, fontWeight: 400, fontSize: 24, color: C.text }}>
+            <h2 className="mt-2" style={{ fontFamily: SERIF, fontWeight: 400, fontSize: 22, lineHeight: 1.08, color: C.text }}>
               Chart, metrics, and mechanics.
             </h2>
             <p className="mt-2" style={{ color: C.muted, fontSize: 14, lineHeight: 1.6 }}>
@@ -1626,8 +1642,9 @@ export default function HybondSimulator({ initialQuery }: { initialQuery: Initia
               border: `1px solid ${C.border}`,
               borderRadius: 0,
               color: C.accent,
-              width: 32,
-              height: 32,
+              width: 28,
+              height: 28,
+              fontFamily: MONO,
               fontSize: 18,
               lineHeight: 1,
               background: 'transparent',
@@ -1904,22 +1921,33 @@ export default function HybondSimulator({ initialQuery }: { initialQuery: Initia
             {/* Calendar table, transposed to Tenbin's row layout (:250-254, :720-734):
                 rows are series, columns are years. */}
             <div className="mt-6 overflow-x-auto">
-              <table className="w-full text-sm" style={{ fontVariantNumeric: 'tabular-nums' }}>
+              <table
+                className="w-full"
+                style={{ fontVariantNumeric: 'tabular-nums', fontFamily: MONO, fontSize: 11.8 }}
+              >
                 <thead>
                   <tr
                     style={{
-                      color: C.eyebrow,
+                      color: '#A49B90',
                       textTransform: 'uppercase',
-                      letterSpacing: 1,
-                      fontSize: 11,
+                      letterSpacing: '0.08em',
+                      fontWeight: 600,
+                      fontSize: 9.5,
                     }}
                     className="text-left"
                   >
-                    <th className="py-2 pr-4 font-semibold">
+                    <th
+                      className="text-left"
+                      style={{ padding: '6px 7px', borderBottom: `1px solid ${C.border}` }}
+                    >
                       Calendar-year return / observation stats
                     </th>
                     {result.calendar.map((row, i) => (
-                      <th key={row.year} className="py-2 pr-4 font-semibold text-right">
+                      <th
+                        key={row.year}
+                        className="text-right"
+                        style={{ padding: '6px 7px', borderBottom: `1px solid ${C.border}` }}
+                      >
                         {yearLabel(
                           row.year,
                           i,
@@ -1929,7 +1957,12 @@ export default function HybondSimulator({ initialQuery }: { initialQuery: Initia
                         )}
                       </th>
                     ))}
-                    <th className="py-2 font-semibold text-right">end $100 → avg/yr</th>
+                    <th
+                      className="text-right"
+                      style={{ padding: '6px 7px', borderBottom: `1px solid ${C.border}` }}
+                    >
+                      end $100 → avg/yr
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
@@ -2080,13 +2113,18 @@ export default function HybondSimulator({ initialQuery }: { initialQuery: Initia
 
       {/* ================= 5b. DEPLOY HANDOFF ================= */}
       <section
-        style={{ background: C.cardBg, border: `1px solid ${C.border}`, borderRadius: 0 }}
-        className="p-6"
+        style={{
+          background: C.cardBg,
+          border: `1px solid ${C.border}`,
+          borderRadius: 0,
+          padding: 14,
+          boxShadow: '0 34px 70px rgba(60,45,28,.045)',
+        }}
       >
         <details>
           <summary className="cursor-pointer">
             <Eyebrow>Deploy handoff</Eyebrow>
-            <h2 className="mt-2" style={{ fontFamily: SERIF, fontWeight: 400, fontSize: 24, color: C.text }}>
+            <h2 className="mt-2" style={{ fontFamily: SERIF, fontWeight: 400, fontSize: 22, lineHeight: 1.08, color: C.text }}>
               Copy final market-design parameters.
             </h2>
             <p className="mt-2" style={{ color: C.muted, fontSize: 14, lineHeight: 1.6 }}>
@@ -2112,7 +2150,7 @@ export default function HybondSimulator({ initialQuery }: { initialQuery: Initia
                   textTransform: 'uppercase',
                   fontSize: 10,
                   letterSpacing: 1,
-                  padding: '7px 12px',
+                  padding: '9px 12px',
                   background: 'transparent',
                   flexShrink: 0,
                 }}
@@ -2151,8 +2189,9 @@ export default function HybondSimulator({ initialQuery }: { initialQuery: Initia
           border: `1px solid ${C.border}`,
           borderLeft: `3px solid ${C.accent}`,
           borderRadius: 0,
+          padding: 14,
+          boxShadow: '0 34px 70px rgba(60,45,28,.045)',
         }}
-        className="p-6"
       >
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <span
@@ -2648,7 +2687,7 @@ function Eyebrow({ children }: { children: React.ReactNode }) {
         color: C.eyebrow,
         textTransform: 'uppercase',
         fontSize: 9.5,
-        letterSpacing: 2,
+        letterSpacing: '0.22em',
         fontWeight: 600,
       }}
     >
@@ -2671,13 +2710,13 @@ function Kpi({
   noteColor?: string;
 }) {
   return (
-    <div style={{ background: C.cardBg, border: `1px solid ${C.border}`, borderRadius: 0, padding: '12px 14px' }}>
-      <p style={{ color: C.kpiLabel, textTransform: 'uppercase', fontSize: 10, letterSpacing: 1 }}>
+    <div style={{ background: C.cardBg, border: `1px solid ${C.border}`, borderRadius: 0, padding: '12px 14px', minHeight: 76 }}>
+      <p style={{ color: C.kpiLabel, textTransform: 'uppercase', fontSize: 8.8, letterSpacing: '0.14em', fontWeight: 700 }}>
         {label}
       </p>
       <p
         className="mt-2"
-        style={{ color: valueColor, fontFamily: MONO, fontWeight: 600, letterSpacing: '-0.04em', fontSize: 26 }}
+        style={{ color: valueColor, fontFamily: MONO, fontWeight: 600, letterSpacing: '-0.05em', fontSize: 28 }}
       >
         {value}
       </p>
@@ -2703,10 +2742,10 @@ function SecondaryStat({
 }) {
   return (
     <div>
-      <p style={{ color: C.kpiLabel, textTransform: 'uppercase', fontSize: 9.5, letterSpacing: 1 }}>
+      <p style={{ color: C.kpiLabel, textTransform: 'uppercase', fontSize: 8.8, letterSpacing: '0.14em', fontWeight: 700 }}>
         {label}
       </p>
-      <p className="mt-1" style={{ color, fontFamily: MONO, fontWeight: 600, letterSpacing: '-0.04em', fontSize: 15 }}>
+      <p className="mt-1" style={{ color, fontFamily: MONO, fontWeight: 600, letterSpacing: '-0.04em', fontSize: 17 }}>
         {value}
       </p>
       {note && (
@@ -2726,7 +2765,7 @@ function Guardrail({ label, ok, body }: { label: string; ok: boolean; body: stri
         border: `1px solid ${ok ? C.border : 'rgba(143,77,66,.45)'}`,
         borderLeft: `3px solid ${ok ? C.olive : C.danger}`,
         borderRadius: 0,
-        padding: '12px 14px',
+        padding: '9px 10px',
         background: ok ? C.cardBg : 'rgba(255,249,246,.95)',
       }}
     >
@@ -2744,13 +2783,14 @@ function StatusPill({ ok, children }: { ok: boolean; children: React.ReactNode }
   return (
     <span
       style={{
-        border: `1px solid ${ok ? C.olive : C.danger}`,
+        border: `1px solid ${ok ? 'rgba(49,156,97,.32)' : 'rgba(143,77,66,.35)'}`,
         color: ok ? C.olive : C.danger,
+        background: ok ? 'rgba(49,156,97,.08)' : 'rgba(143,77,66,.08)',
         textTransform: 'uppercase',
-        fontSize: 9.5,
-        letterSpacing: 1,
-        fontWeight: 600,
-        padding: '2px 7px',
+        fontSize: 10,
+        letterSpacing: '0.12em',
+        fontWeight: 700,
+        padding: '6px 8px',
         whiteSpace: 'nowrap',
       }}
     >
@@ -2797,19 +2837,19 @@ function ReturnRow({
 }) {
   return (
     <tr style={{ borderTop: `1px solid ${C.border}` }}>
-      <td className="py-2 pr-4" style={{ color: C.text, fontSize: 12.5 }}>
+      <td className="text-left" style={{ padding: '6px 7px', borderBottom: `1px solid ${C.border}`, color: C.text }}>
         {label}
       </td>
       {values.map((v, i) => (
         <td
           key={i}
-          className="py-2 pr-4 text-right"
-          style={{ color: signColor(v), fontFamily: MONO }}
+          className="text-right"
+          style={{ padding: '6px 7px', borderBottom: `1px solid ${C.border}`, color: signColor(v) }}
         >
           {fmtSignedPct(v, 1)}
         </td>
       ))}
-      <td className="py-2 text-right" style={{ color: C.text, fontFamily: MONO }}>
+      <td className="text-right" style={{ padding: '6px 7px', borderBottom: `1px solid ${C.border}`, color: C.text }}>
         <b>{fmtUsd(end, 0)}</b>{' '}
         <span style={{ color: C.kpiLabel, fontSize: 11, whiteSpace: 'nowrap' }}>
           {fmtSignedPct(ann, 1)} ann.
@@ -2833,15 +2873,15 @@ function StatRow({
 }) {
   return (
     <tr style={{ borderTop: `1px solid ${C.border}` }}>
-      <td className="py-2 pr-4" style={{ color: C.text, fontSize: 12.5 }}>
+      <td className="text-left" style={{ padding: '6px 7px', borderBottom: `1px solid ${C.border}`, color: C.text }}>
         {label}
       </td>
       {cells.map((c, i) => (
-        <td key={i} className="py-2 pr-4 text-right" style={{ color: C.text, fontFamily: MONO }}>
+        <td key={i} className="text-right" style={{ padding: '6px 7px', borderBottom: `1px solid ${C.border}`, color: C.text }}>
           {c}
         </td>
       ))}
-      <td className="py-2 text-right" style={{ color: C.text, fontFamily: MONO }}>
+      <td className="text-right" style={{ padding: '6px 7px', borderBottom: `1px solid ${C.border}`, color: C.text }}>
         <b>{end}</b>
         {endSuffix && (
           <span style={{ color: C.kpiLabel, fontSize: 11, whiteSpace: 'nowrap' }}> {endSuffix}</span>
@@ -2896,7 +2936,7 @@ function SliderControl({
   };
   return (
     <div style={{ opacity: disabled ? 0.55 : 1 }}>
-      <div className="flex items-center justify-between mb-2">
+      <div className="flex items-center justify-between" style={{ marginBottom: 6 }}>
         <label
           style={{ color: C.eyebrow, textTransform: 'uppercase', fontSize: 10, letterSpacing: 1, fontWeight: 600 }}
         >

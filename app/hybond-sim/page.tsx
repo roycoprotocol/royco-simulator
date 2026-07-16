@@ -21,13 +21,19 @@ export default async function HybondSimPage({
     <div
       className="min-h-screen"
       style={{
-        background: '#FBFAF7',
         color: '#171511',
         fontFamily:
-          "-apple-system, system-ui, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
+          "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
+        fontSize: 14,
+        lineHeight: 1.45,
+        borderTop: '6px solid #11100E',
+        backgroundColor: '#FBFAF7',
+        backgroundImage:
+          'linear-gradient(rgba(150,119,86,.055) 1px,transparent 1px),linear-gradient(90deg,rgba(150,119,86,.055) 1px,transparent 1px)',
+        backgroundSize: '42px 42px',
       }}
     >
-      <div className="max-w-[1120px] mx-auto px-6 py-8">
+      <div className="mx-auto" style={{ maxWidth: 1180, padding: '18px 20px 48px' }}>
         <div className="mt-6">
           <HybondSimulator initialQuery={sp} />
         </div>
