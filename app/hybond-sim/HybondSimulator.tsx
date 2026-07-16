@@ -24,9 +24,18 @@ import {
   Tooltip,
   ReferenceArea,
   ReferenceDot,
+  ReferenceLine,
+  usePlotArea,
 } from 'recharts';
 
-import { runBacktest, type BacktestResult, type ErasureReason } from '@/lib/try/backtest';
+import {
+  runBacktest,
+  type BacktestResult,
+  type ErasureEvent,
+  type ErasureReason,
+  type ObservationPeriod,
+  type SeniorLossEvent,
+} from '@/lib/try/backtest';
 import {
   HYBOND_DEFAULT_PARAMS,
   HYBOND_NAV_SERIES,
@@ -123,6 +132,10 @@ const C = {
   juniorLine: '#1B1A17',
   strategyLine: '#A7A39A',
   obsFill: '#F4C77B',
+  // Tenbin's CHART.junF (:483) — the "Junior if recoveries kept" counterfactual line.
+  juniorKeptLine: '#C9B8A2',
+  // Tenbin's CHART.free (:483) — the hovered non-observation band.
+  freeLine: '#4BCB81',
 };
 
 const SERIF = "Georgia, 'Times New Roman', serif";
@@ -138,6 +151,305 @@ const fmtTrim = (v: number, dec = 2): string =>
 // Port of tenbin-sims/index.html:737. Presentational twin of scenarios.ts's
 // utilWadFromBufferPct (which is the same ratio scaled into WAD).
 const utilizationPctFromBufferPct = (v: number): number => 10000 / Math.max(v, 0.01);
+
+// Port of tenbin-sims/index.html:503-508 erasureCause, extended to this engine's
+// reason set. Tenbin's 'st-il' cause is deliberately NOT ported: Tenbin force-erases
+// Junior's claim on any Senior effective loss, which the accountant never does, so
+// there is no state here to label with it.
+const erasureCause = (reason: ErasureReason): string => {
+  switch (reason) {
+    case 'liquidation':
+      return 'protected Senior exit opened';
+    case 'expired':
+      return 'observation period ended';
+    case 'juniorWiped':
+      return 'Junior fully depleted';
+    case 'noTerm':
+      return 'no observation term set';
+    default:
+      return 'recovery claim erased';
+  }
+};
+
+// Tenbin's estimateText (:487): the SVG chart furniture is laid out by hand, so box
+// widths come from a monospace-ish character estimate rather than measured text.
+const estimateText = (t: string): number => t.length * 6;
+
+// --- chart overlay shapes ---------------------------------------------------
+// Recharts has no I-beam/annotation primitive, so these render through the `shape`
+// render prop of ReferenceLine/ReferenceDot: recharts still owns every data-to-pixel
+// mapping (and the clip path), and these only draw in the pixel space it hands over.
+
+/**
+ * Port of tenbin-sims/index.html:539-550. The claim Junior forfeited at an erasure,
+ * drawn as an I-beam from where Junior would have been (`top`) down to where the
+ * Junior line actually landed.
+ *
+ * Tenbin gates the whole I-beam on forfeit > 0.1% (:540); we draw it for every
+ * erasure event (a sub-pixel beam is still an honest mark) and gate only the label,
+ * on Tenbin's >= 4% (:544).
+ */
+function ErasureIBeam(props: {
+  x1?: number;
+  y1?: number;
+  x2?: number;
+  y2?: number;
+  clipPath?: string;
+  beamLabel?: string | null;
+}) {
+  const plot = usePlotArea();
+  const { x1, y1, y2, clipPath, beamLabel } = props;
+  if (
+    !Number.isFinite(x1) ||
+    !Number.isFinite(y1) ||
+    !Number.isFinite(y2)
+  ) {
+    return null;
+  }
+  const x = x1 as number;
+  const yTop = y1 as number;
+  const yBottom = y2 as number;
+
+  let labelBox: { x: number; y: number; w: number; h: number } | null = null;
+  if (beamLabel) {
+    const w = estimateText(beamLabel) + 12;
+    const h = 16;
+    // Tenbin :546 clamps the box inside the plot rect so it never escapes the chart.
+    const lx = plot
+      ? Math.min(Math.max(x + 7, plot.x + 4), plot.x + plot.width - w - 4)
+      : x + 7;
+    const ly = plot
+      ? Math.min(
+          Math.max((yTop + yBottom) / 2 - h / 2, plot.y + 4),
+          plot.y + plot.height - h - 4,
+        )
+      : (yTop + yBottom) / 2 - h / 2;
+    labelBox = { x: lx, y: ly, w, h };
+  }
+
+  return (
+    <g clipPath={clipPath}>
+      <line x1={x} y1={yTop} x2={x} y2={yBottom} stroke={C.danger} strokeWidth={2.4} />
+      <line x1={x - 5} y1={yTop} x2={x + 5} y2={yTop} stroke={C.danger} strokeWidth={1.2} />
+      <line
+        x1={x - 5}
+        y1={yBottom}
+        x2={x + 5}
+        y2={yBottom}
+        stroke={C.danger}
+        strokeWidth={1.2}
+      />
+      {labelBox && beamLabel && (
+        <g>
+          <rect
+            x={labelBox.x}
+            y={labelBox.y}
+            width={labelBox.w}
+            height={labelBox.h}
+            fill={C.cardBg}
+            fillOpacity={0.94}
+            stroke={C.danger}
+            strokeWidth={0.8}
+          />
+          <text
+            x={labelBox.x + 6}
+            y={labelBox.y + labelBox.h / 2 + 0.5}
+            fill={C.danger}
+            fontSize={10.5}
+            fontWeight={700}
+            dominantBaseline="middle"
+          >
+            {beamLabel}
+          </text>
+        </g>
+      )}
+    </g>
+  );
+}
+
+/** Port of tenbin-sims/index.html:552-554 — a Senior loss event on the Senior line. */
+function SeniorLossMark(props: { cx?: number; cy?: number; clipPath?: string }) {
+  const { cx, cy, clipPath } = props;
+  if (!Number.isFinite(cx) || !Number.isFinite(cy)) return null;
+  const x = cx as number;
+  const y = cy as number;
+  return (
+    <g clipPath={clipPath}>
+      <line x1={x} y1={y - 9} x2={x} y2={y + 9} stroke={C.danger} strokeWidth={1.5} />
+      <circle cx={x} cy={y} r={4.2} fill={C.danger} stroke={C.cardBg} strokeWidth={1.4} />
+    </g>
+  );
+}
+
+/** Port of tenbin-sims/index.html:555-556 — the "Jr N" / "Sr N" tag at the view's right edge. */
+function EndValueTag(props: { cx?: number; cy?: number; text?: string; color?: string }) {
+  const plot = usePlotArea();
+  const { cx, cy, text, color } = props;
+  if (!Number.isFinite(cx) || !Number.isFinite(cy) || !text) return null;
+  const x = plot
+    ? Math.min((cx as number) + 4, plot.x + plot.width - 28)
+    : (cx as number) + 4;
+  return (
+    <text
+      x={x}
+      y={cy}
+      fill={color}
+      fontSize={11}
+      fontWeight={600}
+      dominantBaseline="middle"
+    >
+      {text}
+    </text>
+  );
+}
+
+/** Port of tenbin-sims/index.html:557-565 — the chip above a hovered band. */
+function BandChip(props: {
+  x1?: number;
+  x2?: number;
+  clipPath?: string;
+  chipLabel?: string;
+  color?: string;
+}) {
+  const plot = usePlotArea();
+  const { x1, x2, chipLabel, color } = props;
+  if (!Number.isFinite(x1) || !Number.isFinite(x2) || !chipLabel || !plot) return null;
+  const cx = ((x1 as number) + (x2 as number)) / 2;
+  const w = estimateText(chipLabel) + 16;
+  const h = 20;
+  const tx = Math.min(Math.max(cx - w / 2, plot.x + 4), plot.x + plot.width - w - 4);
+  const ty = plot.y + 6;
+  return (
+    <g>
+      <rect
+        x={tx}
+        y={ty}
+        width={w}
+        height={h}
+        fill={C.cardBg}
+        fillOpacity={0.96}
+        stroke={color}
+      />
+      <text
+        x={tx + w / 2}
+        y={ty + h / 2 + 0.5}
+        fill={color}
+        fontSize={11}
+        fontWeight={600}
+        textAnchor="middle"
+        dominantBaseline="middle"
+      >
+        {chipLabel}
+      </text>
+    </g>
+  );
+}
+
+/**
+ * Observation-period phrasing shared by the hover chip (:558) and the tooltip row
+ * (:573). The target/observed split is load-bearing here: the term is set in seconds
+ * but the series is sampled monthly, so a 30d target is observed as 30d or 31d purely
+ * from month length.
+ */
+const observationSplit = (o: ObservationPeriod, forChip: boolean): string => {
+  if (o.expired && o.targetDays && o.days !== o.targetDays) {
+    return forChip
+      ? `${o.targetDays}d target / ${o.days}d observed`
+      : `${o.targetDays}d target, next sample at ${o.days}d`;
+  }
+  return `${o.days}d`;
+};
+
+/**
+ * Port of tenbin-sims/index.html:566-594. Everything below the series rows is looked
+ * up from the hovered date rather than passed down from hover state, so the tooltip
+ * can never disagree with the label recharts is showing.
+ */
+function ChartTooltip(props: {
+  active?: boolean;
+  label?: string | number;
+  payload?: ReadonlyArray<{ name?: string | number; value?: unknown; color?: string }>;
+  dateIndex: Map<string, number>;
+  observationPeriods: ObservationPeriod[];
+  nonObservationPeriods: ObservationPeriod[];
+  erasureEvents: ErasureEvent[];
+  seniorLossEvents: SeniorLossEvent[];
+}) {
+  const {
+    active,
+    label,
+    payload,
+    dateIndex,
+    observationPeriods,
+    nonObservationPeriods,
+    erasureEvents,
+    seniorLossEvents,
+  } = props;
+  if (!active || !payload || payload.length === 0 || typeof label !== 'string') return null;
+
+  const i = dateIndex.get(label);
+  const inBand = (o: ObservationPeriod) => i !== undefined && i >= o.aIndex && i <= o.bIndex;
+  const obs = observationPeriods.find(inBand) ?? null;
+  const nonObs = obs ? null : (nonObservationPeriods.find(inBand) ?? null);
+  // Tenbin :571-572 allows a one-step tolerance so the row still shows when the
+  // pointer lands just beside the event.
+  const near = (idx: number) => i !== undefined && Math.abs(idx - i) <= 1;
+  const erasure = erasureEvents.find((e) => near(e.index)) ?? null;
+  const seniorLoss = seniorLossEvents.find((e) => near(e.index)) ?? null;
+
+  const row = (glyph: string, color: string, text: string) => (
+    <div key={text} style={{ display: 'flex', gap: 8, alignItems: 'baseline' }}>
+      <span style={{ color, flexShrink: 0 }}>{glyph}</span>
+      <span>{text}</span>
+    </div>
+  );
+
+  return (
+    <div
+      style={{
+        background: C.cardBg,
+        border: `1px solid ${C.border}`,
+        color: C.text,
+        fontSize: 12,
+        padding: '8px 10px',
+        display: 'flex',
+        flexDirection: 'column',
+        gap: 3,
+      }}
+    >
+      <div style={{ color: C.muted, fontWeight: 600, marginBottom: 2 }}>{monthLabel(label)}</div>
+      {payload.map((p) =>
+        typeof p.value === 'number'
+          ? row('●', p.color ?? C.text, `${p.name}: $${p.value.toFixed(2)}`)
+          : null,
+      )}
+      {obs &&
+        row(
+          '■',
+          C.eyebrow,
+          `Observation period: ${observationSplit(obs, false)} (${obs.startDate} -> ${obs.endDate})`,
+        )}
+      {nonObs &&
+        row(
+          '■',
+          C.freeLine,
+          `Non-observation period: ${nonObs.days}d (${nonObs.startDate} -> ${nonObs.endDate})`,
+        )}
+      {erasure &&
+        row(
+          '▼',
+          C.danger,
+          `Junior recovery erased (${erasureCause(erasure.reason)}): ${erasure.forfeitPctOfJuniorNav.toFixed(1)}% of Junior's NAV at the time`,
+        )}
+      {seniorLoss &&
+        row(
+          '●',
+          C.danger,
+          `Senior loss event: $${seniorLoss.lossIndexPts.toFixed(2)} per $100 of Senior`,
+        )}
+    </div>
+  );
+}
 
 /** Port of tenbin-sims/index.html:830-835 — pure function of the buffer setting. */
 function exitThresholdNote(v: number): string {
@@ -412,41 +724,110 @@ export default function HybondSimulator() {
     [result.steps, view.a, view.b],
   );
 
-  // Contiguous observation runs → ReferenceArea shading (presentational).
-  const observationRuns = useMemo(() => {
-    const runs: { x1: string; x2: string }[] = [];
-    let start: string | null = null;
-    let prev: string | null = null;
-    for (const s of visibleSteps) {
-      if (s.inObservation) {
-        if (start === null) start = s.date;
-        prev = s.date;
-      } else if (start !== null) {
-        runs.push({ x1: start, x2: prev ?? start });
-        start = null;
-        prev = null;
-      }
-    }
-    if (start !== null) runs.push({ x1: start, x2: prev ?? start });
-    return runs;
-  }, [visibleSteps]);
+  // Port of Tenbin's clippedBand (:514): a band straddling the window edge still renders,
+  // trimmed to the visible edge rather than dropped.
+  const clipBand = useCallback(
+    (o: ObservationPeriod): { x1: string; x2: string } | null => {
+      const a = Math.max(o.aIndex, view.a);
+      const b = Math.min(o.bIndex, view.b);
+      const x1 = result.steps[a]?.date;
+      const x2 = result.steps[b]?.date;
+      if (b <= a || !x1 || !x2) return null;
+      return { x1, x2 };
+    },
+    [result.steps, view.a, view.b],
+  );
+
+  // Observation bands → ReferenceArea shading (presentational).
+  //
+  // Derived from result.observationPeriods, NOT from a run of `inObservation` steps:
+  // `inObservation` is only true on the step that ENTERS the term (backtest.ts:414), and
+  // a period's real span runs from that entry to the sample that closes it (bIndex, the
+  // first step back out). Shading the `inObservation` steps alone produced x1 === x2, a
+  // zero-width rect, which recharts drops entirely (Rectangle.js:117), so the bands had
+  // been invisible. This is also the source the hover overlay reads, so the highlight now
+  // covers exactly the band it highlights.
+  const observationRuns = useMemo(
+    () =>
+      result.observationPeriods
+        .map(clipBand)
+        .filter((b): b is { x1: string; x2: string } => b !== null),
+    [result.observationPeriods, clipBand],
+  );
 
   const lossMarkers = useMemo(
     () => visibleSteps.filter((s) => s.juniorLossLocked),
     [visibleSteps],
   );
 
+  // Tenbin's `junW` curve (legend :227): Junior's path if no observation period ever
+  // expired, so every coverage recovery is kept.
+  //
+  // Only plotted when replenishment is OFF. With it on, the plotted Junior line carries
+  // fresh Junior capital that this counterfactual does not, so the visual gap between the
+  // two lines would conflate erasure with replenishment. The "Claims value erased" stat
+  // and the deploy handoff still report `gap` in that case, with the caveat in the label.
+  const showJuniorKept = !maintainCoverage;
+
   const chartData = useMemo(
     () =>
-      visibleSteps.map((s) => ({
+      visibleSteps.map((s, i) => ({
         date: s.date,
         strategy: s.priceIndex,
         senior: s.stIndex,
         junior: s.jtIndex,
+        juniorKept: noExpiryResult.steps[view.a + i]?.jtIndex,
         marketState: s.marketState,
       })),
+    [visibleSteps, noExpiryResult.steps, view.a],
+  );
+
+  // Chart annotations, all clipped to the same visible window as chartData.
+  const visibleErasures = useMemo(
+    () => result.erasureEvents.filter((e) => e.index >= view.a && e.index <= view.b),
+    [result.erasureEvents, view.a, view.b],
+  );
+  const visibleSeniorLosses = useMemo(
+    () => result.seniorLossEvents.filter((e) => e.index >= view.a && e.index <= view.b),
+    [result.seniorLossEvents, view.a, view.b],
+  );
+  // Tenbin :533-535 rules a dashed vertical at each year boundary. The x-axis here is a
+  // monthly category, so the January sample stands in for the boundary itself.
+  const yearMarks = useMemo(
+    () =>
+      visibleSteps
+        .filter((s) => s.date.slice(5, 7) === '01')
+        .map((s) => ({ date: s.date, year: s.date.slice(0, 4) })),
     [visibleSteps],
   );
+
+  // Port of Tenbin's visibleYmax (:509-513): the y domain has to cover the erasure tops,
+  // which are annotations rather than data and so are invisible to recharts' auto domain.
+  const yMax = useMemo(() => {
+    let m = 0;
+    for (const d of chartData) {
+      const vals = showJuniorKept
+        ? [d.strategy, d.senior, d.junior, d.juniorKept]
+        : [d.strategy, d.senior, d.junior];
+      for (const v of vals) if (typeof v === 'number' && Number.isFinite(v)) m = Math.max(m, v);
+    }
+    for (const e of visibleErasures) m = Math.max(m, e.top);
+    return Math.max(Math.ceil((m * 1.04) / 10) * 10, 110);
+  }, [chartData, visibleErasures, showJuniorKept]);
+
+  // Hovered date drives the band overlays and the band chip. The tooltip does its own
+  // lookup from the same date, so the two can never drift apart.
+  const [hoverDate, setHoverDate] = useState<string | null>(null);
+  const dateIndex = useMemo(() => {
+    const m = new Map<string, number>();
+    result.steps.forEach((s, i) => m.set(s.date, i));
+    return m;
+  }, [result.steps]);
+  const hoverIndex = hoverDate === null ? undefined : dateIndex.get(hoverDate);
+  const inHoveredBand = (o: ObservationPeriod) =>
+    hoverIndex !== undefined && hoverIndex >= o.aIndex && hoverIndex <= o.bIndex;
+  const hoverObs = result.observationPeriods.find(inHoveredBand) ?? null;
+  const hoverNonObs = hoverObs ? null : (result.nonObservationPeriods.find(inHoveredBand) ?? null);
 
   // Full-history observation bands for the brush's mini preview (index runs).
   const brushBands = useMemo(() => {
@@ -474,6 +855,28 @@ export default function HybondSimulator() {
   );
 
   const dates = useMemo(() => result.steps.map((s) => s.date), [result.steps]);
+
+  const hoverObsBand = hoverObs ? clipBand(hoverObs) : null;
+  const hoverNonObsBand = hoverNonObs ? clipBand(hoverNonObs) : null;
+  // Exactly one chip is ever shown (Tenbin :557 / :562 are an if/else), so it resolves to
+  // a single element rather than two mutually exclusive ones. See the JSX below.
+  const hoverChip: { band: { x1: string; x2: string }; label: string; color: string } | null =
+    hoverObsBand && hoverObs
+      ? {
+          band: hoverObsBand,
+          label: `Observation period ${observationSplit(hoverObs, true)}`,
+          color: C.eyebrow,
+        }
+      : hoverNonObsBand && hoverNonObs
+        ? {
+            band: hoverNonObsBand,
+            label: `Non-observation period ${hoverNonObs.days}d`,
+            color: C.freeLine,
+          }
+        : null;
+
+  // The "Jr N" / "Sr N" tags read the steps at the view's right edge (Tenbin :555-556).
+  const endStep = result.steps[view.b] ?? null;
 
   // Title derived from the series itself rather than a hardcoded label.
   const rangeTitle = dates.length
@@ -1122,11 +1525,17 @@ export default function HybondSimulator() {
             <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mb-4" style={{ fontSize: 12, color: C.muted }}>
               <LegendSwatch color={C.seniorLine}>Senior share price</LegendSwatch>
               <LegendSwatch color={C.juniorLine}>Junior share price</LegendSwatch>
-              <LegendSwatch color={C.strategyLine} dashed>
-                Underlying (composite proxy)
-              </LegendSwatch>
+              {showJuniorKept && (
+                <LegendSwatch color={C.juniorKeptLine} dashed>
+                  Junior if recoveries kept (fixed Junior, no replenishment)
+                </LegendSwatch>
+              )}
+              <LegendSwatch color={C.strategyLine}>Underlying (composite proxy)</LegendSwatch>
               <span className="flex items-center gap-2">
                 <span style={{ color: C.danger }}>●</span> Junior loss locked
+              </span>
+              <span className="flex items-center gap-2">
+                <span style={{ color: C.danger }}>●</span> Senior loss event
               </span>
               <span className="flex items-center gap-2">
                 <span
@@ -1136,9 +1545,25 @@ export default function HybondSimulator() {
               </span>
             </div>
 
+            {showJuniorKept && (
+              <p className="mb-4" style={{ color: C.kpiLabel, fontSize: 11.5, lineHeight: 1.5 }}>
+                The kept-recoveries line is a counterfactual, not a setting. It runs the same
+                path with an observation term longer than the whole horizon, so no period
+                ever expires. That is not deployable: on-chain the fixed term is a uint24 of
+                seconds, capped at 194 days, and this config is never handed to deploy.
+              </p>
+            )}
+
             <div style={{ width: '100%', height: 360 }}>
               <ResponsiveContainerNoSSR>
-                <LineChart data={chartData} margin={{ top: 8, right: 16, bottom: 8, left: 0 }}>
+                <LineChart
+                  data={chartData}
+                  margin={{ top: 8, right: 16, bottom: 8, left: 0 }}
+                  onMouseMove={(s: { activeLabel?: string | number }) =>
+                    setHoverDate(typeof s?.activeLabel === 'string' ? s.activeLabel : null)
+                  }
+                  onMouseLeave={() => setHoverDate(null)}
+                >
                   <CartesianGrid strokeDasharray="3 3" stroke={C.border} />
                   {observationRuns.map((r, i) => (
                     <ReferenceArea
@@ -1150,6 +1575,28 @@ export default function HybondSimulator() {
                       stroke="none"
                     />
                   ))}
+                  {/* Hovered observation band (Tenbin :526-527) */}
+                  {hoverObsBand && (
+                    <ReferenceArea
+                      x1={hoverObsBand.x1}
+                      x2={hoverObsBand.x2}
+                      fill={C.eyebrow}
+                      fillOpacity={0.22}
+                      stroke={C.eyebrow}
+                      strokeWidth={1.5}
+                    />
+                  )}
+                  {/* Hovered non-observation band (Tenbin :528-529) */}
+                  {hoverNonObsBand && (
+                    <ReferenceArea
+                      x1={hoverNonObsBand.x1}
+                      x2={hoverNonObsBand.x2}
+                      fill={C.freeLine}
+                      fillOpacity={0.08}
+                      stroke={C.freeLine}
+                      strokeWidth={1.4}
+                    />
+                  )}
                   <XAxis
                     dataKey="date"
                     tick={{ fill: C.kpiLabel, fontSize: 11 }}
@@ -1159,6 +1606,7 @@ export default function HybondSimulator() {
                   <YAxis
                     tick={{ fill: C.kpiLabel, fontSize: 11 }}
                     stroke={C.border}
+                    domain={[0, yMax]}
                     label={{
                       value: '$ per $100 deposited',
                       angle: -90,
@@ -1169,27 +1617,66 @@ export default function HybondSimulator() {
                     width={64}
                   />
                   <Tooltip
-                    contentStyle={{
-                      background: C.cardBg,
-                      border: `1px solid ${C.border}`,
-                      borderRadius: 0,
-                      color: C.text,
-                      fontSize: 12,
-                    }}
-                    labelStyle={{ color: C.muted }}
-                    formatter={(value: number | string, name: string) => {
-                      const v = typeof value === 'number' ? `$${value.toFixed(2)}` : value;
-                      return [v, name];
-                    }}
+                    content={
+                      <ChartTooltip
+                        dateIndex={dateIndex}
+                        observationPeriods={result.observationPeriods}
+                        nonObservationPeriods={result.nonObservationPeriods}
+                        erasureEvents={result.erasureEvents}
+                        seniorLossEvents={result.seniorLossEvents}
+                      />
+                    }
                   />
+                  {/* $100 baseline (Tenbin :536) */}
+                  <ReferenceLine
+                    y={100}
+                    stroke={C.kpiLabel}
+                    strokeDasharray="2 3"
+                    zIndex={150}
+                  />
+                  {/* Year boundaries (Tenbin :533-535) */}
+                  {yearMarks.map((m) => (
+                    <ReferenceLine
+                      key={`year-${m.year}`}
+                      x={m.date}
+                      stroke={C.border}
+                      strokeDasharray="4 5"
+                      zIndex={150}
+                      label={{
+                        value: m.year,
+                        position: 'insideBottom',
+                        fill: C.kpiLabel,
+                        fontSize: 11,
+                      }}
+                    />
+                  ))}
+                  {/* Line widths, dashes, and draw order follow Tenbin :538 exactly. */}
                   <Line
                     type="monotone"
                     dataKey="strategy"
-                    name="Underlying"
+                    name="Base strategy"
                     stroke={C.strategyLine}
-                    strokeDasharray="5 4"
                     dot={false}
-                    strokeWidth={1.5}
+                    strokeWidth={1.3}
+                  />
+                  {showJuniorKept && (
+                    <Line
+                      type="monotone"
+                      dataKey="juniorKept"
+                      name="Junior if recoveries kept"
+                      stroke={C.juniorKeptLine}
+                      strokeDasharray="6 4"
+                      dot={false}
+                      strokeWidth={1.5}
+                    />
+                  )}
+                  <Line
+                    type="monotone"
+                    dataKey="junior"
+                    name="Junior"
+                    stroke={C.juniorLine}
+                    dot={false}
+                    strokeWidth={2.2}
                   />
                   <Line
                     type="monotone"
@@ -1197,16 +1684,28 @@ export default function HybondSimulator() {
                     name="Senior"
                     stroke={C.seniorLine}
                     dot={false}
-                    strokeWidth={2}
+                    strokeWidth={2.2}
                   />
-                  <Line
-                    type="monotone"
-                    dataKey="junior"
-                    name="Junior"
-                    stroke={C.juniorLine}
-                    dot={false}
-                    strokeWidth={2}
-                  />
+                  {/* Erasure I-beams (Tenbin :539-550) */}
+                  {visibleErasures.map((e) => (
+                    <ReferenceLine
+                      key={`erasure-${e.index}`}
+                      segment={[
+                        { x: e.date, y: e.top },
+                        { x: e.date, y: e.top - e.forfeitIndexPts },
+                      ]}
+                      zIndex={600}
+                      shape={
+                        <ErasureIBeam
+                          beamLabel={
+                            e.forfeitPctOfJuniorNav >= 4
+                              ? `erased −${e.forfeitPctOfJuniorNav.toFixed(0)}%`
+                              : null
+                          }
+                        />
+                      }
+                    />
+                  ))}
                   {lossMarkers.map((s, i) => (
                     <ReferenceDot
                       key={`loss-${i}`}
@@ -1217,6 +1716,57 @@ export default function HybondSimulator() {
                       stroke={C.cardBg}
                     />
                   ))}
+                  {/* Senior loss events (Tenbin :552-554) */}
+                  {visibleSeniorLosses.map((e) => (
+                    <ReferenceDot
+                      key={`senior-loss-${e.index}`}
+                      x={e.date}
+                      y={result.steps[e.index].stIndex}
+                      r={4.2}
+                      shape={<SeniorLossMark />}
+                    />
+                  ))}
+                  {/* End-of-view value tags (Tenbin :555-556) */}
+                  {endStep && (
+                    <ReferenceDot
+                      x={endStep.date}
+                      y={endStep.jtIndex}
+                      shape={
+                        <EndValueTag
+                          text={`Jr ${endStep.jtIndex.toFixed(0)}`}
+                          color={C.juniorLine}
+                        />
+                      }
+                    />
+                  )}
+                  {endStep && (
+                    <ReferenceDot
+                      x={endStep.date}
+                      y={endStep.stIndex}
+                      shape={
+                        <EndValueTag
+                          text={`Sr ${endStep.stIndex.toFixed(0)}`}
+                          color={C.seniorLine}
+                        />
+                      }
+                    />
+                  )}
+                  {/* Hovered band chip (Tenbin :557-565).
+                      Tenbin's two chips (:557 obs, :562 non-obs) are one element here on
+                      purpose. They are mutually exclusive, and as two sibling slots the
+                      swap unmounts one and mounts the other into the same zIndex layer in
+                      a single commit, which recharts 3.5 renders as nothing. Keeping one
+                      element makes the swap a prop update, so the layer is never vacated. */}
+                  {hoverChip && (
+                    <ReferenceLine
+                      segment={[
+                        { x: hoverChip.band.x1, y: 100 },
+                        { x: hoverChip.band.x2, y: 100 },
+                      ]}
+                      zIndex={700}
+                      shape={<BandChip chipLabel={hoverChip.label} color={hoverChip.color} />}
+                    />
+                  )}
                 </LineChart>
               </ResponsiveContainerNoSSR>
             </div>
