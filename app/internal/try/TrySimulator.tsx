@@ -311,9 +311,9 @@ export default function TrySimulator() {
             </h2>
             <p className="mt-3 max-w-2xl" style={{ color: C.muted, fontSize: 14, lineHeight: 1.6 }}>
               Current {activePreset?.label ?? 'custom'} terms{' '}
-              {result.seniorLossEvents === 0
+              {result.seniorMarkdownEvents === 0
                 ? 'pass the Senior hard guardrail: no historical Senior loss events'
-                : `show ${result.seniorLossEvents} Senior loss events`}{' '}
+                : `show ${result.seniorMarkdownEvents} Senior loss events`}{' '}
               with {params.firstLossPct.toFixed(0)}% first-loss protection, {params.observationDays}d
               observation period, and {params.seniorShareToJuniorPct}% of Senior yield paid to Junior.
             </p>
@@ -791,8 +791,8 @@ export default function TrySimulator() {
               />
               <SecondaryStat
                 label="Senior loss events"
-                value={String(result.seniorLossEvents)}
-                color={result.seniorLossEvents > 0 ? C.danger : C.text}
+                value={String(result.seniorMarkdownEvents)}
+                color={result.seniorMarkdownEvents > 0 ? C.danger : C.text}
               />
             </div>
           </div>

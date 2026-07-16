@@ -42,6 +42,16 @@ export interface BacktestParams {
   maintainJuniorCoverage?: boolean;
 }
 
+/**
+ * Why a coverage IL erasure happened, as a LABEL for presentation.
+ *
+ * NOTE: this is a labelling convention, not accounting math. The engine erases IL
+ * (RoycoDayAccountant.sol:668) without telling us which of its resolution conditions
+ * fired; we re-derive the most specific one from the same config + sync outputs the
+ * engine used. No number downstream depends on this string.
+ */
+export type ErasureReason = "expired" | "liquidation" | "juniorWiped" | "noTerm";
+
 export interface BacktestStep {
   date: string;
   price: number; // raw strategy price
@@ -49,14 +59,31 @@ export interface BacktestStep {
   stEff: bigint; // Senior effective NAV (NAV units, WAD-scaled)
   jtEff: bigint; // Junior effective NAV
   il: bigint; // outstanding JT coverage impermanent loss
-  ilErased: bigint; // outstanding JT coverage IL erased (forfeited) this step, 0 if none
+  /**
+   * Coverage IL the accountant ERASED on this sync (r.jtCoverageILErased). Kept in full:
+   * `il` is 0 at every erasure step, so the magnitude of what Junior permanently ate is
+   * unrecoverable from `il` alone.
+   */
+  ilErased: bigint;
+  /** Why `ilErased` was erased (null when nothing was erased). Presentational label only. */
+  erasureReason: ErasureReason | null;
   coverageUtilWad: bigint;
   marketState: MarketState;
   stIndex: number; // Senior share price, indexed to $100 at genesis (per-unit, clean)
   jtIndex: number; // Junior share price, indexed to $100 at genesis (per-unit; replenishment mints at price, so index is undistorted)
+  /**
+   * Dollars of Junior effective NAV per ONE Junior index point at this step, i.e. jtEff$ / jtIndex.
+   *
+   * Recorded explicitly because that quotient is 0/0 exactly when Junior is wiped (jtEff and
+   * jtIndex both hit 0), which is precisely when an erasure needs to be sized. It is a pure
+   * function of the share count and the genesis base (jtShares$ * (jtBase$/jtNav0$) / 100), so
+   * it stays well-defined at a wipe and lets buildErasureEvents convert erased dollars into
+   * index points there. Captured at the same point as jtIndex, BEFORE any replenishment mints
+   * new shares on this step.
+   */
+  jtNavPerIndexPt: number;
   inObservation: boolean; // marketState === FIXED_TERM
-  juniorLossLocked: boolean; // term elapsed / exhaustion → Junior permanently ate a covered loss (FIXED_TERM→PERPETUAL exit only; narrow, kept for compatibility)
-  juniorLossRealized: boolean; // corrected: Junior's outstanding IL was permanently erased this step (catches term-elapse, exhaustion, AND single-sync coverage-liquidation crashes)
+  juniorLossLocked: boolean; // term elapsed / exhaustion → Junior permanently ate a covered loss
   seniorMarkedDown: boolean; // Senior effective share price fell this step (a real Senior loss)
   juniorReplenished: number; // fresh Junior capital attracted this step ($), 0 if none
 }
@@ -70,32 +97,55 @@ export interface CalendarRow {
   strategyReturn: number;
 }
 
+/** A contiguous run of steps in FIXED_TERM (an "observation period"), by step index. */
+export interface ObservationPeriod {
+  aIndex: number; // step index where observation was entered
+  bIndex: number; // step index where it closed (last step if still open at series end)
+  startDate: string;
+  endDate: string;
+  days: number; // observed calendar length (series cadence bounds this, not the term)
+  targetDays: number; // configured fixedTermDurationSeconds, in days
+  expired: boolean; // closed by term expiry (vs. still open / other resolution)
+}
+
+/** Calendar-day accounting for one year (or the `total` aggregate). */
+export interface ObservationDays {
+  obs: number;
+  non: number;
+  total: number;
+}
+
+/** A step where Junior permanently ate covered loss, sized for presentation. */
+export interface ErasureEvent {
+  index: number;
+  date: string;
+  reason: ErasureReason;
+  forfeitIndexPts: number; // Junior index points given up
+  forfeitPctOfJuniorNav: number; // erased / Junior NAV at the time, %
+  top: number; // jtIndex + forfeitIndexPts (where Junior would have been)
+}
+
+/** A step where Senior's share price actually fell. */
+export interface SeniorLossEvent {
+  index: number;
+  date: string;
+  lossIndexPts: number;
+}
+
+/** Compatibility reporting shape used by the current TRY page. */
+export interface ObservationRun {
+  startDate: string;
+  endDate: string;
+  strategyDrawdownPct: number;
+}
+
 export interface PerYearRow {
   year: string;
-  baseReturn: number; // strategy return within the year
+  baseReturn: number;
   seniorReturn: number;
   juniorReturn: number;
-  nonObsPct: number; // % of steps within the year NOT inObservation
-  obsEvents: number; // observation-period entries (PERPETUAL→FIXED_TERM) triggered within the year
-}
-
-export interface ObservationRun {
-  startDate: string; // date of the first FIXED_TERM step in the run
-  endDate: string; // date used for chart band end (extended one step past the run's last FIXED_TERM step for render width)
-  strategyDrawdownPct: number; // peak-to-trough decline of priceIndex over the run, in percent (>= 0)
-}
-
-/**
- * A merged "observation episode": one or more raw observation runs that are
- * close enough in time (gap < fixedTermDays) to represent a single continuing
- * drawdown event rather than distinct re-entries. Presentational only; derived
- * from observationRuns, never fed back into the engine.
- */
-export interface ObservationEpisode {
-  startDate: string; // first FIXED_TERM step of the episode
-  endDate: string; // one data point past the last FIXED_TERM step (for chart band width)
-  strategyDrawdownPct: number; // running-peak max drawdown of priceIndex across the episode span (>= 0), seeded from the pre-episode launch level
-  runCount: number; // how many raw observation runs were merged into this episode
+  nonObsPct: number;
+  obsEvents: number;
 }
 
 export interface BacktestResult {
@@ -110,23 +160,45 @@ export interface BacktestResult {
   seniorMaxDrawdown: number; // worst peak-to-trough of Senior index (>= 0)
   juniorMaxDrawdown: number;
   observationEvents: number; // count of PERPETUAL→FIXED_TERM entries
-  juniorLossEvents: number; // count of permanent Junior loss lock-ins (term elapse / exhaustion; narrow, kept for compatibility)
-  juniorLossRealizedEvents: number; // corrected count of permanent Junior loss lock-ins (term elapse, exhaustion, AND single-sync coverage-liquidation crashes)
-  juniorCapitalLost: number; // total Junior capital ($) permanently forfeited (outstanding IL erased) over the run
-  strategyMaxDrawdown: number; // worst peak-to-trough of the strategy price index (>= 0)
+  juniorLossEvents: number; // count of permanent Junior loss lock-ins (term elapse / exhaustion)
   seniorMarkdownEvents: number; // count of steps where Senior's share price fell
   juniorCapitalInjected: number; // total fresh Junior capital attracted over the run ($)
   calendar: CalendarRow[];
-  observationRuns: ObservationRun[]; // contiguous FIXED_TERM runs (presentational; one per observationEvents entry)
-  observationEpisodes: ObservationEpisode[]; // merged observation runs (presentational; collapses re-entries within one fixed term into a single drawdown episode)
-  nonObservationPct: number; // fraction of steps NOT inObservation, ×100 (overall)
-  maxObservationPeriodDays: number; // longest single contiguous FIXED_TERM run duration, in days
-  seniorLossEvents: number; // count of steps where seniorMarkedDown is true (alias of seniorMarkdownEvents)
-  perYear: PerYearRow[]; // per-calendar-year strategy/senior/junior returns, non-observation %, and observation entries
-  juniorIfKept: number[]; // per-step counterfactual: Junior's index if erased coverage IL had instead been kept (added back cumulatively)
+  /** Contiguous FIXED_TERM runs, in order. */
+  observationPeriods: ObservationPeriod[];
+  /** Complement of observationPeriods: the PERPETUAL stretches between them. */
+  nonObservationPeriods: ObservationPeriod[];
+  /** Longest observed observation period, in calendar days (0 if none). */
+  maxObservedObservationDays: number;
+  /** Per-calendar-year observation/non-observation day split, keyed "YYYY", plus a `total` key. */
+  yearlyObservationDays: Record<string, ObservationDays>;
+  /** Observation entries bucketed by the year they started in, keyed "YYYY". */
+  yearlyObservationTriggers: Record<string, number>;
+  /** Share of the horizon's calendar days spent OUTSIDE observation, %. */
+  outsideObservationPct: number;
+  /** Every step that erased coverage IL, sized in Junior index points. */
+  erasureEvents: ErasureEvent[];
+  /** Every step where Senior's share price fell, sized in Senior index points. */
+  seniorLossEvents: SeniorLossEvent[];
+  /** Rising edges of coverageUtilWad crossing the liquidation threshold (edge-gated). */
+  exitTriggerHits: number;
+  /** Current TRY-page reporting aliases, derived from the same certified steps. */
+  juniorLossRealizedEvents: number;
+  juniorCapitalLost: number;
+  strategyMaxDrawdown: number;
+  observationRuns: ObservationRun[];
+  nonObservationPct: number;
+  maxObservationPeriodDays: number;
+  perYear: PerYearRow[];
+  juniorIfKept: number[];
 }
 
 const YEAR_SECONDS = 365.25 * 24 * 60 * 60;
+
+/** Whole days since epoch for an ISO "YYYY-MM" / "YYYY-MM-DD" date (mirrors secondsBetween's parsing). */
+function dayNum(d: string): number {
+  return Date.parse(d.length === 7 ? d + "-01" : d) / 86400000;
+}
 
 /** dollars → NAV units (WAD-scaled), matching the harness's toNAVUnits(x*1e18-style) convention. */
 function toNav(dollars: number): bigint {
@@ -188,8 +260,6 @@ export function runBacktest(params: BacktestParams): BacktestResult {
   let jtRawCarry = jtNav0; // Junior raw NAV at the previous step's price
   let prevPriceWad = priceWad0;
 
-  let prevState: MarketState = "PERPETUAL";
-  let prevIL = 0n;
   let prevStIndex = 100;
 
   for (let i = 0; i < series.length; i++) {
@@ -212,19 +282,36 @@ export function runBacktest(params: BacktestParams): BacktestResult {
     const stIndex = (toNum(r.stEffectiveNAV) / toNum(stShares)) / (toNum(stBase) / toNum(stNav0)) * 100;
     const jtSharePrice = toNum(r.jtEffectiveNAV) / toNum(jtShares);
     const jtIndex = jtSharePrice / (toNum(jtBase) / toNum(jtNav0)) * 100;
+    // jtEff$ / jtIndex, but derived from shares + base so it survives a wipe (where both are 0).
+    const jtNavPerIndexPt = (toNum(jtShares) * (toNum(jtBase) / toNum(jtNav0))) / 100;
 
-    const backToPerpetual = prevState === "FIXED_TERM" && r.marketState === "PERPETUAL";
-    const juniorLossLocked = backToPerpetual && prevIL > 0n && p.price < series[0].price;
-    const ilErased = r.jtCoverageImpermanentLossErased;
-    const juniorLossRealized = ilErased > 0n;
+    // A junior loss lock-in is exactly when the accountant ERASED outstanding coverage IL
+    // (RoycoDayAccountant.sol:668): the term elapsed / coverage liquidated / Junior was wiped
+    // while IL was still outstanding, so Junior permanently ate the covered loss. IL merely
+    // reaching 0 is NOT a lock-in — that also happens when Senior gains recover it.
+    const juniorLossLocked = r.jtCoverageILErased > 0n;
     const seniorMarkedDown = stIndex < prevStIndex - 1e-9;
+
+    // Label WHY the erasure happened (see ErasureReason: convention, not math).
+    // juniorWiped is checked BEFORE liquidation on purpose: coverageUtilization returns
+    // UINT256_MAX when jtEff === 0 (engine.ts:181), so a wipe also trips the liquidation
+    // threshold. The wipe is the more specific cause, so it wins.
+    let erasureReason: ErasureReason | null = null;
+    if (r.jtCoverageILErased !== 0n) {
+      if (config.fixedTermDurationSeconds === 0n) erasureReason = "noTerm";
+      else if (r.jtEffectiveNAV === 0n && r.stEffectiveNAV > 0n) erasureReason = "juniorWiped";
+      else if (r.coverageUtilWad >= config.coverageLiquidationUtilizationWAD) erasureReason = "liquidation";
+      else erasureReason = "expired";
+    }
 
     // --- Junior replenishment (the intended product model) ---
     // When PERPETUAL and Junior has drained below target, attract fresh Junior
     // capital to restore coverage to the target, re-protecting Senior.
+    // Never at i === 0: genesis Junior is exactly what the user deposited, and no
+    // time has passed for the buffer to have drained.
     let juniorReplenished = 0;
     let jtRawNext = r.jtRawNAV;
-    if (maintain && r.marketState === "PERPETUAL") {
+    if (maintain && i > 0 && r.marketState === "PERPETUAL") {
       // d solves: (stRaw + jtRaw + d)*minCov / (jtEff + d) = targetUtil.
       const t1 = mulDiv(r.stRawNAV + r.jtRawNAV, minCovWAD, WAD, Rounding.Floor);
       const t2 = mulDiv(r.jtEffectiveNAV, targetUtilWAD, WAD, Rounding.Floor);
@@ -252,31 +339,28 @@ export function runBacktest(params: BacktestParams): BacktestResult {
       stEff: r.stEffectiveNAV,
       jtEff: r.jtEffectiveNAV,
       il: r.jtCoverageIL,
-      ilErased,
+      ilErased: r.jtCoverageILErased,
+      erasureReason,
       coverageUtilWad: r.coverageUtilWad,
       marketState: r.marketState,
       stIndex,
       jtIndex,
+      jtNavPerIndexPt,
       inObservation: r.marketState === "FIXED_TERM",
       juniorLossLocked,
-      juniorLossRealized,
       seniorMarkedDown,
       juniorReplenished,
     });
 
-    prevState = r.marketState;
-    prevIL = r.jtCoverageIL;
     prevStIndex = stIndex;
     jtRawCarry = jtRawNext;
     prevPriceWad = priceWad;
   }
 
-  const fixedTermDays = Number(config.fixedTermDurationSeconds) / 86400;
-  return summarize(steps, series, fixedTermDays);
+  return summarize(steps, series, config);
 }
 
-function summarize(steps: BacktestStep[], series: PricePoint[], fixedTermDays = 30): BacktestResult {
-  if (!Number.isFinite(fixedTermDays) || fixedTermDays <= 0) fixedTermDays = 30;
+function summarize(steps: BacktestStep[], series: PricePoint[], config: MarketConfig): BacktestResult {
   const last = steps[steps.length - 1];
   const totalSeconds = Number(secondsBetween(series[0].date, series[series.length - 1].date));
   const years = totalSeconds > 0 ? totalSeconds / YEAR_SECONDS : 0;
@@ -290,16 +374,12 @@ function summarize(steps: BacktestStep[], series: PricePoint[], fixedTermDays = 
   // Observation + junior-loss + senior-markdown + injected-capital tallies.
   let observationEvents = 0;
   let juniorLossEvents = 0;
-  let juniorLossRealizedEvents = 0;
-  let juniorCapitalLost = 0;
   let seniorMarkdownEvents = 0;
   let juniorCapitalInjected = 0;
   let prevObs = false;
   for (const s of steps) {
     if (s.inObservation && !prevObs) observationEvents++;
     if (s.juniorLossLocked) juniorLossEvents++;
-    if (s.juniorLossRealized) juniorLossRealizedEvents++;
-    juniorCapitalLost += toNum(s.ilErased);
     if (s.seniorMarkedDown) seniorMarkdownEvents++;
     juniorCapitalInjected += s.juniorReplenished;
     prevObs = s.inObservation;
@@ -308,121 +388,35 @@ function summarize(steps: BacktestStep[], series: PricePoint[], fixedTermDays = 
   // Calendar (per-year) returns, indexed off the first step of each year.
   const calendar = buildCalendar(steps);
 
-  // Contiguous FIXED_TERM runs (one per observationEvents entry), with a
-  // presentational strategy drawdown computed peak-to-trough over the run.
-  const observationRuns: ObservationRun[] = [];
-  const runRanges: { startIdx: number; lastObsIdx: number }[] = [];
-  {
-    let startIdx: number | null = null;
-    let lastObsIdx: number | null = null;
-    const closeRun = () => {
-      if (startIdx === null || lastObsIdx === null) return;
-      const endIdx = Math.min(lastObsIdx + 1, steps.length - 1);
-      const peak = startIdx > 0 ? steps[startIdx - 1].priceIndex : steps[startIdx].priceIndex;
-      let trough = Infinity;
-      for (let j = startIdx; j <= lastObsIdx; j++) {
-        if (steps[j].priceIndex < trough) trough = steps[j].priceIndex;
-      }
-      const strategyDrawdownPct = peak > 0 ? Math.max(0, ((peak - trough) / peak) * 100) : 0;
-      observationRuns.push({
-        startDate: steps[startIdx].date,
-        endDate: steps[endIdx].date,
-        strategyDrawdownPct,
-      });
-      runRanges.push({ startIdx, lastObsIdx });
-      startIdx = null;
-      lastObsIdx = null;
+  const observationPeriods = buildObservationPeriods(steps, config);
+  const nonObservationPeriods = buildNonObservationPeriods(steps, observationPeriods, config);
+  const { yearly: yearlyObservationDays, outsidePct: outsideObservationPct } = buildYearlyObservationDays(
+    steps,
+    observationPeriods,
+  );
+
+  const yearlyObservationTriggers: Record<string, number> = {};
+  for (const p of observationPeriods) {
+    const y = p.startDate.slice(0, 4);
+    yearlyObservationTriggers[y] = (yearlyObservationTriggers[y] ?? 0) + 1;
+  }
+
+  const erasureEvents = buildErasureEvents(steps);
+  const maxObservedObservationDays = observationPeriods.reduce((mx, p) => Math.max(mx, p.days), 0);
+  const observationRuns: ObservationRun[] = observationPeriods.map((period) => {
+    const launch = period.aIndex > 0 ? steps[period.aIndex - 1].priceIndex : steps[period.aIndex].priceIndex;
+    let trough = launch;
+    for (let i = period.aIndex; i <= period.bIndex; i++) trough = Math.min(trough, steps[i].priceIndex);
+    return {
+      startDate: period.startDate,
+      endDate: period.endDate,
+      strategyDrawdownPct: launch > 0 ? Math.max(0, ((launch - trough) / launch) * 100) : 0,
     };
-    for (let i = 0; i < steps.length; i++) {
-      if (steps[i].inObservation) {
-        if (startIdx === null) startIdx = i;
-        lastObsIdx = i;
-      } else {
-        closeRun();
-      }
-    }
-    closeRun();
-  }
-
-  // Merge contiguous runs whose gap is short (< fixedTermDays) into a single
-  // "episode" — a real drawdown window, rather than a fragment created by
-  // daily price noise flipping PERPETUAL<->FIXED_TERM repeatedly.
-  const observationEpisodes: ObservationEpisode[] = [];
-  {
-    let groupStart: { startIdx: number; lastObsIdx: number } | null = null;
-    let groupLastObsIdx: number | null = null;
-    let runCount = 0;
-    const closeEpisode = () => {
-      if (groupStart === null || groupLastObsIdx === null) return;
-      const i0 = groupStart.startIdx;
-      const i1 = groupLastObsIdx;
-      const endIdx = Math.min(i1 + 1, steps.length - 1);
-      let peak = i0 > 0 ? steps[i0 - 1].priceIndex : steps[i0].priceIndex;
-      let dd = 0;
-      for (let j = i0; j <= i1; j++) {
-        peak = Math.max(peak, steps[j].priceIndex);
-        if (peak > 0) dd = Math.max(dd, ((peak - steps[j].priceIndex) / peak) * 100);
-      }
-      observationEpisodes.push({
-        startDate: steps[i0].date,
-        endDate: steps[endIdx].date,
-        strategyDrawdownPct: dd,
-        runCount,
-      });
-      groupStart = null;
-      groupLastObsIdx = null;
-      runCount = 0;
-    };
-    for (const range of runRanges) {
-      if (groupStart === null) {
-        groupStart = range;
-        groupLastObsIdx = range.lastObsIdx;
-        runCount = 1;
-        continue;
-      }
-      const gapDays =
-        Number(secondsBetween(steps[groupLastObsIdx!].date, steps[range.startIdx].date)) / 86400;
-      if (gapDays < fixedTermDays) {
-        groupLastObsIdx = range.lastObsIdx;
-        runCount++;
-      } else {
-        closeEpisode();
-        groupStart = range;
-        groupLastObsIdx = range.lastObsIdx;
-        runCount = 1;
-      }
-    }
-    closeEpisode();
-  }
-
-  // Non-observation % (overall) and longest contiguous FIXED_TERM run.
-  const nonObservationPct = steps.length > 0
-    ? (steps.filter((s) => !s.inObservation).length / steps.length) * 100
-    : 0;
-  let maxObservationPeriodDays = 0;
-  for (const run of observationRuns) {
-    const d = Number(secondsBetween(run.startDate, run.endDate)) / 86400;
-    if (d > maxObservationPeriodDays) maxObservationPeriodDays = d;
-  }
-
-  // seniorLossEvents: alias of seniorMarkdownEvents (count of steps where
-  // Senior's share price fell), exposed under the reporting name too.
-  const seniorLossEvents = seniorMarkdownEvents;
-
-  // Per-calendar-year reporting rows (extends `calendar` with non-obs % and
-  // observation-entry counts, keyed the same way as buildCalendar).
-  const perYear = buildPerYear(steps);
-
-  // Junior "if kept" counterfactual: add back cumulatively-erased coverage IL
-  // (in $ terms) to Junior's NAV before indexing, using the same per-step
-  // index scale factor jtIndex already applies (jtIndex = k * toNum(jtEff)).
-  let cumulativeErasedUsd = 0;
-  const juniorIfKept: number[] = steps.map((s) => {
-    cumulativeErasedUsd += toNum(s.ilErased);
-    const jtEffUsd = toNum(s.jtEff);
-    if (jtEffUsd === 0) return s.jtIndex;
-    const k = s.jtIndex / jtEffUsd;
-    return s.jtIndex + k * cumulativeErasedUsd;
+  });
+  let cumulativeErased = 0;
+  const juniorIfKept = steps.map((step) => {
+    cumulativeErased += toNum(step.ilErased);
+    return step.jtIndex + (step.jtNavPerIndexPt > 0 ? cumulativeErased / step.jtNavPerIndexPt : 0);
   });
 
   return {
@@ -438,64 +432,195 @@ function summarize(steps: BacktestStep[], series: PricePoint[], fixedTermDays = 
     juniorMaxDrawdown: maxDrawdown(steps.map((s) => s.jtIndex)),
     observationEvents,
     juniorLossEvents,
-    juniorLossRealizedEvents,
-    juniorCapitalLost,
-    strategyMaxDrawdown: maxDrawdown(steps.map((s) => s.priceIndex)),
     seniorMarkdownEvents,
     juniorCapitalInjected,
     calendar,
+    observationPeriods,
+    nonObservationPeriods,
+    maxObservedObservationDays,
+    yearlyObservationDays,
+    yearlyObservationTriggers,
+    outsideObservationPct,
+    erasureEvents,
+    seniorLossEvents: buildSeniorLossEvents(steps),
+    exitTriggerHits: countExitTriggerHits(steps, config),
+    juniorLossRealizedEvents: erasureEvents.length,
+    juniorCapitalLost: steps.reduce((sum, step) => sum + toNum(step.ilErased), 0),
+    strategyMaxDrawdown: maxDrawdown(steps.map((s) => s.priceIndex)),
     observationRuns,
-    observationEpisodes,
-    nonObservationPct,
-    maxObservationPeriodDays,
-    seniorLossEvents,
-    perYear,
+    nonObservationPct: outsideObservationPct,
+    maxObservationPeriodDays: maxObservedObservationDays,
+    perYear: buildPerYear(steps),
     juniorIfKept,
   };
 }
 
-/** Per-calendar-year strategy/senior/junior returns, non-observation %, and observation entries. */
-function buildPerYear(steps: BacktestStep[]): PerYearRow[] {
-  const byYear = new Map<string, BacktestStep[]>();
-  for (const s of steps) {
-    const y = s.date.slice(0, 4);
-    if (!byYear.has(y)) byYear.set(y, []);
-    byYear.get(y)!.push(s);
-  }
-  const rows: PerYearRow[] = [];
-  let prevSt = 100,
-    prevJt = 100,
-    prevStrat = 100;
-  let firstYear = true;
-  let prevObsAcrossYears = false;
-  for (const [year, ys] of [...byYear.entries()].sort()) {
-    const end = ys[ys.length - 1];
-    const startSt = firstYear ? 100 : prevSt;
-    const startJt = firstYear ? 100 : prevJt;
-    const startStrat = firstYear ? 100 : prevStrat;
-    let obsEvents = 0;
-    let nonObsCount = 0;
-    let prevObs: boolean = prevObsAcrossYears;
-    for (const s of ys) {
-      if (s.inObservation && !prevObs) obsEvents++;
-      if (!s.inObservation) nonObsCount++;
-      prevObs = s.inObservation;
+/** Build a period record from a pair of step indices. */
+function makePeriod(
+  steps: BacktestStep[],
+  aIndex: number,
+  bIndex: number,
+  config: MarketConfig,
+  expired: boolean,
+): ObservationPeriod {
+  const startDate = steps[aIndex].date;
+  const endDate = steps[bIndex].date;
+  return {
+    aIndex,
+    bIndex,
+    startDate,
+    endDate,
+    days: Math.round(dayNum(endDate) - dayNum(startDate)),
+    targetDays: Number(config.fixedTermDurationSeconds) / 86400,
+    expired,
+  };
+}
+
+/** Contiguous runs of inObservation steps: entry on the rising edge, close on the first step out. */
+function buildObservationPeriods(steps: BacktestStep[], config: MarketConfig): ObservationPeriod[] {
+  const out: ObservationPeriod[] = [];
+  const n = steps.length;
+  for (let i = 0; i < n; i++) {
+    if (!steps[i].inObservation) continue;
+    if (i !== 0 && steps[i - 1].inObservation) continue; // not a rising edge
+    let j = i + 1;
+    while (j < n && steps[j].inObservation) j++;
+    if (j >= n) {
+      // Still in observation at series end: close on the last step, unresolved.
+      out.push(makePeriod(steps, i, n - 1, config, false));
+    } else {
+      out.push(makePeriod(steps, i, j, config, steps[j].erasureReason === "expired"));
     }
-    prevObsAcrossYears = prevObs;
-    rows.push({
-      year,
-      baseReturn: end.priceIndex / startStrat - 1,
-      seniorReturn: end.stIndex / startSt - 1,
-      juniorReturn: end.jtIndex / startJt - 1,
-      nonObsPct: ys.length > 0 ? (nonObsCount / ys.length) * 100 : 0,
-      obsEvents,
-    });
-    prevSt = end.stIndex;
-    prevJt = end.jtIndex;
-    prevStrat = end.priceIndex;
-    firstYear = false;
   }
-  return rows;
+  return out;
+}
+
+/** The complement of the observation bands: every PERPETUAL stretch, in order. */
+function buildNonObservationPeriods(
+  steps: BacktestStep[],
+  bands: ObservationPeriod[],
+  config: MarketConfig,
+): ObservationPeriod[] {
+  const out: ObservationPeriod[] = [];
+  const n = steps.length;
+  let a = 0;
+  for (const band of bands) {
+    if (band.aIndex > a) out.push(makePeriod(steps, a, band.aIndex, config, false));
+    a = band.bIndex;
+  }
+  if (n - 1 > a) out.push(makePeriod(steps, a, n - 1, config, false));
+  return out;
+}
+
+/**
+ * Per-calendar-year observation-day accounting (ports tenbin-sims/index.html:405-420).
+ * Days are clipped to both the year boundaries and the series' own span, so the totals
+ * reconcile to the actual backtest horizon rather than to whole calendar years.
+ */
+function buildYearlyObservationDays(
+  steps: BacktestStep[],
+  periods: ObservationPeriod[],
+): { yearly: Record<string, ObservationDays>; outsidePct: number } {
+  const yearly: Record<string, ObservationDays> = {};
+  const start = dayNum(steps[0].date);
+  const end = dayNum(steps[steps.length - 1].date);
+  const firstYear = Number(steps[0].date.slice(0, 4));
+  const lastYear = Number(steps[steps.length - 1].date.slice(0, 4));
+
+  const totals: ObservationDays = { obs: 0, non: 0, total: 0 };
+  for (let y = firstYear; y <= lastYear; y++) {
+    const ya = Math.max(dayNum(`${y}-01-01`), start);
+    const yb = Math.min(dayNum(`${y + 1}-01-01`), end);
+    const total = Math.max(0, yb - ya);
+    let obs = 0;
+    for (const p of periods) {
+      obs += Math.max(0, Math.min(dayNum(p.endDate), yb) - Math.max(dayNum(p.startDate), ya));
+    }
+    const row = { obs: Math.round(obs), non: Math.round(Math.max(0, total - obs)), total: Math.round(total) };
+    yearly[String(y)] = row;
+    totals.obs += row.obs;
+    totals.non += row.non;
+    totals.total += row.total;
+  }
+  yearly.total = totals;
+  return { yearly, outsidePct: totals.total > 0 ? (totals.non / totals.total) * 100 : 0 };
+}
+
+/**
+ * Size each IL erasure in Junior index points.
+ *
+ * The denominator is Junior's PRE-LOSS effective NAV (not the original Junior deposit,
+ * which is what tenbin-sims uses). Two reasons: it stays correct when Junior has been
+ * replenished (the deposit is no longer the outstanding base), and it is dimensionally
+ * consistent with jtIndex, which is a per-share index off the CURRENT share count.
+ *
+ * "Pre-loss" matters on a `juniorWiped` erasure: there jtEff is 0 BY CONSTRUCTION (the wipe
+ * is what the label means), so the step's own jtEff cannot size anything. Sizing against it
+ * — or guarding the divide-by-zero with a 0, as this did — reported real erased capital as
+ * "0% / 0 index points", silently hiding the single largest losses in a run. The previous
+ * step's effective NAV is Junior's last valuation before the loss landed, so it is the
+ * denominator the forfeit is actually a fraction OF.
+ *
+ * Index points are converted through the step's own jtNavPerIndexPt, which is well-defined
+ * at a wipe (it depends on shares + genesis base, not on jtEff). For non-wipe steps the
+ * original `jtIndex * frac` expression is kept verbatim, so their output is byte-identical.
+ */
+function buildErasureEvents(steps: BacktestStep[]): ErasureEvent[] {
+  const out: ErasureEvent[] = [];
+  for (let i = 0; i < steps.length; i++) {
+    const s = steps[i];
+    if (s.ilErased <= 0n) continue;
+    const erased$ = toNum(s.ilErased);
+    const jtEff$ = toNum(s.jtEff);
+    const wiped = jtEff$ <= 0;
+
+    // Junior's valuation immediately before this step's loss: its own effective NAV when it
+    // survived, else the previous step's (its last non-zero mark).
+    const preLoss$ = wiped ? (i > 0 ? toNum(steps[i - 1].jtEff) : 0) : jtEff$;
+    const frac = preLoss$ > 0 ? erased$ / preLoss$ : 0;
+    const forfeitIndexPts = wiped
+      ? s.jtNavPerIndexPt > 0
+        ? erased$ / s.jtNavPerIndexPt
+        : 0
+      : s.jtIndex * frac;
+
+    // Nothing non-finite may reach the UI: it drives the chart's I-beam geometry, where a
+    // NaN/Infinity silently corrupts the SVG path rather than erroring.
+    const pts = Number.isFinite(forfeitIndexPts) ? forfeitIndexPts : 0;
+    const pct = Number.isFinite(frac) ? frac * 100 : 0;
+    out.push({
+      index: i,
+      date: s.date,
+      reason: s.erasureReason!,
+      forfeitIndexPts: pts,
+      forfeitPctOfJuniorNav: pct,
+      top: s.jtIndex + pts,
+    });
+  }
+  return out;
+}
+
+function buildSeniorLossEvents(steps: BacktestStep[]): SeniorLossEvent[] {
+  const out: SeniorLossEvent[] = [];
+  let prevStIndex = 100;
+  for (let i = 0; i < steps.length; i++) {
+    const s = steps[i];
+    if (s.seniorMarkedDown) out.push({ index: i, date: s.date, lossIndexPts: prevStIndex - s.stIndex });
+    prevStIndex = s.stIndex;
+  }
+  return out;
+}
+
+/** Rising edges only: a sustained breach across consecutive steps is ONE hit, not many. */
+function countExitTriggerHits(steps: BacktestStep[], config: MarketConfig): number {
+  let hits = 0;
+  let prevBreached = false;
+  for (const s of steps) {
+    const breached = s.coverageUtilWad >= config.coverageLiquidationUtilizationWAD;
+    if (breached && !prevBreached) hits++;
+    prevBreached = breached;
+  }
+  return hits;
 }
 
 function buildCalendar(steps: BacktestStep[]): CalendarRow[] {
@@ -532,6 +657,42 @@ function buildCalendar(steps: BacktestStep[]): CalendarRow[] {
   return rows;
 }
 
+function buildPerYear(steps: BacktestStep[]): PerYearRow[] {
+  const byYear = new Map<string, BacktestStep[]>();
+  for (const step of steps) {
+    const year = step.date.slice(0, 4);
+    if (!byYear.has(year)) byYear.set(year, []);
+    byYear.get(year)!.push(step);
+  }
+  const rows: PerYearRow[] = [];
+  let prevSt = 100;
+  let prevJt = 100;
+  let prevStrategy = 100;
+  let previousInObservation = false;
+  for (const [year, yearSteps] of [...byYear.entries()].sort()) {
+    const end = yearSteps[yearSteps.length - 1];
+    let observationEntries = 0;
+    let nonObservationSteps = 0;
+    for (const step of yearSteps) {
+      if (step.inObservation && !previousInObservation) observationEntries++;
+      if (!step.inObservation) nonObservationSteps++;
+      previousInObservation = step.inObservation;
+    }
+    rows.push({
+      year,
+      baseReturn: end.priceIndex / prevStrategy - 1,
+      seniorReturn: end.stIndex / prevSt - 1,
+      juniorReturn: end.jtIndex / prevJt - 1,
+      nonObsPct: (nonObservationSteps / yearSteps.length) * 100,
+      obsEvents: observationEntries,
+    });
+    prevSt = end.stIndex;
+    prevJt = end.jtIndex;
+    prevStrategy = end.priceIndex;
+  }
+  return rows;
+}
+
 function maxDrawdown(series: number[]): number {
   let peak = -Infinity;
   let mdd = 0;
@@ -556,17 +717,24 @@ function emptyResult(): BacktestResult {
     juniorMaxDrawdown: 0,
     observationEvents: 0,
     juniorLossEvents: 0,
-    juniorLossRealizedEvents: 0,
-    juniorCapitalLost: 0,
-    strategyMaxDrawdown: 0,
     seniorMarkdownEvents: 0,
     juniorCapitalInjected: 0,
     calendar: [],
+    observationPeriods: [],
+    nonObservationPeriods: [],
+    maxObservedObservationDays: 0,
+    yearlyObservationDays: {},
+    yearlyObservationTriggers: {},
+    outsideObservationPct: 0,
+    erasureEvents: [],
+    seniorLossEvents: [],
+    exitTriggerHits: 0,
+    juniorLossRealizedEvents: 0,
+    juniorCapitalLost: 0,
+    strategyMaxDrawdown: 0,
     observationRuns: [],
-    observationEpisodes: [],
     nonObservationPct: 0,
     maxObservationPeriodDays: 0,
-    seniorLossEvents: 0,
     perYear: [],
     juniorIfKept: [],
   };

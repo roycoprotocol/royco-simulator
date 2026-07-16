@@ -7,6 +7,8 @@
     "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint",
+    "test": "npx tsx lib/day/engine/engine.test.ts && npx tsx lib/hybond/timeframe.test.ts && npx tsx lib/hybond/permalink.test.ts",
+    "parity": "npx tsx lib/try/parity.ts && npx tsx lib/hybond/parity.ts",
     "audit:v2-math": "node scripts/v2-math-invariants.mjs"
   },
   "dependencies": {
@@ -23,6 +25,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.0.7",
     "tailwindcss": "^4",
+    "tsx": "^4.23.1",
     "typescript": "^5"
   }
 }
