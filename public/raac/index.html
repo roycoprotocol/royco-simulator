@@ -273,6 +273,26 @@ details[open]>.setupSummary:after{content:"-"}
       </div>
       </div>
     </details>
+    <details class="setupCard card" id="mcDetails" open aria-label="Monte Carlo viability">
+      <summary class="setupSummary">
+        <div>
+          <div class="eyebrow">Viability · Monte Carlo</div>
+          <h2 class="setupTitle">Forward outlook — Royco team only</h2>
+          <p class="setupCopy">Forward projections are internal to the Royco team. They are not shown to onboarded yield sources and are not a promise of returns.</p>
+        </div>
+        <b class="summaryPill" id="mcPill">Team only</b>
+      </summary>
+      <div class="setupDropdown">
+        <div id="mcGate">
+          <div class="controlGroup">
+            <input type="password" id="mcPw" placeholder="Team password" style="padding:10px 12px;border:1px solid var(--line);background:#fff;font-size:14px;max-width:220px;color:var(--ink)">
+            <button type="button" class="copyBtn shareBtn" id="mcPwBtn">Unlock viability</button>
+            <span id="mcPwErr" style="display:none;color:var(--red);font-size:12px;font-weight:600">Wrong password.</span>
+          </div>
+        </div>
+        <div id="mcMount"></div>
+      </div>
+    </details>
     <details class="setupCard card" id="seniorExitDetails" aria-label="Deploy handoff">
       <summary class="setupSummary">
         <div>
@@ -1028,5 +1048,30 @@ document.querySelectorAll('#mkt button').forEach(b=>b.addEventListener('click',(
   const nextPreset=PRESET||DEFAULT_PRESET; MKT=b.dataset.m;
   refreshPresetLabels(); setPreset(nextPreset); if(typeof mcOnMarket==='function') mcOnMarket(); }));
 
+/* ---------- Monte Carlo: gated team unlock ---------- */
+let mcLoaded=false;
+const mcPwBtn=document.getElementById('mcPwBtn'), mcPw=document.getElementById('mcPw'), mcPwErr=document.getElementById('mcPwErr');
+async function mcTryLoad(silent){
+  if(mcLoaded) return true;
+  let html;
+  try{ const r=await fetch('/raac/team/fragment',{cache:'no-store'}); if(!r.ok) throw 0; html=await r.text(); }
+  catch(e){ if(!silent&&mcPwErr) mcPwErr.style.display='inline'; return false; }
+  mcLoaded=true;
+  document.getElementById('mcMount').innerHTML=html;
+  const g=document.getElementById('mcGate'); if(g) g.style.display='none';
+  const s=document.createElement('script'); s.src='/raac/team/script';
+  s.onload=()=>{ if(typeof mcOnMarket==='function') mcOnMarket(); };
+  document.body.appendChild(s);
+  return true;
+}
+if(mcPwBtn){
+  mcPwBtn.addEventListener('click',async()=>{
+    const r=await fetch('/raac/team/login',{method:'POST',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:'password='+encodeURIComponent(mcPw.value)});
+    if(r.ok){ mcPwErr.style.display='none'; mcTryLoad(false); } else { mcPwErr.style.display='inline'; }
+  });
+  mcPw.addEventListener('keydown',e=>{ if(e.key==='Enter'){ e.preventDefault(); mcPwBtn.click(); } });
+}
+
 hydrateFromPermalink();
+mcTryLoad(true);
 </script></body></html>
