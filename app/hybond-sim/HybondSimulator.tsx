@@ -731,7 +731,6 @@ export default function HybondSimulator({ initialQuery }: { initialQuery: Initia
   const genesisUtilPct = result.steps.length
     ? (Number(result.steps[0].coverageUtilWad) / 1e18) * 100
     : 0;
-  const firstSeniorLoss = result.seniorLossEvents[0] ?? null;
 
   // Junior's ACTUAL first-loss protection at genesis: its effective NAV as a share of the
   // whole pool, i.e. dollars absorbed per $100 of market exposure. This is a DIFFERENT
@@ -1180,13 +1179,10 @@ export default function HybondSimulator({ initialQuery }: { initialQuery: Initia
         >
           HYBond Sim
         </h1>
-        <p className="max-w-3xl" style={{ color: C.muted, fontSize: 13, lineHeight: 1.42, margin: '0 0 14px' }}>
-          HYBond Sim models a hypothetical Royco senior and junior market over the BNY Mellon
-          and Insight Global Short-Dated High Yield Bond strategy, the portfolio behind
-          OpenEden&apos;s tokenized HYBOND. Senior is shielded by Junior&apos;s first-loss
-          buffer, and Junior earns a share of Senior&apos;s yield for absorbing that risk. The
-          strategy reported a 7.52% average yield to expected redemption and a 2.35 year
-          average expected maturity, per Insight as at 31 March 2025.
+        <p className="max-w-3xl" style={{ color: C.muted, fontSize: 12.5, lineHeight: 1.38, margin: '0 0 12px' }}>
+          A hypothetical Royco Senior/Junior market over the BNY Global Short-Dated High Yield
+          Bond Fund. Senior is protected by Junior&apos;s first-loss buffer; Junior earns yield
+          for taking that risk.
         </p>
       </section>
 
@@ -1239,24 +1235,9 @@ export default function HybondSimulator({ initialQuery }: { initialQuery: Initia
             >
               {rangeTitle}
             </h2>
-            {/* Descriptor, port of tenbin-sims/index.html:702-704. */}
+            {/* Match Tenbin's concise overview subheader. */}
             <p className="mt-2" style={{ color: C.muted, fontSize: 12.5, lineHeight: 1.38 }}>
-              {seniorProtected ? (
-                <>
-                  Current {activeScenarioName} terms pass the Senior hard guardrail: no historical
-                  Senior loss events with {fmtTrim(genesisFirstLossPct, 2)}% actual genesis
-                  first-loss protection ({params.minCoveragePct}% contractual minimum coverage),{' '}
-                  {params.observationDays}d observation period, and{' '}
-                  {params.seniorShareToJuniorPct}% of Senior yield paid to Junior.
-                </>
-              ) : (
-                <>
-                  Fails Senior hard guardrail: {result.seniorLossEvents.length} historical Senior
-                  loss events
-                  {firstSeniorLoss ? `, first on ${monthLabel(firstSeniorLoss.date)}` : ''}, with{' '}
-                  {fmtPct(result.seniorMaxDrawdown, 1)} worst Senior drawdown.
-                </>
-              )}
+              Current outputs based on the loaded market data and selected terms.
             </p>
 
           </div>
@@ -1296,10 +1277,10 @@ export default function HybondSimulator({ initialQuery }: { initialQuery: Initia
           <div>
             <Eyebrow>Customize terms</Eyebrow>
             <h2 className="mt-2" style={{ fontFamily: SERIF, fontWeight: 400, fontSize: 22, lineHeight: 1.08, color: C.text }}>
-              Adjust the market terms.
+              Adjust the current market terms.
             </h2>
-            <p className="mt-2" style={{ color: C.muted, fontSize: 14, lineHeight: 1.6 }}>
-              Change deposits, the yield share, and the observation cadence to reshape the tranches.
+            <p className="mt-1" style={{ color: C.muted, fontSize: 12.5, lineHeight: 1.38 }}>
+              The loaded strategy path is already set. These five controls change the market terms.
             </p>
           </div>
           <button
@@ -1324,7 +1305,7 @@ export default function HybondSimulator({ initialQuery }: { initialQuery: Initia
         </div>
 
         {showAdvanced && (
-          <div className="mt-6 flex flex-col gap-6">
+          <div className="mt-4 flex flex-col gap-4">
             {/* Preset ladder */}
             <div>
               <Eyebrow>Scenario</Eyebrow>
@@ -1364,14 +1345,10 @@ export default function HybondSimulator({ initialQuery }: { initialQuery: Initia
                   );
                 })}
               </div>
-              <p className="mt-2" style={{ color: C.kpiLabel, fontSize: 11, lineHeight: 1.6 }}>
-                Each rung takes more risk than the last: less actual first-loss capital and a lower
-                minimum coverage requirement, a shorter observation period, and a larger share of
-                Senior&apos;s yield to Junior. Junior&apos;s deposit is derived from the minimum
-                coverage %, so selecting a preset leaves that link on. Each badge is the live screen
-                result: every preset is re-run through the accountant on the selected window, at
-                both replenishment settings, and passes only if Senior is never marked down in
-                either.
+              <p className="mt-1.5" style={{ color: C.kpiLabel, fontSize: 11, lineHeight: 1.4 }}>
+                Risk rises down the ladder: less first-loss capital, shorter recovery, and more
+                Senior yield to Junior. Badges are live accountant screens at both replenishment
+                settings; Senior must remain loss-free in both.
               </p>
             </div>
 
@@ -1626,12 +1603,8 @@ export default function HybondSimulator({ initialQuery }: { initialQuery: Initia
             <h2 className="mt-2" style={{ fontFamily: SERIF, fontWeight: 400, fontSize: 22, lineHeight: 1.08, color: C.text }}>
               Chart, metrics, and mechanics.
             </h2>
-            <p className="mt-2" style={{ color: C.muted, fontSize: 14, lineHeight: 1.6 }}>
-              How the tranches tracked the underlying fund
-              {viewIsFull ? ' across the full history' : ` from ${monthLabel(dates[0])}`}. The
-              backtest window below sets the market&apos;s start and end: moving it restarts
-              the market on that start date, with deposits made there and Junior&apos;s buffer
-              full, and every number on this page recomputes over the window.
+            <p className="mt-1" style={{ color: C.muted, fontSize: 12.5, lineHeight: 1.38 }}>
+              Use this to sanity-check observation periods, erased claims, and protocol mechanics.
             </p>
           </div>
           <button
@@ -1656,9 +1629,9 @@ export default function HybondSimulator({ initialQuery }: { initialQuery: Initia
         </div>
 
         {showHistory && (
-          <div className="mt-6">
+          <div className="mt-4">
             {/* Legend */}
-            <div className="flex flex-wrap items-center gap-x-6 gap-y-2 mb-4" style={{ fontSize: 12, color: C.muted }}>
+            <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 mb-3" style={{ fontSize: 11.5, color: C.muted }}>
               <LegendSwatch color={C.seniorLine}>Senior share price</LegendSwatch>
               <LegendSwatch color={C.juniorLine}>Junior share price</LegendSwatch>
               {showJuniorKept && (
@@ -1682,7 +1655,7 @@ export default function HybondSimulator({ initialQuery }: { initialQuery: Initia
             </div>
 
             {showJuniorKept && (
-              <p className="mb-4" style={{ color: C.kpiLabel, fontSize: 11.5, lineHeight: 1.5 }}>
+              <p className="mb-3" style={{ color: C.kpiLabel, fontSize: 11, lineHeight: 1.4 }}>
                 The kept-recoveries line is a counterfactual, not a setting. It runs the same
                 path with an observation term longer than the whole horizon, so no period
                 ever expires. That is not deployable: on-chain the fixed term is a uint24 of
@@ -1920,7 +1893,7 @@ export default function HybondSimulator({ initialQuery }: { initialQuery: Initia
 
             {/* Calendar table, transposed to Tenbin's row layout (:250-254, :720-734):
                 rows are series, columns are years. */}
-            <div className="mt-6 overflow-x-auto">
+            <div className="mt-4 overflow-x-auto">
               <table
                 className="w-full"
                 style={{ fontVariantNumeric: 'tabular-nums', fontFamily: MONO, fontSize: 11.8 }}
@@ -2005,9 +1978,9 @@ export default function HybondSimulator({ initialQuery }: { initialQuery: Initia
             </div>
 
             {/* Additional outcome metrics (:716-719) */}
-            <div className="mt-8">
+            <div className="mt-6">
               <Eyebrow>Additional outcome metrics</Eyebrow>
-              <div className="mt-3 grid grid-cols-2 sm:grid-cols-4 gap-x-6 gap-y-4">
+              <div className="mt-2 grid grid-cols-2 sm:grid-cols-4 gap-x-5 gap-y-3">
                 <SecondaryStat
                   label="Senior worst drop"
                   value={fmtSignedPct(-result.seniorMaxDrawdown)}
@@ -2045,9 +2018,9 @@ export default function HybondSimulator({ initialQuery }: { initialQuery: Initia
             </div>
 
             {/* Prose panels (:261-265, :268-272) */}
-            <div className="mt-8 grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <div style={{ border: `1px solid ${C.border}`, padding: '14px 16px' }}>
-                <p style={{ fontWeight: 600, color: C.text, fontSize: 13, marginBottom: 8 }}>
+            <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-4">
+              <div style={{ border: `1px solid ${C.border}`, padding: '12px 14px' }}>
+                <p style={{ fontWeight: 600, color: C.text, fontSize: 12.5, marginBottom: 6 }}>
                   Protocol mechanics
                 </p>
                 <ProseRow color={C.seniorLine}>
@@ -2068,8 +2041,8 @@ export default function HybondSimulator({ initialQuery }: { initialQuery: Initia
                   beyond it.
                 </ProseRow>
               </div>
-              <div style={{ border: `1px solid ${C.border}`, padding: '14px 16px' }}>
-                <p style={{ fontWeight: 600, color: C.text, fontSize: 13, marginBottom: 8 }}>
+              <div style={{ border: `1px solid ${C.border}`, padding: '12px 14px' }}>
+                <p style={{ fontWeight: 600, color: C.text, fontSize: 12.5, marginBottom: 6 }}>
                   Preset ladder
                 </p>
                 {/* Prose is derived from the same runs as the badges below (presetProse), so a
@@ -2085,7 +2058,7 @@ export default function HybondSimulator({ initialQuery }: { initialQuery: Initia
                     <b>{p.label}</b>, {p.setup} {p.outcome}
                   </ProseRow>
                 ))}
-                <div className="mt-3 flex flex-col gap-1.5">
+                <div className="mt-2 flex flex-col gap-1">
                   {presetScreen.map((s) => (
                     <div key={s.id} className="flex items-center gap-2" style={{ fontSize: 11, color: C.muted }}>
                       <ScreenBadge pass={s.pass} />
@@ -2096,14 +2069,9 @@ export default function HybondSimulator({ initialQuery }: { initialQuery: Initia
                     </div>
                   ))}
                 </div>
-                <p className="mt-2" style={{ color: C.kpiLabel, fontSize: 11, lineHeight: 1.6 }}>
-                  Scenarios vary how much risk Junior takes: less actual first-loss capital and a
-                  lower minimum coverage requirement, a shorter observation, and a bigger yield
-                  share as you go down the ladder. Both the
-                  descriptions and the badges above are computed live by re-running each preset
-                  through the accountant on the selected window, not asserted. The series is real
-                  daily NAV, so observation terms resolve at daily resolution, and the shortest
-                  rung&apos;s 16-day observation is a genuine 16-day term, distinct from the others.
+                <p className="mt-1.5" style={{ color: C.kpiLabel, fontSize: 11, lineHeight: 1.4 }}>
+                  The ladder is recomputed live on the selected daily series; its 16-day aggressive
+                  term is distinct from the longer rungs.
                 </p>
               </div>
             </div>
@@ -2127,14 +2095,14 @@ export default function HybondSimulator({ initialQuery }: { initialQuery: Initia
             <h2 className="mt-2" style={{ fontFamily: SERIF, fontWeight: 400, fontSize: 22, lineHeight: 1.08, color: C.text }}>
               Copy final market-design parameters.
             </h2>
-            <p className="mt-2" style={{ color: C.muted, fontSize: 14, lineHeight: 1.6 }}>
+            <p className="mt-1" style={{ color: C.muted, fontSize: 12.5, lineHeight: 1.38 }}>
               This is the finalized parameter handoff, not the full integration package.
             </p>
           </summary>
 
-          <div className="mt-5">
+          <div className="mt-4">
             <div className="flex items-start justify-between gap-4 flex-wrap">
-              <p style={{ color: C.muted, fontSize: 13, lineHeight: 1.6 }}>
+              <p style={{ color: C.muted, fontSize: 12.5, lineHeight: 1.4 }}>
                 <StatusPill ok={seniorProtected}>
                   {seniorProtected ? 'Ready' : 'Needs review'}
                 </StatusPill>{' '}
@@ -2174,7 +2142,7 @@ export default function HybondSimulator({ initialQuery }: { initialQuery: Initia
                 fontSize: 11.5,
                 lineHeight: 1.6,
                 padding: '12px 14px',
-                height: 340,
+                height: 265,
                 resize: 'vertical',
               }}
             />
@@ -2220,7 +2188,7 @@ export default function HybondSimulator({ initialQuery }: { initialQuery: Initia
         </div>
 
         {maintainCoverage ? (
-          <p className="mt-3" style={{ color: C.text, fontSize: 14, lineHeight: 1.7 }}>
+          <p className="mt-2" style={{ color: C.text, fontSize: 13, lineHeight: 1.5 }}>
             These results assume <strong>maintained Junior coverage</strong>: each time an
             observation period ends and deposits reopen, fresh Junior capital is attracted to
             rebuild the buffer to at least the {params.minCoveragePct}% minimum, re-protecting
@@ -2280,7 +2248,7 @@ export default function HybondSimulator({ initialQuery }: { initialQuery: Initia
             that case.
           </p>
         ) : (
-          <p className="mt-3" style={{ color: C.text, fontSize: 14, lineHeight: 1.7 }}>
+          <p className="mt-2" style={{ color: C.text, fontSize: 13, lineHeight: 1.5 }}>
             <strong>Fixed Junior capital, no replenishment.</strong> Once a crash exhausts
             Junior there is no buffer left, so Senior would track the underlying down. On this
             path, {juniorWiped ? (
@@ -2329,7 +2297,7 @@ export default function HybondSimulator({ initialQuery }: { initialQuery: Initia
           </p>
         )}
 
-        <p className="mt-4" style={{ color: C.kpiLabel, fontSize: 11, lineHeight: 1.6 }}>
+        <p className="mt-3" style={{ color: C.kpiLabel, fontSize: 11, lineHeight: 1.45 }}>
           Backtest math is the Royco Day accountant, proven wei-exact against the contract on this
           real daily series (698 sampled vectors over the 2,394-day path, all transitions covered).
           Parameters are illustrative and pending accountant sign-off. Projections, not
@@ -2342,7 +2310,7 @@ export default function HybondSimulator({ initialQuery }: { initialQuery: Initia
           substance is unchanged: what the series is, what it is not, and what it cannot
           show. */}
       <footer
-        style={{ color: C.kpiLabel, fontSize: 11, lineHeight: 1.6 }}
+        style={{ color: C.kpiLabel, fontSize: 11, lineHeight: 1.45 }}
         className="pb-8 border-t pt-4"
       >
         <p style={{ borderColor: C.border }}>
@@ -2354,14 +2322,14 @@ export default function HybondSimulator({ initialQuery }: { initialQuery: Initia
           including the COVID selloff of February to March 2020 (a 17.45% fund drawdown) and the
           2022 rate and high-yield selloff, both events the mechanism actually sees.
         </p>
-        <p className="mt-2">
+        <p className="mt-1">
           It is still a counterfactual, not a track record. HYBOND the token launched on 1 April
           2026 and has no multi-year history of its own, so applying a multi-year backtest to it
           is illustrative. No Royco market over HYBOND has been announced, so this is an
           illustration of the mechanism, not a product. HYBOND&apos;s own management fee and the
           fund&apos;s charges would reduce these returns.
         </p>
-        <p className="mt-2">
+        <p className="mt-1">
           Backtest math is the Royco Day accountant, proven wei-exact against the contract on this
           real daily series (698 sampled vectors over the 2,394-day path, all transitions covered).
           Parameters illustrative, pending accountant sign-off (OPEN-QUESTIONS).
@@ -2955,7 +2923,7 @@ function SliderControl({
         className="w-full"
         style={{ accentColor: C.accent }}
       />
-      <p className="mt-1.5" style={{ color: C.muted, fontSize: 12, lineHeight: 1.5 }}>
+      <p className="mt-1" style={{ color: C.muted, fontSize: 11.5, lineHeight: 1.4 }}>
         {desc}
       </p>
       {children}
