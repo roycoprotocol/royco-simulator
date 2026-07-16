@@ -22,7 +22,7 @@ import {
   ReferenceDot,
 } from 'recharts';
 
-import { runBacktest } from '@/lib/try/backtest';
+import { runBacktest, type BacktestResult } from '@/lib/try/backtest';
 import {
   TRY_DEFAULT_PARAMS,
   PRESETS,
@@ -32,6 +32,27 @@ import {
   type TryParams,
   type HistoricalScenario,
 } from '@/lib/try/scenarios';
+
+// Neutral zero-step result. The engine rejects some configurations outright (e.g. a
+// $0 Junior tranche throws INVALID_POST_OP_STATE JT_DEPOSIT), and runBacktest runs
+// inside a render-time useMemo, so a throw takes the whole page down. safeBacktest
+// falls back to this and surfaces the reason inline instead. Mirrors HYBond's guard.
+const EMPTY_RESULT: BacktestResult = runBacktest({
+  config: buildConfig(TRY_DEFAULT_PARAMS),
+  depositST: TRY_DEFAULT_PARAMS.depositST,
+  depositJT: TRY_DEFAULT_PARAMS.depositJT,
+  series: [],
+});
+
+function safeBacktest(
+  run: () => BacktestResult,
+): { result: BacktestResult; error: string | null } {
+  try {
+    return { result: run(), error: null };
+  } catch (e) {
+    return { result: EMPTY_RESULT, error: e instanceof Error ? e.message : String(e) };
+  }
+}
 
 const ResponsiveContainerNoSSR = dynamic(
   () => import('recharts').then((mod) => mod.ResponsiveContainer),
@@ -87,30 +108,35 @@ export default function TrySimulator() {
 
   const scenario = getScenario(scenarioId);
 
-  const result = useMemo(
+  const run = useMemo(
     () =>
-      runBacktest({
-        config: buildConfig(params),
-        depositST: params.depositST,
-        depositJT: params.depositJT,
-        series: getScenario(scenarioId).points,
-        maintainJuniorCoverage: maintainCoverage,
-      }),
+      safeBacktest(() =>
+        runBacktest({
+          config: buildConfig(params),
+          depositST: params.depositST,
+          depositJT: params.depositJT,
+          series: getScenario(scenarioId).points,
+          maintainJuniorCoverage: maintainCoverage,
+        }),
+      ),
     [params, scenarioId, maintainCoverage],
   );
+  const result = run.result;
 
   // Counterfactual: the same path with FIXED Junior (no replenishment), used to
   // show — in the disclaimer — what Senior's exposure looks like without the
   // maintained-coverage assumption.
   const exposedResult = useMemo(
     () =>
-      runBacktest({
-        config: buildConfig(params),
-        depositST: params.depositST,
-        depositJT: params.depositJT,
-        series: getScenario(scenarioId).points,
-        maintainJuniorCoverage: false,
-      }),
+      safeBacktest(() =>
+        runBacktest({
+          config: buildConfig(params),
+          depositST: params.depositST,
+          depositJT: params.depositJT,
+          series: getScenario(scenarioId).points,
+          maintainJuniorCoverage: false,
+        }),
+      ).result,
     [params, scenarioId],
   );
   const exposedSeniorEnd = exposedResult.steps.length
@@ -395,10 +421,13 @@ export default function TrySimulator() {
                 desc="Protected capital that Junior shields from losses."
                 onChange={(v) => updateParam({ depositST: v })}
               />
+              {/* min is 50, not 0: a $0 Junior tranche is a state the accountant rejects
+                  outright (INVALID_POST_OP_STATE JT_DEPOSIT), so it is not a configuration
+                  this control should be able to express. safeBacktest above is the backstop. */}
               <SliderControl
                 label="Junior deposit ($)"
                 value={params.depositJT}
-                min={0}
+                min={50}
                 max={10000}
                 step={50}
                 display={fmtUsd0(params.depositJT)}
@@ -436,6 +465,25 @@ export default function TrySimulator() {
                 onChange={(v) => updateParam({ minCoveragePct: v })}
               />
             </div>
+
+            {/* Engine rejected this configuration — report it instead of crashing. */}
+            {run.error && (
+              <div
+                style={{
+                  border: `1px solid ${C.danger}`,
+                  background: C.cardBg,
+                  padding: '12px 14px',
+                  fontSize: 12,
+                  color: C.danger,
+                  lineHeight: 1.5,
+                  marginTop: 16,
+                }}
+              >
+                <span style={{ fontWeight: 600 }}>This configuration is not valid.</span> The
+                accountant rejected it ({run.error}), so no results are shown. Adjust the inputs
+                above.
+              </div>
+            )}
 
             {/* Summary chips */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
