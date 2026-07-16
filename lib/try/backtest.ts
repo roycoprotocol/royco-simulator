@@ -71,6 +71,17 @@ export interface BacktestStep {
   marketState: MarketState;
   stIndex: number; // Senior share price, indexed to $100 at genesis (per-unit, clean)
   jtIndex: number; // Junior share price, indexed to $100 at genesis (per-unit; replenishment mints at price, so index is undistorted)
+  /**
+   * Dollars of Junior effective NAV per ONE Junior index point at this step, i.e. jtEff$ / jtIndex.
+   *
+   * Recorded explicitly because that quotient is 0/0 exactly when Junior is wiped (jtEff and
+   * jtIndex both hit 0), which is precisely when an erasure needs to be sized. It is a pure
+   * function of the share count and the genesis base (jtShares$ * (jtBase$/jtNav0$) / 100), so
+   * it stays well-defined at a wipe and lets buildErasureEvents convert erased dollars into
+   * index points there. Captured at the same point as jtIndex, BEFORE any replenishment mints
+   * new shares on this step.
+   */
+  jtNavPerIndexPt: number;
   inObservation: boolean; // marketState === FIXED_TERM
   juniorLossLocked: boolean; // term elapsed / exhaustion → Junior permanently ate a covered loss
   seniorMarkedDown: boolean; // Senior effective share price fell this step (a real Senior loss)
@@ -246,6 +257,8 @@ export function runBacktest(params: BacktestParams): BacktestResult {
     const stIndex = (toNum(r.stEffectiveNAV) / toNum(stShares)) / (toNum(stBase) / toNum(stNav0)) * 100;
     const jtSharePrice = toNum(r.jtEffectiveNAV) / toNum(jtShares);
     const jtIndex = jtSharePrice / (toNum(jtBase) / toNum(jtNav0)) * 100;
+    // jtEff$ / jtIndex, but derived from shares + base so it survives a wipe (where both are 0).
+    const jtNavPerIndexPt = (toNum(jtShares) * (toNum(jtBase) / toNum(jtNav0))) / 100;
 
     // A junior loss lock-in is exactly when the accountant ERASED outstanding coverage IL
     // (RoycoDayAccountant.sol:668): the term elapsed / coverage liquidated / Junior was wiped
@@ -307,6 +320,7 @@ export function runBacktest(params: BacktestParams): BacktestResult {
       marketState: r.marketState,
       stIndex,
       jtIndex,
+      jtNavPerIndexPt,
       inObservation: r.marketState === "FIXED_TERM",
       juniorLossLocked,
       seniorMarkedDown,
@@ -484,10 +498,21 @@ function buildYearlyObservationDays(
 /**
  * Size each IL erasure in Junior index points.
  *
- * The denominator is Junior's effective NAV AT THE TIME (not the original Junior deposit,
+ * The denominator is Junior's PRE-LOSS effective NAV (not the original Junior deposit,
  * which is what tenbin-sims uses). Two reasons: it stays correct when Junior has been
  * replenished (the deposit is no longer the outstanding base), and it is dimensionally
  * consistent with jtIndex, which is a per-share index off the CURRENT share count.
+ *
+ * "Pre-loss" matters on a `juniorWiped` erasure: there jtEff is 0 BY CONSTRUCTION (the wipe
+ * is what the label means), so the step's own jtEff cannot size anything. Sizing against it
+ * — or guarding the divide-by-zero with a 0, as this did — reported real erased capital as
+ * "0% / 0 index points", silently hiding the single largest losses in a run. The previous
+ * step's effective NAV is Junior's last valuation before the loss landed, so it is the
+ * denominator the forfeit is actually a fraction OF.
+ *
+ * Index points are converted through the step's own jtNavPerIndexPt, which is well-defined
+ * at a wipe (it depends on shares + genesis base, not on jtEff). For non-wipe steps the
+ * original `jtIndex * frac` expression is kept verbatim, so their output is byte-identical.
  */
 function buildErasureEvents(steps: BacktestStep[]): ErasureEvent[] {
   const out: ErasureEvent[] = [];
@@ -496,15 +521,29 @@ function buildErasureEvents(steps: BacktestStep[]): ErasureEvent[] {
     if (s.ilErased <= 0n) continue;
     const erased$ = toNum(s.ilErased);
     const jtEff$ = toNum(s.jtEff);
-    const frac = jtEff$ > 0 ? erased$ / jtEff$ : 0;
-    const forfeitIndexPts = s.jtIndex * frac;
+    const wiped = jtEff$ <= 0;
+
+    // Junior's valuation immediately before this step's loss: its own effective NAV when it
+    // survived, else the previous step's (its last non-zero mark).
+    const preLoss$ = wiped ? (i > 0 ? toNum(steps[i - 1].jtEff) : 0) : jtEff$;
+    const frac = preLoss$ > 0 ? erased$ / preLoss$ : 0;
+    const forfeitIndexPts = wiped
+      ? s.jtNavPerIndexPt > 0
+        ? erased$ / s.jtNavPerIndexPt
+        : 0
+      : s.jtIndex * frac;
+
+    // Nothing non-finite may reach the UI: it drives the chart's I-beam geometry, where a
+    // NaN/Infinity silently corrupts the SVG path rather than erroring.
+    const pts = Number.isFinite(forfeitIndexPts) ? forfeitIndexPts : 0;
+    const pct = Number.isFinite(frac) ? frac * 100 : 0;
     out.push({
       index: i,
       date: s.date,
       reason: s.erasureReason!,
-      forfeitIndexPts,
-      forfeitPctOfJuniorNav: frac * 100,
-      top: s.jtIndex + forfeitIndexPts,
+      forfeitIndexPts: pts,
+      forfeitPctOfJuniorNav: pct,
+      top: s.jtIndex + pts,
     });
   }
   return out;
