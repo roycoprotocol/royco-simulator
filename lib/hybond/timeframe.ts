@@ -55,16 +55,32 @@ export function normalizeRange(a: number, b: number, max: number): IndexRange {
   return { a: lo, b: up };
 }
 
-/** Move one handle, keeping the range legal. */
+/**
+ * Move one handle, keeping the range legal.
+ *
+ * The DRAGGED handle is clamped against the stationary one; the stationary one never moves.
+ * Routing this through normalizeRange instead would SWAP the handles when they cross, which
+ * yields a range that is valid (a <= b, in bounds, min-window met) but wrong: dragging start
+ * rightwards past the end would drag the end along with it and hand ownership of the grab to
+ * the other handle mid-gesture. Clamping is what a brush is expected to do.
+ */
 export function moveHandle(
   range: IndexRange,
   side: "start" | "end",
   index: number,
   max: number,
 ): IndexRange {
-  return side === "start"
-    ? normalizeRange(index, range.b, max)
-    : normalizeRange(range.a, index, max);
+  const hi = Math.max(0, max);
+  const span = Math.min(MIN_SPAN, hi);
+  const want = clamp(Math.round(index), 0, hi);
+
+  if (side === "start") {
+    // Start can come no closer to the fixed end than the minimum window.
+    const b = clamp(Math.round(range.b), 0, hi);
+    return { a: clamp(want, 0, Math.max(0, b - span)), b };
+  }
+  const a = clamp(Math.round(range.a), 0, hi);
+  return { a, b: clamp(want, Math.min(hi, a + span), hi) };
 }
 
 /**
