@@ -1,10 +1,14 @@
 // ---------------------------------------------------------------------------
-// timeframe.ts — pure index-range helpers for the "Chart timeframe" brush.
+// timeframe.ts — pure index-range helpers for the "Backtest window" brush.
 //
-// The brush selects a VIEW WINDOW over the full monthly series for charting
-// only. It performs no accounting: every KPI, stat, and calendar row on the
-// page stays computed over the full history. These helpers are pure so the
-// clamping/min-window/no-crossing rules can be tested headlessly.
+// The brush selects a window over the full monthly series, and the simulator
+// RESTARTS the market over that slice: the window start is a new genesis, so
+// every KPI, stat, and calendar row recomputes over it. These helpers stay
+// purely about index arithmetic (clamping, min-window, no-crossing) and do no
+// accounting themselves, so those rules can be tested headlessly.
+//
+// MIN_WINDOW_MONTHS is what guarantees a restart always has enough points to be
+// a runnable market rather than a degenerate one.
 // ---------------------------------------------------------------------------
 
 /** Inclusive index range into the series (a = start point, b = end point). */

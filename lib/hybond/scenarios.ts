@@ -95,85 +95,131 @@ export interface Preset {
   params: HybondParams;
 }
 
+/** Senior deposit every preset is sized against. Junior is derived from it, never hand-set. */
+const PRESET_DEPOSIT_ST = 1000;
+
+/**
+ * A rung of the ladder, in Tenbin's own three knobs (tenbin-sims/index.html:302-303):
+ * first-loss %, observation days, and the % of Senior yield paid to Junior.
+ *
+ * Junior is DERIVED from the first-loss % (never hand-set), which is the Tenbin model:
+ * first-loss is the risk dial and the deposit follows from it. So every preset carries
+ * linkJuniorToFirstLoss:true, and selecting one leaves that link ON.
+ */
+const rung = (
+  id: Preset["id"],
+  label: string,
+  cov: number,
+  obs: number,
+  ys: number,
+): Preset => ({
+  id,
+  label,
+  params: {
+    ...HYBOND_DEFAULT_PARAMS,
+    depositST: PRESET_DEPOSIT_ST,
+    depositJT: juniorFromFirstLossPct(PRESET_DEPOSIT_ST, cov),
+    minCoveragePct: cov,
+    observationDays: obs,
+    seniorShareToJuniorPct: ys,
+    linkJuniorToFirstLoss: true,
+  },
+});
+
+/**
+ * The ladder follows Tenbin's REAL direction (stMXN, tenbin-sims/index.html:302), strictly
+ * monotonic on all three knobs as risk increases:
+ *   first-loss DECREASES, observation DECREASES, yield-share-to-Junior INCREASES.
+ *
+ * The previous ladder was backwards on two of the three: yield share was FLAT at 53 across
+ * all rungs (so it did not differentiate them at all), and Aggressive carried the LONGEST
+ * observation (120d) rather than the shortest.
+ *
+ * Known resolution limit, and why the rungs still differ: this series is sampled MONTHLY, so
+ * an observation term under ~30 days cannot resolve before the next month end (obs 1/15/29/30
+ * are byte-identical here). Aggressive's 16d therefore BEHAVES as ~30d. That is expected and
+ * is not a collapse: cov (34/30/18 → Junior 607.14/500/250) and ys (61/62/75) still separate
+ * the three runs, which were verified distinct through the accountant.
+ */
 export const PRESETS: Preset[] = [
-  {
-    id: "conservative",
-    label: "Conservative",
-    params: {
-      ...HYBOND_DEFAULT_PARAMS,
-      depositST: 1000,
-      depositJT: 750,
-      observationDays: 60,
-      linkJuniorToFirstLoss: false,
-    },
-  },
-  {
-    id: "balanced",
-    label: "Balanced",
-    params: { ...HYBOND_DEFAULT_PARAMS },
-  },
-  {
-    id: "aggressive",
-    // 15 days was a fiction on this monthly series: obs of 1/15/29/30 all resolve to
-    // byte-identical output, so the preset was indistinguishable from Balanced. 120 is
-    // a genuinely distinct breakpoint AND is directionally aggressive: a longer term
-    // keeps Junior's capital committed across more of the horizon.
-    label: "Aggressive",
-    params: {
-      ...HYBOND_DEFAULT_PARAMS,
-      depositST: 1000,
-      depositJT: 300,
-      observationDays: 120,
-      linkJuniorToFirstLoss: false,
-    },
-  },
+  rung("conservative", "Conservative", 34, 60, 61),
+  rung("balanced", "Balanced", 30, 45, 62),
+  rung("aggressive", "Aggressive", 18, 16, 75),
 ];
 
 /**
  * Run every preset through the real engine and check the claim the UI makes about them:
  * Senior is never marked down. This makes the assertion falsifiable rather than prose.
  *
- * The row also carries the inputs and outcomes the ladder's PROSE describes (cushion, term,
- * Junior's end value, erased recovery claims), so that prose can be derived from the same
- * runs instead of hand-written. Hand-written prose drifts: it claimed Aggressive had the
- * "shorter recovery time" and "more erased recovery claims" when, after the preset was
- * retuned, it had the LONGEST term (120d) and the FEWEST erasures (1 vs Balanced's 4).
+ * The screen runs each preset at BOTH maintainJuniorCoverage settings and passes only if
+ * Senior is untouched in both. The replenishment assumption is the optimistic one, so
+ * screening it alone would let a preset that only protects Senior WITH fresh Junior capital
+ * show a Pass badge. The hard requirement is that even the most aggressive rung never marks
+ * Senior down, replenished or not.
+ *
+ * The row also carries the inputs and outcomes the ladder's PROSE describes, so that prose can
+ * be derived from the same runs instead of hand-written. Hand-written prose drifts: it claimed
+ * Aggressive had the "shorter recovery time" and "more erased recovery claims" when the preset
+ * in fact had the LONGEST term (120d) and the FEWEST erasures.
  */
 export interface PresetScreenRow {
   id: Preset["id"];
   label: string;
   pass: boolean;
+  /** Worst case across BOTH maintain settings, which is what `pass` is decided on. */
   seniorMarkdownEvents: number;
   seniorMaxDrawdown: number;
   /** Inputs, echoed so prose never has to reach back into PRESETS and desynchronise. */
   depositJT: number;
   observationDays: number;
-  /** Outcomes on this series. */
+  minCoveragePct: number;
+  seniorShareToJuniorPct: number;
+  /** Outcomes on this series, as run with the product's maintained-coverage assumption. */
   juniorEnd: number; // Junior index at the end of the run (100 = genesis)
   seniorEnd: number;
+  juniorAvgYr: number;
+  seniorAvgYr: number;
   erasedRecoveryClaims: number;
 }
 
+/**
+ * Screens the ladder over `series`. The caller passes the ACTIVE backtest window, so the
+ * badges and the ladder prose describe what selecting a preset would do to the market the
+ * user is actually looking at, rather than to a full history they may have windowed away.
+ */
 export function screenPresets(series: PricePoint[] = HYBOND_NAV_SERIES): PresetScreenRow[] {
   return PRESETS.map((p) => {
-    const r = runBacktest({
-      config: buildHybondConfig(p.params),
-      depositST: p.params.depositST,
-      depositJT: p.params.depositJT,
-      series,
-    });
-    const last = r.steps[r.steps.length - 1];
+    const run = (maintainJuniorCoverage: boolean) =>
+      runBacktest({
+        config: buildHybondConfig(p.params),
+        depositST: p.params.depositST,
+        depositJT: p.params.depositJT,
+        series,
+        maintainJuniorCoverage,
+      });
+    const maintained = run(true);
+    const exposed = run(false);
+    const last = maintained.steps[maintained.steps.length - 1];
+    const seniorMarkdownEvents = Math.max(
+      maintained.seniorMarkdownEvents,
+      exposed.seniorMarkdownEvents,
+    );
+    const seniorMaxDrawdown = Math.max(maintained.seniorMaxDrawdown, exposed.seniorMaxDrawdown);
     return {
       id: p.id,
       label: p.label,
-      pass: r.seniorMarkdownEvents === 0 && r.seniorMaxDrawdown < 0.0005,
-      seniorMarkdownEvents: r.seniorMarkdownEvents,
-      seniorMaxDrawdown: r.seniorMaxDrawdown,
+      pass: seniorMarkdownEvents === 0 && seniorMaxDrawdown < 0.0005,
+      seniorMarkdownEvents,
+      seniorMaxDrawdown,
       depositJT: p.params.depositJT,
       observationDays: p.params.observationDays,
+      minCoveragePct: p.params.minCoveragePct,
+      seniorShareToJuniorPct: p.params.seniorShareToJuniorPct,
       juniorEnd: last ? last.jtIndex : 100,
       seniorEnd: last ? last.stIndex : 100,
-      erasedRecoveryClaims: r.erasureEvents.length,
+      juniorAvgYr: maintained.juniorAvgYr,
+      seniorAvgYr: maintained.seniorAvgYr,
+      erasedRecoveryClaims: maintained.erasureEvents.length,
     };
   });
 }
@@ -272,7 +318,9 @@ export function buildHybondNavSeries(): PricePoint[] {
 
 /**
  * The single full-history series: 61 monthly points, 2020-06 through 2025-06.
- * There are no history windows, the UI's "Chart timeframe" brush zooms this
- * series for display while every metric stays computed over the full range.
+ * The UI's "Backtest window" brush SLICES this series and re-runs the market over
+ * the slice, so the window start is a real new genesis (deposits happen there, and
+ * every metric on the page recomputes over the window). This array is the full
+ * history the brush selects from, and the brush's own preview always shows all of it.
  */
 export const HYBOND_NAV_SERIES: PricePoint[] = buildHybondNavSeries();

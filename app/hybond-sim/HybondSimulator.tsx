@@ -471,11 +471,24 @@ function exitThresholdNote(v: number): string {
   return `Middle setting: Senior can leave at about ${fmtTrim(v, 1)}% Junior buffer remaining (${util}).`;
 }
 
-// The series starts mid-2020 and ends mid-2025, so the first and last calendar rows
-// are partial. Label them rather than letting them read as full years.
-const yearLabel = (year: string, i: number, n: number): string => {
-  if (i === 0 && n > 1) return `${year}½`;
-  if (i === n - 1 && n > 1) return `${year} YTD`;
+/**
+ * Calendar-column label. The first and last rows of a run are usually PARTIAL years, and
+ * must not read as full ones.
+ *
+ * Partial-ness is derived from the run's own first/last dates rather than assumed: this used
+ * to hardcode "the series starts mid-2020 and ends mid-2025", which the backtest window
+ * falsifies the moment it restarts the market on a January (a genuinely complete first year
+ * was still being labelled a half-year).
+ */
+const yearLabel = (
+  year: string,
+  i: number,
+  n: number,
+  firstDate: string,
+  lastDate: string,
+): string => {
+  if (i === 0 && firstDate.slice(5, 7) !== '01') return `${year}½`;
+  if (i === n - 1 && lastDate.slice(5, 7) !== '12') return `${year} YTD`;
   return year;
 };
 
@@ -525,6 +538,28 @@ export default function HybondSimulator({ initialQuery }: { initialQuery: Initia
 
   const config = useMemo(() => buildHybondConfig(params), [params]);
 
+  // --- Backtest window -------------------------------------------------------
+  // The brush selects a window over the FULL series and the market is RESTARTED over
+  // it. maxIndex is taken from the series itself, never from a run: every run below is
+  // a function of the window, so sizing the window from a run would be circular.
+  const maxIndex = HYBOND_NAV_SERIES.length - 1;
+  const [range, setRange] = useState<IndexRange>(() => ({ a: 0, b: maxIndex }));
+  const view = useMemo(() => normalizeRange(range.a, range.b, maxIndex), [range, maxIndex]);
+  const viewIsFull = isFullRange(view, maxIndex);
+
+  // The INPUT series every run on this page is fed. Slicing the INPUT (rather than
+  // clipping the output steps, as this page used to) is what makes the window a true
+  // restart: the engine is genesis-agnostic, so the slice's first point becomes day 1.
+  // Deposits happen there, Junior's buffer starts full, no impairment is carried in,
+  // and the market state starts PERPETUAL. Every metric on the page — KPIs, guardrails,
+  // the calendar, the erasure and observation lists, `gap`, the disclaimer — is derived
+  // from these runs, so all of them recompute over the window for free, with no
+  // view-clipping anywhere.
+  const windowSeries = useMemo(
+    () => HYBOND_NAV_SERIES.slice(view.a, view.b + 1),
+    [view.a, view.b],
+  );
+
   const run = useMemo(
     () =>
       safeBacktest(() =>
@@ -532,11 +567,11 @@ export default function HybondSimulator({ initialQuery }: { initialQuery: Initia
           config,
           depositST: params.depositST,
           depositJT: params.depositJT,
-          series: HYBOND_NAV_SERIES,
+          series: windowSeries,
           maintainJuniorCoverage: maintainCoverage,
         }),
       ),
-    [config, params.depositST, params.depositJT, maintainCoverage],
+    [config, params.depositST, params.depositJT, maintainCoverage, windowSeries],
   );
   const result = run.result;
 
@@ -551,11 +586,11 @@ export default function HybondSimulator({ initialQuery }: { initialQuery: Initia
           config,
           depositST: params.depositST,
           depositJT: params.depositJT,
-          series: HYBOND_NAV_SERIES,
+          series: windowSeries,
           maintainJuniorCoverage: false,
         }),
       ).result,
-    [config, params.depositST, params.depositJT],
+    [config, params.depositST, params.depositJT, windowSeries],
   );
   const exposedSeniorEnd = exposedResult.steps.length
     ? exposedResult.steps[exposedResult.steps.length - 1].stIndex
@@ -576,11 +611,11 @@ export default function HybondSimulator({ initialQuery }: { initialQuery: Initia
           config: { ...config, fixedTermDurationSeconds: NO_EXPIRY_TERM_SECONDS },
           depositST: params.depositST,
           depositJT: params.depositJT,
-          series: HYBOND_NAV_SERIES,
+          series: windowSeries,
           maintainJuniorCoverage: false,
         }),
       ).result,
-    [config, params.depositST, params.depositJT],
+    [config, params.depositST, params.depositJT, windowSeries],
   );
 
   const lastIndex = <T,>(arr: T[]): T | null => (arr.length ? arr[arr.length - 1] : null);
@@ -604,11 +639,11 @@ export default function HybondSimulator({ initialQuery }: { initialQuery: Initia
           config,
           depositST: params.depositST,
           depositJT: params.depositJT,
-          series: HYBOND_NAV_SERIES,
+          series: windowSeries,
           maintainJuniorCoverage: true,
         }),
       ).result,
-    [config, params.depositST, params.depositJT],
+    [config, params.depositST, params.depositJT, windowSeries],
   );
   const maintainedSeniorEnd = maintainedResult.steps.length
     ? maintainedResult.steps[maintainedResult.steps.length - 1].stIndex
@@ -627,14 +662,17 @@ export default function HybondSimulator({ initialQuery }: { initialQuery: Initia
       : 0;
 
   // Every preset run through the real engine: the UI shows a computed pass/fail badge
-  // rather than asserting the screen in prose the way Tenbin does (:272).
-  const presetScreen = useMemo(() => screenPresets(), []);
+  // rather than asserting the screen in prose the way Tenbin does (:272). Screened over
+  // the ACTIVE WINDOW, so the badges and the ladder prose describe the market currently
+  // on screen rather than a full history the user may have windowed away.
+  const presetScreen = useMemo(() => screenPresets(windowSeries), [windowSeries]);
 
   // Ladder prose, DERIVED from the live screen rows. Every comparative below ("the largest
   // cushion", "the fewest erased claims") is computed by comparing the actual runs, so the
-  // copy cannot contradict them the way the previous hand-written version did — it described
-  // Aggressive as having the "shorter recovery time" and "more erased recovery claims" when
-  // it in fact has the longest term and the fewest erasures.
+  // copy cannot contradict them the way a hand-written version did — it described Aggressive
+  // as having the "shorter recovery time" and "more erased recovery claims" while the preset
+  // in fact had the longest term and the fewest erasures. Deriving it means retuning the
+  // ladder rewrites its own description.
   const presetProse = useMemo(() => {
     // A superlative is only claimed when it is a UNIQUE extreme, so a tie never reads as one.
     const uniqueExtreme = (pick: (r: (typeof presetScreen)[number]) => number, want: 'max' | 'min') => {
@@ -643,28 +681,41 @@ export default function HybondSimulator({ initialQuery }: { initialQuery: Initia
       const winners = presetScreen.filter((r) => pick(r) === target);
       return winners.length === 1 ? winners[0].id : null;
     };
-    const biggestCushion = uniqueExtreme((r) => r.depositJT, 'max');
-    const smallestCushion = uniqueExtreme((r) => r.depositJT, 'min');
-    const longestTerm = uniqueExtreme((r) => r.observationDays, 'max');
-    const shortestTerm = uniqueExtreme((r) => r.observationDays, 'min');
+    const rank = (
+      r: (typeof presetScreen)[number],
+      pick: (x: (typeof presetScreen)[number]) => number,
+      maxWord: string,
+      minWord: string,
+    ) =>
+      r.id === uniqueExtreme(pick, 'max')
+        ? maxWord
+        : r.id === uniqueExtreme(pick, 'min')
+          ? minWord
+          : 'a middle';
+
     const bestJunior = uniqueExtreme((r) => r.juniorEnd, 'max');
     const mostErased = uniqueExtreme((r) => r.erasedRecoveryClaims, 'max');
     const fewestErased = uniqueExtreme((r) => r.erasedRecoveryClaims, 'min');
 
     return presetScreen.map((r) => {
-      const cushion =
-        r.id === biggestCushion ? 'the largest' : r.id === smallestCushion ? 'the smallest' : 'a middle';
-      const term =
-        r.id === longestTerm ? 'the longest' : r.id === shortestTerm ? 'the shortest' : 'a middle';
+      const cushion = rank(r, (x) => x.minCoveragePct, 'the largest', 'the smallest');
+      const term = rank(r, (x) => x.observationDays, 'the longest', 'the shortest');
+      const share = rank(r, (x) => x.seniorShareToJuniorPct, 'the largest', 'the smallest');
       const erasedTag =
         r.id === fewestErased ? ', the fewest of the three' : r.id === mostErased ? ', the most of the three' : '';
       return {
         id: r.id,
         label: r.label,
-        // e.g. "$300 Junior cushion (the smallest) and the longest 120-day observation."
-        setup: `${fmtUsd0(r.depositJT)} Junior cushion (${cushion}) and ${term} ${r.observationDays}-day observation.`,
-        // e.g. "Junior ends at 186.18, the highest of the three, with 1 erased recovery claim, the fewest of the three."
-        outcome: `Junior ends at ${r.juniorEnd.toFixed(2)}${r.id === bestJunior ? ', the highest of the three,' : ','} with ${r.erasedRecoveryClaims} erased recovery claim${r.erasedRecoveryClaims === 1 ? '' : 's'}${erasedTag}.`,
+        // e.g. "18% first-loss (the smallest cushion, Junior $250), the shortest 16-day
+        // observation, and the largest 75% share of Senior yield to Junior."
+        setup: `${r.minCoveragePct}% first-loss (${cushion} cushion, Junior ${fmtUsd0(r.depositJT)}), ${term} ${r.observationDays}-day observation, and ${share} ${r.seniorShareToJuniorPct}% share of Senior yield to Junior.`,
+        // e.g. "Junior ends at 264.96 (+21.5%/yr), the highest of the three, with 4 erased
+        // recovery claims, the most of the three. Senior is untouched."
+        outcome: `Junior ends at ${r.juniorEnd.toFixed(2)} (${fmtSignedPct(r.juniorAvgYr, 1)}/yr)${r.id === bestJunior ? ', the highest of the three,' : ','} with ${r.erasedRecoveryClaims} erased recovery claim${r.erasedRecoveryClaims === 1 ? '' : 's'}${erasedTag}. ${
+          r.pass
+            ? `Senior is untouched, ${fmtSignedPct(r.seniorAvgYr, 1)}/yr with no loss events.`
+            : `Senior is marked down: ${r.seniorMarkdownEvents} loss event${r.seniorMarkdownEvents === 1 ? '' : 's'}, ${fmtPct(r.seniorMaxDrawdown)} worst drawdown.`
+        }`,
       };
     });
   }, [presetScreen]);
@@ -721,37 +772,25 @@ export default function HybondSimulator({ initialQuery }: { initialQuery: Initia
 
   const activeScenarioName = activePreset?.label ?? 'Custom';
 
-  // --- Chart timeframe brush (VIEW ONLY) ------------------------------------
-  // The brush zooms the chart. It never re-runs the backtest: KPIs, secondary
-  // stats, summary chips, and the calendar table all stay computed over the
-  // full history above, exactly as before.
-  const maxIndex = Math.max(0, result.steps.length - 1);
-  const [range, setRange] = useState<IndexRange>(() => ({
-    a: 0,
-    b: HYBOND_NAV_SERIES.length - 1,
-  }));
-  const view = useMemo(() => normalizeRange(range.a, range.b, maxIndex), [range, maxIndex]);
-  const viewIsFull = isFullRange(view, maxIndex);
+  // --- Chart series and annotations ------------------------------------------
+  // The run IS the window, so nothing here is clipped: every index below is already
+  // an index into the restarted run. The old view-clipping (a full-history run sliced
+  // for display) is gone entirely.
 
-  // Only the steps inside the selected window reach the chart. Deriving the
-  // shading and markers from this same slice clips them to the view for free.
-  const visibleSteps = useMemo(
-    () => result.steps.slice(view.a, view.b + 1),
-    [result.steps, view.a, view.b],
-  );
-
-  // Port of Tenbin's clippedBand (:514): a band straddling the window edge still renders,
-  // trimmed to the visible edge rather than dropped.
-  const clipBand = useCallback(
+  /**
+   * A band's x-extent, as dates on the restarted run.
+   *
+   * A zero-width band is dropped rather than drawn: recharts discards a zero-width
+   * rect outright (Rectangle.js:117), so returning one would render nothing anyway.
+   */
+  const bandDates = useCallback(
     (o: ObservationPeriod): { x1: string; x2: string } | null => {
-      const a = Math.max(o.aIndex, view.a);
-      const b = Math.min(o.bIndex, view.b);
-      const x1 = result.steps[a]?.date;
-      const x2 = result.steps[b]?.date;
-      if (b <= a || !x1 || !x2) return null;
+      const x1 = result.steps[o.aIndex]?.date;
+      const x2 = result.steps[o.bIndex]?.date;
+      if (o.bIndex <= o.aIndex || !x1 || !x2) return null;
       return { x1, x2 };
     },
-    [result.steps, view.a, view.b],
+    [result.steps],
   );
 
   // Observation bands → ReferenceArea shading (presentational).
@@ -766,14 +805,14 @@ export default function HybondSimulator({ initialQuery }: { initialQuery: Initia
   const observationRuns = useMemo(
     () =>
       result.observationPeriods
-        .map(clipBand)
+        .map(bandDates)
         .filter((b): b is { x1: string; x2: string } => b !== null),
-    [result.observationPeriods, clipBand],
+    [result.observationPeriods, bandDates],
   );
 
   const lossMarkers = useMemo(
-    () => visibleSteps.filter((s) => s.juniorLossLocked),
-    [visibleSteps],
+    () => result.steps.filter((s) => s.juniorLossLocked),
+    [result.steps],
   );
 
   // Tenbin's `junW` curve (legend :227): Junior's path if no observation period ever
@@ -785,36 +824,29 @@ export default function HybondSimulator({ initialQuery }: { initialQuery: Initia
   // and the deploy handoff still report `gap` in that case, with the caveat in the label.
   const showJuniorKept = !maintainCoverage;
 
+  // The no-expiry counterfactual runs on the SAME slice, so its steps line up with the
+  // run's index-for-index and need no offset.
   const chartData = useMemo(
     () =>
-      visibleSteps.map((s, i) => ({
+      result.steps.map((s, i) => ({
         date: s.date,
         strategy: s.priceIndex,
         senior: s.stIndex,
         junior: s.jtIndex,
-        juniorKept: noExpiryResult.steps[view.a + i]?.jtIndex,
+        juniorKept: noExpiryResult.steps[i]?.jtIndex,
         marketState: s.marketState,
       })),
-    [visibleSteps, noExpiryResult.steps, view.a],
+    [result.steps, noExpiryResult.steps],
   );
 
-  // Chart annotations, all clipped to the same visible window as chartData.
-  const visibleErasures = useMemo(
-    () => result.erasureEvents.filter((e) => e.index >= view.a && e.index <= view.b),
-    [result.erasureEvents, view.a, view.b],
-  );
-  const visibleSeniorLosses = useMemo(
-    () => result.seniorLossEvents.filter((e) => e.index >= view.a && e.index <= view.b),
-    [result.seniorLossEvents, view.a, view.b],
-  );
   // Tenbin :533-535 rules a dashed vertical at each year boundary. The x-axis here is a
   // monthly category, so the January sample stands in for the boundary itself.
   const yearMarks = useMemo(
     () =>
-      visibleSteps
+      result.steps
         .filter((s) => s.date.slice(5, 7) === '01')
         .map((s) => ({ date: s.date, year: s.date.slice(0, 4) })),
-    [visibleSteps],
+    [result.steps],
   );
 
   // Port of Tenbin's visibleYmax (:509-513): the y domain has to cover the erasure tops,
@@ -827,9 +859,9 @@ export default function HybondSimulator({ initialQuery }: { initialQuery: Initia
         : [d.strategy, d.senior, d.junior];
       for (const v of vals) if (typeof v === 'number' && Number.isFinite(v)) m = Math.max(m, v);
     }
-    for (const e of visibleErasures) m = Math.max(m, e.top);
+    for (const e of result.erasureEvents) m = Math.max(m, e.top);
     return Math.max(Math.ceil((m * 1.04) / 10) * 10, 110);
-  }, [chartData, visibleErasures, showJuniorKept]);
+  }, [chartData, result.erasureEvents, showJuniorKept]);
 
   // Hovered date drives the band overlays and the band chip. The tooltip does its own
   // lookup from the same date, so the two can never drift apart.
@@ -845,11 +877,30 @@ export default function HybondSimulator({ initialQuery }: { initialQuery: Initia
   const hoverObs = result.observationPeriods.find(inHoveredBand) ?? null;
   const hoverNonObs = hoverObs ? null : (result.nonObservationPeriods.find(inHoveredBand) ?? null);
 
+  // --- Brush navigator (ALWAYS full history) ---------------------------------
+  // The preview is the NAVIGATOR: it is the control that selects the window, so it can
+  // never be the thing being sliced — feeding it the windowed run would collapse it to
+  // the selection as you drag. It therefore gets its own full-history run, at the same
+  // params, and always shows all 61 months.
+  const navResult = useMemo(
+    () =>
+      safeBacktest(() =>
+        runBacktest({
+          config,
+          depositST: params.depositST,
+          depositJT: params.depositJT,
+          series: HYBOND_NAV_SERIES,
+          maintainJuniorCoverage: maintainCoverage,
+        }),
+      ).result,
+    [config, params.depositST, params.depositJT, maintainCoverage],
+  );
+
   // Full-history observation bands for the brush's mini preview (index runs).
   const brushBands = useMemo(() => {
     const bands: { a: number; b: number }[] = [];
     let start: number | null = null;
-    result.steps.forEach((s, i) => {
+    navResult.steps.forEach((s, i) => {
       if (s.inObservation) {
         if (start === null) start = i;
       } else if (start !== null) {
@@ -857,23 +908,26 @@ export default function HybondSimulator({ initialQuery }: { initialQuery: Initia
         start = null;
       }
     });
-    if (start !== null) bands.push({ a: start, b: result.steps.length - 1 });
+    if (start !== null) bands.push({ a: start, b: navResult.steps.length - 1 });
     return bands;
-  }, [result.steps]);
+  }, [navResult.steps]);
 
   const brushSeries = useMemo(
     () => ({
-      strategy: result.steps.map((s) => s.priceIndex),
-      senior: result.steps.map((s) => s.stIndex),
-      junior: result.steps.map((s) => s.jtIndex),
+      strategy: navResult.steps.map((s) => s.priceIndex),
+      senior: navResult.steps.map((s) => s.stIndex),
+      junior: navResult.steps.map((s) => s.jtIndex),
     }),
-    [result.steps],
+    [navResult.steps],
   );
 
+  // The brush indexes the FULL series, so its dates are the full series' dates.
+  const allDates = useMemo(() => HYBOND_NAV_SERIES.map((p) => p.date), []);
+  // Dates of the restarted run, for titles and the window readout.
   const dates = useMemo(() => result.steps.map((s) => s.date), [result.steps]);
 
-  const hoverObsBand = hoverObs ? clipBand(hoverObs) : null;
-  const hoverNonObsBand = hoverNonObs ? clipBand(hoverNonObs) : null;
+  const hoverObsBand = hoverObs ? bandDates(hoverObs) : null;
+  const hoverNonObsBand = hoverNonObs ? bandDates(hoverNonObs) : null;
   // Exactly one chip is ever shown (Tenbin :557 / :562 are an if/else), so it resolves to
   // a single element rather than two mutually exclusive ones. See the JSX below.
   const hoverChip: { band: { x1: string; x2: string }; label: string; color: string } | null =
@@ -891,10 +945,12 @@ export default function HybondSimulator({ initialQuery }: { initialQuery: Initia
           }
         : null;
 
-  // The "Jr N" / "Sr N" tags read the steps at the view's right edge (Tenbin :555-556).
-  const endStep = result.steps[view.b] ?? null;
+  // The "Jr N" / "Sr N" tags read the last step of the run (Tenbin :555-556), which IS
+  // the window's right edge now that the run is the window.
+  const endStep = lastIndex(result.steps);
 
-  // Title derived from the series itself rather than a hardcoded label.
+  // Title derived from the run itself rather than a hardcoded label, so it names the
+  // window that was actually simulated.
   const rangeTitle = dates.length
     ? `${monthLabel(dates[0])} to ${monthLabel(dates[dates.length - 1])} projection`
     : 'Projection';
@@ -968,6 +1024,8 @@ export default function HybondSimulator({ initialQuery }: { initialQuery: Initia
   // cannot drift from the simulated numbers the way a re-derivation could.
   const deployText = useMemo(() => {
     const thresholdUtilPct = utilizationPctFromBufferPct(params.exitBufferPct);
+    const windowStart = dates[0] ?? '—';
+    const windowEnd = dates[dates.length - 1] ?? '—';
     const erasedByReason = (['expired', 'liquidation', 'juniorWiped', 'noTerm'] as ErasureReason[])
       .map((reason) => `${reason}: ${result.erasureEvents.filter((e) => e.reason === reason).length}`)
       .join(', ');
@@ -1020,6 +1078,13 @@ export default function HybondSimulator({ initialQuery }: { initialQuery: Initia
       'fee policy fields: SET_BY_PROTOCOL_APPROVED_DEPLOY_POLICY',
       '',
       'Historical simulator read',
+      // The window is emitted because the run RESTARTS at its start: every figure below is
+      // a market that opened on backtestWindowStart, not a clip of the full history. Without
+      // these two lines the same parameter set could hand off wildly different reads with
+      // nothing in the text to say which window produced them.
+      `backtestWindowStart: ${windowStart}   // simulated market genesis: deposits made here`,
+      `backtestWindowEnd: ${windowEnd}`,
+      `backtestWindowMonths: ${result.steps.length}${viewIsFull ? '   // full available history' : `   // windowed; full history is ${allDates[0]} to ${allDates[allDates.length - 1]}`}`,
       `guardrailStatus: ${seniorProtected ? 'READY - no historical Senior loss events' : 'NEEDS_REVIEW - Senior hard guardrail fails'}`,
       `seniorAvgAnnualized: ${(result.seniorAvgYr * 100).toFixed(2)}%`,
       `juniorAvgAnnualized: ${(result.juniorAvgYr * 100).toFixed(2)}%`,
@@ -1039,7 +1104,19 @@ export default function HybondSimulator({ initialQuery }: { initialQuery: Initia
       '- The underlying series is sampled MONTHLY, so an observation period is only ever observed closing at a month end. Historical samples can land well after the exact deploy expiry, and the observed maximum above overstates the configured term for that reason.',
       '- Concrete assets, oracle/quoter wiring, authority, fee policy, whitelist policy, and deployed contract addresses must come from the production integration.',
     ].join('\n');
-  }, [config, params, result, gap, jtPct, seniorProtected, activeScenarioName, genesisFirstLossPct]);
+  }, [
+    config,
+    params,
+    result,
+    gap,
+    jtPct,
+    seniorProtected,
+    activeScenarioName,
+    genesisFirstLossPct,
+    dates,
+    allDates,
+    viewIsFull,
+  ]);
 
   const [copyDeployLabel, setCopyDeployLabel] = useState('Copy');
   const deployRef = useRef<HTMLTextAreaElement>(null);
@@ -1241,8 +1318,9 @@ export default function HybondSimulator({ initialQuery }: { initialQuery: Initia
                     <button
                       key={p.id}
                       type="button"
-                      // Presets carry linkJuniorToFirstLoss:false and a hand-set Junior,
-                      // so selecting one must NOT re-derive it from the first-loss %.
+                      // Presets carry linkJuniorToFirstLoss:true and a Junior already
+                      // DERIVED from their own first-loss %, so applying them wholesale
+                      // is exactly what the link would compute anyway.
                       onClick={() => setParams({ ...p.params })}
                       style={{
                         textAlign: 'left',
@@ -1256,19 +1334,24 @@ export default function HybondSimulator({ initialQuery }: { initialQuery: Initia
                         <span style={{ fontSize: 13, fontWeight: 600, color: C.text }}>{p.label}</span>
                         {screen && <ScreenBadge pass={screen.pass} />}
                       </div>
+                      {/* Tenbin's own sublabel format (:302-303): the three knobs that
+                          define a rung, in the order they ladder. */}
                       <div style={{ fontSize: 11, color: C.muted, marginTop: 4 }}>
-                        Junior {fmtUsd0(p.params.depositJT)}, {p.params.observationDays}-day
-                        observation, {p.params.seniorShareToJuniorPct}% share
+                        {p.params.minCoveragePct}% first-loss · {p.params.observationDays}d obs ·{' '}
+                        {p.params.seniorShareToJuniorPct}% to Junior
                       </div>
                     </button>
                   );
                 })}
               </div>
               <p className="mt-2" style={{ color: C.kpiLabel, fontSize: 11, lineHeight: 1.6 }}>
-                Presets set Junior by hand rather than deriving it from the first-loss
-                slider, so selecting one leaves that link off. Each badge is the live
-                screen result: every preset is re-run through the accountant and passes
-                only if it produces no historical Senior loss events.
+                Each rung takes more risk than the last: less first-loss protection, a
+                shorter observation period, and a larger share of Senior&apos;s yield to
+                Junior. Junior&apos;s deposit is derived from the first-loss %, so selecting
+                a preset leaves that link on. Each badge is the live screen result: every
+                preset is re-run through the accountant on the selected window, at both
+                replenishment settings, and passes only if Senior is never marked down in
+                either.
               </p>
             </div>
 
@@ -1519,8 +1602,11 @@ export default function HybondSimulator({ initialQuery }: { initialQuery: Initia
               Chart, metrics, and mechanics.
             </h2>
             <p className="mt-2" style={{ color: C.muted, fontSize: 14, lineHeight: 1.6 }}>
-              How the tranches tracked the underlying composite proxy across the full history.
-              Metrics below cover every month, the timeframe control zooms the chart only.
+              How the tranches tracked the underlying composite proxy
+              {viewIsFull ? ' across the full history' : ` from ${monthLabel(dates[0])}`}. The
+              backtest window below sets the market&apos;s start and end: moving it restarts
+              the market on that start date, with deposits made there and Junior&apos;s buffer
+              full, and every number on this page recomputes over the window.
             </p>
           </div>
           <button
@@ -1711,7 +1797,7 @@ export default function HybondSimulator({ initialQuery }: { initialQuery: Initia
                     strokeWidth={2.2}
                   />
                   {/* Erasure I-beams (Tenbin :539-550) */}
-                  {visibleErasures.map((e) => (
+                  {result.erasureEvents.map((e) => (
                     <ReferenceLine
                       key={`erasure-${e.index}`}
                       segment={[
@@ -1741,7 +1827,7 @@ export default function HybondSimulator({ initialQuery }: { initialQuery: Initia
                     />
                   ))}
                   {/* Senior loss events (Tenbin :552-554) */}
-                  {visibleSeniorLosses.map((e) => (
+                  {result.seniorLossEvents.map((e) => (
                     <ReferenceDot
                       key={`senior-loss-${e.index}`}
                       x={e.date}
@@ -1795,9 +1881,10 @@ export default function HybondSimulator({ initialQuery }: { initialQuery: Initia
               </ResponsiveContainerNoSSR>
             </div>
 
-            {/* Chart timeframe brush (view-only zoom over the full series) */}
+            {/* Backtest-window brush. Its preview is always the FULL series (navResult);
+                the window it selects is what the market above is restarted over. */}
             <TimeframeBrush
-              dates={dates}
+              dates={allDates}
               series={brushSeries}
               bands={brushBands}
               view={view}
@@ -1824,7 +1911,13 @@ export default function HybondSimulator({ initialQuery }: { initialQuery: Initia
                     </th>
                     {result.calendar.map((row, i) => (
                       <th key={row.year} className="py-2 pr-4 font-semibold text-right">
-                        {yearLabel(row.year, i, result.calendar.length)}
+                        {yearLabel(
+                          row.year,
+                          i,
+                          result.calendar.length,
+                          dates[0] ?? '',
+                          dates[dates.length - 1] ?? '',
+                        )}
                       </th>
                     ))}
                     <th className="py-2 font-semibold text-right">end $100 → avg/yr</th>
@@ -1962,9 +2055,13 @@ export default function HybondSimulator({ initialQuery }: { initialQuery: Initia
                   ))}
                 </div>
                 <p className="mt-2" style={{ color: C.kpiLabel, fontSize: 11, lineHeight: 1.6 }}>
-                  Scenarios vary how much risk Junior takes. Both the descriptions and the badges
-                  above are computed live by re-running each preset through the accountant on this
-                  series, not asserted.
+                  Scenarios vary how much risk Junior takes: less first-loss, a shorter
+                  observation, and a bigger yield share as you go down the ladder. Both the
+                  descriptions and the badges above are computed live by re-running each preset
+                  through the accountant on the selected window, not asserted. One honest caveat:
+                  this series samples monthly, so any observation term under about 30 days
+                  behaves as ~30 days here, and the shortest rung is separated from the others by
+                  its first-loss and yield share rather than by its term.
                 </p>
               </div>
             </div>
@@ -2226,7 +2323,11 @@ export default function HybondSimulator({ initialQuery }: { initialQuery: Initia
   );
 }
 
-// --- Chart timeframe brush --------------------------------------------------
+// --- Backtest-window brush --------------------------------------------------
+//
+// Selects the window the market is restarted over. `dates` and `series` are always
+// the FULL history: this control is the navigator, so its preview must show
+// everything that can be selected, including the parts currently outside the window.
 
 // The brush's own drag state. `pan` remembers where the grab started and the
 // window it started from, so sliding preserves the window width exactly.
@@ -2378,7 +2479,7 @@ function TimeframeBrush({
 
   return (
     <div
-      aria-label="Chart timeframe controls"
+      aria-label="Backtest window controls"
       style={{
         borderTop: `1px solid ${C.border}`,
         borderBottom: `1px solid ${C.border}`,
@@ -2398,7 +2499,7 @@ function TimeframeBrush({
           fontWeight: 600,
         }}
       >
-        <span>Chart timeframe</span>
+        <span>Backtest window</span>
         <span style={{ fontFamily: MONO, color: C.text, fontSize: 10.5, letterSpacing: 0, textTransform: 'none', fontWeight: 500 }}>
           {isFull ? 'Full history' : `${dates[view.a]} → ${dates[view.b]}`}
         </span>
@@ -2426,7 +2527,7 @@ function TimeframeBrush({
               viewBox={`0 0 ${BRUSH_VB_W} ${BRUSH_TRACK_H}`}
               preserveAspectRatio="none"
               role="img"
-              aria-label="Full history overview for chart timeframe"
+              aria-label="Full history overview for the backtest window"
               style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', display: 'block' }}
             >
               {preview.bands.map((b, i) => (
@@ -2471,7 +2572,7 @@ function TimeframeBrush({
             type="button"
             onPointerDown={(e) => begin({ kind: 'handle', side: 'start' }, e)}
             onKeyDown={onHandleKey('start')}
-            aria-label={`Timeframe start, ${monthLabel(dates[view.a])}`}
+            aria-label={`Backtest window start, ${monthLabel(dates[view.a])}`}
             style={{ ...handleStyle, left: `${leftPct}%` }}
           >
             <span style={gripStyle} />
@@ -2480,7 +2581,7 @@ function TimeframeBrush({
             type="button"
             onPointerDown={(e) => begin({ kind: 'handle', side: 'end' }, e)}
             onKeyDown={onHandleKey('end')}
-            aria-label={`Timeframe end, ${monthLabel(dates[view.b])}`}
+            aria-label={`Backtest window end, ${monthLabel(dates[view.b])}`}
             style={{ ...handleStyle, left: `${rightPct}%` }}
           >
             <span style={gripStyle} />

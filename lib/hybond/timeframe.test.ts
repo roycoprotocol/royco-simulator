@@ -1,7 +1,11 @@
 // =============================================================================
-// Chart-timeframe brush invariant tests.
+// Backtest-window brush invariant tests.
 //
 // Run: npx tsx lib/hybond/timeframe.test.ts
+//
+// The brush RESTARTS the market over the window it selects (the slice start is a new
+// genesis), so these index rules are load-bearing for the accounting and not just for
+// a viewport: section 9 pins the restart contract itself.
 //
 // These pin the rule that a dragged handle CLAMPS against the stationary one and
 // never swaps ownership with it. The distinction matters because a swapped range
@@ -14,6 +18,12 @@
 // Clamping start against an end at 34 therefore yields 32, not 31.
 // =============================================================================
 
+import { runBacktest } from "@/lib/try/backtest";
+import {
+  HYBOND_DEFAULT_PARAMS,
+  HYBOND_NAV_SERIES,
+  buildHybondConfig,
+} from "./scenarios";
 import {
   MIN_WINDOW_MONTHS,
   indexFromFraction,
@@ -180,6 +190,73 @@ console.log("\n8. Track helpers");
   check("isFullRange is true only for the whole series", isFullRange({ a: 0, b: MAX }, MAX) && !isFullRange({ a: 1, b: MAX }, MAX));
   check("pctOf spans 0..100", pctOf(0, MAX) === 0 && pctOf(MAX, MAX) === 100);
   check("pctOf is safe on a zero-length track", pctOf(0, 0) === 0);
+}
+
+// ---------------------------------------------------------------------------
+// The window is not a viewport: the simulator slices the INPUT series with it and
+// re-runs the market, so the slice start becomes a real genesis. These assertions are
+// what make MIN_WINDOW_MONTHS meaningful — a legal range must always slice a series the
+// engine can actually run, including at the minimum width.
+console.log("\n9. Every legal window restarts a runnable market");
+{
+  const N = HYBOND_NAV_SERIES.length;
+  check("the fixture is the 61-point full history", N === 61, `N=${N}`);
+
+  // No legal range, from any input, can slice fewer points than the minimum window.
+  let tooShort = 0;
+  for (let a = -5; a <= N + 5; a++) {
+    for (let b = -5; b <= N + 5; b++) {
+      const r = normalizeRange(a, b, N - 1);
+      if (HYBOND_NAV_SERIES.slice(r.a, r.b + 1).length < MIN_WINDOW_MONTHS) tooShort++;
+    }
+  }
+  check("no legal range ever slices fewer than MIN_WINDOW_MONTHS points", tooShort === 0, `${tooShort} violations`);
+
+  const run = (a: number, b: number) =>
+    runBacktest({
+      config: buildHybondConfig(HYBOND_DEFAULT_PARAMS),
+      depositST: HYBOND_DEFAULT_PARAMS.depositST,
+      depositJT: HYBOND_DEFAULT_PARAMS.depositJT,
+      series: HYBOND_NAV_SERIES.slice(a, b + 1),
+    });
+
+  // A minimum-width window, restarted mid-series (right before the 2022 drawdown).
+  const minView = normalizeRange(24, 24, N - 1);
+  const minRun = run(minView.a, minView.b);
+  check("a minimum window runs and yields exactly MIN_WINDOW_MONTHS steps", minRun.steps.length === MIN_WINDOW_MONTHS, `steps=${minRun.steps.length}`);
+
+  const s0 = minRun.steps[0];
+  check(
+    "the restarted run's first step is genesis: stIndex = jtIndex = priceIndex = 100",
+    s0.stIndex === 100 && s0.jtIndex === 100 && s0.priceIndex === 100,
+    `st=${s0.stIndex} jt=${s0.jtIndex} px=${s0.priceIndex}`,
+  );
+  check(
+    "the restarted run starts at the genesis coverage utilization (0.9e18, the curve target)",
+    s0.coverageUtilWad === 900000000000000000n,
+    `util=${s0.coverageUtilWad}`,
+  );
+  check("a restarted run carries in no impairment (no loss locked at genesis)", s0.juniorLossLocked === false);
+
+  // A 3-month CAGR is an extrapolation, but it must still be a NUMBER: an Infinity/NaN
+  // here would render as garbage rather than as the "—" placeholder.
+  const finite = [minRun.seniorAvgYr, minRun.juniorAvgYr, minRun.strategyAvgYr, minRun.years];
+  check("a minimum window's annualized metrics are finite, never Infinity/NaN", finite.every(Number.isFinite), JSON.stringify(finite));
+  check("a minimum window still spans a positive horizon", minRun.years > 0, `years=${minRun.years}`);
+
+  // The restart must actually differ from the full history, otherwise the control does nothing.
+  const full = run(0, N - 1);
+  const restarted = run(HYBOND_NAV_SERIES.findIndex((p) => p.date === "2022-06"), N - 1);
+  check(
+    "a restarted window produces different headline numbers than the full history",
+    full.seniorAvgYr !== restarted.seniorAvgYr && full.juniorAvgYr !== restarted.juniorAvgYr,
+    `full sr=${full.seniorAvgYr} vs restarted sr=${restarted.seniorAvgYr}`,
+  );
+  check(
+    "the restarted window's genesis is its OWN start date, not the series start",
+    restarted.steps[0].date === "2022-06" && restarted.steps[0].jtIndex === 100,
+    `date=${restarted.steps[0].date} jt=${restarted.steps[0].jtIndex}`,
+  );
 }
 
 // ---------------------------------------------------------------------------
