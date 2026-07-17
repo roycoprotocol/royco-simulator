@@ -8,6 +8,7 @@ const failures = [];
 const requiredFiles = [
   "app/day-sim/page.tsx",
   "components/day-simulator/DayMarketSimulator.tsx",
+  "components/day-simulator/DayTimeframeBrush.tsx",
   "components/day-simulator/DaySimulatorPageShell.tsx",
   "lib/day-simulator-template/locked-copy.ts",
   "lib/day-simulator-template/manifest.ts",
@@ -42,6 +43,10 @@ if (!shell.includes("DayMarketSimulator")) {
 
 const simulator = await readFile(
   path.join(root, "components/day-simulator/DayMarketSimulator.tsx"),
+  "utf8",
+);
+const timeframeBrush = await readFile(
+  path.join(root, "components/day-simulator/DayTimeframeBrush.tsx"),
   "utf8",
 );
 for (const contract of [
@@ -104,6 +109,26 @@ for (const invariant of [
   'maintainJuniorCoverage',
 ]) {
   if (!simulator.includes(invariant)) failures.push(`Day simulator missing Dawn behavior invariant: ${invariant}`);
+}
+for (const timeframeContract of [
+  '<DayTimeframeBrush',
+  'isFull={isFullRange(viewRange, maxIndex)}',
+  'onChange={setRange}',
+]) {
+  if (!simulator.includes(timeframeContract)) failures.push(`Day simulator missing Dawn unified timeframe contract: ${timeframeContract}`);
+}
+for (const timeframeContract of [
+  'Backtest window controls',
+  'Full history overview for the backtest window',
+  'Backtest window start,',
+  'Backtest window end,',
+  'moveHandle',
+  'panRange',
+]) {
+  if (!timeframeBrush.includes(timeframeContract)) failures.push(`Day timeframe brush missing Dawn behavior: ${timeframeContract}`);
+}
+for (const forbiddenTimeframe of ['label="Start date"', 'label="End date"', '>Chart timeframe<']) {
+  if (simulator.includes(forbiddenTimeframe)) failures.push(`Day simulator reintroduced split timeframe controls: ${forbiddenTimeframe}`);
 }
 for (const forbidden of ['var(--foundation)', 'var(--theme-background)', 'DaySimulatorSidebar']) {
   if (simulator.includes(forbidden) || shell.includes(forbidden)) {

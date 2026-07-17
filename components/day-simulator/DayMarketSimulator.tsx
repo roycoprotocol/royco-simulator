@@ -16,11 +16,13 @@ import { Sim, defaultConfig } from '@/lib/day/engine/runner';
 import { MarketState } from '@/lib/day/engine/types';
 import { DAY_LOCKED_COPY } from '@/lib/day-simulator-template/locked-copy';
 import { LOCKED_COPY } from '@/lib/simulator-template/locked-copy';
+import { isFullRange, normalizeRange, type IndexRange } from '@/lib/hybond/timeframe';
 import type {
   DayMarket,
   DayMarketManifest,
   DaySeriesPoint,
 } from '@/lib/day-simulator-template/market';
+import { DayTimeframeBrush } from '@/components/day-simulator/DayTimeframeBrush';
 
 const ResponsiveContainerNoSSR = dynamic(
   () => import('recharts').then((mod) => mod.ResponsiveContainer),
@@ -105,49 +107,46 @@ const cardStyle = {
 
 function Eyebrow({ children }: { children: React.ReactNode }) {
   return (
-    <div
+    <span
       style={{
         color: C.eyebrow,
-        fontSize: 10.5,
+        fontSize: 9.5,
         fontWeight: 600,
         letterSpacing: '0.22em',
         textTransform: 'uppercase',
       }}
     >
       {children}
-    </div>
+    </span>
   );
 }
 
 function Kpi({ label, value, color = C.text }: { label: string; value: string; color?: string }) {
   return (
-    <div style={{ border: `1px solid ${C.border}`, padding: '12px 14px', minHeight: 76 }}>
-      <span
+    <div style={{ background: C.cardBg, border: `1px solid ${C.border}`, borderRadius: 0, padding: '12px 14px', minHeight: 76 }}>
+      <p
         style={{
           color: C.kpiLabel,
-          display: 'block',
-          fontSize: 9.2,
-          fontWeight: 600,
-          letterSpacing: '0.16em',
+          fontSize: 8.8,
+          fontWeight: 700,
+          letterSpacing: '0.14em',
           textTransform: 'uppercase',
         }}
       >
         {label}
-      </span>
-      <b
+      </p>
+      <p
+        className="mt-2"
         style={{
           color,
-          display: 'block',
           fontFamily: MONO,
           fontSize: 28,
           fontWeight: 600,
           letterSpacing: '-0.05em',
-          lineHeight: 1,
-          marginTop: 7,
         }}
       >
         {value}
-      </b>
+      </p>
     </div>
   );
 }
@@ -175,23 +174,18 @@ function SliderControl({
   onChange: (value: number) => void;
   children?: React.ReactNode;
 }) {
+  const handle = (raw: string) => {
+    const next = Number(raw);
+    if (Number.isFinite(next)) onChange(next);
+  };
   return (
-    <label style={{ display: 'block' }}>
-      <span
-        style={{
-          color: C.text,
-          display: 'flex',
-          fontSize: 10.5,
-          fontWeight: 500,
-          justifyContent: 'space-between',
-          letterSpacing: '0.12em',
-          marginBottom: 6,
-          textTransform: 'uppercase',
-        }}
-      >
-        {label}
-        <b style={{ color: C.accent, fontFamily: MONO, letterSpacing: 0 }}>{display}</b>
-      </span>
+    <div style={{ opacity: disabled ? 0.55 : 1 }}>
+      <div className="flex items-center justify-between" style={{ marginBottom: 6 }}>
+        <label style={{ color: C.eyebrow, fontSize: 10, fontWeight: 600, letterSpacing: 1, textTransform: 'uppercase' }}>
+          {label}
+        </label>
+        <span style={{ color: C.accent, fontFamily: MONO, fontSize: 13, fontWeight: 600 }}>{display}</span>
+      </div>
       <input
         type="range"
         min={min}
@@ -199,14 +193,15 @@ function SliderControl({
         step={step}
         value={value}
         disabled={disabled}
-        onChange={(event) => onChange(Number(event.target.value))}
-        style={{ accentColor: C.seniorLine, opacity: disabled ? 0.45 : 1, width: '100%' }}
+        onChange={(event) => handle(event.target.value)}
+        className="w-full"
+        style={{ accentColor: C.accent }}
       />
-      <span style={{ color: C.muted, display: 'block', fontSize: 10, lineHeight: 1.35, marginTop: 2 }}>
+      <p className="mt-1" style={{ color: C.muted, fontSize: 11.5, lineHeight: 1.4 }}>
         {description}
-      </span>
+      </p>
       {children}
-    </label>
+    </div>
   );
 }
 
@@ -236,18 +231,26 @@ export default function DayMarketSimulator({ market }: { market?: DayMarket }) {
     defaults.linkJuniorToFirstLoss,
   );
   const [maintainCoverage, setMaintainCoverage] = useState(true);
-  const [startIndex, setStartIndex] = useState(0);
-  const [endIndex, setEndIndex] = useState(activeMarket.series.length - 1);
+  const [range, setRange] = useState<IndexRange>({
+    a: 0,
+    b: activeMarket.series.length - 1,
+  });
   const [copyLabel, setCopyLabel] = useState('Copy link');
   const [copyDeployLabel, setCopyDeployLabel] = useState('Copy');
   const deployRef = useRef<HTMLTextAreaElement>(null);
 
+  const maxIndex = Math.max(0, activeMarket.series.length - 1);
+  const viewRange = useMemo(
+    () => normalizeRange(range.a, range.b, maxIndex),
+    [maxIndex, range],
+  );
   const view = useMemo(
-    () => activeMarket.series.slice(startIndex, endIndex + 1),
-    [activeMarket.series, startIndex, endIndex],
+    () => activeMarket.series.slice(viewRange.a, viewRange.b + 1),
+    [activeMarket.series, viewRange],
   );
 
-  const result = useMemo(() => {
+  const { result, fullResult } = useMemo(() => {
+    const run = (series: DaySeriesPoint[]) => {
     const coverage = coveragePct / 100;
     const minLiquidity = minLiquidityPct / 100;
     const ltRatio = minLiquidity / 0.9;
@@ -282,9 +285,9 @@ export default function DayMarketSimulator({ market }: { market?: DayMarket }) {
     const sim = new Sim(cfg, initial);
     const snapshots = [sim.last()];
     let juniorCapitalInjected = 0;
-    for (let index = 1; index < view.length; index += 1) {
-      const previous = view[index - 1];
-      const current = view[index];
+    for (let index = 1; index < series.length; index += 1) {
+      const previous = series[index - 1];
+      const current = series[index];
       const elapsedDays = Math.max(
         1,
         Math.round((Date.parse(current.date) - Date.parse(previous.date)) / 86_400_000),
@@ -311,14 +314,14 @@ export default function DayMarketSimulator({ market }: { market?: DayMarket }) {
       snapshots.push(sim.last());
     }
     const firstSnapshot = snapshots[0];
-    const chart = view.map((point, index) => {
+    const chart = series.map((point, index) => {
       const snapshot = snapshots[index];
       return {
         date: point.date,
         senior: (snapshot.stPrice / firstSnapshot.stPrice) * 100,
         junior: (snapshot.jtPrice / firstSnapshot.jtPrice) * 100,
         liquidity: (snapshot.ltPrice / firstSnapshot.ltPrice) * 100,
-        strategy: (point.price / view[0].price) * 100,
+        strategy: (point.price / series[0].price) * 100,
         state: snapshot.state,
         stIL: snapshot.stIL,
       };
@@ -327,7 +330,7 @@ export default function DayMarketSimulator({ market }: { market?: DayMarket }) {
     const last = chart[chart.length - 1];
     const days = Math.max(
       1,
-      (Date.parse(view[view.length - 1].date) - Date.parse(view[0].date)) / 86_400_000,
+      (Date.parse(series[series.length - 1].date) - Date.parse(series[0].date)) / 86_400_000,
     );
     const observationBands: Array<{ start: string; end: string }> = [];
     let observationStart: string | null = null;
@@ -411,7 +414,12 @@ export default function DayMarketSimulator({ market }: { market?: DayMarket }) {
       liquidityMaxDrawdown: maxDrawdown('liquidity'),
       calendar,
     };
+    };
+    const result = run(view);
+    const fullResult = isFullRange(viewRange, maxIndex) ? result : run(activeMarket.series);
+    return { result, fullResult };
   }, [
+    activeMarket.series,
     coveragePct,
     defaults,
     exitBufferPct,
@@ -426,7 +434,30 @@ export default function DayMarketSimulator({ market }: { market?: DayMarket }) {
     selfLiquidationBonusPct,
     seniorDeposit,
     view,
+    viewRange,
+    maxIndex,
   ]);
+
+  const allDates = useMemo(
+    () => activeMarket.series.map((point) => point.date),
+    [activeMarket.series],
+  );
+  const brushBands = useMemo(() => {
+    const indexByDate = new Map(allDates.map((date, index) => [date, index]));
+    return fullResult.observationBands.map((band) => ({
+      a: indexByDate.get(band.start) ?? 0,
+      b: indexByDate.get(band.end) ?? 0,
+    }));
+  }, [allDates, fullResult.observationBands]);
+  const brushSeries = useMemo(
+    () => ({
+      strategy: fullResult.chart.map((point) => point.strategy),
+      senior: fullResult.chart.map((point) => point.senior),
+      junior: fullResult.chart.map((point) => point.junior),
+      liquidity: fullResult.chart.map((point) => point.liquidity),
+    }),
+    [fullResult.chart],
+  );
 
   const activePreset = activeMarket.presets?.find(
     (preset) =>
@@ -501,8 +532,8 @@ export default function DayMarketSimulator({ market }: { market?: DayMarket }) {
   return (
     <div className="flex flex-col" style={{ gap: 10 }}>
       <section>
-        <div className="flex items-center gap-3">
-          <span style={{ background: C.text, borderRadius: 999, height: 7, width: 7 }} />
+        <div className="flex items-center gap-2">
+          <span style={{ background: C.olive, borderRadius: 9999, display: 'inline-block', height: 6, width: 6 }} />
           <span
             style={{
               color: C.eyebrow,
@@ -877,34 +908,14 @@ export default function DayMarketSimulator({ market }: { market?: DayMarket }) {
               </ResponsiveContainerNoSSR>
             </div>
 
-            <div style={{ borderBottom: `1px solid ${C.border}`, borderTop: `1px solid ${C.border}`, marginTop: 7, padding: '10px 0 11px' }}>
-              <div className="flex items-center justify-between gap-4" style={{ color: C.kpiLabel, fontSize: 10, fontWeight: 600, letterSpacing: '0.16em', textTransform: 'uppercase' }}>
-                <span>Chart timeframe</span>
-                <b style={{ color: C.text, fontFamily: MONO, fontWeight: 500, letterSpacing: 0, textTransform: 'none' }}>{startDate} → {endDate}</b>
-              </div>
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-5 mt-3">
-                <SliderControl
-                  label="Start date"
-                  value={startIndex}
-                  min={0}
-                  max={Math.max(0, endIndex - 2)}
-                  step={1}
-                  display={activeMarket.series[startIndex]?.date ?? '—'}
-                  description="Full YYYY-MM-DD date for daily source data."
-                  onChange={(value) => setStartIndex(Math.min(value, endIndex - 2))}
-                />
-                <SliderControl
-                  label="End date"
-                  value={endIndex}
-                  min={Math.min(activeMarket.series.length - 1, startIndex + 2)}
-                  max={activeMarket.series.length - 1}
-                  step={1}
-                  display={activeMarket.series[endIndex]?.date ?? '—'}
-                  description="The selected window restarts the market at its own first date."
-                  onChange={(value) => setEndIndex(Math.max(value, startIndex + 2))}
-                />
-              </div>
-            </div>
+            <DayTimeframeBrush
+              dates={allDates}
+              series={brushSeries}
+              bands={brushBands}
+              view={viewRange}
+              isFull={isFullRange(viewRange, maxIndex)}
+              onChange={setRange}
+            />
 
             <div className="mt-6 overflow-x-auto">
               <table style={{ borderCollapse: 'collapse', color: C.text, fontFamily: MONO, fontSize: 10.5, minWidth: 560, width: '100%' }}>

@@ -30,7 +30,7 @@ npm run day-sim:preview
 
 Day changes the accountant and adds the Liquidity Tranche; it does not introduce a different visual system or remove Dawn behavior. Every public Day market must use the Dawn `SimulatorPageShell` and retain the Tenbin palette, typography, square card treatment, spacing, section order, headings, historical review layout, and deploy handoff.
 
-The Dawn contract is invariant in Day: minimum coverage, Senior deposit, Senior yield share to Junior, observation period, Junior buffer remaining for Senior exit, Conservative/Balanced/Aggressive presets, the linked-Junior advanced override, observation state and claim erasure, protected-exit rules, Junior replenishment when deposits reopen, review metrics, and deploy fields must all remain present and accountant-driven.
+The Dawn contract is invariant in Day: minimum coverage, Senior deposit, Senior yield share to Junior, observation period, Junior buffer remaining for Senior exit, Conservative/Balanced/Aggressive presets, the linked-Junior advanced override, observation state and claim erasure, protected-exit rules, Junior replenishment when deposits reopen, the unified two-handle Backtest window scrubber with its full-history mini preview, review metrics, and deploy fields must all remain present and accountant-driven. Replacing the scrubber with separate start/end sliders is a design-contract failure.
 
 Day is additive. Its required additions are the Liquidity KPI, minimum-liquidity control, liquidity-premium control, Liquidity chart line and drawdown, liquidity utilization, and Day deploy fields. These additions must be visibly separated from the invariant Dawn controls. `day-sim:verify` enforces both halves of this contract.
 
