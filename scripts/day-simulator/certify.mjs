@@ -8,7 +8,8 @@ const run = (command, args) => {
   if (result.status !== 0) process.exit(result.status ?? 1);
 };
 
-run("node", ["scripts/day-simulator/verify.mjs"]);
+const marketId = process.argv[2];
+run("node", ["scripts/day-simulator/verify.mjs", ...(marketId ? [marketId] : [])]);
 run("npx", ["tsx", "lib/day/engine/engine.test.ts"]);
 
 console.log("Day accountant invariants: PASS");

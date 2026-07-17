@@ -6,11 +6,14 @@ The Day simulator is separate from the Dawn historical-market factory. Dawn has 
 
 ```bash
 npm run day-sim:verify
+npm run day-sim:verify -- <market-id>
 npm run day-sim:certify
+npm run day-sim:certify -- <market-id>
 npm run day-sim:preview
 ```
 
 - `day-sim:verify` checks the public route, locked copy contract, Day-only file boundary, manifest, default configuration, finite outputs, and NAV conservation.
+- Passing a market ID additionally verifies its Day manifest, source-series provenance, premium-curve guardrails, public route boundary, market defaults, and live accountant outputs.
 - `day-sim:certify` runs verification plus the Day accountant invariant suite.
 - `day-sim:preview` opens the local development server at `http://localhost:3000/day-sim`.
 

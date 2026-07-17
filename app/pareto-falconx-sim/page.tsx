@@ -1,16 +1,12 @@
 import type { Metadata } from 'next';
-import MarketSimulator from '@/components/simulator/MarketSimulator';
-import SimulatorPageShell from '@/components/simulator/SimulatorPageShell';
-import { MARKET } from '@/lib/markets/pareto-falconx/market';
-import type { InitialQuery } from '@/lib/simulator-template/permalink';
+import DaySimulatorPageShell from '@/components/day-simulator/DaySimulatorPageShell';
+import { PARETO_FALCONX_DAY_MARKET } from '@/lib/day-markets/pareto-falconx/market';
 
-export const metadata: Metadata = { title: MARKET.copy.title };
+export const metadata: Metadata = {
+  title: PARETO_FALCONX_DAY_MARKET.copy.title,
+  description: PARETO_FALCONX_DAY_MARKET.copy.description,
+};
 
-export default async function Page({ searchParams }: { searchParams: Promise<InitialQuery> }) {
-  const query = await searchParams;
-  return (
-    <SimulatorPageShell>
-      <MarketSimulator initialQuery={query} market={MARKET} />
-    </SimulatorPageShell>
-  );
+export default function Page() {
+  return <DaySimulatorPageShell market={PARETO_FALCONX_DAY_MARKET} />;
 }

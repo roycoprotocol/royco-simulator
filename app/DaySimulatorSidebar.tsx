@@ -16,6 +16,7 @@ import { Sim, defaultConfig, type StepInput, type Op } from '@/lib/day/engine/ru
 import { type MarketConfig, type YDMConfig } from '@/lib/day/engine/types';
 import { YEAR_SEC, ydmShare } from '@/lib/day/engine/ydm';
 import { DAY_TEMPLATE_MANIFEST } from '@/lib/day-simulator-template/manifest';
+import type { DaySimulatorDefaults } from '@/lib/day-simulator-template/market';
 
 // duplicated from app/internal/day/Simulator.tsx — keep in sync
 // ---------------------------------------------------------------------------
@@ -233,18 +234,22 @@ function AnchorSlider({
 // ---------------------------------------------------------------------------
 // Main component
 // ---------------------------------------------------------------------------
-export default function DaySimulatorSidebar() {
+export default function DaySimulatorSidebar({
+  defaults,
+}: {
+  defaults?: Partial<DaySimulatorDefaults>;
+}) {
   // --- primary inputs ---
-  const [apy, setApy] = useState(0.12);
+  const [apy, setApy] = useState(defaults?.sourceApy ?? 0.12);
   const [coverage, setCoverage] = useState(
-    DAY_TEMPLATE_MANIFEST.defaults.coverage,
+    defaults?.coverage ?? DAY_TEMPLATE_MANIFEST.defaults.coverage,
   );
   const [minLiq, setMinLiq] = useState(
-    DAY_TEMPLATE_MANIFEST.defaults.minLiquidity,
+    defaults?.minLiquidity ?? DAY_TEMPLATE_MANIFEST.defaults.minLiquidity,
   );
-  const [initST, setInitST] = useState(40_000_000);
-  const [initJT, setInitJT] = useState(10_000_000);
-  const [initLT, setInitLT] = useState(6_000_000);
+  const [initST, setInitST] = useState(defaults?.initialST ?? 40_000_000);
+  const [initJT, setInitJT] = useState(defaults?.initialJT ?? 10_000_000);
+  const [initLT, setInitLT] = useState(defaults?.initialLT ?? 6_000_000);
 
   // --- operating utilization (drives premium shares → APYs / split bar / chart dots) ---
   const [covUtil, setCovUtil] = useState(90); // coverage utilization %, 0–100
@@ -256,22 +261,29 @@ export default function DaySimulatorSidebar() {
   const [swapBps, setSwapBps] = useState(10);
   const [turnover, setTurnover] = useState(8);
   const [bandWidth, setBandWidth] = useState(0.15);
-  const [riskYDM, setRiskYDM] = useState<YDMConfig>({
-    mode: 'static',
-    y0: 0.25,
-    yTarget: 0.35,
-    y100: 0.55,
-  });
-  const [liqYDM, setLiqYDM] = useState<YDMConfig>({
-    mode: 'static',
-    y0: 0.08,
-    yTarget: 0.12,
-    y100: 0.2,
-  });
+  const [riskYDM, setRiskYDM] = useState<YDMConfig>(
+    defaults?.riskYDM ?? {
+      mode: 'static',
+      y0: 0.25,
+      yTarget: 0.35,
+      y100: 0.55,
+    },
+  );
+  const [liqYDM, setLiqYDM] = useState<YDMConfig>(
+    defaults?.liqYDM ?? {
+      mode: 'static',
+      y0: 0.08,
+      yTarget: 0.12,
+      y100: 0.2,
+    },
+  );
   const [termDays, setTermDays] = useState(30);
-  const [selfLiq, setSelfLiq] = useState(0.02);
+  const [selfLiq, setSelfLiq] = useState(
+    defaults?.selfLiquidationBonus ?? 0.02,
+  );
   const [liqUtil, setLiqUtil] = useState(
-    DAY_TEMPLATE_MANIFEST.defaults.liquidationUtilization,
+    defaults?.liquidationUtilization ??
+      DAY_TEMPLATE_MANIFEST.defaults.liquidationUtilization,
   );
 
   // beta=1 locked const (JT is always co-invested with ST)
