@@ -1,6 +1,7 @@
 import { Sim, defaultConfig } from '../day/engine/runner';
 import { MarketState } from '../day/engine/types';
 import { buildDayErasureEvent } from './erasure';
+import { shouldRefillJunior } from './refill';
 
 let passed = 0;
 let failed = 0;
@@ -19,6 +20,23 @@ const check = (label: string, condition: boolean, detail = '') => {
 };
 
 console.log('\nDay erasure chart adapter — structured amount and pre-refill geometry');
+
+check(
+  'ordinary PERPETUAL checkpoints do not trigger a Junior refill',
+  !shouldRefillJunior(true, MarketState.PERPETUAL, MarketState.PERPETUAL),
+);
+check(
+  'entering an observation does not trigger a Junior refill',
+  !shouldRefillJunior(true, MarketState.PERPETUAL, MarketState.FIXED_TERM),
+);
+check(
+  'closing an observation triggers a Junior refill when enabled',
+  shouldRefillJunior(true, MarketState.FIXED_TERM, MarketState.PERPETUAL),
+);
+check(
+  'the user toggle disables an otherwise eligible post-observation refill',
+  !shouldRefillJunior(false, MarketState.FIXED_TERM, MarketState.PERPETUAL),
+);
 
 const coverage = 0.03;
 const cfg = defaultConfig({

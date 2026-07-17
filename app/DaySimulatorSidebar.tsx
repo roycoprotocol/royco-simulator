@@ -399,7 +399,6 @@ export default function DaySimulatorSidebar({
         minLiquidity: minLiq,
         riskYDM,
         liqYDM,
-        premiumPriority: 'jtPriority',
         stableYield,
         swapFeeBps: swapBps,
         poolTurnoverPerYear: turnover,

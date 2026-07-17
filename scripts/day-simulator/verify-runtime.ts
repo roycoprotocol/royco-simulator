@@ -28,6 +28,15 @@ async function main() {
         riskYDM: market.defaults.riskYDM,
         liqYDM: market.defaults.liqYDM,
         stSelfLiquidationBonus: market.defaults.selfLiquidationBonus,
+        stProtocolFee: market.defaults.stProtocolFee,
+        jtProtocolFee: market.defaults.jtProtocolFee,
+        yieldShareProtocolFee: market.defaults.jtYieldShareProtocolFee,
+        ltYieldShareProtocolFee: market.defaults.ltYieldShareProtocolFee,
+        stableYield: market.defaults.stableYield,
+        swapFeeBps: market.defaults.swapFeeBps,
+        poolTurnoverPerYear: market.defaults.poolTurnoverPerYear,
+        eclpBandWidth: market.defaults.eclpBandWidth,
+        reinvestLiquidityPremium: market.defaults.reinvestLiquidityPremium,
       }
     : {}),
   });
@@ -80,14 +89,14 @@ async function main() {
   if (cfg.targetUtilization !== 0.9 || cfg.liqTargetUtilization !== 0.9) {
     throw new Error("Day target utilizations must remain at the 90% template default");
   }
-  if (cfg.premiumPriority !== "jtPriority") {
-    throw new Error("Day template premium priority changed unexpectedly");
+  if (cfg.maxJTYieldShare + cfg.maxLTYieldShare > 1) {
+    throw new Error("Day maximum yield shares exceed the contract's 100% combined limit");
   }
   if (market && cfg.fixedTermDurationSec !== market.defaults.observationDays * 86_400) {
     throw new Error("Day observation period diverges from the market manifest");
   }
   if (market && cfg.liquidationUtilization !== 100 / market.defaults.exitBufferPct) {
-    throw new Error("Day protected-exit threshold diverges from the Dawn exit-buffer rule");
+    throw new Error("Day coverage-based exit threshold diverges from the Dawn exit-buffer rule");
   }
 
   console.log("Day runtime defaults: PASS");

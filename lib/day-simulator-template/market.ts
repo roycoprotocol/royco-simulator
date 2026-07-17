@@ -12,20 +12,18 @@ export type DaySimulatorDefaults = {
   riskYDM: YDMConfig;
   liqYDM: YDMConfig;
   selfLiquidationBonus: number;
+  stProtocolFee: number;
+  jtProtocolFee: number;
+  jtYieldShareProtocolFee: number;
+  ltYieldShareProtocolFee: number;
+  stableYield: number;
+  swapFeeBps: number;
+  poolTurnoverPerYear: number;
+  eclpBandWidth: number;
+  reinvestLiquidityPremium: boolean;
   initialST: number;
   initialJT: number;
   initialLT: number;
-};
-
-export type DayMarketPreset = {
-  id: "conservative" | "balanced" | "aggressive";
-  label: string;
-  sourceApy: number;
-  coverage: number;
-  observationDays: number;
-  juniorYieldShare: number;
-  minLiquidity: number;
-  lpYieldShare: number;
 };
 
 export type DayMarketManifest = {
@@ -38,7 +36,6 @@ export type DayMarketManifest = {
     disclosure: string;
   };
   defaults: DaySimulatorDefaults;
-  presets?: DayMarketPreset[];
   targets?: {
     seniorApyMin: number;
     seniorApyMax: number;

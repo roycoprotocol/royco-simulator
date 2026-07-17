@@ -13,7 +13,6 @@ export type DayTemplateManifest = {
     | "liquidationUtilization"
     | "minLiquidity"
     | "liqTargetUtilization"
-    | "premiumPriority"
   >;
 };
 
@@ -29,6 +28,5 @@ export const DAY_TEMPLATE_MANIFEST: DayTemplateManifest = {
     liquidationUtilization: 1.5,
     minLiquidity: 0.12,
     liqTargetUtilization: 0.9,
-    premiumPriority: "jtPriority",
   },
 };

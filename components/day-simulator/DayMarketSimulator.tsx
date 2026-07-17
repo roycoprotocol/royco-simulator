@@ -1,7 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { useCallback, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   CartesianGrid,
   Line,
@@ -19,6 +19,10 @@ import { Sim, defaultConfig } from '@/lib/day/engine/runner';
 import { MarketState } from '@/lib/day/engine/types';
 import { DAY_LOCKED_COPY } from '@/lib/day-simulator-template/locked-copy';
 import { LOCKED_COPY } from '@/lib/simulator-template/locked-copy';
+import {
+  buildDayExplainerMetrics,
+  type DayExplainerMetrics,
+} from '@/lib/day-simulator-template/explainer';
 import { isFullRange, normalizeRange, type IndexRange } from '@/lib/hybond/timeframe';
 import type {
   DayMarket,
@@ -30,6 +34,7 @@ import {
   type DayErasureEvent,
 } from '@/lib/day-simulator-template/erasure';
 import { calibrateSeriesApy } from '@/lib/day-simulator-template/series';
+import { shouldRefillJunior } from '@/lib/day-simulator-template/refill';
 import { DayTimeframeBrush } from '@/components/day-simulator/DayTimeframeBrush';
 
 const ResponsiveContainerNoSSR = dynamic(
@@ -74,33 +79,6 @@ const monthLabel = (key: string): string => {
 const dateLabel = (key: string): string =>
   /^\d{4}-\d{2}-\d{2}$/.test(key) ? key : monthLabel(key);
 
-async function writeClipboardText(text: string): Promise<boolean> {
-  if (typeof document === 'undefined') return false;
-  const area = document.createElement('textarea');
-  area.value = text;
-  area.setAttribute('readonly', '');
-  area.style.position = 'fixed';
-  area.style.left = '-9999px';
-  area.style.top = '0';
-  document.body.appendChild(area);
-  area.focus();
-  area.select();
-  let copied = false;
-  try {
-    copied = document.execCommand('copy');
-  } catch {
-    copied = false;
-  }
-  document.body.removeChild(area);
-  if (copied) return true;
-  try {
-    await navigator.clipboard.writeText(text);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 type DayObservationPeriod = {
   aIndex: number;
   bIndex: number;
@@ -138,6 +116,15 @@ const FALLBACK_MANIFEST: DayMarketManifest = {
     riskYDM: { mode: 'static', y0: 0.25, yTarget: 0.35, y100: 0.55 },
     liqYDM: { mode: 'static', y0: 0.08, yTarget: 0.12, y100: 0.2 },
     selfLiquidationBonus: 0.02,
+    stProtocolFee: 0,
+    jtProtocolFee: 0,
+    jtYieldShareProtocolFee: 0,
+    ltYieldShareProtocolFee: 0,
+    stableYield: 0.035,
+    swapFeeBps: 10,
+    poolTurnoverPerYear: 8,
+    eclpBandWidth: 0.1,
+    reinvestLiquidityPremium: true,
     initialST: 40_000_000,
     initialJT: 10_000_000,
     initialLT: 6_000_000,
@@ -441,6 +428,244 @@ function Kpi({
   );
 }
 
+function FlowBox({
+  eyebrow,
+  value,
+  note,
+  color = C.text,
+}: {
+  eyebrow: string;
+  value: string;
+  note: string;
+  color?: string;
+}) {
+  return (
+    <div
+      style={{
+        background: C.cardBg,
+        border: `1px solid ${C.border}`,
+        minHeight: 92,
+        padding: '12px 14px',
+      }}
+    >
+      <p style={{ color: C.kpiLabel, fontSize: 8.8, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase' }}>
+        {eyebrow}
+      </p>
+      <p className="mt-2" style={{ color, fontFamily: MONO, fontSize: 22, fontWeight: 600, letterSpacing: '-0.04em' }}>
+        {value}
+      </p>
+      <p className="mt-1" style={{ color: C.muted, fontSize: 10.8, lineHeight: 1.35 }}>
+        {note}
+      </p>
+    </div>
+  );
+}
+
+function LiquidityExecutionDiagram({
+  metrics,
+}: {
+  metrics: DayExplainerMetrics['liquidity'];
+}) {
+  const width = 520;
+  const height = 400;
+  const margin = { left: 70, right: 24, top: 52, bottom: 68 };
+  const plotWidth = width - margin.left - margin.right;
+  const plotHeight = height - margin.top - margin.bottom;
+  const xMax = metrics.boundarySellNAV;
+  const curve = [
+    { sellNAV: 0, executionPrice: 1, slippage: 0 },
+    ...metrics.curve,
+  ];
+  const minExecutionPrice = Math.min(...curve.map((point) => point.executionPrice));
+  const yMin = Math.max(0, minExecutionPrice - 0.006);
+  const yRange = Math.max(0.001, 1 - yMin);
+  const x = (sellNAV: number) => margin.left + (sellNAV / xMax) * plotWidth;
+  const y = (executionPrice: number) => margin.top + ((1 - executionPrice) / yRange) * plotHeight;
+  const baseline = margin.top + plotHeight;
+  const referenceX = x(metrics.referenceSellNAV);
+  const boundaryX = x(metrics.boundarySellNAV);
+  const referenceY = y(metrics.referenceQuote.executionPrice);
+  const boundaryY = y(metrics.boundaryQuote.executionPrice);
+  const referenceSlippage = metrics.referenceQuote.slippage * 100;
+  const boundarySlippage = metrics.boundaryQuote.slippage * 100;
+  const referenceSellPct = metrics.referenceSellShareOfSenior * 100;
+  const boundarySellPct = metrics.boundarySellShareOfSenior * 100;
+  const curveLine = curve.map((point) => `${x(point.sellNAV)},${y(point.executionPrice)}`).join(' ');
+  const arbitrageArea = [
+    `${x(0)},${y(1)}`,
+    `${boundaryX},${y(1)}`,
+    ...curve.slice().reverse().map((point) => `${x(point.sellNAV)},${y(point.executionPrice)}`),
+  ].join(' ');
+  return (
+    <div data-accountant-source="buildDayExplainerMetrics.liquidity">
+      <svg
+        aria-label={`Atomic Senior exits execute immediately against the liquidity pool. An exit equal to ${referenceSellPct.toFixed(1)}% of opening Senior NAV has ${referenceSlippage.toFixed(1)}% slippage, while an exit equal to ${boundarySellPct.toFixed(1)}% of opening Senior NAV has ${boundarySlippage.toFixed(1)}% slippage. The widening discount to underlying redemption value represents a growing arbitrage incentive to restore the price.`}
+        className="mt-3 w-full"
+        role="img"
+        viewBox={`0 0 ${width} ${height}`}
+      >
+        {[0.25, 0.5, 0.75].map((fraction) => (
+          <line
+            key={fraction}
+            x1={margin.left}
+            y1={margin.top + plotHeight * fraction}
+            x2={margin.left + plotWidth}
+            y2={margin.top + plotHeight * fraction}
+            stroke={C.border}
+            strokeDasharray="4 4"
+          />
+        ))}
+        <line x1={margin.left} y1={margin.top} x2={margin.left} y2={baseline} stroke={C.border} />
+        <line x1={margin.left} y1={baseline} x2={margin.left + plotWidth} y2={baseline} stroke={C.border} />
+        <polygon points={arbitrageArea} fill={C.olive} fillOpacity={0.09} />
+        <line x1={margin.left} y1={y(1)} x2={margin.left + plotWidth} y2={y(1)} stroke={C.olive} strokeWidth={2} strokeDasharray="6 4" />
+        <polyline points={curveLine} fill="none" stroke={C.seniorLine} strokeWidth={4} strokeLinejoin="round" strokeLinecap="round" />
+        <line x1={referenceX} y1={referenceY - 3} x2={referenceX} y2={y(1) + 10} stroke={C.olive} strokeWidth={2} />
+        <path d={`M ${referenceX - 5} ${y(1) + 17} L ${referenceX} ${y(1) + 9} L ${referenceX + 5} ${y(1) + 17}`} fill="none" stroke={C.olive} strokeWidth={2} />
+        <line x1={boundaryX - 6} y1={boundaryY - 3} x2={boundaryX - 6} y2={y(1) + 10} stroke={C.olive} strokeWidth={3} />
+        <path d={`M ${boundaryX - 12} ${y(1) + 19} L ${boundaryX - 6} ${y(1) + 9} L ${boundaryX} ${y(1) + 19}`} fill="none" stroke={C.olive} strokeWidth={3} />
+        <circle cx={referenceX} cy={referenceY} r={5} fill={C.cardBg} stroke={C.olive} strokeWidth={2.5} />
+        <circle cx={boundaryX} cy={boundaryY} r={6} fill={C.cardBg} stroke={C.danger} strokeWidth={3} />
+        <text x={margin.left + 8} y={margin.top - 15} fill={C.olive} fontSize={13} fontWeight={600}>
+          Underlying redemption value
+        </text>
+        <text x={margin.left + plotWidth} y={margin.top - 15} fill={C.olive} fontSize={13} fontWeight={600} textAnchor="end">
+          Arbitrage incentive grows →
+        </text>
+        <text
+          x={referenceX + 12}
+          y={referenceY - 13}
+          fill={C.olive}
+          fontFamily={MONO}
+          fontSize={12.5}
+          fontWeight={600}
+        >
+          {referenceSlippage.toFixed(1)}% slippage
+        </text>
+        <text x={boundaryX - 10} y={boundaryY - 13} fill={C.danger} fontFamily={MONO} fontSize={12.5} fontWeight={600} textAnchor="end">
+          {boundarySlippage.toFixed(1)}% slippage
+        </text>
+        <text x={referenceX} y={height - 37} fill={C.olive} fontFamily={MONO} fontSize={13} fontWeight={600} textAnchor="middle">
+          {referenceSellPct.toFixed(1)}%
+        </text>
+        <text x={boundaryX} y={height - 37} fill={C.danger} fontFamily={MONO} fontSize={13} fontWeight={600} textAnchor="end">
+          {boundarySellPct.toFixed(1)}%
+        </text>
+        <text x={14} y={margin.top + 4} fill={C.olive} fontFamily={MONO} fontSize={11}>100%</text>
+        <text x={14} y={baseline + 4} fill={C.kpiLabel} fontFamily={MONO} fontSize={11}>
+          {(yMin * 100).toFixed(1)}%
+        </text>
+        <text transform={`translate(13 ${margin.top + plotHeight / 2}) rotate(-90)`} fill={C.kpiLabel} fontSize={12} textAnchor="middle">
+          Execution value
+        </text>
+        <text x={margin.left + plotWidth / 2} y={height - 8} fill={C.kpiLabel} fontSize={12} textAnchor="middle">
+          Atomic Senior exit (% of Senior notional)
+        </text>
+      </svg>
+    </div>
+  );
+}
+
+function CoverageLossDiagram({
+  metrics,
+}: {
+  metrics: DayExplainerMetrics['coverage'];
+}) {
+  const width = 520;
+  const height = 400;
+  const margin = { left: 64, right: 20, top: 30, bottom: 64 };
+  const plotWidth = width - margin.left - margin.right;
+  const plotHeight = height - margin.top - margin.bottom;
+  const yMin = Math.floor(metrics.endingSeniorBalancePer100);
+  const yMax = 100;
+  const yRange = Math.max(1, yMax - yMin);
+  const x = (loss: number) => margin.left + (loss / metrics.displayMaxLoss) * plotWidth;
+  const y = (balance: number) => margin.top + ((yMax - balance) / yRange) * plotHeight;
+  const line = metrics.points.map((point) => `${x(point.loss)},${y(point.seniorBalancePer100)}`).join(' ');
+  const breakpointX = x(metrics.coverageLossLimit);
+  const endpointX = x(metrics.displayMaxLoss);
+  const endpointY = y(metrics.endingSeniorBalancePer100);
+  return (
+    <div data-accountant-source="buildDayExplainerMetrics.coverage">
+      <svg
+        aria-label={`Senior stays at $100 through a ${(metrics.coverageLossLimit * 100).toFixed(1)}% strategy loss, then declines to $${metrics.endingSeniorBalancePer100.toFixed(1)} at a ${(metrics.displayMaxLoss * 100).toFixed(1)}% loss.`}
+        className="mt-3 w-full"
+        role="img"
+        viewBox={`0 0 ${width} ${height}`}
+      >
+        <rect
+          x={margin.left}
+          y={margin.top}
+          width={breakpointX - margin.left}
+          height={plotHeight}
+          fill={C.freeLine}
+          fillOpacity={0.1}
+        />
+        <rect
+          x={breakpointX}
+          y={margin.top}
+          width={endpointX - breakpointX}
+          height={plotHeight}
+          fill={C.danger}
+          fillOpacity={0.06}
+        />
+        <line x1={margin.left} y1={margin.top} x2={margin.left} y2={margin.top + plotHeight} stroke={C.border} />
+        <line x1={margin.left} y1={margin.top + plotHeight} x2={margin.left + plotWidth} y2={margin.top + plotHeight} stroke={C.border} />
+        <line
+          x1={breakpointX}
+          y1={margin.top}
+          x2={breakpointX}
+          y2={margin.top + plotHeight}
+          stroke={C.eyebrow}
+          strokeDasharray="4 4"
+        />
+        <polyline points={line} fill="none" stroke={C.seniorLine} strokeWidth={4} strokeLinejoin="round" strokeLinecap="round" />
+        <circle cx={breakpointX} cy={y(100)} r={7} fill={C.cardBg} stroke={C.olive} strokeWidth={3} />
+        <circle cx={endpointX} cy={endpointY} r={7} fill={C.cardBg} stroke={C.danger} strokeWidth={3} />
+        <text x={14} y={margin.top + 5} fill={C.kpiLabel} fontFamily={MONO} fontSize={12}>$100</text>
+        <text x={14} y={margin.top + plotHeight + 4} fill={C.kpiLabel} fontFamily={MONO} fontSize={12}>${yMin}</text>
+        <text x={margin.left} y={height - 32} fill={C.kpiLabel} fontFamily={MONO} fontSize={12}>0%</text>
+        <text x={breakpointX} y={height - 32} fill={C.eyebrow} fontFamily={MONO} fontSize={12} textAnchor="middle">
+          {(metrics.coverageLossLimit * 100).toFixed(1)}%
+        </text>
+        <text x={margin.left + plotWidth} y={height - 32} fill={C.kpiLabel} fontFamily={MONO} fontSize={12} textAnchor="end">
+          {(metrics.displayMaxLoss * 100).toFixed(1)}%
+        </text>
+        <text x={(margin.left + breakpointX) / 2} y={margin.top + 27} fill={C.olive} fontSize={12.5} fontWeight={600} textAnchor="middle">
+          Junior absorbs loss
+        </text>
+        <text x={(breakpointX + endpointX) / 2} y={margin.top + 27} fill={C.danger} fontSize={12.5} fontWeight={600} textAnchor="middle">
+          Senior absorbs excess
+        </text>
+        <text x={breakpointX - 12} y={y(100) + 56} fill={C.olive} fontFamily={MONO} fontSize={12.5} fontWeight={600} textAnchor="end">
+          $100 covered
+        </text>
+        <text
+          x={endpointX - 7}
+          y={endpointY - 17}
+          fill={C.danger}
+          fontFamily={MONO}
+          fontSize={13.5}
+          fontWeight={600}
+          paintOrder="stroke"
+          stroke={C.cardBg}
+          strokeWidth={7}
+          strokeLinejoin="round"
+          textAnchor="end"
+        >
+          ${metrics.endingSeniorBalancePer100.toFixed(1)}
+        </text>
+        <text transform={`translate(13 ${margin.top + plotHeight / 2}) rotate(-90)`} fill={C.kpiLabel} fontSize={12} textAnchor="middle">
+          Senior $ balance
+        </text>
+        <text x={margin.left + plotWidth / 2} y={height - 8} fill={C.kpiLabel} fontSize={12} textAnchor="middle">
+          Base strategy loss
+        </text>
+      </svg>
+    </div>
+  );
+}
+
 function SliderControl({
   label,
   value,
@@ -449,6 +674,8 @@ function SliderControl({
   step,
   display,
   description,
+  tone = C.accent,
+  labelColor = C.eyebrow,
   disabled = false,
   onChange,
   children,
@@ -459,7 +686,9 @@ function SliderControl({
   max: number;
   step: number;
   display: string;
-  description: string;
+  description?: string;
+  tone?: string;
+  labelColor?: string;
   disabled?: boolean;
   onChange: (value: number) => void;
   children?: React.ReactNode;
@@ -471,10 +700,10 @@ function SliderControl({
   return (
     <div style={{ opacity: disabled ? 0.55 : 1 }}>
       <div className="flex items-center justify-between" style={{ marginBottom: 6 }}>
-        <label style={{ color: C.eyebrow, fontSize: 10, fontWeight: 600, letterSpacing: 1, textTransform: 'uppercase' }}>
+        <label style={{ color: labelColor, fontSize: 10, fontWeight: 600, letterSpacing: 1, textTransform: 'uppercase' }}>
           {label}
         </label>
-        <span style={{ color: C.accent, fontFamily: MONO, fontSize: 13, fontWeight: 600 }}>{display}</span>
+        <span style={{ color: tone, fontFamily: MONO, fontSize: 13, fontWeight: 600 }}>{display}</span>
       </div>
       <input
         type="range"
@@ -485,11 +714,13 @@ function SliderControl({
         disabled={disabled}
         onChange={(event) => handle(event.target.value)}
         className="w-full"
-        style={{ accentColor: C.accent }}
+        style={{ accentColor: tone }}
       />
-      <p className="mt-1" style={{ color: C.muted, fontSize: 11.5, lineHeight: 1.4 }}>
-        {description}
-      </p>
+      {description && (
+        <p className="mt-1" style={{ color: C.muted, fontSize: 11.5, lineHeight: 1.4 }}>
+          {description}
+        </p>
+      )}
       {children}
     </div>
   );
@@ -505,10 +736,11 @@ const signColor = (value: number) => (value < 0 ? C.danger : C.text);
 export default function DayMarketSimulator({ market }: { market?: DayMarket }) {
   const activeMarket = market ?? FALLBACK_MARKET;
   const defaults = activeMarket.defaults;
-  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [showInputs, setShowInputs] = useState(false);
   const [showReview, setShowReview] = useState(true);
-  const [showDeploy, setShowDeploy] = useState(false);
   const [hoverDate, setHoverDate] = useState<string | null>(null);
+  const chartContainerRef = useRef<HTMLDivElement>(null);
+  const [chartTickCount, setChartTickCount] = useState(7);
   const [sourceApyPct, setSourceApyPct] = useState(defaults.sourceApy * 100);
   const [coveragePct, setCoveragePct] = useState(defaults.coverage * 100);
   const [minLiquidityPct, setMinLiquidityPct] = useState(defaults.minLiquidity * 100);
@@ -525,9 +757,20 @@ export default function DayMarketSimulator({ market }: { market?: DayMarket }) {
     a: 0,
     b: activeMarket.series.length - 1,
   });
-  const [copyLabel, setCopyLabel] = useState('Copy link');
-  const [copyDeployLabel, setCopyDeployLabel] = useState('Copy');
-  const deployRef = useRef<HTMLTextAreaElement>(null);
+
+  useEffect(() => {
+    const chartContainer = chartContainerRef.current;
+    if (!chartContainer) return;
+    const updateTickCount = () => {
+      const width = chartContainer.getBoundingClientRect().width;
+      const nextCount = width < 270 ? 2 : width < 370 ? 3 : width < 650 ? 4 : width < 760 ? 6 : 7;
+      setChartTickCount((current) => (current === nextCount ? current : nextCount));
+    };
+    updateTickCount();
+    const observer = new ResizeObserver(updateTickCount);
+    observer.observe(chartContainer);
+    return () => observer.disconnect();
+  }, []);
 
   const maxIndex = Math.max(0, activeMarket.series.length - 1);
   const viewRange = useMemo(
@@ -575,6 +818,15 @@ export default function DayMarketSimulator({ market }: { market?: DayMarket }) {
       fixedTermDurationSec: observationDays * DAY,
       liquidationUtilization: 100 / Math.max(exitBufferPct, 0.01),
       stSelfLiquidationBonus: defaults.selfLiquidationBonus,
+      stProtocolFee: defaults.stProtocolFee,
+      jtProtocolFee: defaults.jtProtocolFee,
+      yieldShareProtocolFee: defaults.jtYieldShareProtocolFee,
+      ltYieldShareProtocolFee: defaults.ltYieldShareProtocolFee,
+      stableYield: defaults.stableYield,
+      swapFeeBps: defaults.swapFeeBps,
+      poolTurnoverPerYear: defaults.poolTurnoverPerYear,
+      eclpBandWidth: defaults.eclpBandWidth,
+      reinvestLiquidityPremium: defaults.reinvestLiquidityPremium,
     });
     const sim = new Sim(cfg, initial);
     const snapshots = [sim.last()];
@@ -600,7 +852,7 @@ export default function DayMarketSimulator({ market }: { market?: DayMarket }) {
         const reason = /term expired/i.test(exitEvent?.msg ?? '')
           ? 'observation period ended'
           : /liquidation breach/i.test(exitEvent?.msg ?? '')
-            ? 'protected Senior exit opened'
+            ? 'coverage-based Senior exit opened'
             : /ST impairment/i.test(exitEvent?.msg ?? '')
               ? 'Senior impairment'
               : 'recovery claim erased';
@@ -625,7 +877,13 @@ export default function DayMarketSimulator({ market }: { market?: DayMarket }) {
           }),
         );
       }
-      if (maintainCoverage && postReturn.state === MarketState.PERPETUAL) {
+      const observationClosed =
+        previousSnapshot.state === MarketState.FIXED_TERM &&
+        postReturn.state === MarketState.PERPETUAL;
+      if (
+        observationClosed &&
+        shouldRefillJunior(maintainCoverage, previousSnapshot.state, postReturn.state)
+      ) {
         const numerator =
           coverage * (sim.state.stRawNAV + sim.state.jtRawNAV * cfg.beta) -
           cfg.targetUtilization * sim.state.jtEffectiveNAV;
@@ -765,6 +1023,7 @@ export default function DayMarketSimulator({ market }: { market?: DayMarket }) {
         liquidityReturn,
       };
     });
+    const final = sim.last();
     return {
       cfg,
       initial,
@@ -774,7 +1033,7 @@ export default function DayMarketSimulator({ market }: { market?: DayMarket }) {
       juniorApy: annualized(last.junior, first.junior, days),
       liquidityApy: annualized(last.liquidity, first.liquidity, days),
       strategyApy: annualized(last.strategy, first.strategy, days),
-      final: sim.last(),
+      final,
       observationPeriods,
       nonObservationPeriods,
       observationBands,
@@ -794,7 +1053,11 @@ export default function DayMarketSimulator({ market }: { market?: DayMarket }) {
     };
     const result = run(view);
     const fullResult = isFullRange(viewRange, maxIndex) ? result : run(modeledSeries);
-    return { result, fullResult };
+    const explainer = buildDayExplainerMetrics(result.cfg, result.initial);
+    return {
+      result: { ...result, explainer },
+      fullResult: { ...fullResult, explainer },
+    };
   }, [
     coveragePct,
     defaults,
@@ -872,7 +1135,7 @@ export default function DayMarketSimulator({ market }: { market?: DayMarket }) {
     const anchorIndices = Array.from(new Set([0, ...yearMarkIndices, dates.length - 1])).sort(
       (left, right) => left - right,
     );
-    const desiredTickCount = Math.min(Math.max(7, anchorIndices.length), dates.length);
+    const desiredTickCount = Math.min(Math.max(chartTickCount, anchorIndices.length), dates.length);
 
     const segmentIntervals = Array.from(
       { length: Math.max(anchorIndices.length - 1, 0) },
@@ -906,7 +1169,7 @@ export default function DayMarketSimulator({ market }: { market?: DayMarket }) {
       }
     }
     return Array.from(new Set(tickIndices)).map((index) => dates[index]);
-  }, [result.chart, yearMarks]);
+  }, [chartTickCount, result.chart, yearMarks]);
   const yMax = useMemo(() => {
     let maximum = 0;
     for (const point of result.chart) {
@@ -950,82 +1213,6 @@ export default function DayMarketSimulator({ market }: { market?: DayMarket }) {
           }
         : null;
   const endStep = result.chart[result.chart.length - 1];
-  const rangeTitle = result.chart.length
-    ? `${monthLabel(result.chart[0].date)} to ${monthLabel(result.chart[result.chart.length - 1].date)} projection`
-    : 'Projection';
-
-  const activePreset = activeMarket.presets?.find(
-    (preset) =>
-      Math.abs(preset.sourceApy * 100 - sourceApyPct) < 1e-9 &&
-      Math.abs(preset.coverage * 100 - coveragePct) < 1e-9 &&
-      preset.observationDays === observationDays &&
-      Math.abs(preset.juniorYieldShare * 100 - riskSharePct) < 1e-9 &&
-      Math.abs(preset.minLiquidity * 100 - minLiquidityPct) < 1e-9 &&
-      Math.abs(preset.lpYieldShare * 100 - liqSharePct) < 1e-9,
-  );
-
-  const applyPreset = (preset: NonNullable<DayMarket['presets']>[number]) => {
-    setSourceApyPct(preset.sourceApy * 100);
-    setCoveragePct(preset.coverage * 100);
-    setObservationDays(preset.observationDays);
-    setRiskSharePct(preset.juniorYieldShare * 100);
-    setMinLiquidityPct(preset.minLiquidity * 100);
-    setLiqSharePct(preset.lpYieldShare * 100);
-  };
-
-  const deployText = useMemo(
-    () =>
-      [
-        `market: ${activeMarket.copy.title}`,
-        `underlying: ${activeMarket.provenance.source}`,
-        `baseStrategyApy: ${sourceApyPct.toFixed(2)}%`,
-        `minimumCoverage: ${(result.cfg.coverage * 100).toFixed(2)}%`,
-        `minimumLP: ${(result.cfg.minLiquidity * 100).toFixed(2)}%`,
-        `observationDuration: ${observationDays} days`,
-        `protectedExitCoverageRemaining: ${exitBufferPct.toFixed(2)}%`,
-        `targetUtilization: ${(result.cfg.targetUtilization * 100).toFixed(0)}%`,
-        `lpTargetUtilization: ${(result.cfg.liqTargetUtilization * 100).toFixed(0)}%`,
-        `riskYieldShareAtTarget: ${(result.cfg.riskYDM.yTarget * 100).toFixed(2)}%`,
-        `riskYieldShareAtFullUtilization: ${(result.cfg.riskYDM.y100 * 100).toFixed(2)}%`,
-        `lpYieldShareAtTarget: ${(result.cfg.liqYDM.yTarget * 100).toFixed(2)}%`,
-        `lpYieldShareAtFullUtilization: ${(result.cfg.liqYDM.y100 * 100).toFixed(2)}%`,
-        `seniorDeposit: ${result.initial.st.toFixed(0)}`,
-        `juniorDeposit: ${result.initial.jt.toFixed(0)}`,
-        `juniorLinkedToCoverage: ${linkJuniorToFirstLoss}`,
-        `maintainJuniorCoverage: ${maintainCoverage}`,
-        `lpDeposit: ${result.initial.lt.toFixed(0)}`,
-        `selfLiquidationBonus: ${(result.cfg.stSelfLiquidationBonus * 100).toFixed(2)}%`,
-        `source: ${activeMarket.provenance.sourceUrl}`,
-      ].join('\n'),
-    [
-      activeMarket,
-      exitBufferPct,
-      linkJuniorToFirstLoss,
-      maintainCoverage,
-      observationDays,
-      result,
-      sourceApyPct,
-    ],
-  );
-
-  const copyText = async (
-    text: string,
-    setLabel: (label: string) => void,
-    done: string,
-    reset: string,
-    selectOnFailure?: () => void,
-  ) => {
-    const copied = await writeClipboardText(text);
-    if (copied) {
-      setLabel(done);
-      window.setTimeout(() => setLabel(reset), 1200);
-    } else {
-      selectOnFailure?.();
-      setLabel(selectOnFailure ? 'Select text' : 'Copy failed');
-      window.setTimeout(() => setLabel(reset), 1600);
-    }
-  };
-
   const startDate = view[0]?.date ?? '—';
   const endDate = view[view.length - 1]?.date ?? '—';
 
@@ -1065,117 +1252,154 @@ export default function DayMarketSimulator({ market }: { market?: DayMarket }) {
         </p>
       </section>
 
-      <section className="flex items-end justify-end flex-wrap gap-4">
-        <button
-          type="button"
-          onClick={() => copyText(window.location.href, setCopyLabel, 'Copied link', 'Copy link')}
-          style={{
-            background: C.text,
-            border: `1px solid ${C.text}`,
-            borderRadius: 0,
-            color: C.cardBg,
-            fontSize: 10,
-            letterSpacing: 1,
-            padding: '9px 12px',
-            textTransform: 'uppercase',
-          }}
-        >
-          {copyLabel}
-        </button>
-      </section>
-
       <section style={{ ...cardStyle, padding: 16 }}>
+        <Eyebrow>How Day works</Eyebrow>
         <div
-          className="grid grid-cols-1 min-[621px]:grid-cols-3 min-[981px]:grid-cols-[minmax(0,1fr)_repeat(3,minmax(185px,220px))]"
-          style={{ gap: 10 }}
+          className="mt-3 grid grid-cols-1 xl:grid-cols-[minmax(0,2.3fr)_minmax(290px,1fr)]"
+          style={{ gap: 8, alignItems: 'center' }}
         >
-          <div className="min-[621px]:col-span-3 min-[981px]:col-span-1">
-            <Eyebrow>{LOCKED_COPY.overviewEyebrow}</Eyebrow>
-            <h2 className="mt-2" style={{ color: C.text, fontFamily: SERIF, fontSize: 22, fontWeight: 400, lineHeight: 1.08 }}>
-              {rangeTitle}
-            </h2>
-            <p className="mt-2" style={{ color: C.muted, fontSize: 12.5, lineHeight: 1.38 }}>
-              {LOCKED_COPY.overviewDescription}
-            </p>
+          <div
+            className="grid grid-cols-1 md:grid-cols-[minmax(140px,.9fr)_24px_minmax(135px,.85fr)_minmax(96px,.62fr)_minmax(180px,1.12fr)]"
+            style={{ gap: 8, alignItems: 'center', minWidth: 0 }}
+          >
+            <FlowBox
+              eyebrow="Underlying"
+              value="Base yield"
+              note={`${activeMarket.provenance.feesIncluded ? 'Fee-inclusive' : 'Fee-exclusive'} source ${activeMarket.provenance.priceType.toUpperCase()} path`}
+              color={C.strategyLine}
+            />
+            <div className="flex items-center justify-center md:hidden" aria-hidden="true" style={{ height: 34 }}>
+              <svg className="h-full w-full" viewBox="0 0 240 34" preserveAspectRatio="xMidYMid meet">
+                <line x1="120" y1="2" x2="120" y2="27" stroke={C.faint} strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
+                <path d="M 115 22 L 120 28 L 125 22" fill="none" stroke={C.faint} strokeWidth="1.5" vectorEffect="non-scaling-stroke" />
+              </svg>
+            </div>
+            <div className="hidden md:flex items-center justify-center" aria-hidden="true" style={{ color: C.faint, fontFamily: MONO, fontSize: 20 }}>
+              →
+            </div>
+            <FlowBox
+              eyebrow="Tranche"
+              value="Senior (ST)"
+              note="Keeps residual yield after premiums"
+              color={C.seniorLine}
+            />
+            <div className="md:hidden" aria-hidden="true" style={{ height: 112 }}>
+              <svg className="h-full w-full" viewBox="0 0 240 112" preserveAspectRatio="xMidYMid meet">
+                <line x1="120" y1="0" x2="120" y2="20" stroke={C.seniorLine} strokeWidth="1.8" vectorEffect="non-scaling-stroke" />
+                <circle cx="120" cy="20" r="3" fill={C.seniorLine} />
+                <path d="M 120 20 H 60 V 34 M 60 72 V 104" fill="none" stroke={C.eyebrow} strokeWidth="1.8" vectorEffect="non-scaling-stroke" />
+                <path d="M 55 98 L 60 105 L 65 98" fill="none" stroke={C.eyebrow} strokeWidth="1.8" vectorEffect="non-scaling-stroke" />
+                <path d="M 120 20 H 180 V 34 M 180 72 V 104" fill="none" stroke={C.olive} strokeWidth="1.8" vectorEffect="non-scaling-stroke" />
+                <path d="M 175 98 L 180 105 L 185 98" fill="none" stroke={C.olive} strokeWidth="1.8" vectorEffect="non-scaling-stroke" />
+                <text x="60" y="47" fill={C.eyebrow} fontSize="8.8" fontWeight="600" letterSpacing="0.08em" textAnchor="middle">
+                  RISK
+                </text>
+                <text x="60" y="59" fill={C.eyebrow} fontSize="8.8" fontWeight="600" letterSpacing="0.08em" textAnchor="middle">
+                  PREMIUM
+                </text>
+                <text x="180" y="47" fill={C.olive} fontSize="8.8" fontWeight="600" letterSpacing="0.08em" textAnchor="middle">
+                  LIQUIDITY
+                </text>
+                <text x="180" y="59" fill={C.olive} fontSize="8.8" fontWeight="600" letterSpacing="0.08em" textAnchor="middle">
+                  PREMIUM
+                </text>
+              </svg>
+            </div>
+            <div className="hidden md:block" aria-hidden="true" style={{ alignSelf: 'stretch', minHeight: 192 }}>
+              <svg className="h-full w-full" viewBox="0 0 112 192">
+                <title>Risk premium from Senior to Junior; Liquidity premium from Senior to LP</title>
+                <line x1="0" y1="96" x2="24" y2="96" stroke={C.seniorLine} strokeWidth="2" vectorEffect="non-scaling-stroke" />
+                <circle cx="24" cy="96" r="3" fill={C.seniorLine} />
+                <path d="M 24 96 V 46 H 106" fill="none" stroke={C.eyebrow} strokeWidth="2" vectorEffect="non-scaling-stroke" />
+                <path d="M 99 42 L 106 46 L 99 50" fill="none" stroke={C.eyebrow} strokeWidth="2" vectorEffect="non-scaling-stroke" />
+                <path d="M 24 96 V 146 H 106" fill="none" stroke={C.olive} strokeWidth="2" vectorEffect="non-scaling-stroke" />
+                <path d="M 99 142 L 106 146 L 99 150" fill="none" stroke={C.olive} strokeWidth="2" vectorEffect="non-scaling-stroke" />
+                <text x="69" y="24" fill={C.eyebrow} fontSize="8.8" fontWeight="600" letterSpacing="0.08em" textAnchor="middle">
+                  RISK
+                </text>
+                <text x="69" y="35" fill={C.eyebrow} fontSize="8.8" fontWeight="600" letterSpacing="0.08em" textAnchor="middle">
+                  PREMIUM
+                </text>
+                <text x="69" y="124" fill={C.olive} fontSize="8.8" fontWeight="600" letterSpacing="0.08em" textAnchor="middle">
+                  LIQUIDITY
+                </text>
+                <text x="69" y="135" fill={C.olive} fontSize="8.8" fontWeight="600" letterSpacing="0.08em" textAnchor="middle">
+                  PREMIUM
+                </text>
+              </svg>
+            </div>
+            <div className="grid grid-cols-2 md:grid-cols-1" style={{ gap: 8 }}>
+              <FlowBox
+                eyebrow="Coverage"
+                value="Junior (JT)"
+                note="Funds Senior downside coverage"
+                color={C.juniorLine}
+              />
+              <FlowBox
+                eyebrow="Liquidity"
+                value="LP"
+                note="Funds secondary-market liquidity"
+                color={C.olive}
+              />
+            </div>
           </div>
-          <Kpi label="Senior avg/yr" value={`${pct(result.seniorApy)}/yr`} valueColor={C.accent} />
-          <Kpi label="Junior avg/yr" value={`${pct(result.juniorApy)}/yr`} valueColor={C.text} />
-          <Kpi label="LP avg/yr" value={`${pct(result.liquidityApy)}/yr`} valueColor={C.olive} />
+          <div
+            className="flex min-w-0 flex-col justify-center border-t xl:border-l xl:border-t-0"
+            style={{ borderColor: C.border, minHeight: 210, padding: '12px 16px' }}
+          >
+            <Eyebrow>Benefits</Eyebrow>
+            <div className="mt-3 flex flex-col" style={{ gap: 14 }}>
+              <div>
+                <div className="flex items-center gap-3">
+                  <span style={{ background: C.juniorLine, borderRadius: 9999, height: 8, width: 8 }} />
+                  <span style={{ color: C.text, fontFamily: SERIF, fontSize: 18 }}>Coverage</span>
+                </div>
+                <p className="mt-2" style={{ color: C.muted, fontSize: 11.5, lineHeight: 1.45 }}>
+                  {DAY_LOCKED_COPY.coverageBenefit}
+                </p>
+              </div>
+              <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 14 }}>
+                <div className="flex items-center gap-3">
+                  <span style={{ background: C.olive, borderRadius: 9999, height: 8, width: 8 }} />
+                  <span style={{ color: C.text, fontFamily: SERIF, fontSize: 18 }}>Liquidity</span>
+                </div>
+                <p className="mt-2" style={{ color: C.muted, fontSize: 11.5, lineHeight: 1.45 }}>
+                  {DAY_LOCKED_COPY.liquidityBenefit}
+                </p>
+              </div>
+            </div>
+          </div>
         </div>
       </section>
 
-      <section style={cardStyle}>
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <Eyebrow>{LOCKED_COPY.customizeEyebrow}</Eyebrow>
-            <h2 className="mt-2" style={{ color: C.text, fontFamily: SERIF, fontSize: 22, fontWeight: 400, lineHeight: 1.08 }}>
-              {LOCKED_COPY.customizeTitle}
-            </h2>
-            <p className="mt-1" style={{ color: C.muted, fontSize: 12.5, lineHeight: 1.38 }}>
-              {DAY_LOCKED_COPY.customizeDescription}
-            </p>
-          </div>
+      <section style={{ ...cardStyle, padding: '10px 12px' }}>
+        <div className="flex items-center justify-between gap-4">
+          <Eyebrow>Market inputs</Eyebrow>
           <button
             type="button"
-            aria-label={showAdvanced ? 'Collapse' : 'Expand'}
-            onClick={() => setShowAdvanced((value) => !value)}
+            onClick={() => setShowInputs((value) => !value)}
+            aria-label={showInputs ? 'Collapse market inputs' : 'Expand market inputs'}
+            aria-expanded={showInputs}
             style={{
-              background: 'transparent',
               border: `1px solid ${C.border}`,
               borderRadius: 0,
               color: C.accent,
-              flexShrink: 0,
+              width: 28,
+              height: 28,
               fontFamily: MONO,
               fontSize: 18,
-              height: 28,
               lineHeight: 1,
-              width: 28,
+              background: 'transparent',
+              flexShrink: 0,
             }}
           >
-            {showAdvanced ? '−' : '+'}
+            {showInputs ? '−' : '+'}
           </button>
         </div>
-        {showAdvanced && (
-          <div className="mt-4 flex flex-col gap-4">
-            {activeMarket.presets && activeMarket.presets.length > 0 && (
-              <div>
-                <Eyebrow>Scenario</Eyebrow>
-                <div className="mt-3 grid grid-cols-1 sm:grid-cols-3" style={{ gap: 8 }}>
-                  {activeMarket.presets.map((preset) => {
-                    const active = activePreset?.id === preset.id;
-                    return (
-                      <button
-                        key={preset.id}
-                        type="button"
-                        onClick={() => applyPreset(preset)}
-                        style={{
-                          background: C.cardBg,
-                          border: `1px solid ${active ? C.accent : C.border}`,
-                          borderRadius: 0,
-                          boxShadow: active ? `inset 0 -2px 0 ${C.accent}` : undefined,
-                          padding: '8px 11px',
-                          textAlign: 'left',
-                        }}
-                      >
-                        <span style={{ color: C.text, fontSize: 13, fontWeight: 600 }}>{preset.label}</span>
-                        <div style={{ color: C.muted, fontSize: 11, marginTop: 4 }}>
-                          {(preset.sourceApy * 100).toFixed(1)}% base APY ·{' '}
-                          {(preset.coverage * 100).toFixed(0)}% coverage ·{' '}
-                          {(preset.minLiquidity * 100).toFixed(0)}% liquidity ·{' '}
-                          {(preset.juniorYieldShare * 100).toFixed(0)}% Junior ·{' '}
-                          {(preset.lpYieldShare * 100).toFixed(0)}% LP · {preset.observationDays}d
-                        </div>
-                      </button>
-                    );
-                  })}
-                </div>
-                <p className="mt-1.5" style={{ color: C.kpiLabel, fontSize: 11, lineHeight: 1.4 }}>
-                  Presets change only the displayed terms. Backend accountant parameters remain fixed for this market.
-                </p>
-              </div>
-            )}
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
+        {showInputs && (
+          <div className="mt-3 grid grid-cols-1 md:grid-cols-2" style={{ gap: 8 }}>
+            <div style={{ background: `${C.strategyLine}14`, border: `1px solid ${C.strategyLine}`, padding: 12 }}>
               <SliderControl
                 label="Base strategy APY (%)"
                 value={sourceApyPct}
@@ -1183,9 +1407,13 @@ export default function DayMarketSimulator({ market }: { market?: DayMarket }) {
                 max={30}
                 step={0.1}
                 display={`${sourceApyPct.toFixed(1)}%`}
-                description="Annualized return of the base strategy. The daily NAV path keeps its historical drawdown shape while its full-window return is calibrated to this APY."
+                description=""
+                tone={C.muted}
+                labelColor={C.muted}
                 onChange={setSourceApyPct}
               />
+            </div>
+            <div style={{ background: C.pageBg, border: `1px solid ${C.border}`, padding: 12 }}>
               <SliderControl
                 label="Minimum coverage (%)"
                 value={coveragePct}
@@ -1193,9 +1421,11 @@ export default function DayMarketSimulator({ market }: { market?: DayMarket }) {
                 max={65}
                 step={1}
                 display={`${coveragePct.toFixed(0)}%`}
-                description="Contractual minimum used by the backend to size and replenish Junior at the 90% utilization target."
+                description=""
                 onChange={setCoveragePct}
               />
+            </div>
+            <div style={{ background: C.pageBg, border: `1px solid ${C.border}`, padding: 12 }}>
               <SliderControl
                 label="Minimum liquidity (%)"
                 value={minLiquidityPct}
@@ -1203,9 +1433,11 @@ export default function DayMarketSimulator({ market }: { market?: DayMarket }) {
                 max={50}
                 step={1}
                 display={`${minLiquidityPct.toFixed(0)}%`}
-                description="Minimum LP backing required for secondary-market liquidity."
+                description=""
                 onChange={setMinLiquidityPct}
               />
+            </div>
+            <div style={{ background: C.pageBg, border: `1px solid ${C.border}`, padding: 12 }}>
               <SliderControl
                 label="Junior yield share (%)"
                 value={riskSharePct}
@@ -1213,12 +1445,14 @@ export default function DayMarketSimulator({ market }: { market?: DayMarket }) {
                 max={80}
                 step={1}
                 display={`${riskSharePct.toFixed(0)}%`}
-                description="Share of Senior yield paid to Junior at the 90% utilization target."
+                description=""
                 onChange={(value) => {
                   setRiskSharePct(value);
                   if (value + liqSharePct > 100) setLiqSharePct(100 - value);
                 }}
               />
+            </div>
+            <div style={{ background: C.pageBg, border: `1px solid ${C.border}`, padding: 12 }}>
               <SliderControl
                 label="LP yield share (%)"
                 value={liqSharePct}
@@ -1226,12 +1460,14 @@ export default function DayMarketSimulator({ market }: { market?: DayMarket }) {
                 max={80}
                 step={1}
                 display={`${liqSharePct.toFixed(0)}%`}
-                description="Share of Senior yield paid to LP at the 90% utilization target."
+                description=""
                 onChange={(value) => {
                   setLiqSharePct(value);
                   if (value + riskSharePct > 100) setRiskSharePct(100 - value);
                 }}
               />
+            </div>
+            <div style={{ background: C.pageBg, border: `1px solid ${C.border}`, padding: 12 }}>
               <SliderControl
                 label="Observation period duration (days)"
                 value={observationDays}
@@ -1239,7 +1475,7 @@ export default function DayMarketSimulator({ market }: { market?: DayMarket }) {
                 max={194}
                 step={1}
                 display={`${observationDays} days`}
-                description={`Junior has ${observationDays} days to recover before the recovery claim is erased. Longer helps Junior, but keeps Senior waiting longer.`}
+                description=""
                 onChange={setObservationDays}
               />
             </div>
@@ -1247,10 +1483,31 @@ export default function DayMarketSimulator({ market }: { market?: DayMarket }) {
         )}
       </section>
 
+      <section style={{ ...cardStyle, padding: 14 }}>
+        <Eyebrow>APYs</Eyebrow>
+        <div className="mt-3 grid grid-cols-1 md:grid-cols-3" style={{ gap: 8 }}>
+          <Kpi label="Senior avg/yr" value={`${pct(result.seniorApy)}/yr`} valueColor={C.accent} />
+          <Kpi label="Junior avg/yr" value={`${pct(result.juniorApy)}/yr`} valueColor={C.text} />
+          <Kpi label="LP avg/yr" value={`${pct(result.liquidityApy)}/yr`} valueColor={C.olive} />
+        </div>
+      </section>
+
+      <section className="grid grid-cols-1 md:grid-cols-2" style={{ gap: 10 }}>
+        <div style={{ ...cardStyle, padding: 14 }}>
+          <Eyebrow>Liquidity</Eyebrow>
+          <LiquidityExecutionDiagram metrics={result.explainer.liquidity} />
+        </div>
+
+        <div style={{ ...cardStyle, padding: 14 }}>
+          <Eyebrow>Coverage</Eyebrow>
+          <CoverageLossDiagram metrics={result.explainer.coverage} />
+        </div>
+      </section>
+
       <section style={cardStyle}>
         <div className="flex items-start justify-between gap-4">
           <div>
-            <Eyebrow>{LOCKED_COPY.reviewEyebrow}</Eyebrow>
+            <Eyebrow>Backtest</Eyebrow>
             <h2 className="mt-2" style={{ color: C.text, fontFamily: SERIF, fontSize: 22, fontWeight: 400, lineHeight: 1.08 }}>
               {LOCKED_COPY.reviewTitle}
             </h2>
@@ -1297,11 +1554,11 @@ export default function DayMarketSimulator({ market }: { market?: DayMarket }) {
                 observation period
               </span>
             </div>
-            <div style={{ width: '100%', minWidth: 0, height: 360, minHeight: 360 }}>
+            <div ref={chartContainerRef} style={{ width: '100%', minWidth: 0, height: 360, minHeight: 360 }}>
               <ResponsiveContainerNoSSR>
                 <LineChart
                   data={result.chart}
-                  margin={{ top: 8, right: 16, bottom: 8, left: 0 }}
+                  margin={{ top: 8, right: chartTickCount <= 3 ? 36 : 16, bottom: 8, left: 0 }}
                   onMouseMove={(state: { activeLabel?: string | number }) =>
                     setHoverDate(typeof state?.activeLabel === 'string' ? state.activeLabel : null)
                   }
@@ -1498,71 +1755,6 @@ export default function DayMarketSimulator({ market }: { market?: DayMarket }) {
             </div>
           </div>
         )}
-      </section>
-
-      <section style={cardStyle}>
-        <details
-          open={showDeploy}
-          onToggle={(event) => setShowDeploy((event.currentTarget as HTMLDetailsElement).open)}
-        >
-          <summary className="flex items-start justify-between gap-4 cursor-pointer" style={{ listStyle: 'none' }}>
-            <div>
-              <Eyebrow>{LOCKED_COPY.deployEyebrow}</Eyebrow>
-              <h2 className="mt-2" style={{ color: C.text, fontFamily: SERIF, fontSize: 22, fontWeight: 400, lineHeight: 1.08 }}>
-                {LOCKED_COPY.deployTitle}
-              </h2>
-              <p className="mt-1" style={{ color: C.muted, fontSize: 12.5, lineHeight: 1.38 }}>
-                {LOCKED_COPY.deployDescription}
-              </p>
-            </div>
-            <button
-              type="button"
-              aria-label={showDeploy ? 'Collapse' : 'Expand'}
-              onClick={(event) => {
-                event.preventDefault();
-                event.stopPropagation();
-                setShowDeploy((value) => !value);
-              }}
-              style={{
-                border: `1px solid ${C.border}`,
-                borderRadius: 0,
-                color: C.accent,
-                width: 28,
-                height: 28,
-                fontFamily: MONO,
-                fontSize: 18,
-                lineHeight: 1,
-                background: 'transparent',
-                flexShrink: 0,
-              }}
-            >
-              {showDeploy ? '−' : '+'}
-            </button>
-          </summary>
-          <div className="mt-4">
-            <div className="flex items-start justify-between gap-4 flex-wrap">
-              <p style={{ color: C.muted, fontSize: 12.5, lineHeight: 1.4 }}>
-                Includes the active accountant terms, tranche sizing, curve anchors, and source.
-              </p>
-              <button
-                type="button"
-                onClick={() => copyText(deployText, setCopyDeployLabel, 'Copied', 'Copy', () => deployRef.current?.select())}
-                style={{ background: 'transparent', border: `1px solid ${C.border}`, borderRadius: 0, color: C.accent, fontSize: 10, letterSpacing: 1, padding: '9px 12px', textTransform: 'uppercase' }}
-              >
-                {copyDeployLabel}
-              </button>
-            </div>
-            <textarea
-              ref={deployRef}
-              readOnly
-              spellCheck={false}
-              aria-label="Deploy handoff"
-              value={deployText}
-              className="mt-3 w-full"
-              style={{ background: C.pageBg, border: `1px solid ${C.border}`, borderRadius: 0, color: C.text, fontFamily: MONO, fontSize: 11.5, height: 285, lineHeight: 1.6, padding: '12px 14px', resize: 'vertical' }}
-            />
-          </div>
-        </details>
       </section>
 
       <section style={{ ...cardStyle, borderLeft: `3px solid ${C.accent}` }}>

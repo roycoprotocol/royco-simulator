@@ -1,11 +1,9 @@
 // =============================================================================
 // Royco Day — engine types
 // -----------------------------------------------------------------------------
-// All NAVs are expressed in NAV units (USD), as floating point. The on-chain
-// system uses WAD (1e18) integers with explicit per-tranche dust tolerances; we
-// model that with floats + a single dust tolerance, which is faithful for
-// simulation (the dust tolerance is exactly what absorbs the WAD rounding the
-// contracts round away). See AUDIT.md for the mapping to the Solidity.
+// Contract-facing accounting values are stored as 18-decimal WAD bigint
+// integers. `Snapshot` and `PublicLiveState` are the only number-facing views;
+// they exist solely for charts, controls, and formatted copy.
 // =============================================================================
 
 export enum MarketState {
@@ -46,20 +44,18 @@ export interface MarketConfig {
   stProtocolFee: number; // on ST kept yield
   jtProtocolFee: number; // on JT total yield
   yieldShareProtocolFee: number; // on the ST->JT risk premium
+  ltYieldShareProtocolFee: number; // on the ST->LT liquidity premium
 
   // ---- Risk-premium YDM (senior -> junior) ----
   riskYDM: YDMConfig;
+  maxJTYieldShare: number; // accountant cap on the JT YDM output
 
   // ---- Royco Day: liquidity tranche ----
   minLiquidity: number; // MIN_LIQUIDITY (% of senior that must be pool-backed)
   liqTargetUtilization: number; // L* target for the liquidity curve (default 0.90)
   // Liquidity-premium YDM (senior -> liquidity), keyed on liquidityUtilization.
   liqYDM: YDMConfig;
-  // When both premiums are demanded out of one ST-yield stream and they sum to
-  // > 100%, who wins? Spec is silent (flagged gap). We make it explicit:
-  //  "jtPriority": JT takes its full share, LT gets the remainder.
-  //  "proRata":    both scaled down to sum to 1.
-  premiumPriority: "jtPriority" | "proRata";
+  maxLTYieldShare: number; // accountant cap on the LT YDM output
 
   // ---- Liquidity tranche pool (E-CLP BPT: ST-share / T-bill stable) ----
   // Swap yield is modeled directly as fee × volume (no curve simulation).
@@ -67,6 +63,10 @@ export interface MarketConfig {
   swapFeeBps: number; // pool trading fee, basis points
   poolTurnoverPerYear: number; // annual volume as a multiple of pool value (the "volume")
   eclpBandWidth: number; // peg band: how far ST can be sold before stable is exhausted
+  // Contract-side premium deployment policy. This is separate from modeled
+  // venue yield/volume: true deploys newly minted LT-owned Senior shares into
+  // the venue; false leaves them staged as idle LT-owned Senior shares.
+  reinvestLiquidityPremium: boolean;
 
   // ---- ST self-liquidation bonus (kernel) ----
   stSelfLiquidationBonus: number; // fraction of redeemed ST NAV, capped util-neutral
@@ -79,36 +79,74 @@ export interface MarketConfig {
 // Modeled by value, not by curve mechanics: the pool earns swap fees (fee × volume)
 // plus the T-bill rate on its stable leg plus net senior yield on its ST-share leg.
 export interface PoolState {
-  stShares: number; // ST shares held in the pool
-  stable: number; // stablecoin (NAV value) held in the pool; earns the T-bill rate
+  stShares: bigint; // WAD ST shares held in the pool
+  stable: bigint; // WAD stablecoin NAV held in the pool
 }
 
 export interface LiveState {
-  t: number; // seconds since start
+  t: bigint; // integer seconds since start
   marketState: MarketState;
-  fixedTermEndSec: number; // 0 if perpetual
+  fixedTermEndSec: bigint; // 0 if perpetual
 
   // checkpointed NAVs (NAV units)
-  stRawNAV: number; // ST pure asset value
-  jtRawNAV: number; // JT pure asset value
-  stEffectiveNAV: number; // ST redemption value
-  jtEffectiveNAV: number; // JT redemption value
-  stImpermanentLoss: number; // ST IL (JT liability to ST)
-  jtImpermanentLoss: number; // JT coverage IL (ST liability to JT)
+  stRawNAV: bigint; // WAD ST pure asset value
+  jtRawNAV: bigint; // WAD JT pure asset value
+  stEffectiveNAV: bigint; // WAD ST redemption value
+  jtEffectiveNAV: bigint; // WAD JT redemption value
+  stImpermanentLoss: bigint; // WAD presentation diagnostic
+  jtImpermanentLoss: bigint; // WAD JT coverage IL
 
   // share supplies (for price/NAV-per-share)
-  stShares: number;
-  jtShares: number;
-  ltShares: number;
+  stShares: bigint;
+  jtShares: bigint;
+  ltShares: bigint;
+
+  // protocol-owned shares minted as fee carve-outs. Fees reassign claims; they
+  // do not remove assets from effective NAV.
+  protocolSTShares: bigint;
+  protocolJTShares: bigint;
+  protocolLTShares: bigint;
 
   // liquidity tranche
   pool: PoolState;
-  accruedLiquidityPremium: number; // LT claim on ST assets (NAV units)
+  ltOwnedSTShares: bigint; // WAD senior shares held by LT from liquidity premiums
 
   // adaptive YDM state (Y_T values that drift over time)
+  riskYTarget: bigint;
+  liqYTarget: bigint;
+  lastYDMUpdateSec: bigint;
+  lastPremiumPaymentSec: bigint;
+  twRiskShareSeconds: bigint;
+  twLiqShareSeconds: bigint;
+  yieldShareAccrualInitialized: boolean;
+}
+
+/** Number-only adapter exposed by `Sim.state` for React and test ergonomics. */
+export interface PublicLiveState {
+  t: number;
+  marketState: MarketState;
+  fixedTermEndSec: number;
+  stRawNAV: number;
+  jtRawNAV: number;
+  stEffectiveNAV: number;
+  jtEffectiveNAV: number;
+  stImpermanentLoss: number;
+  jtImpermanentLoss: number;
+  stShares: number;
+  jtShares: number;
+  ltShares: number;
+  protocolSTShares: number;
+  protocolJTShares: number;
+  protocolLTShares: number;
+  pool: { stShares: number; stable: number };
+  ltOwnedSTShares: number;
   riskYTarget: number;
   liqYTarget: number;
   lastYDMUpdateSec: number;
+  lastPremiumPaymentSec: number;
+  twRiskShareSeconds: number;
+  twLiqShareSeconds: number;
+  yieldShareAccrualInitialized: boolean;
 }
 
 export interface Snapshot {
@@ -127,6 +165,8 @@ export interface Snapshot {
   stIL: number;
   jtIL: number;
   // health
+  coverageRequiredNAV: number; // ceil(COV * (stRaw + beta * jtRaw))
+  liquidityRequiredNAV: number; // ceil(MIN_LIQUIDITY * stEffective)
   utilization: number;
   liquidityUtilization: number;
   coverageOK: boolean; // utilization <= 1
@@ -138,9 +178,21 @@ export interface Snapshot {
   riskShare: number;
   liqShare: number;
   // pool composition
+  poolSeniorNAV: number;
+  poolStableNAV: number;
   poolPctST: number;
   // invariant residual (should be ~0)
   conservationResidual: number;
+}
+
+export interface SecondaryExitQuote {
+  requestedNAV: number;
+  filledNAV: number;
+  stableOutNAV: number;
+  unfilledNAV: number;
+  executionPrice: number;
+  slippage: number;
+  poolPctSTAfter: number;
 }
 
 export type EventKind =

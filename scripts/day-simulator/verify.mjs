@@ -14,6 +14,8 @@ const requiredFiles = [
   "lib/day-simulator-template/manifest.ts",
   "lib/day-simulator-template/erasure.ts",
   "lib/day-simulator-template/erasure.test.ts",
+  "lib/day-simulator-template/explainer.ts",
+  "lib/day-simulator-template/explainer.test.ts",
   "lib/day-simulator-template/series.ts",
   "lib/day/engine/engine.ts",
   "lib/day/engine/runner.ts",
@@ -48,12 +50,20 @@ const simulator = await readFile(
   path.join(root, "components/day-simulator/DayMarketSimulator.tsx"),
   "utf8",
 );
+const dayLockedCopy = await readFile(
+  path.join(root, "lib/day-simulator-template/locked-copy.ts"),
+  "utf8",
+);
 const seriesCalibration = await readFile(
   path.join(root, "lib/day-simulator-template/series.ts"),
   "utf8",
 );
 const erasureAdapter = await readFile(
   path.join(root, "lib/day-simulator-template/erasure.ts"),
+  "utf8",
+);
+const explainerAdapter = await readFile(
+  path.join(root, "lib/day-simulator-template/explainer.ts"),
   "utf8",
 );
 const timeframeBrush = await readFile(
@@ -74,42 +84,50 @@ for (const contract of [
   if (!simulator.includes(contract)) failures.push(`Day simulator violates Dawn/Tenbin design token: ${contract}`);
 }
 for (const lockedCopyReference of [
-  'LOCKED_COPY.overviewEyebrow',
-  'LOCKED_COPY.overviewDescription',
-  'LOCKED_COPY.customizeEyebrow',
-  'LOCKED_COPY.customizeTitle',
-  'DAY_LOCKED_COPY.customizeDescription',
-  'LOCKED_COPY.reviewEyebrow',
   'LOCKED_COPY.reviewTitle',
   'LOCKED_COPY.reviewDescription',
-  'LOCKED_COPY.deployEyebrow',
-  'LOCKED_COPY.deployTitle',
-  'LOCKED_COPY.deployDescription',
+  'DAY_LOCKED_COPY.liquidityBenefit',
+  'DAY_LOCKED_COPY.coverageBenefit',
 ]) {
   if (!simulator.includes(lockedCopyReference)) failures.push(`Day simulator missing locked Dawn copy reference: ${lockedCopyReference}`);
+}
+for (const benefitCopy of [
+  'Many yield opportunities are illiquid by design. Despite that, the LP design now allows ST to buy/sell their positions through a dedicated liquidity layer.',
+  'Every ST position has a minimum JT buffer defined in the protocol’s contracts. This gives risk committees a concrete, verifiable loss-absorption layer.',
+]) {
+  if (!dayLockedCopy.includes(benefitCopy)) failures.push(`Day benefit copy is missing or changed: ${benefitCopy}`);
 }
 for (const layoutContract of [
   'className="flex flex-col" style={{ gap: 10 }}',
   'className="mt-3 max-w-3xl"',
-  'className="flex items-end justify-end flex-wrap gap-4"',
-  'min-[621px]:grid-cols-3',
-  'min-[621px]:col-span-3 min-[981px]:col-span-1',
+  '<Eyebrow>How Day works</Eyebrow>',
+  '<Eyebrow>Market inputs</Eyebrow>',
+  "const [showInputs, setShowInputs] = useState(false)",
+  "aria-label={showInputs ? 'Collapse market inputs' : 'Expand market inputs'}",
+  'aria-expanded={showInputs}',
+  'className="mt-3 grid grid-cols-1 md:grid-cols-2"',
+  '<Eyebrow>APYs</Eyebrow>',
+  '<Eyebrow>Liquidity</Eyebrow>',
+  '<Eyebrow>Coverage</Eyebrow>',
+  '<Eyebrow>Backtest</Eyebrow>',
+  'className="mt-3 grid grid-cols-1 md:grid-cols-3"',
+  'className="grid grid-cols-1 md:grid-cols-2"',
   'className="flex items-start justify-between gap-4"',
-  'aria-label={showAdvanced ? \'Collapse\' : \'Expand\'}',
   'aria-label={showReview ? \'Collapse\' : \'Expand\'}',
-  'aria-label={showDeploy ? \'Collapse\' : \'Expand\'}',
   'className="pb-8 border-t pt-4"',
 ]) {
   if (!simulator.includes(layoutContract)) failures.push(`Day simulator missing Dawn element/layout contract: ${layoutContract}`);
 }
 for (const control of [
   'Base strategy APY (%)',
+  'tone={C.muted}',
+  'labelColor={C.muted}',
+  'background: `${C.strategyLine}14`',
   'Minimum coverage (%)',
   'Minimum liquidity (%)',
   'Junior yield share (%)',
   'LP yield share (%)',
   'Observation period duration (days)',
-  '<Eyebrow>Scenario</Eyebrow>',
   'Refill Junior after losses',
 ]) {
   if (!simulator.includes(control)) failures.push(`Day simulator missing compact public control: ${control}`);
@@ -125,15 +143,28 @@ for (const output of [
   'label="LP return"',
   'result.monthly',
   'function ReturnRow',
-  'aria-label="Deploy handoff"',
   '<Eyebrow>Junior funding</Eyebrow>',
   'LP share price',
+  '<Eyebrow>How Day works</Eyebrow>',
+  '<Eyebrow>Liquidity</Eyebrow>',
+  '<Eyebrow>Coverage</Eyebrow>',
+  'function LiquidityExecutionDiagram',
+  'function CoverageLossDiagram',
+  'buildDayExplainerMetrics(result.cfg, result.initial)',
+  'Atomic Senior exit',
+  'Execution value',
+  'Underlying redemption value',
+  'Risk premium',
+  'Liquidity premium',
+  'Arbitrage incentive grows',
+  'Senior $ balance',
+  'Base strategy loss',
 ]) {
   if (!simulator.includes(output)) failures.push(`Day simulator missing compact public output: ${output}`);
 }
 const kpiCount = simulator.match(/<Kpi label=/g)?.length ?? 0;
 if (kpiCount !== 3) {
-  failures.push(`Day overview must contain exactly three tranche KPI cards; found ${kpiCount}`);
+  failures.push(`Day APY panel must contain exactly three tranche KPI cards; found ${kpiCount}`);
 }
 for (const hiddenControl of [
   'Senior deposit ($)',
@@ -145,7 +176,21 @@ for (const hiddenControl of [
   'Calendar-year return / observation stats',
   'Base strategy return',
   'Key modeling assumption',
+  'Deploy handoff',
+  'LOCKED_COPY.deploy',
+  'LOCKED_COPY.overview',
+  'LOCKED_COPY.customize',
+  'showAdvanced',
+  'RequirementMeter',
+  'MarketInput',
+  'Copy link',
   'Assume Junior is replenished to hold the buffer',
+  '<Eyebrow>Scenario</Eyebrow>',
+  'activePreset',
+  'applyPreset',
+  'Three tranche returns.',
+  'Atomic sell size and slippage.',
+  'Senior balance across strategy losses.',
 ]) {
   if (simulator.includes(hiddenControl)) failures.push(`Day simulator exposes backend-only or removed output: ${hiddenControl}`);
 }
@@ -157,11 +202,29 @@ for (const invariant of [
   'const [maintainCoverage, setMaintainCoverage] = useState(defaults.maintainCoverage)',
   'stSelfLiquidationBonus: defaults.selfLiquidationBonus',
   "op: { type: 'jtDeposit', amount: refill }",
+  'previousSnapshot.state === MarketState.FIXED_TERM',
+  'postReturn.state === MarketState.PERPETUAL',
   'MarketState.PERPETUAL',
   'MarketState.FIXED_TERM',
   '<ReferenceArea',
+  'buildDayExplainerMetrics(result.cfg, result.initial)',
 ]) {
   if (!simulator.includes(invariant)) failures.push(`Day simulator missing Dawn behavior invariant: ${invariant}`);
+}
+for (const explainerContract of [
+  'export const ARBITRAGE_REFERENCE_SLIPPAGE = 0.01',
+  'function findSellAtSlippage',
+  'function findPoolBoundary',
+  'function findCoverageLossLimit',
+  'function shockSeniorBalance',
+  'stReturn: -loss, jtReturn: -loss',
+  'opening.previewSecondarySell(boundaryQuote.filledNAV)',
+  'const curve = Array.from({ length: 25 }',
+  'opening.previewSecondarySell(sellNAV)',
+]) {
+  if (!explainerAdapter.includes(explainerContract)) {
+    failures.push(`Day explainer diagram accounting contract missing: ${explainerContract}`);
+  }
 }
 for (const calibrationContract of [
   'export function annualizedSeriesApy',
@@ -298,6 +361,20 @@ if (marketId) {
     if (!(market.defaults?.exitBufferPct >= 1 && market.defaults.exitBufferPct <= 99.91)) {
       failures.push("Day market exitBufferPct must preserve the Dawn 1–99.91% range");
     }
+    for (const feeField of ["stProtocolFee", "jtProtocolFee", "jtYieldShareProtocolFee", "ltYieldShareProtocolFee"]) {
+      const value = market.defaults?.[feeField];
+      if (!(Number.isFinite(value) && value >= 0 && value <= 1)) {
+        failures.push(`Day market ${feeField} must be explicit and within [0,1]`);
+      }
+    }
+    for (const modelField of ["stableYield", "swapFeeBps", "poolTurnoverPerYear", "eclpBandWidth"]) {
+      if (!Number.isFinite(market.defaults?.[modelField])) {
+        failures.push(`Day market ${modelField} must be explicit`);
+      }
+    }
+    if (typeof market.defaults?.reinvestLiquidityPremium !== "boolean") {
+      failures.push("Day market reinvestLiquidityPremium must be explicit");
+    }
     if (market.defaults?.linkJuniorToFirstLoss !== true) {
       failures.push("Day market backend Junior sizing must be linked to coverage");
     }
@@ -311,56 +388,26 @@ if (marketId) {
       failures.push("Day market linked Junior sizing must land exactly at 90% Dawn coverage utilization");
     }
     if (Math.abs(market.defaults.liquidationUtilization - 100 / market.defaults.exitBufferPct) > 1e-9) {
-      failures.push("Day market protected-exit utilization must derive from exitBufferPct");
+      failures.push("Day market coverage-based exit utilization must derive from exitBufferPct");
     }
-    if (!Array.isArray(market.presets) || market.presets.map((preset) => preset.id).join(",") !== "conservative,balanced,aggressive") {
-      failures.push("Day market must preserve the Conservative, Balanced, Aggressive preset ladder");
-    } else {
-      const [conservative, balanced, aggressive] = market.presets;
-      if (
-        conservative.coverage < balanced.coverage ||
-        balanced.coverage < aggressive.coverage ||
-        conservative.observationDays < balanced.observationDays ||
-        balanced.observationDays < aggressive.observationDays ||
-        conservative.juniorYieldShare > balanced.juniorYieldShare ||
-        balanced.juniorYieldShare > aggressive.juniorYieldShare
-      ) {
-        failures.push("Day preset risk must move logically from Conservative through Aggressive");
-      }
-      for (const preset of market.presets) {
-        for (const displayedField of ["sourceApy", "coverage", "observationDays", "juniorYieldShare", "minLiquidity", "lpYieldShare"]) {
-          if (!Number.isFinite(preset[displayedField])) {
-            failures.push(`Day preset ${preset.id} must provide finite ${displayedField}`);
-          }
-        }
-        for (const hiddenField of ["exitBufferPct", "riskYDM", "liqYDM", "selfLiquidationBonus"]) {
-          if (hiddenField in preset) {
-            failures.push(`Day preset ${preset.id} may not override backend-only ${hiddenField}`);
-          }
-        }
-        if (preset.juniorYieldShare + preset.lpYieldShare > 1) {
-          failures.push(`Day preset ${preset.id} combined yield shares must not exceed 100%`);
-        }
-      }
+    if (market.presets !== undefined) {
+      failures.push("Day market manifests must use one editable default configuration, not scenario presets");
     }
     if (marketId === "pareto-falconx") {
-      const balanced = market.presets?.find((preset) => preset.id === "balanced");
       if (Math.abs(market.defaults.minLiquidity - 0.15) > 1e-12) {
         failures.push("Pareto FalconX Day minimum LP ratio must remain 15%");
       }
       if (
-        !balanced ||
-        balanced.sourceApy !== market.defaults.sourceApy ||
-        balanced.coverage !== 0.03 ||
-        balanced.juniorYieldShare !== 0.06 ||
-        balanced.lpYieldShare !== 0.17 ||
-        balanced.minLiquidity !== 0.15 ||
-        balanced.observationDays !== 7 ||
+        market.defaults.coverage !== 0.03 ||
+        market.defaults.riskYDM?.yTarget !== 0.06 ||
+        market.defaults.liqYDM?.yTarget !== 0.17 ||
+        market.defaults.minLiquidity !== 0.15 ||
+        market.defaults.observationDays !== 7 ||
         market.defaults.riskYDM?.y100 !== 0.18 ||
         market.defaults.exitBufferPct !== 1 ||
         market.defaults.selfLiquidationBonus !== 0.01
       ) {
-        failures.push("Pareto FalconX visible Balanced preset and backend terms must retain the approved values");
+        failures.push("Pareto FalconX editable defaults and backend terms must retain the approved Balanced values");
       }
     }
     for (const curveName of ["riskYDM", "liqYDM"]) {

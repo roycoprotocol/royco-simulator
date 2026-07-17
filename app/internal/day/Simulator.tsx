@@ -148,7 +148,6 @@ export default function Simulator() {
   const [minLiq, setMinLiq] = useState(0.12);
   const [riskYDM, setRiskYDM] = useState<YDMConfig>({ mode: "static", y0: 0.25, yTarget: 0.35, y100: 0.55 });
   const [liqYDM, setLiqYDM] = useState<YDMConfig>({ mode: "static", y0: 0.08, yTarget: 0.12, y100: 0.2 });
-  const [priority, setPriority] = useState<MarketConfig["premiumPriority"]>("jtPriority");
   const [stableYield, setStableYield] = useState(0.035);
   const [swapBps, setSwapBps] = useState(10);
   const [turnover, setTurnover] = useState(8);
@@ -164,10 +163,10 @@ export default function Simulator() {
   const cfg: MarketConfig = useMemo(
     () => defaultConfig({
       coverage, beta, liquidationUtilization: liqUtil, fixedTermDurationSec: termDays * 86400,
-      minLiquidity: minLiq, riskYDM, liqYDM, premiumPriority: priority,
+      minLiquidity: minLiq, riskYDM, liqYDM,
       stableYield, swapFeeBps: swapBps, poolTurnoverPerYear: turnover, eclpBandWidth: bandWidth, stSelfLiquidationBonus: selfLiq,
     }),
-    [coverage, beta, liqUtil, termDays, minLiq, riskYDM, liqYDM, priority, stableYield, swapBps, turnover, bandWidth, selfLiq],
+    [coverage, beta, liqUtil, termDays, minLiq, riskYDM, liqYDM, stableYield, swapBps, turnover, bandWidth, selfLiq],
   );
 
   const sim = useMemo(() => {
@@ -226,7 +225,6 @@ export default function Simulator() {
             <div className="my-2" style={{ borderTop: `1px solid ${C.line}` }} />
             <YDMEditor name="LP premium → LT" cfg={liqYDM} onChange={setLiqYDM} accent={C.lt} />
             <div className="mt-2 pt-2" style={{ borderTop: `1px solid ${C.line}` }}>
-              <Field label="priority if Σ>100%" hint="spec gap: who wins when both premiums exceed senior yield"><Seg value={priority} options={[{ v: "jtPriority", l: "JT first" }, { v: "proRata", l: "pro-rata" }]} onChange={setPriority} /></Field>
             </div>
           </Panel>
 

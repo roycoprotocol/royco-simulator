@@ -381,7 +381,6 @@ export default function DaySimulator() {
         minLiquidity: minLiq,
         riskYDM,
         liqYDM,
-        premiumPriority: 'jtPriority',
         stableYield,
         swapFeeBps: swapBps,
         poolTurnoverPerYear: turnover,
