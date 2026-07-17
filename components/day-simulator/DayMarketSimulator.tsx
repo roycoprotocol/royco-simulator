@@ -215,6 +215,8 @@ export default function DayMarketSimulator({ market }: { market?: DayMarket }) {
   const activeMarket = market ?? FALLBACK_MARKET;
   const defaults = activeMarket.defaults;
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [showReview, setShowReview] = useState(true);
+  const [showDeploy, setShowDeploy] = useState(false);
   const [coveragePct, setCoveragePct] = useState(defaults.coverage * 100);
   const [minLiquidityPct, setMinLiquidityPct] = useState(defaults.minLiquidity * 100);
   const [riskSharePct, setRiskSharePct] = useState(defaults.riskYDM.yTarget * 100);
@@ -853,15 +855,43 @@ export default function DayMarketSimulator({ market }: { market?: DayMarket }) {
       </section>
 
       <section style={cardStyle}>
-        <details open>
-          <summary className="cursor-pointer" style={{ listStyle: 'none' }}>
-            <Eyebrow>Review history</Eyebrow>
-            <h2 style={{ color: C.text, fontFamily: SERIF, fontSize: 22, fontWeight: 400, lineHeight: 1.08, marginTop: 8 }}>
-              Chart, metrics, and mechanics.
-            </h2>
-            <p style={{ color: C.muted, fontSize: 12.5, lineHeight: 1.38, marginTop: 4 }}>
-              {LOCKED_COPY.reviewDescription}
-            </p>
+        <details
+          open={showReview}
+          onToggle={(event) => setShowReview((event.currentTarget as HTMLDetailsElement).open)}
+        >
+          <summary className="flex items-start justify-between gap-4 cursor-pointer" style={{ listStyle: 'none' }}>
+            <div>
+              <Eyebrow>Review history</Eyebrow>
+              <h2 style={{ color: C.text, fontFamily: SERIF, fontSize: 22, fontWeight: 400, lineHeight: 1.08, marginTop: 8 }}>
+                Chart, metrics, and mechanics.
+              </h2>
+              <p style={{ color: C.muted, fontSize: 12.5, lineHeight: 1.38, marginTop: 4 }}>
+                {LOCKED_COPY.reviewDescription}
+              </p>
+            </div>
+            <button
+              type="button"
+              aria-label={showReview ? 'Collapse' : 'Expand'}
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                setShowReview((value) => !value);
+              }}
+              style={{
+                border: `1px solid ${C.border}`,
+                borderRadius: 0,
+                color: C.accent,
+                width: 28,
+                height: 28,
+                fontFamily: MONO,
+                fontSize: 18,
+                lineHeight: 1,
+                background: 'transparent',
+                flexShrink: 0,
+              }}
+            >
+              {showReview ? '−' : '+'}
+            </button>
           </summary>
 
           <div className="mt-4" style={{ borderTop: `1px solid ${C.border}`, paddingTop: 12 }}>
@@ -993,15 +1023,43 @@ export default function DayMarketSimulator({ market }: { market?: DayMarket }) {
       </section>
 
       <section style={cardStyle}>
-        <details>
-          <summary className="cursor-pointer" style={{ listStyle: 'none' }}>
-            <Eyebrow>Deploy handoff</Eyebrow>
-            <h2 style={{ color: C.text, fontFamily: SERIF, fontSize: 22, fontWeight: 400, lineHeight: 1.08, marginTop: 8 }}>
-              Copy final market-design parameters.
-            </h2>
-            <p style={{ color: C.muted, fontSize: 12.5, lineHeight: 1.38, marginTop: 4 }}>
-              This is the finalized parameter handoff, not the full integration package.
-            </p>
+        <details
+          open={showDeploy}
+          onToggle={(event) => setShowDeploy((event.currentTarget as HTMLDetailsElement).open)}
+        >
+          <summary className="flex items-start justify-between gap-4 cursor-pointer" style={{ listStyle: 'none' }}>
+            <div>
+              <Eyebrow>Deploy handoff</Eyebrow>
+              <h2 style={{ color: C.text, fontFamily: SERIF, fontSize: 22, fontWeight: 400, lineHeight: 1.08, marginTop: 8 }}>
+                Copy final market-design parameters.
+              </h2>
+              <p style={{ color: C.muted, fontSize: 12.5, lineHeight: 1.38, marginTop: 4 }}>
+                This is the finalized parameter handoff, not the full integration package.
+              </p>
+            </div>
+            <button
+              type="button"
+              aria-label={showDeploy ? 'Collapse' : 'Expand'}
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                setShowDeploy((value) => !value);
+              }}
+              style={{
+                border: `1px solid ${C.border}`,
+                borderRadius: 0,
+                color: C.accent,
+                width: 28,
+                height: 28,
+                fontFamily: MONO,
+                fontSize: 18,
+                lineHeight: 1,
+                background: 'transparent',
+                flexShrink: 0,
+              }}
+            >
+              {showDeploy ? '−' : '+'}
+            </button>
           </summary>
           <div className="mt-4">
             <div className="flex items-start justify-between gap-4 flex-wrap">
