@@ -916,23 +916,47 @@ export default function DayMarketSimulator({ market }: { market?: DayMarket }) {
   }, [result.chart]);
   const xTicks = useMemo(() => {
     const dates = result.chart.map((point) => point.date);
-    const desiredTickCount = Math.min(8, dates.length);
-    if (desiredTickCount <= 1) return dates;
-    const candidates = Array.from({ length: desiredTickCount }, (_, index) =>
-      dates[Math.round((index * (dates.length - 1)) / (desiredTickCount - 1))],
+    if (dates.length <= 1) return dates;
+    const yearMarkIndices = yearMarks
+      .map((mark) => dates.indexOf(mark.date))
+      .filter((index) => index > 0 && index < dates.length - 1);
+    const anchorIndices = Array.from(new Set([0, ...yearMarkIndices, dates.length - 1])).sort(
+      (left, right) => left - right,
     );
-    const snapped = candidates.map((date) => {
-      const day = Date.parse(date) / 86_400_000;
-      let nearestYearMark: { date: string; distance: number } | null = null;
-      for (const mark of yearMarks) {
-        const distance = Math.abs(Date.parse(mark.date) / 86_400_000 - day);
-        if (!nearestYearMark || distance < nearestYearMark.distance) {
-          nearestYearMark = { date: mark.date, distance };
+    const desiredTickCount = Math.min(Math.max(7, anchorIndices.length), dates.length);
+
+    const segmentIntervals = Array.from(
+      { length: Math.max(anchorIndices.length - 1, 0) },
+      () => 1,
+    );
+    let remainingIntervals = desiredTickCount - 1 - segmentIntervals.length;
+    while (remainingIntervals > 0) {
+      let widestSegment = 0;
+      let widestIntervalDays = -1;
+      for (let index = 0; index < segmentIntervals.length; index += 1) {
+        const start = Date.parse(dates[anchorIndices[index]]);
+        const end = Date.parse(dates[anchorIndices[index + 1]]);
+        const intervalDays = (end - start) / 86_400_000 / segmentIntervals[index];
+        if (intervalDays > widestIntervalDays) {
+          widestSegment = index;
+          widestIntervalDays = intervalDays;
         }
       }
-      return nearestYearMark && nearestYearMark.distance <= 21 ? nearestYearMark.date : date;
-    });
-    return Array.from(new Set(snapped));
+      segmentIntervals[widestSegment] += 1;
+      remainingIntervals -= 1;
+    }
+
+    const tickIndices = [anchorIndices[0]];
+    for (let segment = 0; segment < segmentIntervals.length; segment += 1) {
+      const start = anchorIndices[segment];
+      const end = anchorIndices[segment + 1];
+      for (let step = 1; step <= segmentIntervals[segment]; step += 1) {
+        tickIndices.push(
+          Math.round(start + ((end - start) * step) / segmentIntervals[segment]),
+        );
+      }
+    }
+    return Array.from(new Set(tickIndices)).map((index) => dates[index]);
   }, [result.chart, yearMarks]);
   const yMax = useMemo(() => {
     let maximum = 0;
@@ -1518,6 +1542,7 @@ export default function DayMarketSimulator({ market }: { market?: DayMarket }) {
                   <XAxis
                     dataKey="date"
                     ticks={xTicks}
+                    interval={0}
                     tick={{ fill: C.kpiLabel, fontSize: 11 }}
                     stroke={C.border}
                     minTickGap={32}
