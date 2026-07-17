@@ -914,6 +914,26 @@ export default function DayMarketSimulator({ market }: { market?: DayMarket }) {
     }
     return marks;
   }, [result.chart]);
+  const xTicks = useMemo(() => {
+    const dates = result.chart.map((point) => point.date);
+    const desiredTickCount = Math.min(8, dates.length);
+    if (desiredTickCount <= 1) return dates;
+    const candidates = Array.from({ length: desiredTickCount }, (_, index) =>
+      dates[Math.round((index * (dates.length - 1)) / (desiredTickCount - 1))],
+    );
+    const snapped = candidates.map((date) => {
+      const day = Date.parse(date) / 86_400_000;
+      let nearestYearMark: { date: string; distance: number } | null = null;
+      for (const mark of yearMarks) {
+        const distance = Math.abs(Date.parse(mark.date) / 86_400_000 - day);
+        if (!nearestYearMark || distance < nearestYearMark.distance) {
+          nearestYearMark = { date: mark.date, distance };
+        }
+      }
+      return nearestYearMark && nearestYearMark.distance <= 21 ? nearestYearMark.date : date;
+    });
+    return Array.from(new Set(snapped));
+  }, [result.chart, yearMarks]);
   const yMax = useMemo(() => {
     let maximum = 0;
     for (const point of result.chart) {
@@ -1497,6 +1517,7 @@ export default function DayMarketSimulator({ market }: { market?: DayMarket }) {
                   )}
                   <XAxis
                     dataKey="date"
+                    ticks={xTicks}
                     tick={{ fill: C.kpiLabel, fontSize: 11 }}
                     stroke={C.border}
                     minTickGap={32}
