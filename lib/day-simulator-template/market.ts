@@ -40,3 +40,9 @@ export type DayMarketManifest = {
     lastDate: string;
   };
 };
+
+export type DaySeriesPoint = { date: string; price: number };
+
+export type DayMarket = DayMarketManifest & {
+  series: DaySeriesPoint[];
+};

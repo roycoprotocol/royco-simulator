@@ -7,6 +7,7 @@ const marketId = process.argv[2];
 const failures = [];
 const requiredFiles = [
   "app/day-sim/page.tsx",
+  "components/day-simulator/DayMarketSimulator.tsx",
   "components/day-simulator/DaySimulatorPageShell.tsx",
   "lib/day-simulator-template/locked-copy.ts",
   "lib/day-simulator-template/manifest.ts",
@@ -32,25 +33,54 @@ const shell = await readFile(
   path.join(root, "components/day-simulator/DaySimulatorPageShell.tsx"),
   "utf8",
 );
-if (!shell.includes("market?.copy ?? DAY_LOCKED_COPY")) {
-  failures.push("Day page shell must fall back to the locked template copy");
+if (!shell.includes("SimulatorPageShell")) {
+  failures.push("Day page shell must use the Dawn/Tenbin SimulatorPageShell");
 }
-if (!shell.includes("DaySimulatorSidebar")) {
-  failures.push("Day page shell must render the shared Day simulator component");
+if (!shell.includes("DayMarketSimulator")) {
+  failures.push("Day page shell must render the Tenbin-styled Day market simulator");
 }
 
 const simulator = await readFile(
-  path.join(root, "app/DaySimulatorSidebar.tsx"),
+  path.join(root, "components/day-simulator/DayMarketSimulator.tsx"),
   "utf8",
 );
-if (!simulator.includes("DAY_TEMPLATE_MANIFEST.defaults.coverage")) {
-  failures.push("Day simulator coverage default must come from the template manifest");
+for (const contract of [
+  "pageBg: '#FBFAF7'",
+  "cardBg: '#FFFDF9'",
+  "border: '#E8E2D8'",
+  "text: '#171511'",
+  "eyebrow: '#967756'",
+  "seniorLine: '#8E7355'",
+  "juniorLine: '#1B1A17'",
+  'const SERIF = "Georgia, \'Times New Roman\', serif"',
+  'const MONO = \'"SFMono-Regular", Consolas, monospace\'',
+]) {
+  if (!simulator.includes(contract)) failures.push(`Day simulator violates Dawn/Tenbin design token: ${contract}`);
 }
-if (!simulator.includes("DAY_TEMPLATE_MANIFEST.defaults.minLiquidity")) {
-  failures.push("Day simulator liquidity default must come from the template manifest");
+for (const heading of [
+  'Overview',
+  'Customize terms',
+  'Adjust the current market terms.',
+  'Review history',
+  'Chart, metrics, and mechanics.',
+  'Deploy handoff',
+  'Copy final market-design parameters.',
+]) {
+  if (!simulator.includes(heading)) failures.push(`Day simulator missing locked Dawn section copy: ${heading}`);
 }
-if (!simulator.includes("DAY_TEMPLATE_MANIFEST.defaults.liquidationUtilization")) {
-  failures.push("Day simulator liquidation default must come from the template manifest");
+for (const control of [
+  'Minimum coverage ratio (%)',
+  'Senior deposit ($)',
+  'Senior yield share to Junior (%)',
+  'Minimum liquidity ratio (%)',
+  'Senior yield share to Liquidity (%)',
+]) {
+  if (!simulator.includes(control)) failures.push(`Day simulator missing required five-control contract: ${control}`);
+}
+for (const forbidden of ['var(--foundation)', 'var(--theme-background)', 'DaySimulatorSidebar']) {
+  if (simulator.includes(forbidden) || shell.includes(forbidden)) {
+    failures.push(`public Day simulator contains legacy dark-frontend dependency: ${forbidden}`);
+  }
 }
 
 const manifest = await readFile(

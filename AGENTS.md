@@ -25,3 +25,4 @@ Changes to `lib/try/engine.ts`, `lib/try/backtest.ts`, `components/simulator/`, 
 3. Day mechanism scenarios are not historical price/NAV backtests and must not be described as forecasts.
 4. Run `npm run day-sim:verify` and `npm run day-sim:certify` before requesting publication.
 5. Day invariant certification is not Solidity parity. Do not claim contract parity until authoritative golden vectors are present and pass.
+6. Public Day simulators must use the Dawn/Tenbin visual contract: `SimulatorPageShell`, the approved cream/brown/black/green palette, Georgia headings, system body text, SFMono numeric text, square cards, locked section order, and locked section headings. The legacy dark Day frontend is internal-only and may never be used for a public Day market.

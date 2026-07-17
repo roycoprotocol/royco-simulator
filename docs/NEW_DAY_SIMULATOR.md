@@ -26,6 +26,12 @@ npm run day-sim:preview
 5. The current Day template uses deterministic mechanism scenarios. It must not describe those outputs as historical backtests or forecasts.
 6. A change to `lib/day/engine` requires the complete Day invariant suite, repository tests, lint, build, and an accountant review.
 
+## Dawn/Tenbin visual contract
+
+Day changes the accountant and adds the Liquidity Tranche; it does not introduce a different visual system. Every public Day market must use the Dawn `SimulatorPageShell` and retain the Tenbin palette, typography, square card treatment, spacing, section order, headings, compact five-control builder, historical review layout, and deploy handoff. The required Day-specific additions are the Liquidity KPI, minimum-liquidity control, liquidity-premium control, Liquidity chart line, and Day deploy fields.
+
+The legacy dark components under `app/DaySimulator*.tsx` and `app/internal/day` are internal prototypes. They are not public template components. `day-sim:verify` rejects a public Day route that imports them or uses their dark-theme variables.
+
 ## Accountant certification status
 
 The repository contains a Day engine invariant suite covering conservation, loss waterfall behavior, senior priority, fixed-term transitions, coverage gates, self-liquidation, dual YDM splitting, liquidity-pool behavior, adaptive YDM behavior, and E-CLP properties.
