@@ -62,16 +62,35 @@ for (const contract of [
 ]) {
   if (!simulator.includes(contract)) failures.push(`Day simulator violates Dawn/Tenbin design token: ${contract}`);
 }
-for (const heading of [
-  'Overview',
-  'Customize terms',
-  'Adjust the current market terms.',
-  'Review history',
-  'Chart, metrics, and mechanics.',
-  'Deploy handoff',
-  'Copy final market-design parameters.',
+for (const lockedCopyReference of [
+  'LOCKED_COPY.overviewEyebrow',
+  'LOCKED_COPY.overviewDescription',
+  'LOCKED_COPY.customizeEyebrow',
+  'LOCKED_COPY.customizeTitle',
+  'LOCKED_COPY.customizeDescription',
+  'LOCKED_COPY.reviewEyebrow',
+  'LOCKED_COPY.reviewTitle',
+  'LOCKED_COPY.reviewDescription',
+  'LOCKED_COPY.deployEyebrow',
+  'LOCKED_COPY.deployTitle',
+  'LOCKED_COPY.deployDescription',
 ]) {
-  if (!simulator.includes(heading)) failures.push(`Day simulator missing locked Dawn section copy: ${heading}`);
+  if (!simulator.includes(lockedCopyReference)) failures.push(`Day simulator missing locked Dawn copy reference: ${lockedCopyReference}`);
+}
+for (const layoutContract of [
+  'className="flex flex-col" style={{ gap: 10 }}',
+  'className="mt-3 max-w-3xl"',
+  'className="flex items-end justify-end flex-wrap gap-4"',
+  'min-[621px]:grid-cols-3',
+  'min-[621px]:col-span-3 min-[981px]:col-span-1',
+  'className="flex items-start justify-between gap-4"',
+  'aria-label={showAdvanced ? \'Collapse\' : \'Expand\'}',
+  'aria-label={showReview ? \'Collapse\' : \'Expand\'}',
+  'aria-label={showDeploy ? \'Collapse\' : \'Expand\'}',
+  'className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-4"',
+  'className="pb-8 border-t pt-4"',
+]) {
+  if (!simulator.includes(layoutContract)) failures.push(`Day simulator missing Dawn element/layout contract: ${layoutContract}`);
 }
 for (const control of [
   'Minimum coverage ratio (%)',
@@ -109,6 +128,49 @@ for (const invariant of [
   'maintainJuniorCoverage',
 ]) {
   if (!simulator.includes(invariant)) failures.push(`Day simulator missing Dawn behavior invariant: ${invariant}`);
+}
+for (const chartContract of [
+  'function ChartTooltip',
+  'function BandChip',
+  'function EndValueTag',
+  'function ErasureIBeam',
+  'function SeniorLossMark',
+  'function LegendSwatch',
+  'Observation period: ${observationSplit',
+  'Non-observation period:',
+  'dateLabel(label)',
+  'hoverObservationBand',
+  'hoverNonObservationBand',
+  'setHoverDate(typeof state?.activeLabel',
+  'fillOpacity={0.32}',
+  'strokeDasharray="3 3"',
+  "value: '$ per $100 deposited'",
+  '<ReferenceLine y={100}',
+  'strokeDasharray="4 5"',
+  'height: 360, minHeight: 360',
+  'Calendar-year return / observation stats',
+  'yearLabel(row.year',
+  'What this is, and what it is not.',
+]) {
+  if (!simulator.includes(chartContract)) failures.push(`Day simulator missing exact Dawn review/chart contract: ${chartContract}`);
+}
+for (const observationContract of [
+  'const observationPeriods: DayObservationPeriod[]',
+  'const nonObservationPeriods: DayObservationPeriod[]',
+  "event.kind === 'exit-fixed-term'",
+  '/term expired/i',
+  'targetDays: observationDays',
+  'index >= period.aIndex && index <= period.bIndex',
+]) {
+  if (!simulator.includes(observationContract)) failures.push(`Day simulator missing observation hover/accounting contract: ${observationContract}`);
+}
+for (const forbiddenChartRegression of [
+  'contentStyle={{ background: C.cardBg',
+  'labelFormatter={(label)',
+  'height: 340',
+  'minTickGap={70}',
+]) {
+  if (simulator.includes(forbiddenChartRegression)) failures.push(`Day simulator reintroduced simplified chart behavior: ${forbiddenChartRegression}`);
 }
 for (const timeframeContract of [
   '<DayTimeframeBrush',
@@ -176,6 +238,12 @@ if (marketId) {
     if (market.defaults?.linkJuniorToFirstLoss !== true) {
       failures.push("Day market Junior override must be linked to coverage by default");
     }
+    const genesisCoverageUtilization =
+      (market.defaults.coverage * (market.defaults.initialST + market.defaults.initialJT)) /
+      market.defaults.initialJT;
+    if (Math.abs(genesisCoverageUtilization - 0.9) > 1e-9) {
+      failures.push("Day market linked Junior sizing must land exactly at 90% Dawn coverage utilization");
+    }
     if (Math.abs(market.defaults.liquidationUtilization - 100 / market.defaults.exitBufferPct) > 1e-9) {
       failures.push("Day market protected-exit utilization must derive from exitBufferPct");
     }
@@ -230,9 +298,7 @@ if (marketId) {
     if (market.targets) {
       const sourceApy = market.defaults.sourceApy;
       const coverage = market.defaults.coverage;
-      const minLiquidity = market.defaults.minLiquidity;
-      const ltSize = minLiquidity / 0.9;
-      const jtSize = (coverage * (1 + 0.1 * ltSize)) / (0.9 - coverage);
+      const jtSize = coverage / (0.9 - coverage);
       const riskShare = market.defaults.riskYDM.yTarget;
       const liqShare = market.defaults.liqYDM.yTarget;
       const seniorApy = sourceApy * (1 - riskShare - liqShare);

@@ -29,7 +29,7 @@
     },
     "selfLiquidationBonus": 0.01,
     "initialST": 1000,
-    "initialJT": 35.05747126436782,
+    "initialJT": 34.48275862068966,
     "initialLT": 166.66666666666666
   },
   "presets": [
