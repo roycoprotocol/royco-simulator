@@ -70,12 +70,12 @@ const C = { bg: "#FBFBF8", panel: "#ffffff", panel2: "#fafaf7", line: "#e5e5e0",
 const EXPL: Record<string, [string, string, string]> = {
   APY: ["APY — yield of the source", C.text, "The raw return of the underlying yield source. Every tranche yield below is just a split of this number. These are my estimates — edit to your real figures."],
   coverage: ["coverage → JT size", C.lt, "SIZES the junior tranche. The minimum % of senior losses the JT must always be able to absorb. Higher coverage = a bigger JT = more first-loss capital. Because the same risk premium is spread over more JT dollars, higher coverage LOWERS the JT's per-dollar yield."],
-  minLiq: ["minLiq → LT size", C.lt, "SIZES the liquidity tranche. The minimum % of senior value that must be backed by secondary (pool) liquidity at all times. Higher minLiq = a bigger LT. Because the liquidity premium is spread over more LT dollars, higher minLiq LOWERS the LT's per-dollar yield."],
+  minLiq: ["minLiq → LT size", C.lt, "SIZES the LP tranche. The minimum % of senior value that must be backed by secondary (pool) LP at all times. Higher minLiq = a bigger LT. Because the LP premium is spread over more LT dollars, higher minLiq LOWERS the LT's per-dollar yield."],
   sRisk: ["s_risk → JT cut", C.jt, "PRICES the junior tranche. The share of the senior's yield handed to the JT in exchange for coverage. Higher s_risk = the senior keeps less, the JT earns more. This is a price, not a size."],
-  sLiq: ["s_liq → LT cut", C.jt, "PRICES the liquidity tranche. The share of the senior's yield handed to the LT in exchange for providing exit liquidity. Higher s_liq = the senior keeps less, the LT earns more. A price, not a size."],
+  sLiq: ["s_liq → LT cut", C.jt, "PRICES the LP tranche. The share of the senior's yield handed to the LT in exchange for providing exit LP. Higher s_liq = the senior keeps less, the LT earns more. A price, not a size."],
   beta: ["β — JT deployment", C.jt, "Where the junior's capital sits. 0 = a risk-free asset (uncorrelated to senior losses, cleaner coverage, earns only RFR + premium). 1 = the same asset as the senior (earns the source yield too, but is exposed to the very losses it is covering). β also feeds the JT sizing formula."],
   Ustar: ["coverage util target", C.mut, "How fully the JT's coverage capacity is used at steady state. 90% means the JT runs slightly larger than the bare minimum so it stays perpetually liquid. Feeds JT sizing."],
-  Lustar: ["liquidity util target", C.mut, "Same idea for the LT: how fully the liquidity tranche is utilized at steady state. Feeds LT sizing."],
+  Lustar: ["LP util target", C.mut, "Same idea for the LT: how fully the LP tranche is utilized at steady state. Feeds LT sizing."],
   rfr: ["risk-free rate", C.mut, "What the JT earns on its own capital when β=0 (parked in T-bills / a money-market asset)."],
   stable: ["T-bill leg yield", C.mut, "Yield on the stablecoin half of the E-CLP pool. The 90% stable leg sits in T-bills / a tokenized-treasury stablecoin (≈3.5%), so it earns the bill rate on top of swap fees. Feeds BPT carry."],
   wST: ["BPT % in ST", C.mut, "Share of the E-CLP pool held as senior shares vs T-bill stables. Default 10% senior / 90% stable — the pool is quote-heavy in the healthy state so it can absorb senior sells, and fills with senior shares only under exit pressure. The 10% senior slice earns senior net yield; the 90% stable slice earns the T-bill rate (≈3.5%). Feeds BPT carry."],
@@ -106,7 +106,7 @@ function breakdown(kind: string, s: Source, g: GlobalsWithSwap, c: Computed): Br
   if (kind === "st") return { name: "Senior net (both designs)", color: C.sr, total: c.dayST, rows: [
     { l: "Base APY", v: s.apy, sub: "the source yield" },
     { l: "− Risk premium", v: -s.sRisk * s.apy, sub: `s_risk ${p0(s.sRisk)} × APY → paid to JT` },
-    { l: "− Liquidity premium", v: -s.sLiq * s.apy, sub: `s_liq ${p0(s.sLiq)} × APY → paid to LT` },
+    { l: "− LP premium", v: -s.sLiq * s.apy, sub: `s_liq ${p0(s.sLiq)} × APY → paid to LT` },
   ] };
   if (kind === "duskjt") { const prem = ((s.sRisk + s.sLiq) * s.apy) / c.duskSize;
     return { name: "Dusk JT (one tranche, both jobs)", color: C.jt, total: c.duskJT, rows: [
@@ -123,7 +123,7 @@ function breakdown(kind: string, s: Source, g: GlobalsWithSwap, c: Computed): Br
   }
   const prem = (s.sLiq * s.apy) / c.ltSize;
   return { name: "Day LT (pure liquidity)", color: C.lt, total: c.dayLT, rows: [
-    { l: "Liquidity premium", v: prem, sub: `s_liq ${p0(s.sLiq)} × APY = ${p1(s.sLiq * s.apy)} of senior, ÷ LT size ${p0(c.ltSize)}` },
+    { l: "LP premium", v: prem, sub: `s_liq ${p0(s.sLiq)} × APY = ${p1(s.sLiq * s.apy)} of senior, ÷ LT size ${p0(c.ltSize)}` },
     { l: "Swap fees", v: g.swap, sub: swapSub },
     { l: "BPT carry", v: carry(c.dayST), sub: carrySub(c.dayST) },
   ] };

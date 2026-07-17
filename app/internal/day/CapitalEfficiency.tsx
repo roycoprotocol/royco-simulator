@@ -14,7 +14,7 @@
 //   Day JT = APY + s_risk·APY/jtSize                           (co-invested in source)
 //   Day LT = s_liq·APY/ltSize + carry
 //   Dusk JT = (s_risk+s_liq)·APY/duskSize + carry              (one junior, both jobs)
-//   Dusk LT = N/A                                              (no separate liquidity tranche)
+//   Dusk LT = N/A                                              (no separate LP tranche)
 //   carry = wST·ST_net + (1−wST)·stable + swap   (BPT carry).  See CLAUDE.md §5 / §7.
 // =============================================================================
 import { useState, type ReactNode } from "react";
@@ -170,7 +170,7 @@ export default function CapitalEfficiency() {
             day={{ v: pc1(c.dayJT), big: true, bar: c.dayJT / yMax, note: "mostly source yield + premium" }}
             dusk={{ v: pc1(c.duskJT), big: true, bar: c.duskJT / yMax, note: "premium-heavy (both cuts, lazy BPT)" }} />
 
-          <Row label="Liquidity (LT) yield" accentRow={DAY}
+            <Row label="LP (LT) yield" accentRow={DAY}
             day={{ v: pc1(c.dayLT), big: true, bar: c.dayLT / yMax, note: "separate BPT tranche" }}
             dusk={{ v: "N/A", na: true, note: "no LT — the junior provides liquidity" }} />
 
