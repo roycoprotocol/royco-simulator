@@ -14,7 +14,10 @@
     "sim:source-test": "node scripts/simulator/source.test.mjs",
     "sim:verify": "node scripts/simulator/verify.mjs",
     "sim:preview": "node scripts/simulator/preview.mjs",
-    "sim:certify": "node scripts/simulator/certify.mjs"
+    "sim:certify": "node scripts/simulator/certify.mjs",
+    "day-sim:verify": "node scripts/day-simulator/verify.mjs",
+    "day-sim:preview": "node scripts/day-simulator/preview.mjs",
+    "day-sim:certify": "node scripts/day-simulator/certify.mjs"
   },
   "dependencies": {
     "next": "16.0.7",

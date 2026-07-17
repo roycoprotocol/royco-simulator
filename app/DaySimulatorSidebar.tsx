@@ -15,6 +15,7 @@ import {
 import { Sim, defaultConfig, type StepInput, type Op } from '@/lib/day/engine/runner';
 import { type MarketConfig, type YDMConfig } from '@/lib/day/engine/types';
 import { YEAR_SEC, ydmShare } from '@/lib/day/engine/ydm';
+import { DAY_TEMPLATE_MANIFEST } from '@/lib/day-simulator-template/manifest';
 
 // duplicated from app/internal/day/Simulator.tsx — keep in sync
 // ---------------------------------------------------------------------------
@@ -235,8 +236,12 @@ function AnchorSlider({
 export default function DaySimulatorSidebar() {
   // --- primary inputs ---
   const [apy, setApy] = useState(0.12);
-  const [coverage, setCoverage] = useState(0.2);
-  const [minLiq, setMinLiq] = useState(0.12);
+  const [coverage, setCoverage] = useState(
+    DAY_TEMPLATE_MANIFEST.defaults.coverage,
+  );
+  const [minLiq, setMinLiq] = useState(
+    DAY_TEMPLATE_MANIFEST.defaults.minLiquidity,
+  );
   const [initST, setInitST] = useState(40_000_000);
   const [initJT, setInitJT] = useState(10_000_000);
   const [initLT, setInitLT] = useState(6_000_000);
@@ -265,7 +270,9 @@ export default function DaySimulatorSidebar() {
   });
   const [termDays, setTermDays] = useState(30);
   const [selfLiq, setSelfLiq] = useState(0.02);
-  const [liqUtil, setLiqUtil] = useState(1.5);
+  const [liqUtil, setLiqUtil] = useState(
+    DAY_TEMPLATE_MANIFEST.defaults.liquidationUtilization,
+  );
 
   // beta=1 locked const (JT is always co-invested with ST)
   const beta = 1;

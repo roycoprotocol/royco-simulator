@@ -11,7 +11,15 @@ npm run sim:preview -- <market-id>
 npm run sim:certify -- <market-id>
 ```
 
-The separate Royco Day simulator is under active standardization. Dawn and Day accounting must remain isolated.
+The separate Royco Day template is documented in [`docs/NEW_DAY_SIMULATOR.md`](docs/NEW_DAY_SIMULATOR.md). Its commands are:
+
+```bash
+npm run day-sim:verify
+npm run day-sim:preview
+npm run day-sim:certify
+```
+
+Dawn and Day accounting remain isolated.
 
 ## Local development
 

@@ -1,6 +1,7 @@
-# Dawn simulator factory rules
+# Simulator template rules
 
 Read `docs/NEW_SIMULATOR.md` before creating or editing a Dawn simulator.
+Read `docs/NEW_DAY_SIMULATOR.md` before creating or editing the Day simulator.
 
 ## Non-negotiable boundaries
 
@@ -16,3 +17,11 @@ Read `docs/NEW_SIMULATOR.md` before creating or editing a Dawn simulator.
 ## Shared-file changes
 
 Changes to `lib/try/engine.ts`, `lib/try/backtest.ts`, `components/simulator/`, or `lib/simulator-template/` are template changes affecting every market. They require the full repository test, parity, lint, build, and visual review—not merely a market verification.
+
+## Day boundary
+
+1. Day accounting flows through `lib/day/engine`; never copy its formulas into UI or market files.
+2. Day UI and template work belongs in `components/day-simulator` and `lib/day-simulator-template`. Do not modify Dawn accounting or design files for a Day change.
+3. Day mechanism scenarios are not historical price/NAV backtests and must not be described as forecasts.
+4. Run `npm run day-sim:verify` and `npm run day-sim:certify` before requesting publication.
+5. Day invariant certification is not Solidity parity. Do not claim contract parity until authoritative golden vectors are present and pass.
