@@ -1,7 +1,7 @@
 'use client';
 
 import dynamic from 'next/dynamic';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import {
   CartesianGrid,
   Line,
@@ -504,12 +504,15 @@ const annualized = (end: number, start: number, days: number) =>
   days > 0 && start > 0 && end > 0 ? Math.pow(end / start, 365 / days) - 1 : 0;
 const pct = (value: number, digits = 1) =>
   `${value >= 0 ? '+' : ''}${(value * 100).toFixed(digits)}%`;
+const usd0 = (value: number) => `$${Math.round(value).toLocaleString('en-US')}`;
+const signColor = (value: number) => (value < 0 ? C.danger : C.text);
 
 export default function DayMarketSimulator({ market }: { market?: DayMarket }) {
   const activeMarket = market ?? FALLBACK_MARKET;
   const defaults = activeMarket.defaults;
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [showReview, setShowReview] = useState(true);
+  const [showDeploy, setShowDeploy] = useState(false);
   const [hoverDate, setHoverDate] = useState<string | null>(null);
   const [sourceApyPct, setSourceApyPct] = useState(defaults.sourceApy * 100);
   const [coveragePct, setCoveragePct] = useState(defaults.coverage * 100);
@@ -522,12 +525,14 @@ export default function DayMarketSimulator({ market }: { market?: DayMarket }) {
   const seniorDeposit = defaults.initialST;
   const manualJuniorDeposit = defaults.initialJT;
   const linkJuniorToFirstLoss = defaults.linkJuniorToFirstLoss;
-  const maintainCoverage = defaults.maintainCoverage;
+  const [maintainCoverage, setMaintainCoverage] = useState(defaults.maintainCoverage);
   const [range, setRange] = useState<IndexRange>({
     a: 0,
     b: activeMarket.series.length - 1,
   });
   const [copyLabel, setCopyLabel] = useState('Copy link');
+  const [copyDeployLabel, setCopyDeployLabel] = useState('Copy');
+  const deployRef = useRef<HTMLTextAreaElement>(null);
 
   const maxIndex = Math.max(0, activeMarket.series.length - 1);
   const viewRange = useMemo(
@@ -744,43 +749,27 @@ export default function DayMarketSimulator({ market }: { market?: DayMarket }) {
       const lossIndexPts = Math.max(0, chart[index - 1].senior - point.senior);
       return lossIndexPts > 1e-9 ? [{ index, date: point.date, lossIndexPts }] : [];
     });
-    const calendarYears = Array.from(new Set(chart.map((point) => point.date.slice(0, 4))));
+    const monthEnds = new Map<string, (typeof chart)[number]>();
+    for (const point of chart) monthEnds.set(point.date.slice(0, 7), point);
     let previousStrategy = 100;
     let previousJunior = 100;
     let previousSenior = 100;
     let previousLiquidity = 100;
-    const seriesStartDay = Date.parse(chart[0].date) / 86_400_000;
-    const seriesEndDay = Date.parse(chart[chart.length - 1].date) / 86_400_000;
-    const calendar = calendarYears.map((year) => {
-      const yearPoints = chart.filter((point) => point.date.startsWith(year));
-      const yearLast = yearPoints[yearPoints.length - 1];
-      const strategyReturn = yearLast.strategy / previousStrategy - 1;
-      const juniorReturn = yearLast.junior / previousJunior - 1;
-      const seniorReturn = yearLast.senior / previousSenior - 1;
-      const liquidityReturn = yearLast.liquidity / previousLiquidity - 1;
-      previousStrategy = yearLast.strategy;
-      previousJunior = yearLast.junior;
-      previousSenior = yearLast.senior;
-      previousLiquidity = yearLast.liquidity;
-      const yearNumber = Number(year);
-      const yearStart = Math.max(Date.parse(`${yearNumber}-01-01`) / 86_400_000, seriesStartDay);
-      const yearEnd = Math.min(Date.parse(`${yearNumber + 1}-01-01`) / 86_400_000, seriesEndDay);
-      const totalDays = Math.max(0, yearEnd - yearStart);
-      const observationDayCount = observationPeriods.reduce((sum, period) => {
-        const periodStart = Date.parse(period.startDate) / 86_400_000;
-        const periodEnd = Date.parse(period.endDate) / 86_400_000;
-        return sum + Math.max(0, Math.min(periodEnd, yearEnd) - Math.max(periodStart, yearStart));
-      }, 0);
+    const monthly = Array.from(monthEnds.entries()).map(([month, monthEnd]) => {
+      const strategyReturn = monthEnd.strategy / previousStrategy - 1;
+      const juniorReturn = monthEnd.junior / previousJunior - 1;
+      const seniorReturn = monthEnd.senior / previousSenior - 1;
+      const liquidityReturn = monthEnd.liquidity / previousLiquidity - 1;
+      previousStrategy = monthEnd.strategy;
+      previousJunior = monthEnd.junior;
+      previousSenior = monthEnd.senior;
+      previousLiquidity = monthEnd.liquidity;
       return {
-        year,
+        month,
         strategyReturn,
         juniorReturn,
         seniorReturn,
         liquidityReturn,
-        nonObservationPct: totalDays > 0
-          ? ((totalDays - observationDayCount) / totalDays) * 100
-          : 0,
-        observationTriggers: observationPeriods.filter((period) => period.startDate.startsWith(year)).length,
       };
     });
     return {
@@ -807,7 +796,7 @@ export default function DayMarketSimulator({ market }: { market?: DayMarket }) {
       seniorMaxDrawdown: maxDrawdown('senior'),
       juniorMaxDrawdown: maxDrawdown('junior'),
       liquidityMaxDrawdown: maxDrawdown('liquidity'),
-      calendar,
+      monthly,
     };
     };
     const result = run(view);
@@ -991,18 +980,55 @@ export default function DayMarketSimulator({ market }: { market?: DayMarket }) {
     setLiqSharePct(preset.lpYieldShare * 100);
   };
 
+  const deployText = useMemo(
+    () =>
+      [
+        `market: ${activeMarket.copy.title}`,
+        `underlying: ${activeMarket.provenance.source}`,
+        `baseStrategyApy: ${sourceApyPct.toFixed(2)}%`,
+        `minimumCoverage: ${(result.cfg.coverage * 100).toFixed(2)}%`,
+        `minimumLP: ${(result.cfg.minLiquidity * 100).toFixed(2)}%`,
+        `observationDuration: ${observationDays} days`,
+        `protectedExitCoverageRemaining: ${exitBufferPct.toFixed(2)}%`,
+        `targetUtilization: ${(result.cfg.targetUtilization * 100).toFixed(0)}%`,
+        `lpTargetUtilization: ${(result.cfg.liqTargetUtilization * 100).toFixed(0)}%`,
+        `riskYieldShareAtTarget: ${(result.cfg.riskYDM.yTarget * 100).toFixed(2)}%`,
+        `riskYieldShareAtFullUtilization: ${(result.cfg.riskYDM.y100 * 100).toFixed(2)}%`,
+        `lpYieldShareAtTarget: ${(result.cfg.liqYDM.yTarget * 100).toFixed(2)}%`,
+        `lpYieldShareAtFullUtilization: ${(result.cfg.liqYDM.y100 * 100).toFixed(2)}%`,
+        `seniorDeposit: ${result.initial.st.toFixed(0)}`,
+        `juniorDeposit: ${result.initial.jt.toFixed(0)}`,
+        `juniorLinkedToCoverage: ${linkJuniorToFirstLoss}`,
+        `maintainJuniorCoverage: ${maintainCoverage}`,
+        `lpDeposit: ${result.initial.lt.toFixed(0)}`,
+        `selfLiquidationBonus: ${(result.cfg.stSelfLiquidationBonus * 100).toFixed(2)}%`,
+        `source: ${activeMarket.provenance.sourceUrl}`,
+      ].join('\n'),
+    [
+      activeMarket,
+      exitBufferPct,
+      linkJuniorToFirstLoss,
+      maintainCoverage,
+      observationDays,
+      result,
+      sourceApyPct,
+    ],
+  );
+
   const copyText = async (
     text: string,
     setLabel: (label: string) => void,
     done: string,
     reset: string,
+    selectOnFailure?: () => void,
   ) => {
     const copied = await writeClipboardText(text);
     if (copied) {
       setLabel(done);
       window.setTimeout(() => setLabel(reset), 1200);
     } else {
-      setLabel('Copy failed');
+      selectOnFailure?.();
+      setLabel(selectOnFailure ? 'Select text' : 'Copy failed');
       window.setTimeout(() => setLabel(reset), 1600);
     }
   };
@@ -1067,10 +1093,10 @@ export default function DayMarketSimulator({ market }: { market?: DayMarket }) {
 
       <section style={{ ...cardStyle, padding: 16 }}>
         <div
-          className="grid grid-cols-1 min-[621px]:grid-cols-2 min-[981px]:grid-cols-[minmax(0,1fr)_repeat(4,minmax(150px,190px))]"
+          className="grid grid-cols-1 min-[621px]:grid-cols-3 min-[981px]:grid-cols-[minmax(0,1fr)_repeat(3,minmax(185px,220px))]"
           style={{ gap: 10 }}
         >
-          <div className="min-[621px]:col-span-2 min-[981px]:col-span-1">
+          <div className="min-[621px]:col-span-3 min-[981px]:col-span-1">
             <Eyebrow>{LOCKED_COPY.overviewEyebrow}</Eyebrow>
             <h2 className="mt-2" style={{ color: C.text, fontFamily: SERIF, fontSize: 22, fontWeight: 400, lineHeight: 1.08 }}>
               {rangeTitle}
@@ -1082,7 +1108,6 @@ export default function DayMarketSimulator({ market }: { market?: DayMarket }) {
           <Kpi label="Senior avg/yr" value={`${pct(result.seniorApy)}/yr`} valueColor={C.accent} />
           <Kpi label="Junior avg/yr" value={`${pct(result.juniorApy)}/yr`} valueColor={C.text} />
           <Kpi label="LP avg/yr" value={`${pct(result.liquidityApy)}/yr`} valueColor={C.olive} />
-          <Kpi label="Base strategy return" value={`${pct(result.strategyApy)}/yr`} valueColor={C.strategyLine} />
         </div>
       </section>
 
@@ -1443,8 +1468,131 @@ export default function DayMarketSimulator({ market }: { market?: DayMarket }) {
               isFull={isFullRange(viewRange, maxIndex)}
               onChange={setRange}
             />
+
+            <div className="mt-4 overflow-x-auto">
+              <table className="w-full" style={{ fontVariantNumeric: 'tabular-nums', fontFamily: MONO, fontSize: 11.8 }}>
+                <thead>
+                  <tr
+                    className="text-left"
+                    style={{
+                      color: C.kpiLabel,
+                      textTransform: 'uppercase',
+                      letterSpacing: '0.08em',
+                      fontWeight: 600,
+                      fontSize: 9.5,
+                    }}
+                  >
+                    <th className="text-left" style={{ borderBottom: `1px solid ${C.border}`, padding: '6px 7px', whiteSpace: 'nowrap' }}>
+                      Month-over-month return
+                    </th>
+                    {result.monthly.map((row) => (
+                      <th key={row.month} className="text-right" style={{ borderBottom: `1px solid ${C.border}`, padding: '6px 7px', whiteSpace: 'nowrap' }}>
+                        {monthLabel(row.month)}
+                      </th>
+                    ))}
+                    <th className="text-right" style={{ borderBottom: `1px solid ${C.border}`, padding: '6px 7px', whiteSpace: 'nowrap' }}>
+                      end $100 → avg/yr
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <ReturnRow label="Base strategy" values={result.monthly.map((row) => row.strategyReturn)} end={endStep?.strategy ?? 100} annualized={result.strategyApy} />
+                  <ReturnRow label="Senior return" values={result.monthly.map((row) => row.seniorReturn)} end={endStep?.senior ?? 100} annualized={result.seniorApy} />
+                  <ReturnRow label="Junior return" values={result.monthly.map((row) => row.juniorReturn)} end={endStep?.junior ?? 100} annualized={result.juniorApy} />
+                  <ReturnRow label="LP return" values={result.monthly.map((row) => row.liquidityReturn)} end={endStep?.liquidity ?? 100} annualized={result.liquidityApy} />
+                </tbody>
+              </table>
+            </div>
           </div>
         )}
+      </section>
+
+      <section style={cardStyle}>
+        <details
+          open={showDeploy}
+          onToggle={(event) => setShowDeploy((event.currentTarget as HTMLDetailsElement).open)}
+        >
+          <summary className="flex items-start justify-between gap-4 cursor-pointer" style={{ listStyle: 'none' }}>
+            <div>
+              <Eyebrow>{LOCKED_COPY.deployEyebrow}</Eyebrow>
+              <h2 className="mt-2" style={{ color: C.text, fontFamily: SERIF, fontSize: 22, fontWeight: 400, lineHeight: 1.08 }}>
+                {LOCKED_COPY.deployTitle}
+              </h2>
+              <p className="mt-1" style={{ color: C.muted, fontSize: 12.5, lineHeight: 1.38 }}>
+                {LOCKED_COPY.deployDescription}
+              </p>
+            </div>
+            <button
+              type="button"
+              aria-label={showDeploy ? 'Collapse' : 'Expand'}
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                setShowDeploy((value) => !value);
+              }}
+              style={{
+                border: `1px solid ${C.border}`,
+                borderRadius: 0,
+                color: C.accent,
+                width: 28,
+                height: 28,
+                fontFamily: MONO,
+                fontSize: 18,
+                lineHeight: 1,
+                background: 'transparent',
+                flexShrink: 0,
+              }}
+            >
+              {showDeploy ? '−' : '+'}
+            </button>
+          </summary>
+          <div className="mt-4">
+            <div className="flex items-start justify-between gap-4 flex-wrap">
+              <p style={{ color: C.muted, fontSize: 12.5, lineHeight: 1.4 }}>
+                Includes the active accountant terms, tranche sizing, curve anchors, and source.
+              </p>
+              <button
+                type="button"
+                onClick={() => copyText(deployText, setCopyDeployLabel, 'Copied', 'Copy', () => deployRef.current?.select())}
+                style={{ background: 'transparent', border: `1px solid ${C.border}`, borderRadius: 0, color: C.accent, fontSize: 10, letterSpacing: 1, padding: '9px 12px', textTransform: 'uppercase' }}
+              >
+                {copyDeployLabel}
+              </button>
+            </div>
+            <textarea
+              ref={deployRef}
+              readOnly
+              spellCheck={false}
+              aria-label="Deploy handoff"
+              value={deployText}
+              className="mt-3 w-full"
+              style={{ background: C.pageBg, border: `1px solid ${C.border}`, borderRadius: 0, color: C.text, fontFamily: MONO, fontSize: 11.5, height: 285, lineHeight: 1.6, padding: '12px 14px', resize: 'vertical' }}
+            />
+          </div>
+        </details>
+      </section>
+
+      <section style={{ ...cardStyle, borderLeft: `3px solid ${C.accent}` }}>
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <Eyebrow>Junior funding</Eyebrow>
+          <label className="flex items-center gap-2 cursor-pointer select-none" style={{ color: C.muted, fontSize: 12 }}>
+            <input
+              type="checkbox"
+              checked={maintainCoverage}
+              onChange={(event) => setMaintainCoverage(event.target.checked)}
+              style={{ accentColor: C.accent }}
+            />
+            Refill Junior after losses
+          </label>
+        </div>
+        <p className="mt-2" style={{ color: C.text, fontSize: 13, lineHeight: 1.5 }}>
+          {maintainCoverage
+            ? `Junior is refilled after each observation period to restore the ${coveragePct.toFixed(0)}% minimum coverage. This run adds ${usd0(result.juniorCapitalInjected)}.`
+            : 'Junior is not refilled after losses. Everything else stays the same.'}
+        </p>
+        <p className="mt-3" style={{ color: C.kpiLabel, fontSize: 11, lineHeight: 1.45 }}>
+          Illustrative parameters. Not an offer or investment advice.
+        </p>
       </section>
 
       <footer
@@ -1462,6 +1610,41 @@ export default function DayMarketSimulator({ market }: { market?: DayMarket }) {
         </p>
       </footer>
     </div>
+  );
+}
+
+function ReturnRow({
+  label,
+  values,
+  end,
+  annualized,
+}: {
+  label: string;
+  values: number[];
+  end: number;
+  annualized: number;
+}) {
+  return (
+    <tr style={{ borderTop: `1px solid ${C.border}` }}>
+      <td className="text-left" style={{ padding: '6px 7px', borderBottom: `1px solid ${C.border}`, color: C.text, whiteSpace: 'nowrap' }}>
+        {label}
+      </td>
+      {values.map((value, index) => (
+        <td
+          key={index}
+          className="text-right"
+          style={{ padding: '6px 7px', borderBottom: `1px solid ${C.border}`, color: signColor(value), whiteSpace: 'nowrap' }}
+        >
+          {pct(value)}
+        </td>
+      ))}
+      <td className="text-right" style={{ padding: '6px 7px', borderBottom: `1px solid ${C.border}`, color: C.text, whiteSpace: 'nowrap' }}>
+        <b>${end.toFixed(0)}</b>{' '}
+        <span style={{ color: C.kpiLabel, fontSize: 11 }}>
+          {pct(annualized)} ann.
+        </span>
+      </td>
+    </tr>
   );
 }
 

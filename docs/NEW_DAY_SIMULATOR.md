@@ -30,11 +30,11 @@ npm run day-sim:preview
 
 Day changes the accountant and adds the LP tranche; it does not introduce a different visual system or remove Dawn behavior. Every public Day market must use the Dawn `SimulatorPageShell` and retain the Tenbin palette, typography, square card treatment, spacing, section order, headings, historical review layout, and deploy handoff.
 
-The public Day control surface is intentionally compact. It displays only Base strategy APY, minimum coverage, minimum liquidity, Junior yield share, LP yield share, observation-period duration, and the Conservative/Balanced/Aggressive presets. Presets may change only those displayed inputs.
+The public Day control surface is intentionally compact. It displays six sliders—Base strategy APY, minimum coverage, minimum liquidity, Junior yield share, LP yield share, and observation-period duration—plus the Conservative/Balanced/Aggressive presets and the plain-language `Refill Junior after losses` checkbox. Presets may change only the six slider inputs.
 
 All other accountant terms are backend market configuration: protected-exit threshold, Junior sizing and replenishment, risk- and LP-curve endpoints, notional sizing, self-liquidation bonus, fees, stable yield, swap assumptions, E-CLP settings, and premium priority. Hiding a term never removes it from the accountant. Market manifests must provide the hidden values explicitly, and the simulator must pass them through `lib/day/engine` without duplicating formulas in the UI.
 
-Public outputs are limited to the three tranche yields, base-strategy return, and the full-detail Dawn history chart. The chart retains the complete legend, ISO-date hover, observation and non-observation hover bands, claim-erasure and Senior-loss marks, line-end values, year markers, and unified two-handle Backtest window scrubber with its full-history mini preview. Replacing the scrubber with separate start/end sliders is a design-contract failure.
+The overview contains exactly three KPI cards: Senior, Junior, and LP average annual yield. Base-strategy return is not a fourth KPI. The full-detail Dawn history chart is followed by a month-over-month table with Base strategy, Senior, Junior, and LP returns, plus each row's end value and annualized result. The chart retains the complete legend, ISO-date hover, observation and non-observation hover bands, claim-erasure and Senior-loss marks, line-end values, year markers, and unified two-handle Backtest window scrubber with its full-history mini preview. Replacing the scrubber with separate start/end sliders is a design-contract failure. Retain the locked deploy handoff and keep the Junior-refill explanation short and plain-language.
 
 The legacy dark components under `app/DaySimulator*.tsx` and `app/internal/day` are internal prototypes. They are not public template components. `day-sim:verify` rejects a public Day route that imports them or uses their dark-theme variables.
 
@@ -55,4 +55,4 @@ npm run lint
 npm run build
 ```
 
-Then inspect `/day-sim` in a browser, including the six visible sliders, the visible-only preset ladder, the four return KPIs, observation-period bands and dates, full chart interactions, and browser console. Do not open a PR until the preview is approved.
+Then inspect `/day-sim` in a browser, including the six visible sliders, the visible-only preset ladder, the Junior-refill checkbox, the three tranche-yield KPIs, the four-row month-over-month table, observation-period bands and dates, deploy handoff, full chart interactions, and browser console. Do not open a PR until the preview is approved.

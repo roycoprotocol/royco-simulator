@@ -76,6 +76,9 @@ for (const lockedCopyReference of [
   'LOCKED_COPY.reviewEyebrow',
   'LOCKED_COPY.reviewTitle',
   'LOCKED_COPY.reviewDescription',
+  'LOCKED_COPY.deployEyebrow',
+  'LOCKED_COPY.deployTitle',
+  'LOCKED_COPY.deployDescription',
 ]) {
   if (!simulator.includes(lockedCopyReference)) failures.push(`Day simulator missing locked Dawn copy reference: ${lockedCopyReference}`);
 }
@@ -83,11 +86,12 @@ for (const layoutContract of [
   'className="flex flex-col" style={{ gap: 10 }}',
   'className="mt-3 max-w-3xl"',
   'className="flex items-end justify-end flex-wrap gap-4"',
-  'min-[621px]:grid-cols-2',
-  'min-[621px]:col-span-2 min-[981px]:col-span-1',
+  'min-[621px]:grid-cols-3',
+  'min-[621px]:col-span-3 min-[981px]:col-span-1',
   'className="flex items-start justify-between gap-4"',
   'aria-label={showAdvanced ? \'Collapse\' : \'Expand\'}',
   'aria-label={showReview ? \'Collapse\' : \'Expand\'}',
+  'aria-label={showDeploy ? \'Collapse\' : \'Expand\'}',
   'className="pb-8 border-t pt-4"',
 ]) {
   if (!simulator.includes(layoutContract)) failures.push(`Day simulator missing Dawn element/layout contract: ${layoutContract}`);
@@ -100,6 +104,7 @@ for (const control of [
   'LP yield share (%)',
   'Observation period duration (days)',
   '<Eyebrow>Scenario</Eyebrow>',
+  'Refill Junior after losses',
 ]) {
   if (!simulator.includes(control)) failures.push(`Day simulator missing compact public control: ${control}`);
 }
@@ -107,10 +112,22 @@ for (const output of [
   'Senior avg/yr',
   'Junior avg/yr',
   'LP avg/yr',
-  'Base strategy return',
+  'Month-over-month return',
+  'label="Base strategy"',
+  'label="Senior return"',
+  'label="Junior return"',
+  'label="LP return"',
+  'result.monthly',
+  'function ReturnRow',
+  'aria-label="Deploy handoff"',
+  '<Eyebrow>Junior funding</Eyebrow>',
   'LP share price',
 ]) {
   if (!simulator.includes(output)) failures.push(`Day simulator missing compact public output: ${output}`);
+}
+const kpiCount = simulator.match(/<Kpi label=/g)?.length ?? 0;
+if (kpiCount !== 3) {
+  failures.push(`Day overview must contain exactly three tranche KPI cards; found ${kpiCount}`);
 }
 for (const hiddenControl of [
   'Senior deposit ($)',
@@ -120,7 +137,9 @@ for (const hiddenControl of [
   'Assume Junior is replenished to hold the buffer',
   'Additional outcome metrics',
   'Calendar-year return / observation stats',
-  'Deploy handoff',
+  'Base strategy return',
+  'Key modeling assumption',
+  'Assume Junior is replenished to hold the buffer',
 ]) {
   if (simulator.includes(hiddenControl)) failures.push(`Day simulator exposes backend-only or removed output: ${hiddenControl}`);
 }
@@ -129,7 +148,7 @@ for (const invariant of [
   'fixedTermDurationSec: observationDays * DAY',
   'liquidationUtilization: 100 / Math.max(exitBufferPct, 0.01)',
   'const linkJuniorToFirstLoss = defaults.linkJuniorToFirstLoss',
-  'const maintainCoverage = defaults.maintainCoverage',
+  'const [maintainCoverage, setMaintainCoverage] = useState(defaults.maintainCoverage)',
   'stSelfLiquidationBonus: defaults.selfLiquidationBonus',
   "op: { type: 'jtDeposit', amount: refill }",
   'MarketState.PERPETUAL',
