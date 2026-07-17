@@ -166,4 +166,6 @@ export interface SimEvent {
   kind: EventKind;
   msg: string;
   level: "info" | "warn" | "danger" | "good";
+  /** Exact NAV amount for value-bearing events. Never recover accounting data from msg. */
+  amountNAV?: number;
 }

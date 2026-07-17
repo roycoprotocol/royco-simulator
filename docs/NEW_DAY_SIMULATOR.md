@@ -38,6 +38,8 @@ The overview contains exactly three KPI cards: Senior, Junior, and LP average an
 
 The legacy dark components under `app/DaySimulator*.tsx` and `app/internal/day` are internal prototypes. They are not public template components. `day-sim:verify` rejects a public Day route that imports them or uses their dark-theme variables.
 
+Erasure chart geometry is an accountant-data contract. `jt-il-erased` events carry an exact structured NAV amount; the Day adapter converts that amount into Dawn's I-beam height and tooltip percentage using Junior's valuation and share base immediately after erasure but before any same-timestamp refill. Formatted event copy must never be parsed for accounting values. The repository test suite includes a forced observation-expiry fixture with Junior refill enabled and must prove a non-zero I-beam, the pre-refill percentage, and the Dawn material-erasure label.
+
 ## Accountant certification status
 
 The repository contains a Day engine invariant suite covering conservation, loss waterfall behavior, senior priority, fixed-term transitions, coverage gates, self-liquidation, dual YDM splitting, LP-pool behavior, adaptive YDM behavior, and E-CLP properties.

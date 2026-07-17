@@ -12,6 +12,8 @@ const requiredFiles = [
   "components/day-simulator/DaySimulatorPageShell.tsx",
   "lib/day-simulator-template/locked-copy.ts",
   "lib/day-simulator-template/manifest.ts",
+  "lib/day-simulator-template/erasure.ts",
+  "lib/day-simulator-template/erasure.test.ts",
   "lib/day-simulator-template/series.ts",
   "lib/day/engine/engine.ts",
   "lib/day/engine/runner.ts",
@@ -48,6 +50,10 @@ const simulator = await readFile(
 );
 const seriesCalibration = await readFile(
   path.join(root, "lib/day-simulator-template/series.ts"),
+  "utf8",
+);
+const erasureAdapter = await readFile(
+  path.join(root, "lib/day-simulator-template/erasure.ts"),
   "utf8",
 );
 const timeframeBrush = await readFile(
@@ -191,8 +197,25 @@ for (const chartContract of [
   'strokeDasharray="4 5"',
   'height: 360, minHeight: 360',
   'What this is, and what it is not.',
+  'erasureEvent?.amountNAV',
+  'preRefillJuniorNAV',
+  '(sim.state.jtShares * firstSnapshot.jtPrice) / 100',
+  'buildDayErasureEvent({',
 ]) {
   if (!simulator.includes(chartContract)) failures.push(`Day simulator missing exact Dawn review/chart contract: ${chartContract}`);
+}
+for (const erasureContract of [
+  'export function buildDayErasureEvent',
+  'erasedAmount / input.navPerIndexPoint',
+  'erasedAmount / input.preRefillJuniorNAV',
+  'input.currentJuniorIndex + safeIndexPoints',
+]) {
+  if (!erasureAdapter.includes(erasureContract)) {
+    failures.push(`Day erasure adapter missing exact Dawn geometry contract: ${erasureContract}`);
+  }
+}
+if (simulator.includes('event.msg.match(/erased:')) {
+  failures.push('Day erasure accounting data must not be parsed from formatted event text');
 }
 for (const observationContract of [
   'const observationPeriods: DayObservationPeriod[]',

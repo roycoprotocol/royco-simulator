@@ -25,6 +25,10 @@ import type {
   DayMarketManifest,
   DaySeriesPoint,
 } from '@/lib/day-simulator-template/market';
+import {
+  buildDayErasureEvent,
+  type DayErasureEvent,
+} from '@/lib/day-simulator-template/erasure';
 import { calibrateSeriesApy } from '@/lib/day-simulator-template/series';
 import { DayTimeframeBrush } from '@/components/day-simulator/DayTimeframeBrush';
 
@@ -105,15 +109,6 @@ type DayObservationPeriod = {
   days: number;
   targetDays: number;
   expired: boolean;
-};
-
-type DayErasureEvent = {
-  index: number;
-  date: string;
-  forfeitIndexPts: number;
-  forfeitPctOfJuniorNav: number;
-  top: number;
-  reason: string;
 };
 
 type DaySeniorLossEvent = {
@@ -583,6 +578,8 @@ export default function DayMarketSimulator({ market }: { market?: DayMarket }) {
     });
     const sim = new Sim(cfg, initial);
     const snapshots = [sim.last()];
+    const firstSnapshot = snapshots[0];
+    const erasureEvents: DayErasureEvent[] = [];
     let juniorCapitalInjected = 0;
     for (let index = 1; index < series.length; index += 1) {
       const previous = series[index - 1];
@@ -592,8 +589,42 @@ export default function DayMarketSimulator({ market }: { market?: DayMarket }) {
         Math.round((Date.parse(current.date) - Date.parse(previous.date)) / 86_400_000),
       );
       const sourceReturn = current.price / previous.price - 1;
+      const eventStart = sim.events.length;
+      const previousSnapshot = snapshots[snapshots.length - 1];
       sim.step({ dtSec: elapsedDays * DAY, stReturn: sourceReturn, jtReturn: sourceReturn });
       const postReturn = sim.last();
+      const stepEvents = sim.events.slice(eventStart);
+      const erasureEvent = stepEvents.find((event) => event.kind === 'jt-il-erased');
+      if (erasureEvent?.amountNAV !== undefined) {
+        const exitEvent = stepEvents.find((event) => event.kind === 'exit-fixed-term');
+        const reason = /term expired/i.test(exitEvent?.msg ?? '')
+          ? 'observation period ended'
+          : /liquidation breach/i.test(exitEvent?.msg ?? '')
+            ? 'protected Senior exit opened'
+            : /ST impairment/i.test(exitEvent?.msg ?? '')
+              ? 'Senior impairment'
+              : 'recovery claim erased';
+        const currentJuniorIndex = firstSnapshot.jtPrice > 0
+          ? (postReturn.jtPrice / firstSnapshot.jtPrice) * 100
+          : 0;
+        const preRefillJuniorNAV = postReturn.jtEffectiveNAV > 1e-12
+          ? postReturn.jtEffectiveNAV
+          : previousSnapshot.jtEffectiveNAV;
+        const navPerIndexPoint = firstSnapshot.jtPrice > 0
+          ? (sim.state.jtShares * firstSnapshot.jtPrice) / 100
+          : 0;
+        erasureEvents.push(
+          buildDayErasureEvent({
+            index,
+            date: current.date,
+            currentJuniorIndex,
+            erasedAmount: erasureEvent.amountNAV,
+            preRefillJuniorNAV,
+            navPerIndexPoint,
+            reason,
+          }),
+        );
+      }
       if (maintainCoverage && postReturn.state === MarketState.PERPETUAL) {
         const numerator =
           coverage * (sim.state.stRawNAV + sim.state.jtRawNAV * cfg.beta) -
@@ -612,7 +643,6 @@ export default function DayMarketSimulator({ market }: { market?: DayMarket }) {
       }
       snapshots.push(sim.last());
     }
-    const firstSnapshot = snapshots[0];
     const chart = series.map((point, index) => {
       const snapshot = snapshots[index];
       return {
@@ -707,43 +737,6 @@ export default function DayMarketSimulator({ market }: { market?: DayMarket }) {
       }
       return worst;
     };
-    const erasureEvents: DayErasureEvent[] = sim.events
-      .filter((event) => event.kind === 'jt-il-erased')
-      .map((event) => {
-        const index = chart.findIndex((point) => point.t === event.t);
-        if (index < 0) return null;
-        const amountMatch = event.msg.match(/erased:\s*([\d,.]+)/i);
-        const erasedAmount = Number((amountMatch?.[1] ?? '0').replace(/,/g, ''));
-        const current = chart[index];
-        const previous = chart[Math.max(0, index - 1)];
-        const reference = current.juniorEffectiveNAV > 1e-12 ? current : previous;
-        const navPerIndexPoint = reference.junior > 0
-          ? reference.juniorEffectiveNAV / reference.junior
-          : 0;
-        const forfeitIndexPts = navPerIndexPoint > 0 ? erasedAmount / navPerIndexPoint : 0;
-        const forfeitPctOfJuniorNav = reference.juniorEffectiveNAV > 0
-          ? (erasedAmount / reference.juniorEffectiveNAV) * 100
-          : 0;
-        const exitEvent = sim.events.find(
-          (candidate) => candidate.t === event.t && candidate.kind === 'exit-fixed-term',
-        );
-        const reason = /term expired/i.test(exitEvent?.msg ?? '')
-          ? 'observation period ended'
-          : /liquidation breach/i.test(exitEvent?.msg ?? '')
-            ? 'protected Senior exit opened'
-            : /ST impairment/i.test(exitEvent?.msg ?? '')
-              ? 'Senior impairment'
-              : 'recovery claim erased';
-        return {
-          index,
-          date: current.date,
-          forfeitIndexPts,
-          forfeitPctOfJuniorNav,
-          top: current.junior + forfeitIndexPts,
-          reason,
-        };
-      })
-      .filter((event): event is DayErasureEvent => event !== null);
     const seniorLossEventDetails: DaySeniorLossEvent[] = chart.flatMap((point, index) => {
       if (index === 0 || point.stIL <= chart[index - 1].stIL + 1e-9) return [];
       const lossIndexPts = Math.max(0, chart[index - 1].senior - point.senior);

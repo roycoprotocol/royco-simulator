@@ -146,8 +146,12 @@ export function reconcile(
 ): ReconcileExtras {
   const dust = cfg.dustTolerance;
   const ev: SimEvent[] = [];
-  const push = (kind: EventKind, msg: string, level: SimEvent["level"]) =>
-    ev.push({ t: state.t, kind, msg, level });
+  const push = (
+    kind: EventKind,
+    msg: string,
+    level: SimEvent["level"],
+    amountNAV?: number,
+  ) => ev.push({ t: state.t, kind, msg, level, amountNAV });
 
   const initialState = state.marketState;
   const inFT = initialState === MarketState.FIXED_TERM;
@@ -289,7 +293,12 @@ export function reconcile(
     else push("exit-fixed-term", `Drawdown fully recovered — back to PERPETUAL, JT made whole.`, "good");
   }
   if (jtILErased > dust) {
-    push("jt-il-erased", `JT impermanent loss erased: ${fmt(jtILErased)} realized as a JT loss.`, "danger");
+    push(
+      "jt-il-erased",
+      `JT impermanent loss erased: ${fmt(jtILErased)} realized as a JT loss.`,
+      "danger",
+      jtILErased,
+    );
   }
 
   // ---- protocol fees: taken iff the RESULTING state is PERPETUAL (never in FIXED_TERM) ----
