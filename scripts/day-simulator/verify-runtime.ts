@@ -3,6 +3,10 @@ import { DAY_TEMPLATE_MANIFEST } from "../../lib/day-simulator-template/manifest
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import type { DayMarketManifest } from "../../lib/day-simulator-template/market";
+import {
+  annualizedSeriesApy,
+  calibrateSeriesApy,
+} from "../../lib/day-simulator-template/series";
 
 async function main() {
   const marketId = process.argv[2];
@@ -35,6 +39,20 @@ async function main() {
     }
   : { st: 40_000_000, jt: 10_000_000, lt: 6_000_000 };
   const sourceApy = market?.defaults.sourceApy ?? 0.12;
+  if (market?.provenance.seriesPath) {
+    const sourceSeries = JSON.parse(
+      await readFile(path.join(process.cwd(), market.provenance.seriesPath), "utf8"),
+    );
+    for (const targetApy of [0, sourceApy, 0.2]) {
+      const calibrated = calibrateSeriesApy(sourceSeries, targetApy);
+      const actualApy = annualizedSeriesApy(calibrated);
+      if (Math.abs(actualApy - targetApy) > 1e-10) {
+        throw new Error(
+          `Day base-strategy calibration missed target ${(targetApy * 100).toFixed(2)}%: ${(actualApy * 100).toFixed(8)}%`,
+        );
+      }
+    }
+  }
   const sim = new Sim(cfg, initial);
   steadyYear(sourceApy, 1, cfg.stableYield).forEach((step) => sim.step(step));
 
@@ -73,6 +91,7 @@ async function main() {
   }
 
   console.log("Day runtime defaults: PASS");
+  console.log("Day base-strategy APY calibration: PASS");
   console.log("Day NAV conservation: PASS");
   if (market) {
     console.log(`${market.id} minimum LP ratio: ${(cfg.minLiquidity * 100).toFixed(0)}% PASS`);

@@ -12,6 +12,7 @@ const requiredFiles = [
   "components/day-simulator/DaySimulatorPageShell.tsx",
   "lib/day-simulator-template/locked-copy.ts",
   "lib/day-simulator-template/manifest.ts",
+  "lib/day-simulator-template/series.ts",
   "lib/day/engine/engine.ts",
   "lib/day/engine/runner.ts",
   "lib/day/engine/engine.test.ts",
@@ -45,6 +46,10 @@ const simulator = await readFile(
   path.join(root, "components/day-simulator/DayMarketSimulator.tsx"),
   "utf8",
 );
+const seriesCalibration = await readFile(
+  path.join(root, "lib/day-simulator-template/series.ts"),
+  "utf8",
+);
 const timeframeBrush = await readFile(
   path.join(root, "components/day-simulator/DayTimeframeBrush.tsx"),
   "utf8",
@@ -67,13 +72,10 @@ for (const lockedCopyReference of [
   'LOCKED_COPY.overviewDescription',
   'LOCKED_COPY.customizeEyebrow',
   'LOCKED_COPY.customizeTitle',
-  'LOCKED_COPY.customizeDescription',
+  'DAY_LOCKED_COPY.customizeDescription',
   'LOCKED_COPY.reviewEyebrow',
   'LOCKED_COPY.reviewTitle',
   'LOCKED_COPY.reviewDescription',
-  'LOCKED_COPY.deployEyebrow',
-  'LOCKED_COPY.deployTitle',
-  'LOCKED_COPY.deployDescription',
 ]) {
   if (!simulator.includes(lockedCopyReference)) failures.push(`Day simulator missing locked Dawn copy reference: ${lockedCopyReference}`);
 }
@@ -81,53 +83,69 @@ for (const layoutContract of [
   'className="flex flex-col" style={{ gap: 10 }}',
   'className="mt-3 max-w-3xl"',
   'className="flex items-end justify-end flex-wrap gap-4"',
-  'min-[621px]:grid-cols-3',
-  'min-[621px]:col-span-3 min-[981px]:col-span-1',
+  'min-[621px]:grid-cols-2',
+  'min-[621px]:col-span-2 min-[981px]:col-span-1',
   'className="flex items-start justify-between gap-4"',
   'aria-label={showAdvanced ? \'Collapse\' : \'Expand\'}',
   'aria-label={showReview ? \'Collapse\' : \'Expand\'}',
-  'aria-label={showDeploy ? \'Collapse\' : \'Expand\'}',
-  'className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-4"',
   'className="pb-8 border-t pt-4"',
 ]) {
   if (!simulator.includes(layoutContract)) failures.push(`Day simulator missing Dawn element/layout contract: ${layoutContract}`);
 }
 for (const control of [
-  'Minimum coverage ratio (%)',
+  'Base strategy APY (%)',
+  'Minimum coverage (%)',
+  'Minimum liquidity (%)',
+  'Junior yield share (%)',
+  'LP yield share (%)',
+  'Observation period duration (days)',
+  '<Eyebrow>Scenario</Eyebrow>',
+]) {
+  if (!simulator.includes(control)) failures.push(`Day simulator missing compact public control: ${control}`);
+}
+for (const output of [
+  'Senior avg/yr',
+  'Junior avg/yr',
+  'LP avg/yr',
+  'Base strategy return',
+  'LP share price',
+]) {
+  if (!simulator.includes(output)) failures.push(`Day simulator missing compact public output: ${output}`);
+}
+for (const hiddenControl of [
   'Senior deposit ($)',
-  'Senior yield share to Junior (%)',
-  'Observation period (days)',
   'Junior buffer remaining for Senior exit (%)',
   'Advanced override',
   'Junior deposit ($)',
-  'Unlink Junior',
-  'Relink to coverage ratio',
+  'Assume Junior is replenished to hold the buffer',
+  'Additional outcome metrics',
+  'Calendar-year return / observation stats',
+  'Deploy handoff',
 ]) {
-  if (!simulator.includes(control)) failures.push(`Day simulator missing invariant Dawn control: ${control}`);
-}
-for (const control of [
-  'Minimum LP ratio (%)',
-  'Senior yield share to LP (%)',
-  'Day LP additions',
-  'LP avg/yr',
-  'LP share price',
-]) {
-  if (!simulator.includes(control)) failures.push(`Day simulator missing additive LP contract: ${control}`);
+  if (simulator.includes(hiddenControl)) failures.push(`Day simulator exposes backend-only or removed output: ${hiddenControl}`);
 }
 for (const invariant of [
+  'calibrateSeriesApy(activeMarket.series, sourceApyPct / 100)',
   'fixedTermDurationSec: observationDays * DAY',
   'liquidationUtilization: 100 / Math.max(exitBufferPct, 0.01)',
-  'linkJuniorToFirstLoss',
+  'const linkJuniorToFirstLoss = defaults.linkJuniorToFirstLoss',
+  'const maintainCoverage = defaults.maintainCoverage',
+  'stSelfLiquidationBonus: defaults.selfLiquidationBonus',
   "op: { type: 'jtDeposit', amount: refill }",
   'MarketState.PERPETUAL',
   'MarketState.FIXED_TERM',
   '<ReferenceArea',
-  'Claims erased',
-  'Observation periods triggered',
-  'Assume Junior is replenished to hold the buffer',
-  'maintainJuniorCoverage',
 ]) {
   if (!simulator.includes(invariant)) failures.push(`Day simulator missing Dawn behavior invariant: ${invariant}`);
+}
+for (const calibrationContract of [
+  'export function annualizedSeriesApy',
+  'export function calibrateSeriesApy',
+  'pathResidual + targetLogGrowth * progress',
+]) {
+  if (!seriesCalibration.includes(calibrationContract)) {
+    failures.push(`Day base-strategy APY calibration contract missing: ${calibrationContract}`);
+  }
 }
 for (const chartContract of [
   'function ChartTooltip',
@@ -153,8 +171,6 @@ for (const chartContract of [
   '<ReferenceLine y={100}',
   'strokeDasharray="4 5"',
   'height: 360, minHeight: 360',
-  'Calendar-year return / observation stats',
-  'yearLabel(row.year',
   'What this is, and what it is not.',
 ]) {
   if (!simulator.includes(chartContract)) failures.push(`Day simulator missing exact Dawn review/chart contract: ${chartContract}`);
@@ -241,7 +257,10 @@ if (marketId) {
       failures.push("Day market exitBufferPct must preserve the Dawn 1–99.91% range");
     }
     if (market.defaults?.linkJuniorToFirstLoss !== true) {
-      failures.push("Day market Junior override must be linked to coverage by default");
+      failures.push("Day market backend Junior sizing must be linked to coverage");
+    }
+    if (market.defaults?.maintainCoverage !== true) {
+      failures.push("Day market backend must explicitly enable Junior coverage replenishment");
     }
     const genesisCoverageUtilization =
       (market.defaults.coverage * (market.defaults.initialST + market.defaults.initialJT)) /
@@ -261,14 +280,25 @@ if (marketId) {
         balanced.coverage < aggressive.coverage ||
         conservative.observationDays < balanced.observationDays ||
         balanced.observationDays < aggressive.observationDays ||
-        conservative.riskYDM.yTarget > balanced.riskYDM.yTarget ||
-        balanced.riskYDM.yTarget > aggressive.riskYDM.yTarget ||
-        conservative.riskYDM.y100 > balanced.riskYDM.y100 ||
-        balanced.riskYDM.y100 > aggressive.riskYDM.y100 ||
-        conservative.selfLiquidationBonus > balanced.selfLiquidationBonus ||
-        balanced.selfLiquidationBonus > aggressive.selfLiquidationBonus
+        conservative.juniorYieldShare > balanced.juniorYieldShare ||
+        balanced.juniorYieldShare > aggressive.juniorYieldShare
       ) {
         failures.push("Day preset risk must move logically from Conservative through Aggressive");
+      }
+      for (const preset of market.presets) {
+        for (const displayedField of ["sourceApy", "coverage", "observationDays", "juniorYieldShare", "minLiquidity", "lpYieldShare"]) {
+          if (!Number.isFinite(preset[displayedField])) {
+            failures.push(`Day preset ${preset.id} must provide finite ${displayedField}`);
+          }
+        }
+        for (const hiddenField of ["exitBufferPct", "riskYDM", "liqYDM", "selfLiquidationBonus"]) {
+          if (hiddenField in preset) {
+            failures.push(`Day preset ${preset.id} may not override backend-only ${hiddenField}`);
+          }
+        }
+        if (preset.juniorYieldShare + preset.lpYieldShare > 1) {
+          failures.push(`Day preset ${preset.id} combined yield shares must not exceed 100%`);
+        }
       }
     }
     if (marketId === "pareto-falconx") {
@@ -278,14 +308,17 @@ if (marketId) {
       }
       if (
         !balanced ||
+        balanced.sourceApy !== market.defaults.sourceApy ||
         balanced.coverage !== 0.03 ||
-        balanced.riskYDM?.yTarget !== 0.06 ||
-        balanced.riskYDM?.y100 !== 0.18 ||
+        balanced.juniorYieldShare !== 0.06 ||
+        balanced.lpYieldShare !== 0.17 ||
+        balanced.minLiquidity !== 0.15 ||
         balanced.observationDays !== 7 ||
-        balanced.exitBufferPct !== 1 ||
-        balanced.selfLiquidationBonus !== 0.01
+        market.defaults.riskYDM?.y100 !== 0.18 ||
+        market.defaults.exitBufferPct !== 1 ||
+        market.defaults.selfLiquidationBonus !== 0.01
       ) {
-        failures.push("Pareto FalconX Balanced preset must retain the approved Dawn parameters");
+        failures.push("Pareto FalconX visible Balanced preset and backend terms must retain the approved values");
       }
     }
     for (const curveName of ["riskYDM", "liqYDM"]) {

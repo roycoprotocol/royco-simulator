@@ -30,9 +30,11 @@ npm run day-sim:preview
 
 Day changes the accountant and adds the LP tranche; it does not introduce a different visual system or remove Dawn behavior. Every public Day market must use the Dawn `SimulatorPageShell` and retain the Tenbin palette, typography, square card treatment, spacing, section order, headings, historical review layout, and deploy handoff.
 
-The Dawn contract is invariant in Day: minimum coverage, Senior deposit, Senior yield share to Junior, observation period, Junior buffer remaining for Senior exit, Conservative/Balanced/Aggressive presets, the linked-Junior advanced override, observation state and claim erasure, protected-exit rules, Junior replenishment when deposits reopen, the unified two-handle Backtest window scrubber with its full-history mini preview, review metrics, and deploy fields must all remain present and accountant-driven. Replacing the scrubber with separate start/end sliders is a design-contract failure.
+The public Day control surface is intentionally compact. It displays only Base strategy APY, minimum coverage, minimum liquidity, Junior yield share, LP yield share, observation-period duration, and the Conservative/Balanced/Aggressive presets. Presets may change only those displayed inputs.
 
-Day is additive. Its required additions are the LP KPI, minimum-LP control, LP-premium control, LP chart line and drawdown, LP utilization, and Day deploy fields. These additions must be visibly separated from the invariant Dawn controls. `day-sim:verify` enforces both halves of this contract.
+All other accountant terms are backend market configuration: protected-exit threshold, Junior sizing and replenishment, risk- and LP-curve endpoints, notional sizing, self-liquidation bonus, fees, stable yield, swap assumptions, E-CLP settings, and premium priority. Hiding a term never removes it from the accountant. Market manifests must provide the hidden values explicitly, and the simulator must pass them through `lib/day/engine` without duplicating formulas in the UI.
+
+Public outputs are limited to the three tranche yields, base-strategy return, and the full-detail Dawn history chart. The chart retains the complete legend, ISO-date hover, observation and non-observation hover bands, claim-erasure and Senior-loss marks, line-end values, year markers, and unified two-handle Backtest window scrubber with its full-history mini preview. Replacing the scrubber with separate start/end sliders is a design-contract failure.
 
 The legacy dark components under `app/DaySimulator*.tsx` and `app/internal/day` are internal prototypes. They are not public template components. `day-sim:verify` rejects a public Day route that imports them or uses their dark-theme variables.
 
@@ -53,4 +55,4 @@ npm run lint
 npm run build
 ```
 
-Then inspect `/day-sim` in a browser, including all five Dawn controls, linked-Junior behavior, the observation-period bands and dates, preset direction, Day LP additions, tranche APYs, and browser console. Do not open a PR until the preview is approved.
+Then inspect `/day-sim` in a browser, including the six visible sliders, the visible-only preset ladder, the four return KPIs, observation-period bands and dates, full chart interactions, and browser console. Do not open a PR until the preview is approved.

@@ -15,6 +15,7 @@
     "observationDays": 7,
     "exitBufferPct": 1,
     "linkJuniorToFirstLoss": true,
+    "maintainCoverage": true,
     "riskYDM": {
       "mode": "static",
       "y0": 0.06,
@@ -36,35 +37,32 @@
     {
       "id": "conservative",
       "label": "Conservative",
+      "sourceApy": 0.09272332251507232,
       "coverage": 0.05,
       "observationDays": 14,
-      "exitBufferPct": 2,
-      "riskYDM": { "mode": "static", "y0": 0.04, "yTarget": 0.04, "y100": 0.12 },
+      "juniorYieldShare": 0.04,
       "minLiquidity": 0.15,
-      "liqYDM": { "mode": "static", "y0": 0.08, "yTarget": 0.17, "y100": 0.2 },
-      "selfLiquidationBonus": 0.005
+      "lpYieldShare": 0.17
     },
     {
       "id": "balanced",
       "label": "Balanced",
+      "sourceApy": 0.09272332251507232,
       "coverage": 0.03,
       "observationDays": 7,
-      "exitBufferPct": 1,
-      "riskYDM": { "mode": "static", "y0": 0.06, "yTarget": 0.06, "y100": 0.18 },
+      "juniorYieldShare": 0.06,
       "minLiquidity": 0.15,
-      "liqYDM": { "mode": "static", "y0": 0.08, "yTarget": 0.17, "y100": 0.2 },
-      "selfLiquidationBonus": 0.01
+      "lpYieldShare": 0.17
     },
     {
       "id": "aggressive",
       "label": "Aggressive",
+      "sourceApy": 0.09272332251507232,
       "coverage": 0.03,
       "observationDays": 7,
-      "exitBufferPct": 1,
-      "riskYDM": { "mode": "static", "y0": 0.08, "yTarget": 0.08, "y100": 0.24 },
+      "juniorYieldShare": 0.08,
       "minLiquidity": 0.15,
-      "liqYDM": { "mode": "static", "y0": 0.08, "yTarget": 0.17, "y100": 0.2 },
-      "selfLiquidationBonus": 0.015
+      "lpYieldShare": 0.17
     }
   ],
   "provenance": {

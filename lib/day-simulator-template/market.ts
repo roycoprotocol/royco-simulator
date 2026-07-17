@@ -8,6 +8,7 @@ export type DaySimulatorDefaults = {
   observationDays: number;
   exitBufferPct: number;
   linkJuniorToFirstLoss: boolean;
+  maintainCoverage: boolean;
   riskYDM: YDMConfig;
   liqYDM: YDMConfig;
   selfLiquidationBonus: number;
@@ -19,13 +20,12 @@ export type DaySimulatorDefaults = {
 export type DayMarketPreset = {
   id: "conservative" | "balanced" | "aggressive";
   label: string;
+  sourceApy: number;
   coverage: number;
   observationDays: number;
-  exitBufferPct: number;
-  riskYDM: YDMConfig;
+  juniorYieldShare: number;
   minLiquidity: number;
-  liqYDM: YDMConfig;
-  selfLiquidationBonus: number;
+  lpYieldShare: number;
 };
 
 export type DayMarketManifest = {
