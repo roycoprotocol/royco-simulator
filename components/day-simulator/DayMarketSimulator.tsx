@@ -1598,7 +1598,7 @@ export default function DayMarketSimulator({ market }: { market?: DayMarket }) {
         </p>
         <p className="mt-1">{activeMarket.copy.disclosure}</p>
         <p className="mt-1">
-          Day uses the Dawn protection and observation rules with an additive LP tranche. Source:{' '}
+          Source:{' '}
           {activeMarket.provenance.sourceUrl}
         </p>
       </footer>
