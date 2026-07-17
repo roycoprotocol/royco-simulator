@@ -87,13 +87,13 @@ for (const control of [
   if (!simulator.includes(control)) failures.push(`Day simulator missing invariant Dawn control: ${control}`);
 }
 for (const control of [
-  'Minimum liquidity ratio (%)',
-  'Senior yield share to Liquidity (%)',
-  'Day liquidity additions',
-  'Liquidity avg/yr',
-  'Liquidity share price',
+  'Minimum LP ratio (%)',
+  'Senior yield share to LP (%)',
+  'Day LP additions',
+  'LP avg/yr',
+  'LP share price',
 ]) {
-  if (!simulator.includes(control)) failures.push(`Day simulator missing additive Liquidity contract: ${control}`);
+  if (!simulator.includes(control)) failures.push(`Day simulator missing additive LP contract: ${control}`);
 }
 for (const invariant of [
   'fixedTermDurationSec: observationDays * DAY',
@@ -162,7 +162,7 @@ if (marketId) {
     if (market.id !== marketId) failures.push("Day market id does not match its folder");
     if (market.route !== `/${marketId}-sim`) failures.push("Day market route must match /<market-id>-sim");
     if (!(market.defaults?.minLiquidity > 0 && market.defaults.minLiquidity < 1)) {
-      failures.push("Day market minLiquidity must be a fraction between 0 and 1");
+      failures.push("Day market LP ratio must be a fraction between 0 and 1");
     }
     if (!(market.defaults?.sourceApy > -1 && Number.isFinite(market.defaults.sourceApy))) {
       failures.push("Day market sourceApy must be finite and greater than -100%");
@@ -201,7 +201,7 @@ if (marketId) {
     if (marketId === "pareto-falconx") {
       const balanced = market.presets?.find((preset) => preset.id === "balanced");
       if (Math.abs(market.defaults.minLiquidity - 0.15) > 1e-12) {
-        failures.push("Pareto FalconX Day minimum liquidity must remain 15%");
+        failures.push("Pareto FalconX Day minimum LP ratio must remain 15%");
       }
       if (
         !balanced ||

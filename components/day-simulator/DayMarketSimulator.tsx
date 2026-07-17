@@ -490,20 +490,20 @@ export default function DayMarketSimulator({ market }: { market?: DayMarket }) {
         `market: ${activeMarket.copy.title}`,
         `underlying: ${activeMarket.provenance.source}`,
         `minimumCoverage: ${(result.cfg.coverage * 100).toFixed(2)}%`,
-        `minimumLiquidity: ${(result.cfg.minLiquidity * 100).toFixed(2)}%`,
+        `minimumLP: ${(result.cfg.minLiquidity * 100).toFixed(2)}%`,
         `observationDuration: ${observationDays} days`,
         `protectedExitCoverageRemaining: ${exitBufferPct.toFixed(2)}%`,
         `targetUtilization: ${(result.cfg.targetUtilization * 100).toFixed(0)}%`,
-        `liquidityTargetUtilization: ${(result.cfg.liqTargetUtilization * 100).toFixed(0)}%`,
+        `lpTargetUtilization: ${(result.cfg.liqTargetUtilization * 100).toFixed(0)}%`,
         `riskYieldShareAtTarget: ${(result.cfg.riskYDM.yTarget * 100).toFixed(2)}%`,
         `riskYieldShareAtFullUtilization: ${(result.cfg.riskYDM.y100 * 100).toFixed(2)}%`,
-        `liquidityYieldShareAtTarget: ${(result.cfg.liqYDM.yTarget * 100).toFixed(2)}%`,
-        `liquidityYieldShareAtFullUtilization: ${(result.cfg.liqYDM.y100 * 100).toFixed(2)}%`,
+        `lpYieldShareAtTarget: ${(result.cfg.liqYDM.yTarget * 100).toFixed(2)}%`,
+        `lpYieldShareAtFullUtilization: ${(result.cfg.liqYDM.y100 * 100).toFixed(2)}%`,
         `seniorDeposit: ${result.initial.st.toFixed(0)}`,
         `juniorDeposit: ${result.initial.jt.toFixed(0)}`,
         `juniorLinkedToCoverage: ${linkJuniorToFirstLoss}`,
         `maintainJuniorCoverage: ${maintainCoverage}`,
-        `liquidityDeposit: ${result.initial.lt.toFixed(0)}`,
+        `lpDeposit: ${result.initial.lt.toFixed(0)}`,
         `selfLiquidationBonus: ${(result.cfg.stSelfLiquidationBonus * 100).toFixed(2)}%`,
         `source: ${activeMarket.provenance.sourceUrl}`,
       ].join('\n'),
@@ -597,7 +597,7 @@ export default function DayMarketSimulator({ market }: { market?: DayMarket }) {
           </div>
           <Kpi label="Senior avg/yr" value={`${pct(result.seniorApy)}/yr`} color={C.accent} />
           <Kpi label="Junior avg/yr" value={`${pct(result.juniorApy)}/yr`} />
-          <Kpi label="Liquidity avg/yr" value={`${pct(result.liquidityApy)}/yr`} color={C.olive} />
+          <Kpi label="LP avg/yr" value={`${pct(result.liquidityApy)}/yr`} color={C.olive} />
         </div>
       </section>
 
@@ -609,7 +609,7 @@ export default function DayMarketSimulator({ market }: { market?: DayMarket }) {
               Adjust the current market terms.
             </h2>
             <p style={{ color: C.muted, fontSize: 12.5, lineHeight: 1.38, marginTop: 4 }}>
-              {LOCKED_COPY.customizeDescription} Day adds the two Liquidity controls below.
+              {LOCKED_COPY.customizeDescription} Day adds the two LP controls below.
             </p>
           </div>
           <button
@@ -674,14 +674,14 @@ export default function DayMarketSimulator({ market }: { market?: DayMarket }) {
                       >
                         <span style={{ color: C.text, fontSize: 13, fontWeight: 600 }}>{preset.label}</span>
                         <div style={{ color: C.muted, fontSize: 11, marginTop: 4 }}>
-                          {(preset.coverage * 100).toFixed(0)}% minimum coverage · {preset.observationDays}d obs · {(preset.riskYDM.yTarget * 100).toFixed(0)}% to Junior · {(preset.minLiquidity * 100).toFixed(0)}% liquidity
+                          {(preset.coverage * 100).toFixed(0)}% minimum coverage · {preset.observationDays}d obs · {(preset.riskYDM.yTarget * 100).toFixed(0)}% to Junior · {(preset.minLiquidity * 100).toFixed(0)}% LP
                         </div>
                       </button>
                     );
                   })}
                 </div>
                 <p className="mt-1.5" style={{ color: C.kpiLabel, fontSize: 11, lineHeight: 1.4 }}>
-                  Risk rises down the ladder through the Dawn terms. The Day liquidity requirement remains explicit on every rung.
+                  Risk rises down the ladder through the Dawn terms. The Day LP requirement remains explicit on every rung.
                 </p>
               </div>
             )}
@@ -753,26 +753,26 @@ export default function DayMarketSimulator({ market }: { market?: DayMarket }) {
             </div>
 
             <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 14 }}>
-              <Eyebrow>Day liquidity additions</Eyebrow>
+              <Eyebrow>Day LP additions</Eyebrow>
               <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
                 <SliderControl
-                  label="Minimum liquidity ratio (%)"
+                  label="Minimum LP ratio (%)"
                   value={minLiquidityPct}
                   min={1}
                   max={50}
                   step={1}
                   display={`${minLiquidityPct.toFixed(0)}%`}
-                  description={`Liquidity capital derived at 90% target utilization: ${usd0(result.initial.lt)}.`}
+                  description={`LP capital derived at 90% target utilization: ${usd0(result.initial.lt)}.`}
                   onChange={setMinLiquidityPct}
                 />
                 <SliderControl
-                  label="Senior yield share to Liquidity (%)"
+                  label="Senior yield share to LP (%)"
                   value={liqSharePct}
                   min={0}
                   max={80}
                   step={1}
                   display={`${liqSharePct.toFixed(0)}%`}
-                  description="Liquidity premium paid to the Liquidity Tranche at 90% utilization."
+                  description="LP premium paid to the LP tranche at 90% utilization."
                   onChange={(value) => {
                     setLiqSharePct(value);
                     if (value + riskSharePct > 100) setRiskSharePct(100 - value);
@@ -840,7 +840,7 @@ export default function DayMarketSimulator({ market }: { market?: DayMarket }) {
                 ['Premium budget', `${(riskSharePct + liqSharePct).toFixed(0)}% / 100%`],
                 ['Observation term', `${observationDays}d / 7–194d`],
                 ['Protected exit', `${exitBufferPct.toFixed(2)}% remaining`],
-                ['Minimum liquidity', `${minLiquidityPct.toFixed(0)}%`],
+                ['Minimum LP', `${minLiquidityPct.toFixed(0)}%`],
               ].map(([label, value]) => (
                 <div key={label}>
                   <span style={{ color: C.kpiLabel, display: 'block', fontSize: 9.5, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' }}>{label}</span>
@@ -869,7 +869,7 @@ export default function DayMarketSimulator({ market }: { market?: DayMarket }) {
               {[
                 ['Senior share price', C.seniorLine],
                 ['Junior share price', C.juniorLine],
-                ['Liquidity share price', C.olive],
+                ['LP share price', C.olive],
                 ['Base strategy', C.strategyLine],
                 ['Observation period', C.obsFill],
               ].map(([label, color]) => (
@@ -902,7 +902,7 @@ export default function DayMarketSimulator({ market }: { market?: DayMarket }) {
                   ))}
                   <Line type="monotone" dataKey="senior" name="Senior" stroke={C.seniorLine} strokeWidth={2.4} dot={false} isAnimationActive={false} />
                   <Line type="monotone" dataKey="junior" name="Junior" stroke={C.juniorLine} strokeWidth={2.4} dot={false} isAnimationActive={false} />
-                  <Line type="monotone" dataKey="liquidity" name="Liquidity" stroke={C.olive} strokeWidth={2.4} dot={false} isAnimationActive={false} />
+                  <Line type="monotone" dataKey="liquidity" name="LP" stroke={C.olive} strokeWidth={2.4} dot={false} isAnimationActive={false} />
                   <Line type="monotone" dataKey="strategy" name="Base strategy" stroke={C.strategyLine} strokeWidth={1.6} strokeDasharray="5 4" dot={false} isAnimationActive={false} />
                 </LineChart>
               </ResponsiveContainerNoSSR>
@@ -933,7 +933,7 @@ export default function DayMarketSimulator({ market }: { market?: DayMarket }) {
                     ['Base strategy', result.calendar.map((row) => pct(row.strategyReturn)), `$${result.chart[result.chart.length - 1].strategy.toFixed(2)} → ${pct(result.strategyApy)}/yr`],
                     ['Junior return', result.calendar.map((row) => pct(row.juniorReturn)), `$${result.chart[result.chart.length - 1].junior.toFixed(2)} → ${pct(result.juniorApy)}/yr`],
                     ['Senior return', result.calendar.map((row) => pct(row.seniorReturn)), `$${result.chart[result.chart.length - 1].senior.toFixed(2)} → ${pct(result.seniorApy)}/yr`],
-                    ['Liquidity return', result.calendar.map((row) => pct(row.liquidityReturn)), `$${result.chart[result.chart.length - 1].liquidity.toFixed(2)} → ${pct(result.liquidityApy)}/yr`],
+                    ['LP return', result.calendar.map((row) => pct(row.liquidityReturn)), `$${result.chart[result.chart.length - 1].liquidity.toFixed(2)} → ${pct(result.liquidityApy)}/yr`],
                     ['Non-observation %', result.calendar.map((row) => `${row.nonObservationPct.toFixed(1)}%`), '—'],
                     ['Observation periods triggered', result.calendar.map((row) => String(row.observationTriggers)), `${result.observationEvents} total`],
                   ].map(([label, cells, end]) => (
@@ -955,7 +955,7 @@ export default function DayMarketSimulator({ market }: { market?: DayMarket }) {
                 {[
                   ['Senior worst drop', pct(-result.seniorMaxDrawdown)],
                   ['Junior worst drop', pct(-result.juniorMaxDrawdown)],
-                  ['Liquidity worst drop', pct(-result.liquidityMaxDrawdown)],
+                  ['LP worst drop', pct(-result.liquidityMaxDrawdown)],
                   ['Max observed observation period', `${result.maxObservedObservationDays}d (${observationDays}d target)`],
                   ['Claims erased', String(result.erasedRecoveryClaims)],
                   ['Senior loss events', String(result.seniorLossEvents)],
@@ -963,7 +963,7 @@ export default function DayMarketSimulator({ market }: { market?: DayMarket }) {
                   ['Junior capital injected', usd0(result.juniorCapitalInjected)],
                   ['Strategy avg/yr', `${pct(result.strategyApy)}/yr`],
                   ['Coverage utilization', `${(result.final.utilization * 100).toFixed(1)}%`],
-                  ['Liquidity utilization', `${(result.final.liquidityUtilization * 100).toFixed(1)}%`],
+                  ['LP utilization', `${(result.final.liquidityUtilization * 100).toFixed(1)}%`],
                   ['NAV conservation residual', result.final.conservationResidual.toExponential(2)],
                 ].map(([label, value]) => (
                   <div key={label}>
@@ -980,7 +980,7 @@ export default function DayMarketSimulator({ market }: { market?: DayMarket }) {
                 <p style={{ color: C.muted, fontSize: 11.5, lineHeight: 1.45 }}>Senior is protected first by Junior. Junior earns the risk premium for taking first losses.</p>
                 <p style={{ color: C.muted, fontSize: 11.5, lineHeight: 1.45, marginTop: 6 }}>Junior has {observationDays} days to recover after the Dawn observation state opens; unrecovered claims are erased when the term expires.</p>
                 <p style={{ color: C.muted, fontSize: 11.5, lineHeight: 1.45, marginTop: 6 }}>When deposits reopen, fresh Junior capital rebuilds the coverage requirement at the 90% target. Senior&apos;s protected exit threshold remains {exitBufferPct.toFixed(2)}% Junior buffer.</p>
-                <p style={{ color: C.muted, fontSize: 11.5, lineHeight: 1.45, marginTop: 6 }}>Day is additive: Liquidity backs secondary exits through the E-CLP pool and earns the liquidity premium, stable carry, and modeled swap fees.</p>
+                <p style={{ color: C.muted, fontSize: 11.5, lineHeight: 1.45, marginTop: 6 }}>Day is additive: the LP tranche backs secondary exits through the E-CLP pool and earns the LP premium, stable carry, and modeled swap fees.</p>
               </div>
               <div style={{ border: `1px solid ${C.border}`, padding: '12px 14px' }}>
                 <p style={{ color: C.text, fontSize: 12.5, fontWeight: 600, marginBottom: 6 }}>Data provenance</p>

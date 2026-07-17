@@ -1,6 +1,6 @@
 # Royco Day simulator template
 
-The Day simulator is separate from the Dawn historical-market factory. Dawn has two tranches and historical price/NAV backtests. Day adds a Liquidity Tranche and currently runs deterministic mechanism scenarios through `lib/day/engine`.
+The Day simulator is separate from the Dawn historical-market factory. Dawn has two tranches and historical price/NAV backtests. Day adds an LP tranche and currently runs deterministic mechanism scenarios through `lib/day/engine`.
 
 ## Commands
 
@@ -19,7 +19,7 @@ npm run day-sim:preview
 
 ## Boundaries
 
-1. All Day state transitions, waterfall behavior, liquidity-premium accounting, E-CLP behavior, and NAV conservation flow through `lib/day/engine`.
+1. All Day state transitions, waterfall behavior, LP-premium accounting, E-CLP behavior, and NAV conservation flow through `lib/day/engine`.
 2. Day UI belongs in `components/day-simulator` and Day template configuration belongs in `lib/day-simulator-template`.
 3. Dawn files under `components/simulator`, `lib/simulator-template`, `lib/markets`, and `lib/try` are not Day extension points.
 4. Standard Day page copy lives in `lib/day-simulator-template/locked-copy.ts`.
@@ -28,17 +28,17 @@ npm run day-sim:preview
 
 ## Dawn/Tenbin visual contract
 
-Day changes the accountant and adds the Liquidity Tranche; it does not introduce a different visual system or remove Dawn behavior. Every public Day market must use the Dawn `SimulatorPageShell` and retain the Tenbin palette, typography, square card treatment, spacing, section order, headings, historical review layout, and deploy handoff.
+Day changes the accountant and adds the LP tranche; it does not introduce a different visual system or remove Dawn behavior. Every public Day market must use the Dawn `SimulatorPageShell` and retain the Tenbin palette, typography, square card treatment, spacing, section order, headings, historical review layout, and deploy handoff.
 
 The Dawn contract is invariant in Day: minimum coverage, Senior deposit, Senior yield share to Junior, observation period, Junior buffer remaining for Senior exit, Conservative/Balanced/Aggressive presets, the linked-Junior advanced override, observation state and claim erasure, protected-exit rules, Junior replenishment when deposits reopen, the unified two-handle Backtest window scrubber with its full-history mini preview, review metrics, and deploy fields must all remain present and accountant-driven. Replacing the scrubber with separate start/end sliders is a design-contract failure.
 
-Day is additive. Its required additions are the Liquidity KPI, minimum-liquidity control, liquidity-premium control, Liquidity chart line and drawdown, liquidity utilization, and Day deploy fields. These additions must be visibly separated from the invariant Dawn controls. `day-sim:verify` enforces both halves of this contract.
+Day is additive. Its required additions are the LP KPI, minimum-LP control, LP-premium control, LP chart line and drawdown, LP utilization, and Day deploy fields. These additions must be visibly separated from the invariant Dawn controls. `day-sim:verify` enforces both halves of this contract.
 
 The legacy dark components under `app/DaySimulator*.tsx` and `app/internal/day` are internal prototypes. They are not public template components. `day-sim:verify` rejects a public Day route that imports them or uses their dark-theme variables.
 
 ## Accountant certification status
 
-The repository contains a Day engine invariant suite covering conservation, loss waterfall behavior, senior priority, fixed-term transitions, coverage gates, self-liquidation, dual YDM splitting, liquidity-pool behavior, adaptive YDM behavior, and E-CLP properties.
+The repository contains a Day engine invariant suite covering conservation, loss waterfall behavior, senior priority, fixed-term transitions, coverage gates, self-liquidation, dual YDM splitting, LP-pool behavior, adaptive YDM behavior, and E-CLP properties.
 
 The repository does not contain the `AUDIT.md` referenced by legacy source comments, deployed-contract bytecode references, or authoritative Solidity golden vectors. Therefore `day-sim:certify` certifies the implemented TypeScript accountant’s invariants but does not claim Solidity parity. Contract parity must remain visibly `NOT CERTIFIED` until authoritative vectors are added and compared exactly.
 
@@ -53,4 +53,4 @@ npm run lint
 npm run build
 ```
 
-Then inspect `/day-sim` in a browser, including all five Dawn controls, linked-Junior behavior, the observation-period bands and dates, preset direction, Day liquidity additions, tranche APYs, and browser console. Do not open a PR until the preview is approved.
+Then inspect `/day-sim` in a browser, including all five Dawn controls, linked-Junior behavior, the observation-period bands and dates, preset direction, Day LP additions, tranche APYs, and browser console. Do not open a PR until the preview is approved.

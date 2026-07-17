@@ -75,7 +75,7 @@ async function main() {
   console.log("Day runtime defaults: PASS");
   console.log("Day NAV conservation: PASS");
   if (market) {
-    console.log(`${market.id} minimum liquidity: ${(cfg.minLiquidity * 100).toFixed(0)}% PASS`);
+    console.log(`${market.id} minimum LP ratio: ${(cfg.minLiquidity * 100).toFixed(0)}% PASS`);
   }
 }
 

@@ -4,7 +4,7 @@
   "copy": {
     "eyebrow": "ROYCO DAY · PARETO FALCONX MARKET",
     "title": "Pareto FalconX Day Simulator",
-    "description": "Explore a hypothetical three-tranche Royco Day market over AA_FalconXUSDC. Senior receives first-loss protection from Junior, while a 15% Liquidity Tranche supports secondary-market exits.",
+    "description": "Explore a hypothetical three-tranche Royco Day market over AA_FalconXUSDC. Senior receives first-loss protection from Junior, while a 15% LP tranche supports secondary-market exits.",
     "disclosure": "The source APY is derived from 371 fee-inclusive daily NAV observations supplied by RWA.xyz. Scenario outputs are mechanism simulations, not historical backtests, forecasts, or an announced product."
   },
   "defaults": {
