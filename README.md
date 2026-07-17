@@ -1,7 +1,19 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Royco Dawn Simulator Template
 
-## Getting Started
-abcd
+This repository contains the standardized Dawn simulator factory and its shared accountant, locked copy, design contract, market-data importer, verification checks, and certification commands.
+
+To create a market simulator, follow [`docs/NEW_SIMULATOR.md`](docs/NEW_SIMULATOR.md). The factory commands are:
+
+```bash
+npm run sim:new -- <market-id> <csv-or-public-url>
+npm run sim:verify -- <market-id>
+npm run sim:preview -- <market-id>
+npm run sim:certify -- <market-id>
+```
+
+The separate Royco Day simulator is under active standardization. Dawn and Day accounting must remain isolated.
+
+## Local development
 
 First, run the development server:
 

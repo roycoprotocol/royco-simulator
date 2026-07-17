@@ -33,6 +33,8 @@ import {
 import {
   OBSERVATION_DAYS_MAX,
   OBSERVATION_DAYS_MIN,
+  effectiveSelfLiquidationBonusPct,
+  effectiveYieldShareAtFullUtilPct,
   juniorFromFirstLossPct,
   buildSimulatorConfig,
   findMarketPreset,
@@ -110,6 +112,10 @@ const monthLabel = (key: string): string => {
   const name = MONTH_NAMES[Number(m) - 1];
   return name && y ? `${name} ${y}` : key;
 };
+
+/** Preserve full ISO dates for daily series; use the compact month label for monthly data. */
+const dateLabel = (key: string): string =>
+  /^\d{4}-\d{2}-\d{2}$/.test(key) ? key : monthLabel(key);
 
 // --- tenbin design tokens ---------------------------------------------------
 const C = {
@@ -413,7 +419,7 @@ function ChartTooltip(props: {
         gap: 3,
       }}
     >
-      <div style={{ color: C.muted, fontWeight: 600, marginBottom: 2 }}>{monthLabel(label)}</div>
+      <div style={{ color: C.muted, fontWeight: 600, marginBottom: 2 }}>{dateLabel(label)}</div>
       {payload.map((p) =>
         typeof p.value === 'number'
           ? row('●', p.color ?? C.text, `${p.name}: $${p.value.toFixed(2)}`)
@@ -776,6 +782,14 @@ export default function MarketSimulator({
   // The utilization at which THIS buffer setting opens the protected Senior exit.
   const exitUtilThreshold = utilizationPctFromBufferPct(params.exitBufferPct) / 100;
   const activeScenarioName = activePreset?.label ?? 'Custom';
+  const y100Pct = effectiveYieldShareAtFullUtilPct(params);
+  const selfLiquidationBonusPct = effectiveSelfLiquidationBonusPct(params);
+  const aggressiveObservationDays =
+    market.presets.find((preset) => preset.id === 'aggressive')?.params.observationDays ?? 16;
+  const curveShapeDescription =
+    y100Pct === params.seniorShareToJuniorPct
+      ? `flat at ${fmtTrim(params.seniorShareToJuniorPct, 2)}%`
+      : `${fmtTrim(params.seniorShareToJuniorPct, 2)}% at the 90% target and ${fmtTrim(y100Pct, 2)}% at 100% utilization`;
 
   // --- Chart series and annotations ------------------------------------------
   // The run IS the window, so nothing here is clipped: every index below is already
@@ -1056,13 +1070,16 @@ export default function MarketSimulator({
       `genesisFirstLossProtection: ${genesisFirstLossPct.toFixed(2)}%   // actual, Junior effective NAV / market exposure at genesis`,
       `observationPeriod: ${params.observationDays} days`,
       `seniorYieldSharePaidToJunior: ${params.seniorShareToJuniorPct}%`,
+      `yieldShareAtFullUtilization: ${fmtTrim(y100Pct, 2)}%`,
       `seniorExitTrigger: ${fmtTrim(params.exitBufferPct, 2)}% Junior buffer remaining`,
+      `selfLiquidationBonus: ${fmtTrim(selfLiquidationBonusPct, 2)}%`,
       `initialFundingRead: ${jtPct.toFixed(1)}% Junior / ${(100 - jtPct).toFixed(1)}% Senior at 90% target utilization`,
       '',
       'MarketConfig fields resolved by this tool',
       `minCoverageWAD: ${config.minCoverageWAD.toString()}   // ${params.minCoveragePct}% contractual minimum coverage ratio`,
       `fixedTermDurationSeconds: ${config.fixedTermDurationSeconds.toString()}   // ${params.observationDays} days`,
       `coverageLiquidationUtilizationWAD: ${config.coverageLiquidationUtilizationWAD.toString()}   // opens Senior exit at ${fmtTrim(params.exitBufferPct, 1)}% Junior buffer remaining (${fmtTrim(thresholdUtilPct, 2)}% utilization)`,
+      `targetUtilization: 90%   // targetUtilizationWAD ${config.jtYDM.targetUtilizationWAD.toString()}`,
       `jtCoinvested: ${config.jtCoinvested}   // Junior follows the same strategy path as Senior`,
       'ydmType: DeployScript.YDMType.StaticCurve',
       'ydmSpecificParams: abi.encode(DeployScript.StaticCurveYDMParams({',
@@ -1082,7 +1099,7 @@ export default function MarketSimulator({
       'marketName: SET_FINAL_MARKET_NAME',
       'chainId: SET_CHAIN_ID',
       'seniorAsset / juniorAsset: SET_BY_MARKET_ASSET',
-      'stSelfLiquidationBonusWAD: SET_BY_DEPLOY_POLICY',
+      `stSelfLiquidationBonusPct: ${fmtTrim(selfLiquidationBonusPct, 2)}%   // supplied by market brief; convert to WAD in deploy integration`,
       'stDustTolerance / jtDustTolerance: SET_FROM_QUOTER_INTEGRATION',
       `kernelType / kernelSpecificParams: SET_BY_${market.copy.integrationLabel}_INTEGRATION`,
       `oracle or quoter wiring: SET_BY_${market.copy.integrationLabel}_INTEGRATION`,
@@ -1112,7 +1129,7 @@ export default function MarketSimulator({
       'Notes',
       '- These are finalized market-design parameters, not a complete deploy transaction.',
       '- Deploy.s.sol builds RoycoAccountantInitParams and ydmInitializationData from MarketConfig; do not paste ydmInitializationData directly into MarketConfig.',
-      '- The simulator uses a flat yield-share projection. Live market pricing can move with supply, demand, and the deployed YDM curve.',
+      `- The simulator uses the configured StaticCurveYDM projection: ${curveShapeDescription}. Live market pricing can move with supply, demand, and the deployed YDM curve.`,
       `- The underlying series is sampled ${market.dataCadence.toUpperCase()}. Observation periods close on the first available sample after the exact deploy expiry, so the observed maximum can be slightly longer than the configured term.`,
       '- Concrete assets, oracle/quoter wiring, authority, fee policy, whitelist policy, and deployed contract addresses must come from the production integration.',
     ].join('\n');
@@ -1124,7 +1141,10 @@ export default function MarketSimulator({
     jtPct,
     seniorProtected,
     activeScenarioName,
+    curveShapeDescription,
     genesisFirstLossPct,
+    selfLiquidationBonusPct,
+    y100Pct,
     dates,
     allDates,
     viewIsFull,
@@ -1373,7 +1393,7 @@ export default function MarketSimulator({
               <SliderControl
                 label="Minimum coverage ratio (%)"
                 value={params.minCoveragePct}
-                min={8}
+                min={3}
                 max={65}
                 step={1}
                 display={`${params.minCoveragePct}%`}
@@ -1410,7 +1430,7 @@ export default function MarketSimulator({
               <SliderControl
                 label="Senior yield share to Junior (%)"
                 value={params.seniorShareToJuniorPct}
-                min={20}
+                min={0}
                 max={80}
                 step={1}
                 display={`${params.seniorShareToJuniorPct}%`}
@@ -1418,8 +1438,9 @@ export default function MarketSimulator({
                 onChange={(v) => updateParam({ seniorShareToJuniorPct: v })}
               >
                 <p className="mt-1.5" style={{ color: C.kpiLabel, fontSize: 11, lineHeight: 1.5 }}>
-                  This run models the curve as genuinely flat: the same share applies at every
-                  utilization, so nothing here reprices it.
+                  This run models a StaticCurveYDM that is {curveShapeDescription}. The control
+                  sets the share at the 90% target; the full-utilization endpoint is carried by
+                  the market configuration.
                 </p>
               </SliderControl>
 
@@ -2041,7 +2062,7 @@ export default function MarketSimulator({
                 ))}
                 <p className="mt-1.5" style={{ color: C.kpiLabel, fontSize: 11, lineHeight: 1.4 }}>
                   The ladder is recomputed live on the selected {market.dataCadence} series; its
-                  16-day aggressive term is distinct from the longer rungs.
+                  {' '}{aggressiveObservationDays}-day aggressive term is distinct from the longer rungs.
                 </p>
               </div>
             </div>
@@ -2471,7 +2492,7 @@ function TimeframeBrush({
       >
         <span>Backtest window</span>
         <span style={{ fontFamily: MONO, color: C.text, fontSize: 10.5, letterSpacing: 0, textTransform: 'none', fontWeight: 500 }}>
-          {isFull ? 'Full history' : `${dates[view.a]} → ${dates[view.b]}`}
+          {isFull ? 'Full history' : `${dateLabel(dates[view.a])} → ${dateLabel(dates[view.b])}`}
         </span>
       </div>
 
@@ -2542,7 +2563,7 @@ function TimeframeBrush({
             type="button"
             onPointerDown={(e) => begin({ kind: 'handle', side: 'start' }, e)}
             onKeyDown={onHandleKey('start')}
-            aria-label={`Backtest window start, ${monthLabel(dates[view.a])}`}
+            aria-label={`Backtest window start, ${dateLabel(dates[view.a])}`}
             style={{ ...handleStyle, left: `${leftPct}%` }}
           >
             <span style={gripStyle} />
@@ -2551,7 +2572,7 @@ function TimeframeBrush({
             type="button"
             onPointerDown={(e) => begin({ kind: 'handle', side: 'end' }, e)}
             onKeyDown={onHandleKey('end')}
-            aria-label={`Backtest window end, ${monthLabel(dates[view.b])}`}
+            aria-label={`Backtest window end, ${dateLabel(dates[view.b])}`}
             style={{ ...handleStyle, left: `${rightPct}%` }}
           >
             <span style={gripStyle} />
@@ -2585,13 +2606,13 @@ function TimeframeBrush({
           <span>
             Start{' '}
             <b style={{ fontFamily: MONO, color: C.text, letterSpacing: 0, textTransform: 'none', fontWeight: 500 }}>
-              {monthLabel(dates[view.a])}
+              {dateLabel(dates[view.a])}
             </b>
           </span>
           <span>
             End{' '}
             <b style={{ fontFamily: MONO, color: C.text, letterSpacing: 0, textTransform: 'none', fontWeight: 500 }}>
-              {monthLabel(dates[view.b])}
+              {dateLabel(dates[view.b])}
             </b>
           </span>
         </div>

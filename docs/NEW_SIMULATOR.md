@@ -1,6 +1,6 @@
-# Create a new simulator
+# Create a new Dawn simulator
 
-This process is designed for someone who does not edit code.
+This is the standardized Dawn simulator factory. The process is designed for someone who does not edit code.
 
 ## What you provide
 
@@ -32,6 +32,14 @@ npm run sim:certify -- market-id
 3. `sim:verify` checks the data, rejects unresolved provenance/copy placeholders, checks preset direction and live engine outputs, and verifies the shared design files against the approved template fingerprint.
 4. `sim:preview` starts the local website at `http://localhost:3000/market-id-sim`.
 5. `sim:certify` reruns verification and the repository’s wei-exact accountant parity suite.
+
+## Template defaults for new markets
+
+The Advanced override is linked to Junior by default. Keep `linkJuniorToFirstLoss: true` unless the market brief explicitly requires a manually sized Junior deposit; when linked, the Junior deposit is derived from the minimum coverage ratio and the override control remains disabled until deliberately unlinked.
+
+For daily series, chart hover cards and backtest-window endpoints must display the full ISO date (`YYYY-MM-DD`). Monthly series may use a compact `Mon YYYY` label.
+
+The standardized curve target is 90% utilization. If the brief supplies a distinct `Y_100`, set `yieldShareAtFullUtilPct` alongside `seniorShareToJuniorPct`; if omitted, the factory preserves a flat curve. Record `selfLiquidationBonusPct` when supplied, but treat it as a deploy-handoff term: the shared TRY accountant does not apply that bonus to historical backtest math.
 
 ## Required PASS report
 

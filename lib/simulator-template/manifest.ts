@@ -13,9 +13,9 @@ export interface MarketManifest {
   copy: SimulatorMarket['copy'];
   defaults: Omit<SimulatorParams, 'depositJT'> & { depositJT?: number };
   presets: {
-    conservative: { minimumCoveragePct: number; observationDays: number; seniorYieldShareToJuniorPct: number };
-    balanced: { minimumCoveragePct: number; observationDays: number; seniorYieldShareToJuniorPct: number };
-    aggressive: { minimumCoveragePct: number; observationDays: number; seniorYieldShareToJuniorPct: number };
+    conservative: PresetManifestValues;
+    balanced: PresetManifestValues;
+    aggressive: PresetManifestValues;
   };
   certification: SimulatorMarket['certification'];
   provenance: {
@@ -26,6 +26,15 @@ export interface MarketManifest {
     feesIncluded: boolean | 'unknown';
     notes: string;
   };
+}
+
+interface PresetManifestValues {
+  minimumCoveragePct: number;
+  observationDays: number;
+  seniorYieldShareToJuniorPct: number;
+  exitBufferPct?: number;
+  yieldShareAtFullUtilPct?: number;
+  selfLiquidationBonusPct?: number;
 }
 
 export function marketFromManifest(
@@ -50,6 +59,7 @@ export function marketFromManifest(
       values.minimumCoveragePct,
       values.observationDays,
       values.seniorYieldShareToJuniorPct,
+      values,
     );
   };
   return {

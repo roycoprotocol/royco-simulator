@@ -1,6 +1,6 @@
-# Simulator factory rules
+# Dawn simulator factory rules
 
-Read `docs/NEW_SIMULATOR.md` before creating or editing a simulator.
+Read `docs/NEW_SIMULATOR.md` before creating or editing a Dawn simulator.
 
 ## Non-negotiable boundaries
 

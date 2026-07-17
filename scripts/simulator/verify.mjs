@@ -49,6 +49,15 @@ const preset = manifest.presets;
 if (!(preset.conservative.minimumCoveragePct >= preset.balanced.minimumCoveragePct && preset.balanced.minimumCoveragePct >= preset.aggressive.minimumCoveragePct)) failures.push('coverage must decrease down the ladder');
 if (!(preset.conservative.observationDays >= preset.balanced.observationDays && preset.balanced.observationDays >= preset.aggressive.observationDays)) failures.push('observation period must decrease down the ladder');
 if (!(preset.conservative.seniorYieldShareToJuniorPct <= preset.balanced.seniorYieldShareToJuniorPct && preset.balanced.seniorYieldShareToJuniorPct <= preset.aggressive.seniorYieldShareToJuniorPct)) failures.push('Junior yield share must increase down the ladder');
+const fullUtilShare = (values) => values.yieldShareAtFullUtilPct ?? values.seniorYieldShareToJuniorPct;
+if (!(fullUtilShare(preset.conservative) <= fullUtilShare(preset.balanced) && fullUtilShare(preset.balanced) <= fullUtilShare(preset.aggressive))) failures.push('Y_100 share must increase down the ladder');
+for (const [id, values] of Object.entries(preset)) {
+  if (fullUtilShare(values) < values.seniorYieldShareToJuniorPct) failures.push(`${id}: Y_100 share must be at least the target share`);
+  if (values.exitBufferPct !== undefined && (!Number.isFinite(values.exitBufferPct) || values.exitBufferPct <= 0)) failures.push(`${id}: exitBufferPct must be positive`);
+  if (values.selfLiquidationBonusPct !== undefined && (!Number.isFinite(values.selfLiquidationBonusPct) || values.selfLiquidationBonusPct < 0)) failures.push(`${id}: selfLiquidationBonusPct must be non-negative`);
+}
+if (manifest.defaults.yieldShareAtFullUtilPct !== undefined && manifest.defaults.yieldShareAtFullUtilPct < manifest.defaults.seniorShareToJuniorPct) failures.push('defaults: Y_100 share must be at least the target share');
+if (manifest.defaults.selfLiquidationBonusPct !== undefined && (!Number.isFinite(manifest.defaults.selfLiquidationBonusPct) || manifest.defaults.selfLiquidationBonusPct < 0)) failures.push('defaults: selfLiquidationBonusPct must be non-negative');
 const marketFiles = await readdir(marketDir);
 if (marketFiles.some((file) => file.endsWith('.css') || file.endsWith('.tsx'))) failures.push('market folders may not contain CSS or React components');
 const templateLock = JSON.parse(await readFile(path.join(root, 'scripts', 'simulator', 'template-lock.json'), 'utf8'));

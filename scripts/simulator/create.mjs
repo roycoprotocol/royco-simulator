@@ -58,6 +58,8 @@ const manifest = {
     minCoveragePct: 20,
     observationDays: 45,
     seniorShareToJuniorPct: 47,
+    yieldShareAtFullUtilPct: 47,
+    selfLiquidationBonusPct: 0.25,
   },
   presets: {
     conservative: { minimumCoveragePct: 24, observationDays: 60, seniorYieldShareToJuniorPct: 34 },

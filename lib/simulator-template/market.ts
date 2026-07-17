@@ -10,9 +10,13 @@ export interface SimulatorParams {
   depositST: number;
   depositJT: number;
   seniorShareToJuniorPct: number;
+  /** Junior yield share at the 100% utilization endpoint; defaults to the target share. */
+  yieldShareAtFullUtilPct?: number;
   observationDays: number;
   minCoveragePct: number;
   exitBufferPct: number;
+  /** Deploy-handoff term; the shared TRY accountant does not model this bonus. */
+  selfLiquidationBonusPct?: number;
   linkJuniorToFirstLoss: boolean;
 }
 
@@ -82,27 +86,49 @@ export function juniorFromFirstLossPct(depositST: number, minCoveragePct: number
 }
 
 export function buildSimulatorConfig(params: SimulatorParams): MarketConfig {
+  const baseConfig = buildConfig({
+    firstLossPct: (params.depositJT / (params.depositST + params.depositJT)) * 100,
+    observationDays: params.observationDays,
+    seniorShareToJuniorPct: params.seniorShareToJuniorPct,
+    juniorBufferRemainingPct: params.minCoveragePct,
+    seniorExitBonusPct: 0.25,
+  });
+  const pctToWad = (pct: number): bigint =>
+    (BigInt(Math.round((pct / 100) * 1e6)) * WAD) / 1_000_000n;
+  const targetShareWAD = pctToWad(params.seniorShareToJuniorPct);
   return {
-    ...buildConfig({
-      firstLossPct: (params.depositJT / (params.depositST + params.depositJT)) * 100,
-      observationDays: params.observationDays,
-      seniorShareToJuniorPct: params.seniorShareToJuniorPct,
-      juniorBufferRemainingPct: params.minCoveragePct,
-      seniorExitBonusPct: 0.25,
-    }),
+    ...baseConfig,
+    jtYDM: {
+      ...baseConfig.jtYDM,
+      yieldShareAtZeroUtilWAD: targetShareWAD,
+      yieldShareAtTargetWAD: targetShareWAD,
+      yieldShareAtFullUtilWAD: pctToWad(
+        params.yieldShareAtFullUtilPct ?? params.seniorShareToJuniorPct,
+      ),
+    },
     coverageLiquidationUtilizationWAD: utilWadFromBufferPct(params.exitBufferPct),
   };
 }
 
+export const effectiveYieldShareAtFullUtilPct = (params: SimulatorParams): number =>
+  params.yieldShareAtFullUtilPct ?? params.seniorShareToJuniorPct;
+
+export const effectiveSelfLiquidationBonusPct = (params: SimulatorParams): number =>
+  params.selfLiquidationBonusPct ?? 0.25;
+
 export function findMarketPreset(market: SimulatorMarket, params: SimulatorParams) {
+  const fullUtilShare = effectiveYieldShareAtFullUtilPct(params);
+  const selfLiquidationBonus = effectiveSelfLiquidationBonusPct(params);
   return market.presets.find(
     (preset) =>
       preset.params.depositST === params.depositST &&
       preset.params.depositJT === params.depositJT &&
       preset.params.seniorShareToJuniorPct === params.seniorShareToJuniorPct &&
+      effectiveYieldShareAtFullUtilPct(preset.params) === fullUtilShare &&
       preset.params.observationDays === params.observationDays &&
       preset.params.minCoveragePct === params.minCoveragePct &&
-      preset.params.exitBufferPct === params.exitBufferPct,
+      preset.params.exitBufferPct === params.exitBufferPct &&
+      effectiveSelfLiquidationBonusPct(preset.params) === selfLiquidationBonus,
   );
 }
 
@@ -158,12 +184,17 @@ export function makePreset(
   minimumCoveragePct: number,
   observationDays: number,
   seniorYieldShareToJuniorPct: number,
+  overrides: Partial<Pick<
+    SimulatorParams,
+    'exitBufferPct' | 'yieldShareAtFullUtilPct' | 'selfLiquidationBonusPct'
+  >> = {},
 ): SimulatorPreset {
   return {
     id,
     label,
     params: {
       ...base,
+      ...overrides,
       depositJT: juniorFromFirstLossPct(base.depositST, minimumCoveragePct),
       minCoveragePct: minimumCoveragePct,
       observationDays,

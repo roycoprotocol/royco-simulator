@@ -1,6 +1,8 @@
 import {
   OBSERVATION_DAYS_MAX,
   OBSERVATION_DAYS_MIN,
+  effectiveSelfLiquidationBonusPct,
+  effectiveYieldShareAtFullUtilPct,
   findMarketPreset,
   juniorFromFirstLossPct,
   type SimulatorMarket,
@@ -47,7 +49,7 @@ export function createPermalinkCodec(market: SimulatorMarket) {
       return Number.isFinite(parsed) ? parsed : null;
     };
     const coverage = numberValue('coverage');
-    if (coverage !== null) params.minCoveragePct = clamp(Math.round(coverage), 8, 65);
+    if (coverage !== null) params.minCoveragePct = clamp(Math.round(coverage), 3, 65);
     const observation = numberValue('obs');
     if (observation !== null) {
       params.observationDays = clamp(
@@ -57,9 +59,15 @@ export function createPermalinkCodec(market: SimulatorMarket) {
       );
     }
     const yieldShare = numberValue('yieldShare');
-    if (yieldShare !== null) params.seniorShareToJuniorPct = clamp(Math.round(yieldShare), 20, 80);
+    if (yieldShare !== null) params.seniorShareToJuniorPct = clamp(Math.round(yieldShare), 0, 80);
+    const y100 = numberValue('y100');
+    if (y100 !== null) params.yieldShareAtFullUtilPct = clamp(y100, 0, 100);
     const exitBuffer = numberValue('exitBuffer');
     if (exitBuffer !== null) params.exitBufferPct = clamp(exitBuffer, 1, 99.91);
+    const selfLiquidationBonus = numberValue('selfLiqBonus');
+    if (selfLiquidationBonus !== null) {
+      params.selfLiquidationBonusPct = clamp(selfLiquidationBonus, 0, 100);
+    }
     const senior = numberValue('st');
     if (senior !== null) params.depositST = snap(senior, 100, 100, 10000);
     const link = query.get('link');
@@ -100,6 +108,12 @@ export function createPermalinkCodec(market: SimulatorMarket) {
       from: market.series[legalRange.a].date,
       to: market.series[legalRange.b].date,
     });
+    if (params.yieldShareAtFullUtilPct !== undefined) {
+      query.set('y100', String(effectiveYieldShareAtFullUtilPct(params)));
+    }
+    if (params.selfLiquidationBonusPct !== undefined) {
+      query.set('selfLiqBonus', String(effectiveSelfLiquidationBonusPct(params)));
+    }
     if (!params.linkJuniorToFirstLoss) query.set('jt', String(params.depositJT));
     return query.toString();
   };
