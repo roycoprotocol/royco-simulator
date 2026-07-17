@@ -11,30 +11,62 @@
     "sourceApy": 0.09272332251507232,
     "coverage": 0.03,
     "minLiquidity": 0.15,
-    "liquidationUtilization": 1.5,
+    "liquidationUtilization": 100,
+    "observationDays": 7,
+    "exitBufferPct": 1,
+    "linkJuniorToFirstLoss": true,
     "riskYDM": {
       "mode": "static",
-      "y0": 0.04,
-      "yTarget": 0.04,
+      "y0": 0.06,
+      "yTarget": 0.06,
       "y100": 0.18
     },
     "liqYDM": {
       "mode": "static",
       "y0": 0.08,
-      "yTarget": 0.19,
+      "yTarget": 0.17,
       "y100": 0.2
     },
     "selfLiquidationBonus": 0.01,
-    "initialST": 40000000,
-    "initialJT": 1402299,
-    "initialLT": 6666667
+    "initialST": 1000,
+    "initialJT": 35.05747126436782,
+    "initialLT": 166.66666666666666
   },
-  "targets": {
-    "seniorApyMin": 0.07,
-    "seniorApyMax": 0.0725,
-    "juniorApyMin": 0.18,
-    "juniorApyMax": 0.22
-  },
+  "presets": [
+    {
+      "id": "conservative",
+      "label": "Conservative",
+      "coverage": 0.05,
+      "observationDays": 14,
+      "exitBufferPct": 2,
+      "riskYDM": { "mode": "static", "y0": 0.04, "yTarget": 0.04, "y100": 0.12 },
+      "minLiquidity": 0.15,
+      "liqYDM": { "mode": "static", "y0": 0.08, "yTarget": 0.17, "y100": 0.2 },
+      "selfLiquidationBonus": 0.005
+    },
+    {
+      "id": "balanced",
+      "label": "Balanced",
+      "coverage": 0.03,
+      "observationDays": 7,
+      "exitBufferPct": 1,
+      "riskYDM": { "mode": "static", "y0": 0.06, "yTarget": 0.06, "y100": 0.18 },
+      "minLiquidity": 0.15,
+      "liqYDM": { "mode": "static", "y0": 0.08, "yTarget": 0.17, "y100": 0.2 },
+      "selfLiquidationBonus": 0.01
+    },
+    {
+      "id": "aggressive",
+      "label": "Aggressive",
+      "coverage": 0.03,
+      "observationDays": 7,
+      "exitBufferPct": 1,
+      "riskYDM": { "mode": "static", "y0": 0.08, "yTarget": 0.08, "y100": 0.24 },
+      "minLiquidity": 0.15,
+      "liqYDM": { "mode": "static", "y0": 0.08, "yTarget": 0.17, "y100": 0.2 },
+      "selfLiquidationBonus": 0.015
+    }
+  ],
   "provenance": {
     "source": "RWA.xyz export: FalconX Credit Vault / AA_FalconXUSDC Net Asset Value (Dollar)",
     "sourceUrl": "https://app.rwa.xyz/assets/AA_FalconXUSDC",

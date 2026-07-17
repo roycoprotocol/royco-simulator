@@ -6,13 +6,16 @@ import {
   CartesianGrid,
   Line,
   LineChart,
+  ReferenceArea,
   Tooltip,
   XAxis,
   YAxis,
 } from 'recharts';
 
 import { Sim, defaultConfig } from '@/lib/day/engine/runner';
+import { MarketState } from '@/lib/day/engine/types';
 import { DAY_LOCKED_COPY } from '@/lib/day-simulator-template/locked-copy';
+import { LOCKED_COPY } from '@/lib/simulator-template/locked-copy';
 import type {
   DayMarket,
   DayMarketManifest,
@@ -40,6 +43,7 @@ const C = {
   seniorLine: '#8E7355',
   juniorLine: '#1B1A17',
   strategyLine: '#A7A39A',
+  obsFill: '#F4C77B',
 };
 
 const SERIF = "Georgia, 'Times New Roman', serif";
@@ -60,6 +64,9 @@ const FALLBACK_MANIFEST: DayMarketManifest = {
     coverage: 0.2,
     minLiquidity: 0.12,
     liquidationUtilization: 1.5,
+    observationDays: 30,
+    exitBufferPct: 66.67,
+    linkJuniorToFirstLoss: true,
     riskYDM: { mode: 'static', y0: 0.25, yTarget: 0.35, y100: 0.55 },
     liqYDM: { mode: 'static', y0: 0.08, yTarget: 0.12, y100: 0.2 },
     selfLiquidationBonus: 0.02,
@@ -153,7 +160,9 @@ function SliderControl({
   step,
   display,
   description,
+  disabled = false,
   onChange,
+  children,
 }: {
   label: string;
   value: number;
@@ -162,7 +171,9 @@ function SliderControl({
   step: number;
   display: string;
   description: string;
+  disabled?: boolean;
   onChange: (value: number) => void;
+  children?: React.ReactNode;
 }) {
   return (
     <label style={{ display: 'block' }}>
@@ -187,12 +198,14 @@ function SliderControl({
         max={max}
         step={step}
         value={value}
+        disabled={disabled}
         onChange={(event) => onChange(Number(event.target.value))}
-        style={{ accentColor: C.seniorLine, width: '100%' }}
+        style={{ accentColor: C.seniorLine, opacity: disabled ? 0.45 : 1, width: '100%' }}
       />
       <span style={{ color: C.muted, display: 'block', fontSize: 10, lineHeight: 1.35, marginTop: 2 }}>
         {description}
       </span>
+      {children}
     </label>
   );
 }
@@ -210,8 +223,19 @@ export default function DayMarketSimulator({ market }: { market?: DayMarket }) {
   const [coveragePct, setCoveragePct] = useState(defaults.coverage * 100);
   const [minLiquidityPct, setMinLiquidityPct] = useState(defaults.minLiquidity * 100);
   const [riskSharePct, setRiskSharePct] = useState(defaults.riskYDM.yTarget * 100);
+  const [riskFullPct, setRiskFullPct] = useState(defaults.riskYDM.y100 * 100);
   const [liqSharePct, setLiqSharePct] = useState(defaults.liqYDM.yTarget * 100);
+  const [observationDays, setObservationDays] = useState(defaults.observationDays);
+  const [exitBufferPct, setExitBufferPct] = useState(defaults.exitBufferPct);
+  const [selfLiquidationBonusPct, setSelfLiquidationBonusPct] = useState(
+    defaults.selfLiquidationBonus * 100,
+  );
   const [seniorDeposit, setSeniorDeposit] = useState(defaults.initialST);
+  const [manualJuniorDeposit, setManualJuniorDeposit] = useState(defaults.initialJT);
+  const [linkJuniorToFirstLoss, setLinkJuniorToFirstLoss] = useState(
+    defaults.linkJuniorToFirstLoss,
+  );
+  const [maintainCoverage, setMaintainCoverage] = useState(true);
   const [startIndex, setStartIndex] = useState(0);
   const [endIndex, setEndIndex] = useState(activeMarket.series.length - 1);
   const [copyLabel, setCopyLabel] = useState('Copy link');
@@ -230,7 +254,7 @@ export default function DayMarketSimulator({ market }: { market?: DayMarket }) {
     const jtRatio = (coverage * (1 + 0.1 * ltRatio)) / Math.max(0.9 - coverage, 0.001);
     const initial = {
       st: seniorDeposit,
-      jt: seniorDeposit * jtRatio,
+      jt: linkJuniorToFirstLoss ? seniorDeposit * jtRatio : manualJuniorDeposit,
       lt: seniorDeposit * ltRatio,
     };
     const riskTarget = riskSharePct / 100;
@@ -243,7 +267,7 @@ export default function DayMarketSimulator({ market }: { market?: DayMarket }) {
         ...defaults.riskYDM,
         y0: Math.min(defaults.riskYDM.y0, riskTarget),
         yTarget: riskTarget,
-        y100: Math.max(defaults.riskYDM.y100, riskTarget),
+        y100: Math.max(riskFullPct / 100, riskTarget),
       },
       liqYDM: {
         ...defaults.liqYDM,
@@ -251,9 +275,13 @@ export default function DayMarketSimulator({ market }: { market?: DayMarket }) {
         yTarget: liqTarget,
         y100: Math.max(defaults.liqYDM.y100, liqTarget),
       },
-      stSelfLiquidationBonus: defaults.selfLiquidationBonus,
+      fixedTermDurationSec: observationDays * DAY,
+      liquidationUtilization: 100 / Math.max(exitBufferPct, 0.01),
+      stSelfLiquidationBonus: selfLiquidationBonusPct / 100,
     });
     const sim = new Sim(cfg, initial);
+    const snapshots = [sim.last()];
+    let juniorCapitalInjected = 0;
     for (let index = 1; index < view.length; index += 1) {
       const previous = view[index - 1];
       const current = view[index];
@@ -263,16 +291,36 @@ export default function DayMarketSimulator({ market }: { market?: DayMarket }) {
       );
       const sourceReturn = current.price / previous.price - 1;
       sim.step({ dtSec: elapsedDays * DAY, stReturn: sourceReturn, jtReturn: sourceReturn });
+      const postReturn = sim.last();
+      if (maintainCoverage && postReturn.state === MarketState.PERPETUAL) {
+        const numerator =
+          coverage * (sim.state.stRawNAV + sim.state.jtRawNAV * cfg.beta) -
+          cfg.targetUtilization * sim.state.jtEffectiveNAV;
+        const denominator = cfg.targetUtilization - coverage * cfg.beta;
+        const refill = denominator > 0 ? numerator / denominator : 0;
+        if (refill > cfg.dustTolerance) {
+          sim.step({
+            dtSec: 0,
+            stReturn: 0,
+            jtReturn: 0,
+            op: { type: 'jtDeposit', amount: refill },
+          });
+          juniorCapitalInjected += refill;
+        }
+      }
+      snapshots.push(sim.last());
     }
-    const firstSnapshot = sim.history[0];
+    const firstSnapshot = snapshots[0];
     const chart = view.map((point, index) => {
-      const snapshot = sim.history[index];
+      const snapshot = snapshots[index];
       return {
         date: point.date,
         senior: (snapshot.stPrice / firstSnapshot.stPrice) * 100,
         junior: (snapshot.jtPrice / firstSnapshot.jtPrice) * 100,
         liquidity: (snapshot.ltPrice / firstSnapshot.ltPrice) * 100,
         strategy: (point.price / view[0].price) * 100,
+        state: snapshot.state,
+        stIL: snapshot.stIL,
       };
     });
     const first = chart[0];
@@ -281,6 +329,67 @@ export default function DayMarketSimulator({ market }: { market?: DayMarket }) {
       1,
       (Date.parse(view[view.length - 1].date) - Date.parse(view[0].date)) / 86_400_000,
     );
+    const observationBands: Array<{ start: string; end: string }> = [];
+    let observationStart: string | null = null;
+    let observationEvents = 0;
+    let maxObservedObservationDays = 0;
+    for (let index = 0; index < chart.length; index += 1) {
+      const inObservation = chart[index].state === MarketState.FIXED_TERM;
+      if (inObservation && observationStart === null) {
+        observationStart = chart[index].date;
+        observationEvents += 1;
+      }
+      const closes = observationStart !== null && (!inObservation || index === chart.length - 1);
+      if (closes && observationStart !== null) {
+        const start = observationStart;
+        const end = inObservation ? chart[index].date : chart[Math.max(0, index - 1)].date;
+        observationBands.push({ start, end });
+        maxObservedObservationDays = Math.max(
+          maxObservedObservationDays,
+          (Date.parse(end) - Date.parse(start)) / 86_400_000 + 1,
+        );
+        observationStart = null;
+      }
+    }
+    const maxDrawdown = (key: 'senior' | 'junior' | 'liquidity') => {
+      let peak = chart[0][key];
+      let worst = 0;
+      for (const point of chart) {
+        peak = Math.max(peak, point[key]);
+        worst = Math.max(worst, peak > 0 ? 1 - point[key] / peak : 0);
+      }
+      return worst;
+    };
+    const erasedRecoveryClaims = sim.events.filter(
+      (event) => event.kind === 'exit-fixed-term' && event.level === 'danger',
+    ).length;
+    const seniorLossEvents = chart.filter(
+      (point, index) => index > 0 && point.stIL > chart[index - 1].stIL + 1e-9,
+    ).length;
+    const calendar = Array.from(new Set(chart.map((point) => point.date.slice(0, 4)))).map((year) => {
+      const yearPoints = chart.filter((point) => point.date.startsWith(year));
+      const yearFirst = yearPoints[0];
+      const yearLast = yearPoints[yearPoints.length - 1];
+      const observationPointCount = yearPoints.filter(
+        (point) => point.state === MarketState.FIXED_TERM,
+      ).length;
+      const observationTriggers = yearPoints.filter((point) => {
+        if (point.state !== MarketState.FIXED_TERM) return false;
+        const globalIndex = chart.indexOf(point);
+        return globalIndex === 0 || chart[globalIndex - 1].state !== MarketState.FIXED_TERM;
+      }).length;
+      return {
+        year,
+        strategyReturn: yearLast.strategy / yearFirst.strategy - 1,
+        juniorReturn: yearLast.junior / yearFirst.junior - 1,
+        seniorReturn: yearLast.senior / yearFirst.senior - 1,
+        liquidityReturn: yearLast.liquidity / yearFirst.liquidity - 1,
+        nonObservationPct: yearPoints.length
+          ? ((yearPoints.length - observationPointCount) / yearPoints.length) * 100
+          : 0,
+        observationTriggers,
+      };
+    });
     return {
       cfg,
       initial,
@@ -291,8 +400,58 @@ export default function DayMarketSimulator({ market }: { market?: DayMarket }) {
       liquidityApy: annualized(last.liquidity, first.liquidity, days),
       strategyApy: annualized(last.strategy, first.strategy, days),
       final: sim.last(),
+      observationBands,
+      observationEvents,
+      maxObservedObservationDays,
+      erasedRecoveryClaims,
+      seniorLossEvents,
+      juniorCapitalInjected,
+      seniorMaxDrawdown: maxDrawdown('senior'),
+      juniorMaxDrawdown: maxDrawdown('junior'),
+      liquidityMaxDrawdown: maxDrawdown('liquidity'),
+      calendar,
     };
-  }, [coveragePct, defaults, liqSharePct, minLiquidityPct, riskSharePct, seniorDeposit, view]);
+  }, [
+    coveragePct,
+    defaults,
+    exitBufferPct,
+    linkJuniorToFirstLoss,
+    liqSharePct,
+    manualJuniorDeposit,
+    maintainCoverage,
+    minLiquidityPct,
+    observationDays,
+    riskFullPct,
+    riskSharePct,
+    selfLiquidationBonusPct,
+    seniorDeposit,
+    view,
+  ]);
+
+  const activePreset = activeMarket.presets?.find(
+    (preset) =>
+      linkJuniorToFirstLoss &&
+      Math.abs(preset.coverage * 100 - coveragePct) < 1e-9 &&
+      preset.observationDays === observationDays &&
+      Math.abs(preset.exitBufferPct - exitBufferPct) < 1e-9 &&
+      Math.abs(preset.riskYDM.yTarget * 100 - riskSharePct) < 1e-9 &&
+      Math.abs(preset.riskYDM.y100 * 100 - riskFullPct) < 1e-9 &&
+      Math.abs(preset.minLiquidity * 100 - minLiquidityPct) < 1e-9 &&
+      Math.abs(preset.liqYDM.yTarget * 100 - liqSharePct) < 1e-9 &&
+      Math.abs(preset.selfLiquidationBonus * 100 - selfLiquidationBonusPct) < 1e-9,
+  );
+
+  const applyPreset = (preset: NonNullable<DayMarket['presets']>[number]) => {
+    setCoveragePct(preset.coverage * 100);
+    setObservationDays(preset.observationDays);
+    setExitBufferPct(preset.exitBufferPct);
+    setRiskSharePct(preset.riskYDM.yTarget * 100);
+    setRiskFullPct(preset.riskYDM.y100 * 100);
+    setMinLiquidityPct(preset.minLiquidity * 100);
+    setLiqSharePct(preset.liqYDM.yTarget * 100);
+    setSelfLiquidationBonusPct(preset.selfLiquidationBonus * 100);
+    setLinkJuniorToFirstLoss(true);
+  };
 
   const deployText = useMemo(
     () =>
@@ -301,6 +460,8 @@ export default function DayMarketSimulator({ market }: { market?: DayMarket }) {
         `underlying: ${activeMarket.provenance.source}`,
         `minimumCoverage: ${(result.cfg.coverage * 100).toFixed(2)}%`,
         `minimumLiquidity: ${(result.cfg.minLiquidity * 100).toFixed(2)}%`,
+        `observationDuration: ${observationDays} days`,
+        `protectedExitCoverageRemaining: ${exitBufferPct.toFixed(2)}%`,
         `targetUtilization: ${(result.cfg.targetUtilization * 100).toFixed(0)}%`,
         `liquidityTargetUtilization: ${(result.cfg.liqTargetUtilization * 100).toFixed(0)}%`,
         `riskYieldShareAtTarget: ${(result.cfg.riskYDM.yTarget * 100).toFixed(2)}%`,
@@ -309,11 +470,13 @@ export default function DayMarketSimulator({ market }: { market?: DayMarket }) {
         `liquidityYieldShareAtFullUtilization: ${(result.cfg.liqYDM.y100 * 100).toFixed(2)}%`,
         `seniorDeposit: ${result.initial.st.toFixed(0)}`,
         `juniorDeposit: ${result.initial.jt.toFixed(0)}`,
+        `juniorLinkedToCoverage: ${linkJuniorToFirstLoss}`,
+        `maintainJuniorCoverage: ${maintainCoverage}`,
         `liquidityDeposit: ${result.initial.lt.toFixed(0)}`,
         `selfLiquidationBonus: ${(result.cfg.stSelfLiquidationBonus * 100).toFixed(2)}%`,
         `source: ${activeMarket.provenance.sourceUrl}`,
       ].join('\n'),
-    [activeMarket, result],
+    [activeMarket, exitBufferPct, linkJuniorToFirstLoss, maintainCoverage, observationDays, result],
   );
 
   const copyText = async (
@@ -415,7 +578,7 @@ export default function DayMarketSimulator({ market }: { market?: DayMarket }) {
               Adjust the current market terms.
             </h2>
             <p style={{ color: C.muted, fontSize: 12.5, lineHeight: 1.38, marginTop: 4 }}>
-              The loaded strategy path is already set. These five controls change the market terms.
+              {LOCKED_COPY.customizeDescription} Day adds the two Liquidity controls below.
             </p>
           </div>
           <button
@@ -438,64 +601,222 @@ export default function DayMarketSimulator({ market }: { market?: DayMarket }) {
             {showAdvanced ? '−' : '+'}
           </button>
         </div>
+        {result.seniorLossEvents > 0 && (
+          <div
+            className="mt-3"
+            role="alert"
+            style={{
+              background: 'rgba(143,77,66,.06)',
+              border: '1px solid rgba(143,77,66,.35)',
+              color: C.danger,
+              fontSize: 11,
+              lineHeight: 1.4,
+              padding: '8px 10px',
+            }}
+          >
+            <strong>Heads up — these terms would lead to Senior losses.</strong>{' '}
+            {result.seniorLossEvents} Senior loss event
+            {result.seniorLossEvents === 1 ? '' : 's'} across the selected window ({pct(-result.seniorMaxDrawdown)} worst Senior drawdown).
+          </div>
+        )}
         {showAdvanced && (
-          <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
-            <SliderControl
-              label="Minimum coverage ratio (%)"
-              value={coveragePct}
-              min={3}
-              max={65}
-              step={1}
-              display={`${coveragePct.toFixed(0)}%`}
-              description={`Junior deposit derived at 90% target utilization: ${usd0(result.initial.jt)}.`}
-              onChange={setCoveragePct}
-            />
-            <SliderControl
-              label="Senior deposit ($)"
-              value={seniorDeposit}
-              min={1_000_000}
-              max={100_000_000}
-              step={1_000_000}
-              display={usd0(seniorDeposit)}
-              description="Market size. Protected capital that Junior shields from losses."
-              onChange={setSeniorDeposit}
-            />
-            <SliderControl
-              label="Senior yield share to Junior (%)"
-              value={riskSharePct}
-              min={0}
-              max={80}
-              step={1}
-              display={`${riskSharePct.toFixed(0)}%`}
-              description="Risk premium paid to Junior at 90% coverage utilization."
-              onChange={(value) => {
-                setRiskSharePct(value);
-                if (value + liqSharePct > 100) setLiqSharePct(100 - value);
-              }}
-            />
-            <SliderControl
-              label="Minimum liquidity ratio (%)"
-              value={minLiquidityPct}
-              min={1}
-              max={50}
-              step={1}
-              display={`${minLiquidityPct.toFixed(0)}%`}
-              description={`Liquidity capital derived at 90% target utilization: ${usd0(result.initial.lt)}.`}
-              onChange={setMinLiquidityPct}
-            />
-            <SliderControl
-              label="Senior yield share to Liquidity (%)"
-              value={liqSharePct}
-              min={0}
-              max={80}
-              step={1}
-              display={`${liqSharePct.toFixed(0)}%`}
-              description="Liquidity premium paid to the Liquidity Tranche at 90% utilization."
-              onChange={(value) => {
-                setLiqSharePct(value);
-                if (value + riskSharePct > 100) setRiskSharePct(100 - value);
-              }}
-            />
+          <div className="mt-4 flex flex-col gap-4">
+            {activeMarket.presets && activeMarket.presets.length > 0 && (
+              <div>
+                <Eyebrow>Scenario</Eyebrow>
+                <div className="mt-3 grid grid-cols-1 sm:grid-cols-3" style={{ gap: 8 }}>
+                  {activeMarket.presets.map((preset) => {
+                    const active = activePreset?.id === preset.id;
+                    return (
+                      <button
+                        key={preset.id}
+                        type="button"
+                        onClick={() => applyPreset(preset)}
+                        style={{
+                          background: C.cardBg,
+                          border: `1px solid ${active ? C.accent : C.border}`,
+                          borderRadius: 0,
+                          boxShadow: active ? `inset 0 -2px 0 ${C.accent}` : undefined,
+                          padding: '8px 11px',
+                          textAlign: 'left',
+                        }}
+                      >
+                        <span style={{ color: C.text, fontSize: 13, fontWeight: 600 }}>{preset.label}</span>
+                        <div style={{ color: C.muted, fontSize: 11, marginTop: 4 }}>
+                          {(preset.coverage * 100).toFixed(0)}% minimum coverage · {preset.observationDays}d obs · {(preset.riskYDM.yTarget * 100).toFixed(0)}% to Junior · {(preset.minLiquidity * 100).toFixed(0)}% liquidity
+                        </div>
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="mt-1.5" style={{ color: C.kpiLabel, fontSize: 11, lineHeight: 1.4 }}>
+                  Risk rises down the ladder through the Dawn terms. The Day liquidity requirement remains explicit on every rung.
+                </p>
+              </div>
+            )}
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
+              <SliderControl
+                label="Minimum coverage ratio (%)"
+                value={coveragePct}
+                min={3}
+                max={65}
+                step={1}
+                display={`${coveragePct.toFixed(0)}%`}
+                description={linkJuniorToFirstLoss
+                  ? `Junior deposit derived at 90% target utilization: ${usd0(result.initial.jt)}.`
+                  : 'Junior is set by hand, so this sets the coverage floor rebuilt when deposits reopen.'}
+                onChange={setCoveragePct}
+              />
+              <SliderControl
+                label="Senior deposit ($)"
+                value={seniorDeposit}
+                min={100}
+                max={10_000}
+                step={100}
+                display={usd0(seniorDeposit)}
+                description="Market size. Protected capital that Junior shields from losses."
+                onChange={setSeniorDeposit}
+              />
+              <SliderControl
+                label="Senior yield share to Junior (%)"
+                value={riskSharePct}
+                min={0}
+                max={80}
+                step={1}
+                display={`${riskSharePct.toFixed(0)}%`}
+                description="Projection assumption: Junior receives this share of Senior yield at the 90% target."
+                onChange={(value) => {
+                  setRiskSharePct(value);
+                  if (value + liqSharePct > 100) setLiqSharePct(100 - value);
+                }}
+              >
+                <p className="mt-1.5" style={{ color: C.kpiLabel, fontSize: 11, lineHeight: 1.5 }}>
+                  The full-utilization endpoint remains {riskFullPct.toFixed(0)}%, carried by the market configuration.
+                </p>
+              </SliderControl>
+              <SliderControl
+                label="Observation period (days)"
+                value={observationDays}
+                min={7}
+                max={194}
+                step={1}
+                display={`${observationDays} days`}
+                description={`Junior has ${observationDays} days to recover before the recovery claim is erased. Longer helps Junior, but keeps Senior waiting longer.`}
+                onChange={setObservationDays}
+              >
+                <p className="mt-1.5" style={{ color: C.kpiLabel, fontSize: 11, lineHeight: 1.5 }}>
+                  Daily NAV means every 7–194 day term is distinct. The 194-day ceiling preserves the Dawn accountant limit.
+                </p>
+              </SliderControl>
+              <SliderControl
+                label="Junior buffer remaining for Senior exit (%)"
+                value={exitBufferPct}
+                min={1}
+                max={99.91}
+                step={0.01}
+                display={`${exitBufferPct.toFixed(2)}% buffer`}
+                description={`Senior's protected exit opens at ${(100 / Math.max(exitBufferPct, 0.01)).toFixed(2)}× coverage utilization.`}
+                onChange={setExitBufferPct}
+              />
+            </div>
+
+            <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 14 }}>
+              <Eyebrow>Day liquidity additions</Eyebrow>
+              <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-6">
+                <SliderControl
+                  label="Minimum liquidity ratio (%)"
+                  value={minLiquidityPct}
+                  min={1}
+                  max={50}
+                  step={1}
+                  display={`${minLiquidityPct.toFixed(0)}%`}
+                  description={`Liquidity capital derived at 90% target utilization: ${usd0(result.initial.lt)}.`}
+                  onChange={setMinLiquidityPct}
+                />
+                <SliderControl
+                  label="Senior yield share to Liquidity (%)"
+                  value={liqSharePct}
+                  min={0}
+                  max={80}
+                  step={1}
+                  display={`${liqSharePct.toFixed(0)}%`}
+                  description="Liquidity premium paid to the Liquidity Tranche at 90% utilization."
+                  onChange={(value) => {
+                    setLiqSharePct(value);
+                    if (value + riskSharePct > 100) setRiskSharePct(100 - value);
+                  }}
+                />
+              </div>
+            </div>
+
+            <div style={{ background: C.cardBg, border: `1px solid ${C.border}`, padding: '14px 16px' }}>
+              <div className="flex items-start justify-between gap-4 flex-wrap">
+                <div>
+                  <Eyebrow>Advanced override</Eyebrow>
+                  <p className="mt-1.5" style={{ color: C.muted, fontSize: 12, lineHeight: 1.5 }}>
+                    {linkJuniorToFirstLoss
+                      ? 'Junior deposit is derived from the minimum coverage ratio above, which holds genesis utilization at the curve target. Unlink to set it directly.'
+                      : 'Junior deposit is set directly. The minimum coverage slider no longer sizes it.'}
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (linkJuniorToFirstLoss) {
+                      setManualJuniorDeposit(
+                        Math.max(50, Math.round(result.initial.jt / 50) * 50),
+                      );
+                    }
+                    setLinkJuniorToFirstLoss((linked) => !linked);
+                  }}
+                  style={{
+                    background: 'transparent',
+                    border: `1px solid ${C.border}`,
+                    borderRadius: 0,
+                    color: C.accent,
+                    flexShrink: 0,
+                    fontSize: 10,
+                    letterSpacing: 1,
+                    padding: '7px 12px',
+                    textTransform: 'uppercase',
+                  }}
+                >
+                  {linkJuniorToFirstLoss ? 'Unlink Junior' : 'Relink to coverage ratio'}
+                </button>
+              </div>
+              <div className="mt-4">
+                <SliderControl
+                  label="Junior deposit ($)"
+                  value={linkJuniorToFirstLoss ? Math.max(50, result.initial.jt) : manualJuniorDeposit}
+                  min={50}
+                  max={10_000}
+                  step={50}
+                  disabled={linkJuniorToFirstLoss}
+                  display={usd0(result.initial.jt)}
+                  description="First-loss buffer that absorbs drawdowns for Senior."
+                  onChange={setManualJuniorDeposit}
+                >
+                  <p className="mt-1.5" style={{ color: C.kpiLabel, fontSize: 11, lineHeight: 1.5 }}>
+                    When observation ends and deposits reopen, Junior is replenished to the contractual 90% coverage-utilization target.
+                  </p>
+                </SliderControl>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-x-5 gap-y-3">
+              {[
+                ['Premium budget', `${(riskSharePct + liqSharePct).toFixed(0)}% / 100%`],
+                ['Observation term', `${observationDays}d / 7–194d`],
+                ['Protected exit', `${exitBufferPct.toFixed(2)}% remaining`],
+                ['Minimum liquidity', `${minLiquidityPct.toFixed(0)}%`],
+              ].map(([label, value]) => (
+                <div key={label}>
+                  <span style={{ color: C.kpiLabel, display: 'block', fontSize: 9.5, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase' }}>{label}</span>
+                  <b style={{ color: C.text, display: 'block', fontFamily: MONO, fontSize: 15, fontWeight: 600, marginTop: 3 }}>{value}</b>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </section>
@@ -508,7 +829,7 @@ export default function DayMarketSimulator({ market }: { market?: DayMarket }) {
               Chart, metrics, and mechanics.
             </h2>
             <p style={{ color: C.muted, fontSize: 12.5, lineHeight: 1.38, marginTop: 4 }}>
-              Use this to sanity-check historical tranche behavior and protocol mechanics.
+              {LOCKED_COPY.reviewDescription}
             </p>
           </summary>
 
@@ -519,6 +840,7 @@ export default function DayMarketSimulator({ market }: { market?: DayMarket }) {
                 ['Junior share price', C.juniorLine],
                 ['Liquidity share price', C.olive],
                 ['Base strategy', C.strategyLine],
+                ['Observation period', C.obsFill],
               ].map(([label, color]) => (
                 <span key={label} className="inline-flex items-center gap-2">
                   <i style={{ background: color, display: 'inline-block', height: 2, width: 16 }} />
@@ -537,6 +859,16 @@ export default function DayMarketSimulator({ market }: { market?: DayMarket }) {
                     labelFormatter={(label) => String(label)}
                     formatter={(value, name) => [`$${Number(value).toFixed(2)}`, String(name)]}
                   />
+                  {result.observationBands.map((band, index) => (
+                    <ReferenceArea
+                      key={`${band.start}-${band.end}-${index}`}
+                      x1={band.start}
+                      x2={band.end}
+                      fill={C.obsFill}
+                      fillOpacity={0.28}
+                      strokeOpacity={0}
+                    />
+                  ))}
                   <Line type="monotone" dataKey="senior" name="Senior" stroke={C.seniorLine} strokeWidth={2.4} dot={false} isAnimationActive={false} />
                   <Line type="monotone" dataKey="junior" name="Junior" stroke={C.juniorLine} strokeWidth={2.4} dot={false} isAnimationActive={false} />
                   <Line type="monotone" dataKey="liquidity" name="Liquidity" stroke={C.olive} strokeWidth={2.4} dot={false} isAnimationActive={false} />
@@ -574,10 +906,50 @@ export default function DayMarketSimulator({ market }: { market?: DayMarket }) {
               </div>
             </div>
 
+            <div className="mt-6 overflow-x-auto">
+              <table style={{ borderCollapse: 'collapse', color: C.text, fontFamily: MONO, fontSize: 10.5, minWidth: 560, width: '100%' }}>
+                <thead>
+                  <tr style={{ color: C.kpiLabel, textTransform: 'uppercase' }}>
+                    <th style={{ borderBottom: `1px solid ${C.border}`, padding: '6px 7px', textAlign: 'left' }}>Calendar return</th>
+                    {result.calendar.map((row) => (
+                      <th key={row.year} style={{ borderBottom: `1px solid ${C.border}`, padding: '6px 7px', textAlign: 'right' }}>{row.year}</th>
+                    ))}
+                    <th style={{ borderBottom: `1px solid ${C.border}`, padding: '6px 7px', textAlign: 'right' }}>End $100 → avg/yr</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[
+                    ['Base strategy', result.calendar.map((row) => pct(row.strategyReturn)), `$${result.chart[result.chart.length - 1].strategy.toFixed(2)} → ${pct(result.strategyApy)}/yr`],
+                    ['Junior return', result.calendar.map((row) => pct(row.juniorReturn)), `$${result.chart[result.chart.length - 1].junior.toFixed(2)} → ${pct(result.juniorApy)}/yr`],
+                    ['Senior return', result.calendar.map((row) => pct(row.seniorReturn)), `$${result.chart[result.chart.length - 1].senior.toFixed(2)} → ${pct(result.seniorApy)}/yr`],
+                    ['Liquidity return', result.calendar.map((row) => pct(row.liquidityReturn)), `$${result.chart[result.chart.length - 1].liquidity.toFixed(2)} → ${pct(result.liquidityApy)}/yr`],
+                    ['Non-observation %', result.calendar.map((row) => `${row.nonObservationPct.toFixed(1)}%`), '—'],
+                    ['Observation periods triggered', result.calendar.map((row) => String(row.observationTriggers)), `${result.observationEvents} total`],
+                  ].map(([label, cells, end]) => (
+                    <tr key={String(label)}>
+                      <th style={{ borderBottom: `1px solid ${C.border}`, fontFamily: 'inherit', fontWeight: 500, padding: '6px 7px', textAlign: 'left' }}>{String(label)}</th>
+                      {(cells as string[]).map((cell, index) => (
+                        <td key={`${label}-${index}`} style={{ borderBottom: `1px solid ${C.border}`, padding: '6px 7px', textAlign: 'right' }}>{cell}</td>
+                      ))}
+                      <td style={{ borderBottom: `1px solid ${C.border}`, padding: '6px 7px', textAlign: 'right' }}>{String(end)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+
             <div className="mt-6">
               <Eyebrow>Additional outcome metrics</Eyebrow>
               <div className="mt-2 grid grid-cols-2 sm:grid-cols-4 gap-x-5 gap-y-3">
                 {[
+                  ['Senior worst drop', pct(-result.seniorMaxDrawdown)],
+                  ['Junior worst drop', pct(-result.juniorMaxDrawdown)],
+                  ['Liquidity worst drop', pct(-result.liquidityMaxDrawdown)],
+                  ['Max observed observation period', `${result.maxObservedObservationDays}d (${observationDays}d target)`],
+                  ['Claims erased', String(result.erasedRecoveryClaims)],
+                  ['Senior loss events', String(result.seniorLossEvents)],
+                  ['Observation periods', String(result.observationEvents)],
+                  ['Junior capital injected', usd0(result.juniorCapitalInjected)],
                   ['Strategy avg/yr', `${pct(result.strategyApy)}/yr`],
                   ['Coverage utilization', `${(result.final.utilization * 100).toFixed(1)}%`],
                   ['Liquidity utilization', `${(result.final.liquidityUtilization * 100).toFixed(1)}%`],
@@ -595,7 +967,9 @@ export default function DayMarketSimulator({ market }: { market?: DayMarket }) {
               <div style={{ border: `1px solid ${C.border}`, padding: '12px 14px' }}>
                 <p style={{ color: C.text, fontSize: 12.5, fontWeight: 600, marginBottom: 6 }}>Protocol mechanics</p>
                 <p style={{ color: C.muted, fontSize: 11.5, lineHeight: 1.45 }}>Senior is protected first by Junior. Junior earns the risk premium for taking first losses.</p>
-                <p style={{ color: C.muted, fontSize: 11.5, lineHeight: 1.45, marginTop: 6 }}>Liquidity backs secondary exits through the Day E-CLP pool and earns the liquidity premium, stable carry, and modeled swap fees.</p>
+                <p style={{ color: C.muted, fontSize: 11.5, lineHeight: 1.45, marginTop: 6 }}>Junior has {observationDays} days to recover after the Dawn observation state opens; unrecovered claims are erased when the term expires.</p>
+                <p style={{ color: C.muted, fontSize: 11.5, lineHeight: 1.45, marginTop: 6 }}>When deposits reopen, fresh Junior capital rebuilds the coverage requirement at the 90% target. Senior&apos;s protected exit threshold remains {exitBufferPct.toFixed(2)}% Junior buffer.</p>
+                <p style={{ color: C.muted, fontSize: 11.5, lineHeight: 1.45, marginTop: 6 }}>Day is additive: Liquidity backs secondary exits through the E-CLP pool and earns the liquidity premium, stable carry, and modeled swap fees.</p>
               </div>
               <div style={{ border: `1px solid ${C.border}`, padding: '12px 14px' }}>
                 <p style={{ color: C.text, fontSize: 12.5, fontWeight: 600, marginBottom: 6 }}>Data provenance</p>
@@ -640,6 +1014,42 @@ export default function DayMarketSimulator({ market }: { market?: DayMarket }) {
             />
           </div>
         </details>
+      </section>
+
+      <section
+        style={{
+          ...cardStyle,
+          borderLeft: `3px solid ${C.accent}`,
+        }}
+      >
+        <div className="flex items-start justify-between gap-4 flex-wrap">
+          <span style={{ color: C.eyebrow, fontSize: 10, fontWeight: 600, letterSpacing: 1.5, textTransform: 'uppercase' }}>
+            Key modeling assumption
+          </span>
+          <label className="flex items-center gap-2 cursor-pointer select-none" style={{ color: C.muted, fontSize: 12 }}>
+            <input
+              type="checkbox"
+              checked={maintainCoverage}
+              onChange={(event) => setMaintainCoverage(event.target.checked)}
+              style={{ accentColor: C.accent }}
+            />
+            Assume Junior is replenished to hold the buffer
+          </label>
+        </div>
+        <p className="mt-2" style={{ color: C.text, fontSize: 13, lineHeight: 1.5 }}>
+          {maintainCoverage ? (
+            <>
+              These results assume <strong>maintained Junior coverage</strong>: whenever an observation period ends and deposits reopen, fresh Junior capital rebuilds the buffer to the {coveragePct.toFixed(0)}% minimum at the 90% target. This run injects <span style={{ fontFamily: MONO, fontWeight: 600 }}>{usd0(result.juniorCapitalInjected)}</span> over the selected horizon. Uncheck the box to inspect the fixed-Junior accountant path.
+            </>
+          ) : (
+            <>
+              <strong>Fixed Junior capital, no replenishment.</strong> Once losses consume Junior, no fresh buffer is added when deposits reopen. This exposes the raw fixed-capital path while leaving every other Dawn and Day term unchanged.
+            </>
+          )}
+        </p>
+        <p className="mt-3" style={{ color: C.kpiLabel, fontSize: 11, lineHeight: 1.45 }}>
+          Parameters are illustrative and pending accountant sign-off. Projections, not promises. This is not an offer or investment advice.
+        </p>
       </section>
     </div>
   );

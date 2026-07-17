@@ -19,7 +19,8 @@ async function main() {
     ? {
         coverage: market.defaults.coverage,
         minLiquidity: market.defaults.minLiquidity,
-        liquidationUtilization: market.defaults.liquidationUtilization,
+        fixedTermDurationSec: market.defaults.observationDays * 86_400,
+        liquidationUtilization: 100 / market.defaults.exitBufferPct,
         riskYDM: market.defaults.riskYDM,
         liqYDM: market.defaults.liqYDM,
         stSelfLiquidationBonus: market.defaults.selfLiquidationBonus,
@@ -63,6 +64,12 @@ async function main() {
   }
   if (cfg.premiumPriority !== "jtPriority") {
     throw new Error("Day template premium priority changed unexpectedly");
+  }
+  if (market && cfg.fixedTermDurationSec !== market.defaults.observationDays * 86_400) {
+    throw new Error("Day observation period diverges from the market manifest");
+  }
+  if (market && cfg.liquidationUtilization !== 100 / market.defaults.exitBufferPct) {
+    throw new Error("Day protected-exit threshold diverges from the Dawn exit-buffer rule");
   }
 
   console.log("Day runtime defaults: PASS");

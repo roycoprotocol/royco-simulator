@@ -28,7 +28,11 @@ npm run day-sim:preview
 
 ## Dawn/Tenbin visual contract
 
-Day changes the accountant and adds the Liquidity Tranche; it does not introduce a different visual system. Every public Day market must use the Dawn `SimulatorPageShell` and retain the Tenbin palette, typography, square card treatment, spacing, section order, headings, compact five-control builder, historical review layout, and deploy handoff. The required Day-specific additions are the Liquidity KPI, minimum-liquidity control, liquidity-premium control, Liquidity chart line, and Day deploy fields.
+Day changes the accountant and adds the Liquidity Tranche; it does not introduce a different visual system or remove Dawn behavior. Every public Day market must use the Dawn `SimulatorPageShell` and retain the Tenbin palette, typography, square card treatment, spacing, section order, headings, historical review layout, and deploy handoff.
+
+The Dawn contract is invariant in Day: minimum coverage, Senior deposit, Senior yield share to Junior, observation period, Junior buffer remaining for Senior exit, Conservative/Balanced/Aggressive presets, the linked-Junior advanced override, observation state and claim erasure, protected-exit rules, Junior replenishment when deposits reopen, review metrics, and deploy fields must all remain present and accountant-driven.
+
+Day is additive. Its required additions are the Liquidity KPI, minimum-liquidity control, liquidity-premium control, Liquidity chart line and drawdown, liquidity utilization, and Day deploy fields. These additions must be visibly separated from the invariant Dawn controls. `day-sim:verify` enforces both halves of this contract.
 
 The legacy dark components under `app/DaySimulator*.tsx` and `app/internal/day` are internal prototypes. They are not public template components. `day-sim:verify` rejects a public Day route that imports them or uses their dark-theme variables.
 
@@ -49,4 +53,4 @@ npm run lint
 npm run build
 ```
 
-Then inspect `/day-sim` in a browser, including the default values, advanced controls, both utilization curves, tranche APYs, and browser console. Do not open a PR until the preview is approved.
+Then inspect `/day-sim` in a browser, including all five Dawn controls, linked-Junior behavior, the observation-period bands and dates, preset direction, Day liquidity additions, tranche APYs, and browser console. Do not open a PR until the preview is approved.

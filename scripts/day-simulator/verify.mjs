@@ -72,10 +72,38 @@ for (const control of [
   'Minimum coverage ratio (%)',
   'Senior deposit ($)',
   'Senior yield share to Junior (%)',
+  'Observation period (days)',
+  'Junior buffer remaining for Senior exit (%)',
+  'Advanced override',
+  'Junior deposit ($)',
+  'Unlink Junior',
+  'Relink to coverage ratio',
+]) {
+  if (!simulator.includes(control)) failures.push(`Day simulator missing invariant Dawn control: ${control}`);
+}
+for (const control of [
   'Minimum liquidity ratio (%)',
   'Senior yield share to Liquidity (%)',
+  'Day liquidity additions',
+  'Liquidity avg/yr',
+  'Liquidity share price',
 ]) {
-  if (!simulator.includes(control)) failures.push(`Day simulator missing required five-control contract: ${control}`);
+  if (!simulator.includes(control)) failures.push(`Day simulator missing additive Liquidity contract: ${control}`);
+}
+for (const invariant of [
+  'fixedTermDurationSec: observationDays * DAY',
+  'liquidationUtilization: 100 / Math.max(exitBufferPct, 0.01)',
+  'linkJuniorToFirstLoss',
+  "op: { type: 'jtDeposit', amount: refill }",
+  'MarketState.PERPETUAL',
+  'MarketState.FIXED_TERM',
+  '<ReferenceArea',
+  'Claims erased',
+  'Observation periods triggered',
+  'Assume Junior is replenished to hold the buffer',
+  'maintainJuniorCoverage',
+]) {
+  if (!simulator.includes(invariant)) failures.push(`Day simulator missing Dawn behavior invariant: ${invariant}`);
 }
 for (const forbidden of ['var(--foundation)', 'var(--theme-background)', 'DaySimulatorSidebar']) {
   if (simulator.includes(forbidden) || shell.includes(forbidden)) {
@@ -113,6 +141,54 @@ if (marketId) {
     }
     if (!(market.defaults?.sourceApy > -1 && Number.isFinite(market.defaults.sourceApy))) {
       failures.push("Day market sourceApy must be finite and greater than -100%");
+    }
+    if (!(market.defaults?.observationDays >= 7 && market.defaults.observationDays <= 194)) {
+      failures.push("Day market observationDays must preserve the Dawn 7–194 day range");
+    }
+    if (!(market.defaults?.exitBufferPct >= 1 && market.defaults.exitBufferPct <= 99.91)) {
+      failures.push("Day market exitBufferPct must preserve the Dawn 1–99.91% range");
+    }
+    if (market.defaults?.linkJuniorToFirstLoss !== true) {
+      failures.push("Day market Junior override must be linked to coverage by default");
+    }
+    if (Math.abs(market.defaults.liquidationUtilization - 100 / market.defaults.exitBufferPct) > 1e-9) {
+      failures.push("Day market protected-exit utilization must derive from exitBufferPct");
+    }
+    if (!Array.isArray(market.presets) || market.presets.map((preset) => preset.id).join(",") !== "conservative,balanced,aggressive") {
+      failures.push("Day market must preserve the Conservative, Balanced, Aggressive preset ladder");
+    } else {
+      const [conservative, balanced, aggressive] = market.presets;
+      if (
+        conservative.coverage < balanced.coverage ||
+        balanced.coverage < aggressive.coverage ||
+        conservative.observationDays < balanced.observationDays ||
+        balanced.observationDays < aggressive.observationDays ||
+        conservative.riskYDM.yTarget > balanced.riskYDM.yTarget ||
+        balanced.riskYDM.yTarget > aggressive.riskYDM.yTarget ||
+        conservative.riskYDM.y100 > balanced.riskYDM.y100 ||
+        balanced.riskYDM.y100 > aggressive.riskYDM.y100 ||
+        conservative.selfLiquidationBonus > balanced.selfLiquidationBonus ||
+        balanced.selfLiquidationBonus > aggressive.selfLiquidationBonus
+      ) {
+        failures.push("Day preset risk must move logically from Conservative through Aggressive");
+      }
+    }
+    if (marketId === "pareto-falconx") {
+      const balanced = market.presets?.find((preset) => preset.id === "balanced");
+      if (Math.abs(market.defaults.minLiquidity - 0.15) > 1e-12) {
+        failures.push("Pareto FalconX Day minimum liquidity must remain 15%");
+      }
+      if (
+        !balanced ||
+        balanced.coverage !== 0.03 ||
+        balanced.riskYDM?.yTarget !== 0.06 ||
+        balanced.riskYDM?.y100 !== 0.18 ||
+        balanced.observationDays !== 7 ||
+        balanced.exitBufferPct !== 1 ||
+        balanced.selfLiquidationBonus !== 0.01
+      ) {
+        failures.push("Pareto FalconX Balanced preset must retain the approved Dawn parameters");
+      }
     }
     for (const curveName of ["riskYDM", "liqYDM"]) {
       const curve = market.defaults?.[curveName];
