@@ -1,0 +1,6 @@
+{
+  "app/globals.css": "9630f62f3e53beea7b27611c76d82affeea6dc86d29609a1b2a59a3dd9111782",
+  "components/simulator/MarketSimulator.tsx": "5c4443b802c92e188af5969ecae31c3ff1f373eb7a0ccc31e5d0bd426b6c26d0",
+  "components/simulator/SimulatorPageShell.tsx": "38d1e86becdc19bb5880559757df58eb4e9a70a108495272819f73f61983eec9",
+  "lib/simulator-template/locked-copy.ts": "37a121fd3c7f6363077ae61b9cf23e538391e06dd7018f65ac67870ff5591554"
+}

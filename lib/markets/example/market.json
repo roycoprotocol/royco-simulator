@@ -1,0 +1,57 @@
+{
+  "id": "example",
+  "route": "/example-sim",
+  "dataCadence": "monthly",
+  "copy": {
+    "marketEyebrow": "ROYCO · EXAMPLE MARKET",
+    "title": "Example Sim",
+    "hero": "A hypothetical Royco Senior/Junior market over the Example strategy. Senior is protected by Junior's first-loss buffer; Junior earns yield for taking that risk.",
+    "loadedMarket": "Example strategy (synthetic monthly fixture)",
+    "strategyLegend": "Underlying strategy",
+    "seniorTrancheName": "Royco-ST Example Senior",
+    "seniorTrancheSymbol": "ST-EXAMPLE",
+    "juniorTrancheName": "Royco-JT Example Junior",
+    "juniorTrancheSymbol": "JT-EXAMPLE",
+    "integrationLabel": "EXAMPLE",
+    "footerParagraphs": [
+      "The underlying is a synthetic 24-point monthly fixture covering January 2024 through December 2025. It exists only to prove that a pasted date/price CSV can render through the locked simulator template.",
+      "This is a counterfactual mechanism illustration, not a track record or announced product.",
+      "Backtest math uses the shared Royco Day accountant engine and the repository parity suite. The fixture data and parameters are intentionally illustrative."
+    ]
+  },
+  "defaults": {
+    "depositST": 1000,
+    "exitBufferPct": 5,
+    "linkJuniorToFirstLoss": true,
+    "minCoveragePct": 20,
+    "observationDays": 45,
+    "seniorShareToJuniorPct": 47
+  },
+  "presets": {
+    "conservative": {
+      "minimumCoveragePct": 24,
+      "observationDays": 60,
+      "seniorYieldShareToJuniorPct": 34
+    },
+    "balanced": {
+      "minimumCoveragePct": 20,
+      "observationDays": 45,
+      "seniorYieldShareToJuniorPct": 47
+    },
+    "aggressive": {
+      "minimumCoveragePct": 18,
+      "observationDays": 16,
+      "seniorYieldShareToJuniorPct": 59
+    }
+  },
+  "certification": {
+    "label": "Shared accountant engine",
+    "detail": "Backtest math uses the shared Royco Day accountant engine and must pass the repository parity suite before publication."
+  },
+  "provenance": {
+    "source": "Repository-owned synthetic example fixture",
+    "priceType": "price",
+    "feesIncluded": false,
+    "notes": "Smooth synthetic monthly data used only to test the generator, shared design, and verification workflow."
+  }
+}

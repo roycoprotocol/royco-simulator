@@ -24,8 +24,15 @@
 // ---------------------------------------------------------------------------
 import { runBacktest, type PricePoint } from "@/lib/try/backtest";
 import type { MarketConfig } from "@/lib/try/engine";
-import { WAD } from "@/lib/try/engine";
-import { buildConfig } from "@/lib/try/scenarios";
+import {
+  OBSERVATION_DAYS_MAX,
+  OBSERVATION_DAYS_MIN,
+  buildSimulatorConfig,
+  bufferPctFromUtilWad as templateBufferPctFromUtilWad,
+  juniorFromFirstLossPct as templateJuniorFromFirstLossPct,
+  utilWadFromBufferPct as templateUtilWadFromBufferPct,
+  type SimulatorParams,
+} from "@/lib/simulator-template/market";
 import navDaily from "./data/nav-daily.json";
 export type { PricePoint };
 
@@ -41,10 +48,10 @@ export type { PricePoint };
 
 /** Exit buffer % → coverageLiquidationUtilizationWAD. 5% → 20e18. */
 export const utilWadFromBufferPct = (b: number): bigint =>
-  (BigInt(Math.round((100 / Math.max(b, 0.01)) * 1e6)) * WAD) / 1_000_000n;
+  templateUtilWadFromBufferPct(b);
 
 /** Inverse of utilWadFromBufferPct. */
-export const bufferPctFromUtilWad = (w: bigint): number => 100 / (Number(w) / 1e18);
+export const bufferPctFromUtilWad = (w: bigint): number => templateBufferPctFromUtilWad(w);
 
 /**
  * 0.9 = flatCurve's hardcoded targetUtilizationWAD (lib/try/scenarios.ts:24). At genesis
@@ -53,8 +60,6 @@ export const bufferPctFromUtilWad = (w: bigint): number => 100 / (Number(w) / 1e
  * At the Balanced minCov 20 / ST 1000 this gives 285.714286 after NAV input rounding
  * (Junior = 22.22% of the pool, U = 0.9).
  */
-const GENESIS_TARGET_UTIL_PCT = 90; // 0.9e18, as a percent (exact in binary float; 0.9 is not)
-
 /**
  * Junior deposit implied by a first-loss-protection %, given the Senior deposit.
  *
@@ -63,29 +68,16 @@ const GENESIS_TARGET_UTIL_PCT = 90; // 0.9e18, as a percent (exact in binary flo
  * avoidable intermediate floating-point rounding before NAV inputs are rounded to 6 decimals.
  */
 export function juniorFromFirstLossPct(depositST: number, minCoveragePct: number): number {
-  const denom = GENESIS_TARGET_UTIL_PCT - minCoveragePct;
-  if (denom <= 0) return Infinity; // first loss >= target utilization: no finite Junior satisfies it
-  return (depositST * minCoveragePct) / denom;
+  return templateJuniorFromFirstLossPct(depositST, minCoveragePct);
 }
 
 /**
  * `fixedTermDurationSeconds` is a uint24 in the real accountant, so the hard ceiling is
  * 16,777,215s = 194.18 days. Min mirrors Tenbin's 7.
  */
-export const OBSERVATION_DAYS_MIN = 7;
-export const OBSERVATION_DAYS_MAX = 194;
+export { OBSERVATION_DAYS_MIN, OBSERVATION_DAYS_MAX };
 
-export interface HybondParams {
-  depositST: number;
-  depositJT: number;
-  seniorShareToJuniorPct: number;
-  observationDays: number;
-  minCoveragePct: number;
-  /** Junior's headroom before coverage is force-liquidated, %. */
-  exitBufferPct: number;
-  /** When true, depositJT is derived from minCoveragePct via juniorFromFirstLossPct. */
-  linkJuniorToFirstLoss: boolean;
-}
+export type HybondParams = SimulatorParams;
 
 /**
  * The page lands on the Balanced rung, so the ladder shows a named preset rather than
@@ -105,16 +97,7 @@ export const HYBOND_DEFAULT_PARAMS: HybondParams = {
 
 /** TRY's config plus HYBond's exit-buffer-derived liquidation threshold. */
 export function buildHybondConfig(p: HybondParams): MarketConfig {
-  return {
-    ...buildConfig({
-      firstLossPct: (p.depositJT / (p.depositST + p.depositJT)) * 100,
-      observationDays: p.observationDays,
-      seniorShareToJuniorPct: p.seniorShareToJuniorPct,
-      juniorBufferRemainingPct: p.minCoveragePct,
-      seniorExitBonusPct: 0.25,
-    }),
-    coverageLiquidationUtilizationWAD: utilWadFromBufferPct(p.exitBufferPct),
-  };
+  return buildSimulatorConfig(p);
 }
 
 // --- Presets (identical mechanism params to TRY's ladder) -------------------

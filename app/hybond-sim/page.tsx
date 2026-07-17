@@ -1,4 +1,5 @@
 import type { Metadata } from 'next';
+import SimulatorPageShell from '@/components/simulator/SimulatorPageShell';
 import HybondSimulator from './HybondSimulator';
 
 export const metadata: Metadata = {
@@ -18,26 +19,8 @@ export default async function HybondSimPage({
   const sp = await searchParams;
 
   return (
-    <div
-      className="min-h-screen"
-      style={{
-        color: '#171511',
-        fontFamily:
-          "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif",
-        fontSize: 14,
-        lineHeight: 1.45,
-        borderTop: '6px solid #11100E',
-        backgroundColor: '#FBFAF7',
-        backgroundImage:
-          'linear-gradient(rgba(150,119,86,.055) 1px,transparent 1px),linear-gradient(90deg,rgba(150,119,86,.055) 1px,transparent 1px)',
-        backgroundSize: '42px 42px',
-      }}
-    >
-      <div className="mx-auto" style={{ maxWidth: 1180, padding: '18px 20px 48px' }}>
-        <div>
-          <HybondSimulator initialQuery={sp} />
-        </div>
-      </div>
-    </div>
+    <SimulatorPageShell>
+      <HybondSimulator initialQuery={sp} />
+    </SimulatorPageShell>
   );
 }
