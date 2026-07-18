@@ -5,7 +5,6 @@
 
 import { MarketState } from "./types";
 import { Sim, defaultConfig, steadyYear, type StepInput } from "./runner";
-import { ltPrice } from "./engine";
 import { YEAR_SEC, ydmShare } from "./ydm";
 import { eclpParamsForWeight, eclpSellValue, eclpInvariant, eclpTVL, reservesPerL } from "./eclp";
 
@@ -36,7 +35,7 @@ const hold = (dtSec: number, stReturn: number, jtReturn: number): StepInput => (
 console.log("\n\x1b[1mRoyco Day engine — invariant audit\x1b[0m\n");
 
 // ---------------------------------------------------------------------------
-console.log("1. NAV conservation (stRaw+jtRaw == stEff+jtEff+liqPrem+fees)");
+console.log("1. NAV conservation (stRaw+jtRaw == stEff+jtEff; premiums and fees are share claims)");
 {
   const sim = new Sim(defaultConfig(), { st: 1000, jt: 250, lt: 150 });
   steadyYear(0.12, 0).forEach((s) => sim.step(s));
@@ -75,7 +74,7 @@ console.log("\n2. Loss waterfall: JT covers first, ST IL only after JT exhausted
 }
 
 // ---------------------------------------------------------------------------
-console.log("\n3. Senior priority: ST IL has first claim on appreciation, before any premium");
+console.log("\n3. Claim-based PnL attribution replaces the legacy ST-IL repayment bucket");
 {
   // distressed market: stIL>0, jtIL erased (they provably never coexist post-sync)
   const sim = new Sim(defaultConfig({ fixedTermDurationSec: 365 * 86400, liquidationUtilization: 5 }), { st: 1000, jt: 200, lt: 150 });
@@ -84,9 +83,13 @@ console.log("\n3. Senior priority: ST IL has first claim on appreciation, before
   check("distressed state carries ST IL (~100)", approx(before.stIL, 100), `stIL=${before.stIL}`);
   sim.step(shock(+0.05)); // +5% of stRaw 700 = +35
   const a = sim.last();
-  check("ST IL recovers first (100 -> ~65)", approx(a.stIL, 65, 1e-2), `stIL=${a.stIL}`);
-  check("all appreciation went to ST IL recovery, none to yield (ΔstEff ~35)", approx(a.stEffectiveNAV - before.stEffectiveNAV, 35, 1e-2), `ΔstEff=${a.stEffectiveNAV - before.stEffectiveNAV}`);
-  check("JT got no premium while ST still impaired", approx(a.jtEffectiveNAV, before.jtEffectiveNAV, 1e-2), `ΔjtEff=${a.jtEffectiveNAV - before.jtEffectiveNAV}`);
+  check("visual Senior-loss diagnostic declines without driving accounting", approx(a.stIL, 65, 1e-2), `stIL=${a.stIL}`);
+  check("contract pays JT premium on Senior-attributed gain", a.jtEffectiveNAV > before.jtEffectiveNAV, `ΔjtEff=${a.jtEffectiveNAV - before.jtEffectiveNAV}`);
+  check("Senior and Junior effective gains sum to the attributed gain", approx(
+    (a.stEffectiveNAV - before.stEffectiveNAV) + (a.jtEffectiveNAV - before.jtEffectiveNAV),
+    35,
+    1e-2,
+  ));
 }
 
 // ---------------------------------------------------------------------------
@@ -165,16 +168,21 @@ console.log("\n7. Dual YDM yield split: ST keeps residual, JT gets risk premium,
   });
   const sim = new Sim(cfg, { st: 1000, jt: 250, lt: 150 });
   const b = sim.last();
-  const liqPremB = b.accruedLiquidityPremium;
+  const poolSeniorSharesBefore = sim.state.pool.stShares;
   sim.step(hold(YEAR_SEC, 0.1, 0)); // +100 ST yield over a year
   const a = sim.last();
   const dST = a.stEffectiveNAV - b.stEffectiveNAV;
   const dJT = a.jtEffectiveNAV - b.jtEffectiveNAV;
-  const dLiq = a.accruedLiquidityPremium - liqPremB;
+  const reinvestedPremiumShares = sim.state.pool.stShares - poolSeniorSharesBefore;
+  const dLiq = reinvestedPremiumShares * a.stPrice;
+  const plainSeniorGain = (a.stPrice - b.stPrice) * 1000;
   check("JT received ~30% of ST yield as risk premium", approx(dJT, 30, 0.5), `dJT=${dJT}`);
-  check("LT accrued ~10% of ST yield as liquidity premium", approx(dLiq, 10, 0.5), `dLiq=${dLiq}`);
-  check("ST kept ~60% of its own yield", approx(dST, 60, 0.5), `dST=${dST}`);
-  check("split sums to the full yield (conservation of yield)", approx(dST + dJT + dLiq, 100, 1e-2));
+  check("LT received ~10% of ST yield as reinvested Senior shares", approx(dLiq, 10, 0.5), `dLiq=${dLiq}`);
+  check("liquidity premium is deployed into the ECLP Senior leg", reinvestedPremiumShares > 0);
+  check("successful reinvestment leaves no idle premium Senior shares", sim.state.ltOwnedSTShares === 0);
+  check("Senior effective NAV includes its retained yield and the LT-owned premium", approx(dST, 70, 0.5), `dST=${dST}`);
+  check("pre-existing Senior shares kept ~60% of yield after the LT share mint", approx(plainSeniorGain, 60, 0.5), `gain=${plainSeniorGain}`);
+  check("economic split sums to the full yield", approx(plainSeniorGain + dJT + dLiq, 100, 1e-2));
 }
 
 // ---------------------------------------------------------------------------
@@ -298,11 +306,135 @@ console.log("\n15. LT deposit prices shares via the oracle: ltPrice invariant ev
   const sim = new Sim(defaultConfig(), { st: 1000, jt: 250, lt: 150 });
   // imbalance the pool off-peg with secondary sells
   for (let i = 0; i < 4; i++) sim.step({ dtSec: 0, stReturn: 0, jtReturn: 0, op: { type: "secondarySell", amount: 10 } });
-  const pxBefore = ltPrice(sim.state, sim.cfg);
+  const pxBefore = sim.last().ltPrice;
   sim.step({ dtSec: 0, stReturn: 0, jtReturn: 0, op: { type: "ltDeposit", amount: 100 } });
-  const pxAfter = ltPrice(sim.state, sim.cfg);
+  const pxAfter = sim.last().ltPrice;
   check("off-peg LT deposit does not move ltPrice (oracle-consistent, no cohort transfer)", approx(pxBefore, pxAfter, 1e-6), `${pxBefore} -> ${pxAfter}`);
   assertConservation(sim, "off-peg LT deposit");
+}
+
+// ---------------------------------------------------------------------------
+console.log("\n16. Contract claim attribution clears the recovery claim at the same checkpoint");
+{
+  const cfg = defaultConfig({
+    coverage: 0.03,
+    beta: 1,
+    minLiquidity: 0.15,
+    fixedTermDurationSec: 7 * 86400,
+    liquidationUtilization: 100,
+    riskYDM: { mode: "static", y0: 0, yTarget: 0, y100: 0 },
+    liqYDM: { mode: "static", y0: 0, yTarget: 0, y100: 0 },
+  });
+  const sim = new Sim(cfg, { st: 1000, jt: 34.48275862068966, lt: 166.66666666666666 });
+  for (const sourceReturn of [-0.01, 0.004, 0.006060606060606061]) {
+    sim.step({ dtSec: 86400, stReturn: sourceReturn, jtReturn: sourceReturn });
+  }
+  check("claim-weighted recovery clears JT coverage IL", sim.last().jtIL < 1e-9, `jtIL=${sim.last().jtIL}`);
+  check("claim-weighted recovery returns the market to PERPETUAL", sim.last().state === MarketState.PERPETUAL);
+  assertConservation(sim, "contract claim-attribution replay");
+}
+
+// ---------------------------------------------------------------------------
+console.log("\n17. Fixed-term gates and Senior-deposit liquidity requirement match the kernel");
+{
+  const sim = new Sim(defaultConfig({ fixedTermDurationSec: 365 * 86400 }), { st: 1000, jt: 250, lt: 150 });
+  sim.step(shock(-0.05));
+  const stBefore = sim.state.stShares;
+  const jtBefore = sim.state.jtShares;
+  sim.step({ dtSec: 0, stReturn: 0, jtReturn: 0, op: { type: "stDeposit", amount: 1 } });
+  sim.step({ dtSec: 0, stReturn: 0, jtReturn: 0, op: { type: "jtRedeem", shares: 1 } });
+  check("Senior deposit is blocked in FIXED_TERM", sim.state.stShares === stBefore);
+  check("Junior redemption is blocked in FIXED_TERM", sim.state.jtShares === jtBefore);
+}
+{
+  const sim = new Sim(defaultConfig({ coverage: 0.2, minLiquidity: 0.12 }), { st: 1000, jt: 500, lt: 120 });
+  const before = sim.state.stShares;
+  sim.step({ dtSec: 0, stReturn: 0, jtReturn: 0, op: { type: "stDeposit", amount: 1 } });
+  check("Senior deposit that breaches minimum liquidity is blocked", sim.state.stShares === before);
+}
+
+// ---------------------------------------------------------------------------
+console.log("\n18. Wiped Junior refills stay finite under the contract dilution clamp");
+{
+  const sim = new Sim(defaultConfig({ fixedTermDurationSec: 0 }), { st: 1000, jt: 250, lt: 150 });
+  sim.step(shock(0, -1));
+  sim.step({ dtSec: 0, stReturn: 0, jtReturn: 0, op: { type: "jtDeposit", amount: 10 } });
+  check("wiped-Junior refill mints a finite share count", Number.isFinite(sim.state.jtShares));
+  check("wiped-Junior refill restores a positive finite price", Number.isFinite(sim.last().jtPrice) && sim.last().jtPrice > 0, `jtPrice=${sim.last().jtPrice}`);
+  assertConservation(sim, "wiped-Junior refill");
+}
+
+// ---------------------------------------------------------------------------
+console.log("\n19. Coverage liquidation unlocks full LT redemption");
+{
+  const cfg = defaultConfig({ coverage: 0.4, liquidationUtilization: 1.2, fixedTermDurationSec: 0 });
+  const sim = new Sim(cfg, { st: 1000, jt: 500, lt: 150 });
+  sim.step(shock(-0.2));
+  sim.step(shock(-0.1));
+  check("coverage liquidation threshold is breached", sim.last().utilization >= cfg.liquidationUtilization);
+  sim.step({ dtSec: 0, stReturn: 0, jtReturn: 0, op: { type: "ltRedeem", shares: sim.state.ltShares } });
+  check("full LT redemption succeeds despite the minimum-liquidity check", sim.state.ltShares < 1e-9);
+}
+
+// ---------------------------------------------------------------------------
+console.log("\n20. Time-weighted premium uses the checkpoint utilizations since last payment");
+{
+  const cfg = defaultConfig({
+    coverage: 0.2,
+    riskYDM: { mode: "static", y0: 0, yTarget: 0.9, y100: 1 },
+    liqYDM: { mode: "static", y0: 0, yTarget: 0, y100: 0 },
+  });
+  const sim = new Sim(cfg, { st: 1000, jt: 250, lt: 150 });
+  sim.step({ dtSec: 0, stReturn: 0, jtReturn: 0 });
+  sim.step({ dtSec: 10, stReturn: 0, jtReturn: 0 });
+  sim.step({ dtSec: 0, stReturn: 0, jtReturn: 0, op: { type: "jtDeposit", amount: 250 } });
+  sim.step({ dtSec: 10, stReturn: 0, jtReturn: 0 });
+  sim.step({ dtSec: 0, stReturn: 0.01, jtReturn: 0 });
+  check("premium share is the 20-second average of 80% and 40% utilization", approx(sim.last().riskShare, 0.6, 1e-6), `share=${sim.last().riskShare}`);
+}
+
+// ---------------------------------------------------------------------------
+console.log("\n21. Public explainer metrics are exact accountant ratios and executable quotes");
+{
+  const cfg = defaultConfig({ coverage: 0.03, beta: 1, minLiquidity: 0.15 });
+  const sim = new Sim(cfg, { st: 1000, jt: 34.48275862068966, lt: 166.66666666666666 });
+  const snapshot = sim.last();
+  check(
+    "coverage panel requirement reproduces accountant utilization",
+    approx(snapshot.coverageRequiredNAV / snapshot.jtEffectiveNAV, snapshot.utilization, 1e-12),
+    `panel=${snapshot.coverageRequiredNAV / snapshot.jtEffectiveNAV} accountant=${snapshot.utilization}`,
+  );
+  check(
+    "liquidity panel requirement reproduces accountant utilization",
+    approx(snapshot.liquidityRequiredNAV / snapshot.ltRawNAV, snapshot.liquidityUtilization, 1e-12),
+    `panel=${snapshot.liquidityRequiredNAV / snapshot.ltRawNAV} accountant=${snapshot.liquidityUtilization}`,
+  );
+  check(
+    "pool composition values sum to spot pool NAV",
+    approx(snapshot.poolSeniorNAV + snapshot.poolStableNAV, snapshot.poolValue, 1e-9),
+  );
+
+  const stateBefore = sim.state;
+  const quote = sim.previewSecondarySell(snapshot.stEffectiveNAV * 0.01);
+  const stateAfterPreview = sim.state;
+  check(
+    "1% secondary quote is read-only",
+    approx(stateAfterPreview.pool.stShares, stateBefore.pool.stShares, 1e-12) &&
+      approx(stateAfterPreview.pool.stable, stateBefore.pool.stable, 1e-12),
+  );
+  sim.step({
+    dtSec: 0,
+    stReturn: 0,
+    jtReturn: 0,
+    op: { type: "secondarySell", amount: snapshot.stEffectiveNAV * 0.01 },
+  });
+  const stateAfterSell = sim.state;
+  const actualStableOut = stateBefore.pool.stable - stateAfterSell.pool.stable;
+  const actualFilledNAV =
+    (stateAfterSell.pool.stShares - stateBefore.pool.stShares) * snapshot.stPrice;
+  check("previewed stable output equals the executed sale", approx(quote.stableOutNAV, actualStableOut, 1e-9));
+  check("previewed filled NAV equals the executed sale", approx(quote.filledNAV, actualFilledNAV, 1e-9));
+  check("previewed post-sale pool mix equals the executed state", approx(quote.poolPctSTAfter, sim.last().poolPctST, 1e-12));
 }
 
 // ---------------------------------------------------------------------------

@@ -1,13 +1,13 @@
 // ---------------------------------------------------------------------------
 // timeframe.ts — pure index-range helpers for the "Backtest window" brush.
 //
-// The brush selects a window over the full monthly series, and the simulator
+// The brush selects a window over the full input series, and the simulator
 // RESTARTS the market over that slice: the window start is a new genesis, so
 // every KPI, stat, and calendar row recomputes over it. These helpers stay
 // purely about index arithmetic (clamping, min-window, no-crossing) and do no
 // accounting themselves, so those rules can be tested headlessly.
 //
-// MIN_WINDOW_MONTHS is what guarantees a restart always has enough points to be
+// MIN_WINDOW_POINTS is what guarantees a restart always has enough points to be
 // a runnable market rather than a degenerate one.
 // ---------------------------------------------------------------------------
 
@@ -18,13 +18,15 @@ export interface IndexRange {
 }
 
 /**
- * Minimum selectable window, in months (points). The series is monthly, so a
- * 3-point window is 3 months and the brush can never collapse to nothing.
+ * Minimum selectable window, measured in input points. Three points keep the
+ * brush from collapsing for either daily or monthly data.
  */
-export const MIN_WINDOW_MONTHS = 3;
+export const MIN_WINDOW_POINTS = 3;
+/** Backward-compatible name retained for existing HYBond tests and imports. */
+export const MIN_WINDOW_MONTHS = MIN_WINDOW_POINTS;
 
 /** Minimum index distance between the two handles (inclusive window => n - 1). */
-const MIN_SPAN = MIN_WINDOW_MONTHS - 1;
+const MIN_SPAN = MIN_WINDOW_POINTS - 1;
 
 const clamp = (n: number, lo: number, hi: number): number =>
   n < lo ? lo : n > hi ? hi : n;
@@ -32,7 +34,7 @@ const clamp = (n: number, lo: number, hi: number): number =>
 /**
  * Coerce an arbitrary (a, b) pair into a legal range over [0, max]:
  * clamps to the series bounds, un-crosses the handles, and widens the window
- * to MIN_WINDOW_MONTHS (preferring to push the end right, falling back to
+ * to MIN_WINDOW_POINTS (preferring to push the end right, falling back to
  * pulling the start left when there is no room).
  */
 export function normalizeRange(a: number, b: number, max: number): IndexRange {

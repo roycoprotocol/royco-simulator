@@ -1,591 +1,1103 @@
 // =============================================================================
-// Royco Day — simulation engine
+// Royco Day — WAD-precise simulation engine
 // -----------------------------------------------------------------------------
-// Faithful model of Dawn's two-tranche mechanics (RoycoAccountant / RoycoKernel)
-// extended with the Royco Day Liquidity Tranche per the spec. Every block maps
-// to a Solidity reference; see AUDIT.md.
-//
-// Invariant the contracts enforce (NAV_CONSERVATION_VIOLATION):
-//     stRawNAV + jtRawNAV == stEffectiveNAV + jtEffectiveNAV
-// With the LT paid out of ST yield in ST's asset, this generalizes to:
-//     stRawNAV + jtRawNAV == stEffectiveNAV + jtEffectiveNAV
-//                            + accruedLiquidityPremium + protocolFeeNAV
-// (the pool's stablecoin is both an asset and an LT claim, so it cancels).
+// Senior/Junior accounting, utilization, premiums, fees, share conversion, and
+// kernel operation gates use 18-decimal bigint arithmetic with explicit
+// Solidity rounding. The ECLP invariant is an off-chain venue model; its
+// floating-point result is quantized to WAD before it enters accountant state.
 // =============================================================================
 
 import {
   MarketState,
-  type MarketConfig,
-  type LiveState,
-  type Snapshot,
-  type SimEvent,
   type EventKind,
-} from "./types";
-import { ydmShare, adaptYTarget, YEAR_SEC } from "./ydm";
-import { type EclpParams, eclpParamsForWeight, eclpInvariant, eclpTVL, eclpSellValue } from "./eclp";
+  type LiveState,
+  type MarketConfig,
+  type PublicLiveState,
+  type SecondaryExitQuote,
+  type SimEvent,
+  type Snapshot,
+  type YDMConfig,
+} from './types';
+import { adaptYTargetWithAverage, YEAR_SEC } from './ydm';
+import {
+  Rounding,
+  UINT256_MAX,
+  WAD,
+  fromWad,
+  minWad,
+  mulDiv,
+  saturatingSub,
+  signedMulDiv,
+  toWad,
+} from './wad';
+import {
+  type EclpParams,
+  eclpInvariant,
+  eclpParamsForWeight,
+  eclpSellValue,
+  eclpTVL,
+} from './eclp';
+
+const LT_LAMBDA = 1;
+const LT_WEIGHT_WAD = toWad('0.1');
+const ONE_NAV_WEI = 1n;
+// Equivalent to the contract's finite dilution protection for a wiped tranche.
+const MAX_MINT_DILUTION_WAD = WAD - 1_000_000n;
+
+const dustWad = (cfg: MarketConfig) => toWad(cfg.dustTolerance);
+const asSeconds = (value: number) => BigInt(Math.round(value));
+const fmt = (value: bigint) => {
+  const x = fromWad(value);
+  return '$' + (Math.abs(x) >= 1e6
+    ? `${(x / 1e6).toFixed(2)}M`
+    : Math.abs(x) >= 1e3
+      ? `${(x / 1e3).toFixed(1)}k`
+      : x.toFixed(0));
+};
 
 // ---------------------------------------------------------------------------
-// Health metrics
+// Utilization (ceil rounding favors Senior, matching UtilizationLogic.sol)
 // ---------------------------------------------------------------------------
 
-// Dawn utilization  (UtilsLib.computeUtilization). Rounds in favor of senior.
+export function coverageUtilizationWad(
+  stRaw: bigint,
+  jtRaw: bigint,
+  beta: number,
+  coverageWad: bigint,
+  jtEffective: bigint,
+): bigint {
+  if (coverageWad === 0n) return 0n;
+  const exposure = stRaw + mulDiv(jtRaw, toWad(beta), WAD);
+  if (exposure === 0n) return 0n;
+  if (jtEffective === 0n) return UINT256_MAX;
+  return mulDiv(exposure, coverageWad, jtEffective, Rounding.Ceil);
+}
+
+export function liquidityUtilizationWad(
+  stEffective: bigint,
+  minLiquidityWad: bigint,
+  liquidityRawNAV: bigint,
+): bigint {
+  if (stEffective === 0n || minLiquidityWad === 0n) return 0n;
+  if (liquidityRawNAV === 0n) return UINT256_MAX;
+  return mulDiv(stEffective, minLiquidityWad, liquidityRawNAV, Rounding.Ceil);
+}
+
+const utilizationNumber = (value: bigint) => value === UINT256_MAX ? Infinity : fromWad(value);
+
 export function utilization(
   stRaw: number,
   jtRaw: number,
   beta: number,
-  cov: number,
-  jtEff: number,
+  coverage: number,
+  jtEffective: number,
 ): number {
-  if (stRaw <= 0) return 0;
-  if (jtEff <= 0) return Infinity;
-  return (cov * (stRaw + jtRaw * beta)) / jtEff;
+  return utilizationNumber(coverageUtilizationWad(
+    toWad(stRaw),
+    toWad(jtRaw),
+    beta,
+    toWad(coverage),
+    toWad(jtEffective),
+  ));
 }
 
-// Royco Day liquidity utilization  (spec: (ST_EFF * MIN_LIQUIDITY) / LT_RAW_NAV).
 export function liquidityUtilization(
-  stEff: number,
-  minLiq: number,
-  poolValue: number,
+  stEffective: number,
+  minLiquidity: number,
+  liquidityRawNAV: number,
 ): number {
-  if (minLiq <= 0) return 0;
-  if (poolValue <= 0) return Infinity;
-  return (stEff * minLiq) / poolValue;
+  return utilizationNumber(liquidityUtilizationWad(
+    toWad(stEffective),
+    toWad(minLiquidity),
+    toWad(liquidityRawNAV),
+  ));
 }
 
 // ---------------------------------------------------------------------------
-// Liquidity-tranche pool (E-CLP BPT: ~10% ST shares / 90% T-bill stable).
-//
-// YIELDS are modeled directly — no AMM curve is simulated:
-//   • swap income  = fee(bps) × volume   (volume = turnover × pool value)
-//   • stable leg   = T-bill rate (≈3.5%)   • ST-share leg = senior net yield
-//   • liquidity premium = a share of ST yield via the LT's YDM.
-//
-// VALUATION mimics Balancer's E-CLP oracle (EclpLPOracle): the BPT is valued from
-// the *invariant* of the rate-scaled leg balances, not naive spot reserves —
-//   ltRawNAV = eclpTVL(params, eclpInvariant(X, Y), 1, 1)
-//   X = stShares·stPrice (ST leg NAV),  Y = stable (stable leg NAV).
-// Both legs are already in NAV units (rate providers), so the oracle numeraire
-// price is 1 per leg. Because the invariant is maximized at the peg composition,
-// an imbalanced pool is valued *below* its naive spot sum — exactly the
-// manipulation resistance the real oracle provides, and the wrong-way-risk the LT
-// bears when a run fills the pool with ST. See AUDIT.md §6.
-// (Day/Dawn only; the Dusk-as-collateral fixed point is out of scope.)
+// ECLP venue valuation. This is not part of RoycoDayAccountant Solidity math.
 // ---------------------------------------------------------------------------
 
-const LT_LAMBDA = 1; // E-CLP shape (circle base case) — verified stable/low-slippage
-const LT_WEIGHT = 0.1; // target ST value weight at the peg (10% ST / 90% stable)
-
-let _eclpCache: { key: string; p: EclpParams } | null = null;
+let eclpCache: { key: string; params: EclpParams } | null = null;
 function eclpParamsFor(cfg: MarketConfig): EclpParams {
-  const key = `${LT_WEIGHT}|${LT_LAMBDA}|${cfg.eclpBandWidth}`;
-  if (!_eclpCache || _eclpCache.key !== key)
-    _eclpCache = { key, p: eclpParamsForWeight(LT_WEIGHT, LT_LAMBDA, cfg.eclpBandWidth) };
-  return _eclpCache.p;
+  const key = `${LT_LAMBDA}|${cfg.eclpBandWidth}`;
+  if (!eclpCache || eclpCache.key !== key) {
+    eclpCache = {
+      key,
+      params: eclpParamsForWeight(0.1, LT_LAMBDA, cfg.eclpBandWidth),
+    };
+  }
+  return eclpCache.params;
 }
 
-// Naive spot value of pool reserves at NAV (manipulable; shown for divergence).
-export function poolValue(state: LiveState): number {
-  return state.pool.stShares * stPrice(state) + state.pool.stable;
+export const stPriceWad = (state: LiveState): bigint => state.stShares > 0n
+  ? mulDiv(state.stEffectiveNAV, WAD, state.stShares)
+  : WAD;
+export const jtPriceWad = (state: LiveState): bigint => state.jtShares > 0n
+  ? mulDiv(state.jtEffectiveNAV, WAD, state.jtShares)
+  : WAD;
+
+export const poolValueWad = (state: LiveState): bigint =>
+  mulDiv(state.pool.stShares, stPriceWad(state), WAD) + state.pool.stable;
+
+export function ltRawNAVWad(state: LiveState, cfg: MarketConfig): bigint {
+  const seniorLeg = fromWad(mulDiv(state.pool.stShares, stPriceWad(state), WAD));
+  const stableLeg = fromWad(state.pool.stable);
+  if (seniorLeg <= 0 && stableLeg <= 0) return 0n;
+  const params = eclpParamsFor(cfg);
+  return toWad(eclpTVL(params, eclpInvariant(params, seniorLeg, stableLeg), 1, 1));
 }
 
-// Manipulation-resistant BPT NAV (Balancer EclpLPOracle): value the invariant of
-// the rate-scaled balances at numeraire prices [1, 1].
-export function ltRawNAV(state: LiveState, cfg: MarketConfig): number {
-  const X = state.pool.stShares * stPrice(state);
-  const Y = state.pool.stable;
-  if (X <= 0 && Y <= 0) return 0;
-  const p = eclpParamsFor(cfg);
-  return eclpTVL(p, eclpInvariant(p, X, Y), 1, 1);
+export const ltOwnedSTValueWad = (state: LiveState): bigint =>
+  mulDiv(state.ltOwnedSTShares, stPriceWad(state), WAD);
+export const ltEffectiveNAVWad = (state: LiveState, cfg: MarketConfig): bigint =>
+  ltRawNAVWad(state, cfg) + ltOwnedSTValueWad(state);
+export const ltPriceWad = (state: LiveState, cfg: MarketConfig): bigint => state.ltShares > 0n
+  ? mulDiv(ltEffectiveNAVWad(state, cfg), WAD, state.ltShares)
+  : WAD;
+
+export const stPrice = (state: LiveState) => fromWad(stPriceWad(state));
+export const jtPrice = (state: LiveState) => fromWad(jtPriceWad(state));
+export const poolValue = (state: LiveState) => fromWad(poolValueWad(state));
+export const ltRawNAV = (state: LiveState, cfg: MarketConfig) => fromWad(ltRawNAVWad(state, cfg));
+export const ltPrice = (state: LiveState, cfg: MarketConfig) => fromWad(ltPriceWad(state, cfg));
+
+// ---------------------------------------------------------------------------
+// Exact share conversion and ST/JT claim decomposition
+// ---------------------------------------------------------------------------
+
+export function sharesForValueWad(
+  value: bigint,
+  totalValue: bigint,
+  totalSupply: bigint,
+): bigint {
+  if (value <= 0n) return 0n;
+  if (totalSupply <= 0n) return value;
+  const denominator = totalValue > 0n ? totalValue : ONE_NAV_WEI;
+  const fairShares = mulDiv(totalSupply, value, denominator);
+  const cap = mulDiv(totalSupply, MAX_MINT_DILUTION_WAD, WAD - MAX_MINT_DILUTION_WAD);
+  return minWad(fairShares, cap);
+}
+
+export function sharesForValue(value: number, totalValue: number, totalSupply: number): number {
+  return fromWad(sharesForValueWad(toWad(value), toWad(totalValue), toWad(totalSupply)));
+}
+
+export interface RawNAVClaimsWad {
+  stClaimOnST: bigint;
+  stClaimOnJT: bigint;
+  jtClaimOnST: bigint;
+  jtClaimOnJT: bigint;
+}
+
+export function rawNAVClaimsWad(
+  stRaw: bigint,
+  jtRaw: bigint,
+  stEffective: bigint,
+  jtEffective: bigint,
+): RawNAVClaimsWad {
+  const stClaimOnJT = saturatingSub(stEffective, stRaw);
+  const jtClaimOnST = saturatingSub(jtEffective, jtRaw);
+  return {
+    stClaimOnST: saturatingSub(stRaw, jtClaimOnST),
+    stClaimOnJT,
+    jtClaimOnST,
+    jtClaimOnJT: saturatingSub(jtRaw, stClaimOnJT),
+  };
 }
 
 // ---------------------------------------------------------------------------
-// Per-share prices (NAV per whole share). Bootstrap at 1.0.
+// YDM evaluation. Static curves are wei-exact. Adaptive target evolution uses
+// the existing exponential off-chain model and quantizes its result to WAD.
 // ---------------------------------------------------------------------------
-export const stPrice = (s: LiveState) =>
-  s.stShares > 0 ? s.stEffectiveNAV / s.stShares : 1;
-export const jtPrice = (s: LiveState) =>
-  s.jtShares > 0 ? s.jtEffectiveNAV / s.jtShares : 1;
-export const ltEffectiveNAV = (s: LiveState, cfg: MarketConfig) =>
-  ltRawNAV(s, cfg) + s.accruedLiquidityPremium;
-export const ltPrice = (s: LiveState, cfg: MarketConfig) =>
-  s.ltShares > 0 ? ltEffectiveNAV(s, cfg) / s.ltShares : 1;
 
-// ---------------------------------------------------------------------------
-// Premium priority (spec gap: two premiums, one yield stream).
-// ---------------------------------------------------------------------------
-function capShares(
-  jtShare: number,
-  liqShare: number,
-  mode: MarketConfig["premiumPriority"],
-): [number, number] {
-  if (jtShare + liqShare <= 1) return [jtShare, liqShare];
-  if (mode === "jtPriority") return [Math.min(jtShare, 1), Math.max(0, 1 - jtShare)];
-  const k = 1 / (jtShare + liqShare); // proRata
-  return [jtShare * k, liqShare * k];
+export function ydmShareWad(
+  cfg: YDMConfig,
+  liveTarget: bigint,
+  utilizationWad: bigint,
+  targetUtilizationWad: bigint,
+): bigint {
+  const utilization = minWad(utilizationWad, WAD);
+  const configuredTarget = toWad(cfg.yTarget);
+  const lowerSpread = configuredTarget - toWad(cfg.y0);
+  const upperSpread = toWad(cfg.y100) - configuredTarget;
+  const y0 = saturatingSub(liveTarget, lowerSpread);
+  const y100 = minWad(WAD, liveTarget + upperSpread);
+  if (utilization < targetUtilizationWad) {
+    const slope = mulDiv(liveTarget - y0, WAD, targetUtilizationWad);
+    return y0 + mulDiv(slope, utilization, WAD);
+  }
+  const denominator = WAD - targetUtilizationWad;
+  if (denominator === 0n) return liveTarget;
+  const slope = mulDiv(y100 - liveTarget, WAD, denominator);
+  return liveTarget + mulDiv(slope, utilization - targetUtilizationWad, WAD);
 }
 
-// ---------------------------------------------------------------------------
-// reconcile = pre-op sync (RoycoAccountant.previewSyncTrancheAccounting):
-// reconcile organic PnL, apply the loss waterfall, distribute yield via both
-// YDMs, accrue protocol fees, run the market state machine. Mutates `state`.
-// `protocolFeeNAV` is returned-by-ref via state for the conservation check.
-// ---------------------------------------------------------------------------
+function adaptTarget(
+  cfg: YDMConfig,
+  current: bigint,
+  utilizationWad: bigint,
+  elapsed: bigint,
+  targetUtilization: number,
+): { next: bigint; average: bigint } {
+  const result = adaptYTargetWithAverage(
+    cfg,
+    fromWad(current),
+    utilizationNumber(utilizationWad),
+    Number(elapsed),
+    targetUtilization,
+  );
+  return { next: toWad(result.next), average: toWad(result.average) };
+}
+
 export interface ReconcileExtras {
   protocolFeeNAVAdded: number;
   riskShare: number;
   liqShare: number;
+  contractValues: {
+    liquidityPremium: bigint;
+    stProtocolFee: bigint;
+    jtProtocolFee: bigint;
+    ltProtocolFee: bigint;
+  };
   events: SimEvent[];
 }
 
 export function reconcile(
   state: LiveState,
   cfg: MarketConfig,
-  newStRaw: number,
-  newJtRaw: number,
-  dtSec: number,
+  newStRaw: bigint,
+  newJtRaw: bigint,
 ): ReconcileExtras {
-  const dust = cfg.dustTolerance;
-  const ev: SimEvent[] = [];
-  const push = (kind: EventKind, msg: string, level: SimEvent["level"]) =>
-    ev.push({ t: state.t, kind, msg, level });
-
+  const dust = dustWad(cfg);
+  const events: SimEvent[] = [];
+  const push = (kind: EventKind, msg: string, level: SimEvent['level'], amount?: bigint) => {
+    events.push({
+      t: Number(state.t),
+      kind,
+      msg,
+      level,
+      ...(amount === undefined ? {} : { amountNAV: fromWad(amount) }),
+    });
+  };
   const initialState = state.marketState;
-  const inFT = initialState === MarketState.FIXED_TERM;
+  const oldStRaw = state.stRawNAV;
+  const oldJtRaw = state.jtRawNAV;
+  const oldStEffective = state.stEffectiveNAV;
+  const oldJtEffective = state.jtEffectiveNAV;
+  const claims = rawNAVClaimsWad(oldStRaw, oldJtRaw, oldStEffective, oldJtEffective);
+  const deltaStRaw = newStRaw - oldStRaw;
+  const deltaJtRaw = newJtRaw - oldJtRaw;
+  const deltaStOnSt = oldStRaw === 0n
+    ? (oldStEffective > 0n ? deltaStRaw : 0n)
+    : signedMulDiv(deltaStRaw, claims.stClaimOnST, oldStRaw);
+  const deltaStOnJt = oldJtRaw === 0n
+    ? 0n
+    : signedMulDiv(deltaJtRaw, claims.stClaimOnJT, oldJtRaw);
+  const deltaStEffective = deltaStOnSt + deltaStOnJt;
+  const deltaJtEffective = deltaStRaw + deltaJtRaw - deltaStEffective;
 
-  const dST = newStRaw - state.stRawNAV;
-  const dJT = newJtRaw - state.jtRawNAV;
-  state.stRawNAV = newStRaw;
-  state.jtRawNAV = newJtRaw;
-
-  let stEff = state.stEffectiveNAV;
-  let jtEff = state.jtEffectiveNAV;
-  let stIL = state.stImpermanentLoss;
-  let jtIL = state.jtImpermanentLoss;
-  let feeAdded = 0;
-  let riskShareUsed = 0;
-  let liqShareUsed = 0;
-  // Protocol-fee bases are accrued during the waterfall but the keep/zero decision is
-  // deferred to AFTER the state machine: the contract keeps fees iff the RESULTING
-  // state is PERPETUAL (it fees the residual yield even on a FIXED_TERM→PERPETUAL
-  // recovery) and zeroes them iff the resulting state is FIXED_TERM. Gating on the
-  // initial state (the old behavior) skipped fees on a recovery the contract fees.
-  let jtGainFeeBase = 0; // JT residual gain (net of ST-IL recovery), before coverage
-  let coverageApplied = 0; // JT buffer consumed as ST coverage this sync
-  let yieldShareFeeBase = 0; // JT risk-premium yield (yieldShareProtocolFee base)
-  let stYieldFeeBase = 0; // ST residual yield (stProtocolFee base)
-
-  // ---- JT own PnL (its own deployment) -----------------------------------
-  if (dJT < -dust) {
-    const loss = -dJT;
-    const absorbed = Math.min(loss, jtEff);
-    jtEff -= absorbed;
-    const spill = loss - absorbed;
-    if (spill > dust) {
-      // JT effective NAV depleted -> spill to ST as ST IL
-      stEff -= spill;
-      stIL += spill;
+  const coverageWad = toWad(cfg.coverage);
+  const minLiquidityWad = toWad(cfg.minLiquidity);
+  const targetUtilWad = toWad(cfg.targetUtilization);
+  const liquidityTargetWad = toWad(cfg.liqTargetUtilization);
+  const preCoverage = coverageUtilizationWad(
+    oldStRaw,
+    oldJtRaw,
+    cfg.beta,
+    coverageWad,
+    oldJtEffective,
+  );
+  const preLiquidity = liquidityUtilizationWad(
+    oldStEffective,
+    minLiquidityWad,
+    ltRawNAVWad(state, cfg),
+  );
+  const elapsed = state.t > state.lastYDMUpdateSec ? state.t - state.lastYDMUpdateSec : 0n;
+  let riskTargetForAccrual = state.riskYTarget;
+  let liquidityTargetForAccrual = state.liqYTarget;
+  if (state.yieldShareAccrualInitialized) {
+    if (initialState === MarketState.PERPETUAL && elapsed > 0n) {
+      const riskAdaptation = adaptTarget(
+        cfg.riskYDM,
+        state.riskYTarget,
+        preCoverage,
+        elapsed,
+        cfg.targetUtilization,
+      );
+      const liquidityAdaptation = adaptTarget(
+        cfg.liqYDM,
+        state.liqYTarget,
+        preLiquidity,
+        elapsed,
+        cfg.liqTargetUtilization,
+      );
+      state.riskYTarget = riskAdaptation.next;
+      state.liqYTarget = liquidityAdaptation.next;
+      riskTargetForAccrual = riskAdaptation.average;
+      liquidityTargetForAccrual = liquidityAdaptation.average;
     }
-  } else if (dJT > dust) {
-    let gain = dJT;
-    // senior priority: JT appreciation first makes ST whole (STEP_APPLY_JT_GAIN)
-    const r0 = Math.min(gain, stIL);
-    stIL -= r0;
-    stEff += r0;
-    gain -= r0;
-    if (gain > dust) {
-      jtGainFeeBase = gain; // fee taken later (on the post-coverage net), if PERPETUAL
-      jtEff += gain; // JT accrues residual gain (full; fee deducted post-state-machine)
-    }
-  }
-
-  // ---- ST PnL (with coverage + IL waterfall) -----------------------------
-  if (dST < -dust) {
-    let loss = -dST;
-    // JT provides coverage up to its available buffer
-    const coverage = Math.min(loss, jtEff);
-    coverageApplied = coverage; // strips JT of gain the JT fee would be charged on
-    jtEff -= coverage;
-    jtIL += coverage; // JT claim on future ST appreciation
-    loss -= coverage;
-    if (loss > dust) {
-      // residual uncovered loss absorbed by ST
-      stEff -= loss;
-      stIL += loss;
-    }
-  } else if (dST > dust) {
-    let gain = dST;
-    // 1) recover ST IL first (senior priority)
-    const r1 = Math.min(gain, stIL);
-    stIL -= r1;
-    stEff += r1;
-    gain -= r1;
-    // 2) recover JT coverage IL second
-    const r2 = Math.min(gain, jtIL);
-    jtIL -= r2;
-    jtEff += r2;
-    gain -= r2;
-    // 3) distribute residual as yield via both YDMs
-    if (gain > dust) {
-      const pv = ltRawNAV(state, cfg); // spec: liquidityUtilization keys on LT_RAW_NAV (oracle)
-      const U = utilization(state.stRawNAV, state.jtRawNAV, cfg.beta, cfg.coverage, jtEff);
-      const Lu = liquidityUtilization(stEff, cfg.minLiquidity, pv);
-      // adapt the kink only when the market is perpetual (YDM frozen in fixed term)
-      if (!inFT) {
-        state.riskYTarget = adaptYTarget(cfg.riskYDM, state.riskYTarget, U, dtSec, cfg.targetUtilization);
-        state.liqYTarget = adaptYTarget(cfg.liqYDM, state.liqYTarget, Lu, dtSec, cfg.liqTargetUtilization);
-      }
-      let jtShare = ydmShare(cfg.riskYDM, state.riskYTarget, U, cfg.targetUtilization);
-      let liqShare = ydmShare(cfg.liqYDM, state.liqYTarget, Lu, cfg.liqTargetUtilization);
-      [jtShare, liqShare] = capShares(jtShare, liqShare, cfg.premiumPriority);
-      riskShareUsed = jtShare;
-      liqShareUsed = liqShare;
-
-      const jtYield = gain * jtShare;
-      const ltYield = gain * liqShare;
-      const stYield = gain - jtYield - ltYield;
-      yieldShareFeeBase = jtYield; // fee bases; deducted post-state-machine if PERPETUAL
-      stYieldFeeBase = stYield;
-
-      stEff += stYield; // full yield credited; protocol fees carved out later
-      jtEff += jtYield;
-      state.accruedLiquidityPremium += ltYield; // LT claim on ST assets (in ST asset)
-    }
-  }
-
-  // ---- market state machine (mirrors RoycoAccountant resulting-state branch) ----
-  const U = utilization(state.stRawNAV, state.jtRawNAV, cfg.beta, cfg.coverage, jtEff);
-  const expired = initialState === MarketState.FIXED_TERM && state.t >= state.fixedTermEndSec;
-  const breached = U >= cfg.liquidationUtilization; // >= per Solidity
-  const distressed = stIL > dust;
-  let newState: MarketState;
-  let jtILErased = 0;
-
-  if (cfg.fixedTermDurationSec === 0 || expired || breached || distressed) {
-    // 1. Forced Perpetual: JT coverage IL is explicitly cleared
-    if (jtIL > dust) jtILErased = jtIL;
-    jtIL = 0;
-    newState = MarketState.PERPETUAL;
-    state.fixedTermEndSec = 0;
-  } else if (jtIL <= dust) {
-    // 2. Normal Perpetual / dust
-    if (initialState === MarketState.PERPETUAL || jtIL <= 1e-12) {
-      newState = MarketState.PERPETUAL;
-      state.fixedTermEndSec = 0;
-    } else {
-      // was fixed-term, coverage IL within dust but not fully zero -> hold until restored
-      newState = MarketState.FIXED_TERM;
-    }
+    const currentRiskShare = minWad(
+      ydmShareWad(cfg.riskYDM, riskTargetForAccrual, preCoverage, targetUtilWad),
+      toWad(cfg.maxJTYieldShare),
+    );
+    const currentLiquidityShare = minWad(
+      ydmShareWad(cfg.liqYDM, liquidityTargetForAccrual, preLiquidity, liquidityTargetWad),
+      toWad(cfg.maxLTYieldShare),
+    );
+    state.twRiskShareSeconds += currentRiskShare * elapsed;
+    state.twLiqShareSeconds += currentLiquidityShare * elapsed;
   } else {
-    // 3. Fixed-term: jtIL above dust, healthy, not distressed, not expired, duration > 0
-    newState = MarketState.FIXED_TERM;
-    if (initialState === MarketState.PERPETUAL) state.fixedTermEndSec = state.t + cfg.fixedTermDurationSec;
+    state.yieldShareAccrualInitialized = true;
+    state.lastPremiumPaymentSec = state.t;
   }
-
-  if (initialState === MarketState.PERPETUAL && newState === MarketState.FIXED_TERM)
-    push("enter-fixed-term", `JT covered an ST drawdown — FIXED_TERM begins (ST redemptions & JT deposits blocked; YDM frozen).`, "warn");
-  if (initialState === MarketState.FIXED_TERM && newState === MarketState.PERPETUAL) {
-    if (jtILErased > dust)
-      push("exit-fixed-term", `Forced to PERPETUAL (${expired ? "term expired" : breached ? "liquidation breach" : "ST impairment"}) — JT forfeits its recovery claim.`, "danger");
-    else push("exit-fixed-term", `Drawdown fully recovered — back to PERPETUAL, JT made whole.`, "good");
-  }
-  if (jtILErased > dust) {
-    push("jt-il-erased", `JT impermanent loss erased: ${fmt(jtILErased)} realized as a JT loss.`, "danger");
-  }
-
-  // ---- protocol fees: taken iff the RESULTING state is PERPETUAL (never in FIXED_TERM) ----
-  if (newState === MarketState.PERPETUAL) {
-    // JT-gain fee on the net gain that actually survived same-sync ST coverage
-    // (RoycoAccountant recomputes jtNetGain -= coverageApplied before the fee).
-    const jtNetGain = Math.max(0, jtGainFeeBase - coverageApplied);
-    if (cfg.jtProtocolFee > 0 && jtNetGain > dust) {
-      const f = jtNetGain * cfg.jtProtocolFee;
-      jtEff -= f;
-      feeAdded += f;
-    }
-    if (cfg.yieldShareProtocolFee > 0 && yieldShareFeeBase > dust) {
-      const f = yieldShareFeeBase * cfg.yieldShareProtocolFee;
-      jtEff -= f;
-      feeAdded += f;
-    }
-    if (cfg.stProtocolFee > 0 && stYieldFeeBase > dust) {
-      const f = stYieldFeeBase * cfg.stProtocolFee;
-      stEff -= f;
-      feeAdded += f;
-    }
-  }
-
-  state.stEffectiveNAV = stEff;
-  state.jtEffectiveNAV = jtEff;
-  state.stImpermanentLoss = stIL;
-  state.jtImpermanentLoss = jtIL;
-  state.marketState = newState;
   state.lastYDMUpdateSec = state.t;
 
-  return { protocolFeeNAVAdded: feeAdded, riskShare: riskShareUsed, liqShare: liqShareUsed, events: ev };
-}
+  let stEffective = oldStEffective;
+  let jtEffective = oldJtEffective;
+  let stImpermanentLoss = state.stImpermanentLoss;
+  let jtImpermanentLoss = state.jtImpermanentLoss;
+  let jtNetGain = 0n;
+  let jtProtocolFee = 0n;
+  let stProtocolFee = 0n;
+  let ltProtocolFee = 0n;
+  let liquidityPremium = 0n;
+  let riskShareUsed = 0n;
+  let liquidityShareUsed = 0n;
+  let premiumsPaid = false;
 
-// ---------------------------------------------------------------------------
-// Operations (RoycoKernel). Each assumes reconcile (pre-op sync) already ran.
-// Returns the event(s); a blocked op leaves state untouched.
-// ---------------------------------------------------------------------------
-
-export interface OpResult {
-  ok: boolean;
-  events: SimEvent[];
-}
-
-function blocked(state: LiveState, kind: EventKind, msg: string): OpResult {
-  return { ok: false, events: [{ t: state.t, kind: "blocked", msg, level: "warn" }] };
-}
-
-export function stDeposit(state: LiveState, cfg: MarketConfig, amountNAV: number): OpResult {
-  const dust = cfg.dustTolerance;
-  if (state.stImpermanentLoss > dust)
-    return blocked(state, "st-deposit", "ST deposit blocked: ST impermanent loss exists (would dilute existing senior LPs).");
-  const price = stPrice(state);
-  const shares = amountNAV / price;
-  // post-op utilization: ST deposit raises the numerator (more senior to protect),
-  // the JT buffer (denominator) is unchanged -> utilization rises.
-  const U = utilization(state.stRawNAV + amountNAV, state.jtRawNAV, cfg.beta, cfg.coverage, state.jtEffectiveNAV);
-  if (U > 1 + 1e-12)
-    return blocked(state, "st-deposit", `ST deposit blocked: coverage requirement violated (utilization ${(U * 100).toFixed(1)}% > 100%). JT buffer too thin.`);
-  state.stRawNAV += amountNAV;
-  state.stEffectiveNAV += amountNAV;
-  state.stShares += shares;
-  return { ok: true, events: [{ t: state.t, kind: "st-deposit", msg: `ST deposit ${fmt(amountNAV)} → ${shares.toFixed(2)} shares.`, level: "info" }] };
-}
-
-export function jtDeposit(state: LiveState, cfg: MarketConfig, amountNAV: number): OpResult {
-  if (state.marketState !== MarketState.PERPETUAL)
-    return blocked(state, "jt-deposit", "JT deposit blocked: only enabled in PERPETUAL (protects existing JT during recovery).");
-  const price = jtPrice(state);
-  const shares = amountNAV / price;
-  state.jtRawNAV += amountNAV;
-  state.jtEffectiveNAV += amountNAV;
-  state.jtShares += shares;
-  return { ok: true, events: [{ t: state.t, kind: "jt-deposit", msg: `JT deposit ${fmt(amountNAV)} → ${shares.toFixed(2)} shares.`, level: "info" }] };
-}
-
-export function stRedeem(state: LiveState, cfg: MarketConfig, shares: number, bypass = false): OpResult {
-  const dust = cfg.dustTolerance;
-  if (state.marketState !== MarketState.PERPETUAL && !bypass)
-    return blocked(state, "st-redeem", "ST redeem blocked: only enabled in PERPETUAL (the secondary pool is the intended exit in FIXED_TERM).");
-  if (shares > state.stShares + dust) shares = state.stShares;
-  const frac = shares / state.stShares;
-  const redemptionNAV = frac * state.stEffectiveNAV;
-
-  // ST self-liquidation bonus when the liquidation threshold is breached
-  let bonus = 0;
-  const U = utilization(state.stRawNAV, state.jtRawNAV, cfg.beta, cfg.coverage, state.jtEffectiveNAV);
-  if (U >= cfg.liquidationUtilization && cfg.stSelfLiquidationBonus > 0) {
-    const desired = redemptionNAV * cfg.stSelfLiquidationBonus;
-    const A0 = state.stRawNAV + state.jtRawNAV * cfg.beta; // covered exposure
-    // Utilization-neutral cap. The bonus debits both jtEff and jtRaw, so jtRaw enters
-    // the post-redeem numerator β-weighted: U' = cov·(A0−redeem−β·b)/(jtEff−b) ≤ U
-    // requires b ≤ redeem·jtEff/(A0 − β·jtEff). This is RoycoKernel's Case-2 denominator
-    // (E − β·jtEff) — the engine sources the bonus from JT's own raw pool. It reduces to
-    // A0 at β=0 and A0−jtEff at β=1, and is provably > 0 when the breach branch runs
-    // (U ≥ liqUtil ≥ 1 with cov < 1 ⇒ A0 > jtEff ≥ β·jtEff).
-    const denom = A0 - cfg.beta * state.jtEffectiveNAV;
-    const utilNeutralCap = denom > 0 ? (redemptionNAV * state.jtEffectiveNAV) / denom : Infinity;
-    bonus = Math.min(desired, state.jtEffectiveNAV, utilNeutralCap);
+  if (deltaJtEffective < 0n) {
+    jtEffective += deltaJtEffective;
+  } else if (deltaJtEffective > 0n) {
+    jtNetGain = deltaJtEffective;
+    if (jtNetGain > dust) {
+      jtProtocolFee = mulDiv(jtNetGain, toWad(cfg.jtProtocolFee), WAD);
+    }
+    jtEffective += jtNetGain;
   }
 
-  state.stRawNAV -= redemptionNAV;
+  if (deltaStEffective < 0n) {
+    let stLoss = -deltaStEffective;
+    const coverageApplied = minWad(stLoss, jtEffective);
+    if (coverageApplied > 0n) {
+      if (jtProtocolFee > 0n) {
+        jtNetGain = saturatingSub(jtNetGain, coverageApplied);
+        jtProtocolFee = jtNetGain > dust
+          ? mulDiv(jtNetGain, toWad(cfg.jtProtocolFee), WAD)
+          : 0n;
+      }
+      jtEffective -= coverageApplied;
+      jtImpermanentLoss += coverageApplied;
+      stLoss -= coverageApplied;
+    }
+    if (stLoss > 0n) {
+      stEffective -= stLoss;
+      stImpermanentLoss += stLoss;
+    }
+  } else if (deltaStEffective > 0n) {
+    let stGain = deltaStEffective;
+    const recovery = minWad(stGain, jtImpermanentLoss);
+    if (recovery > 0n) {
+      jtImpermanentLoss -= recovery;
+      jtEffective += recovery;
+      stGain -= recovery;
+    }
+    stImpermanentLoss = saturatingSub(stImpermanentLoss, deltaStEffective);
+    if (stGain > 0n) {
+      premiumsPaid = stGain > dust;
+      let elapsedSincePremium = state.t - state.lastPremiumPaymentSec;
+      if (elapsedSincePremium === 0n) elapsedSincePremium = 1n;
+      const instantaneousRisk = minWad(
+        ydmShareWad(cfg.riskYDM, state.riskYTarget, preCoverage, targetUtilWad),
+        toWad(cfg.maxJTYieldShare),
+      );
+      const instantaneousLiquidity = minWad(
+        ydmShareWad(cfg.liqYDM, state.liqYTarget, preLiquidity, liquidityTargetWad),
+        toWad(cfg.maxLTYieldShare),
+      );
+      riskShareUsed = state.twRiskShareSeconds > 0n
+        ? state.twRiskShareSeconds / elapsedSincePremium
+        : instantaneousRisk;
+      liquidityShareUsed = state.twLiqShareSeconds > 0n
+        ? state.twLiqShareSeconds / elapsedSincePremium
+        : instantaneousLiquidity;
+      if (riskShareUsed + liquidityShareUsed > WAD) {
+        throw new Error('PREMIUMS_EXCEED_SENIOR_YIELD');
+      }
+      const juniorPremium = mulDiv(stGain, riskShareUsed, WAD);
+      liquidityPremium = mulDiv(stGain, liquidityShareUsed, WAD);
+      const retainedSeniorGain = stGain - juniorPremium - liquidityPremium;
+      if (juniorPremium > 0n) {
+        if (premiumsPaid) {
+          jtProtocolFee += mulDiv(juniorPremium, toWad(cfg.yieldShareProtocolFee), WAD);
+        }
+        jtEffective += juniorPremium;
+      }
+      if (liquidityPremium > 0n && premiumsPaid) {
+        ltProtocolFee = mulDiv(liquidityPremium, toWad(cfg.ltYieldShareProtocolFee), WAD);
+      }
+      if (premiumsPaid) {
+        stProtocolFee = mulDiv(retainedSeniorGain, toWad(cfg.stProtocolFee), WAD);
+      }
+      // LT premium remains in ST effective NAV; ownership moves by minting ST shares.
+      stEffective += retainedSeniorGain + liquidityPremium;
+    }
+  }
+
+  if (newStRaw + newJtRaw !== stEffective + jtEffective) {
+    throw new Error('NAV_CONSERVATION_VIOLATION');
+  }
+
+  const coverageAfter = coverageUtilizationWad(
+    newStRaw,
+    newJtRaw,
+    cfg.beta,
+    coverageWad,
+    jtEffective,
+  );
+  const expired = initialState === MarketState.FIXED_TERM && state.fixedTermEndSec <= state.t;
+  const breached = coverageAfter >= toWad(cfg.liquidationUtilization);
+  const undercollateralized = jtEffective === 0n && stEffective > 0n;
+  let nextState: MarketState;
+  let erased = 0n;
+  if (cfg.fixedTermDurationSec === 0 || expired || breached || undercollateralized) {
+    erased = jtImpermanentLoss;
+    jtImpermanentLoss = 0n;
+    nextState = MarketState.PERPETUAL;
+    state.fixedTermEndSec = 0n;
+  } else if (jtImpermanentLoss <= dust) {
+    if (initialState === MarketState.PERPETUAL || jtImpermanentLoss === 0n) {
+      nextState = MarketState.PERPETUAL;
+      state.fixedTermEndSec = 0n;
+    } else {
+      nextState = MarketState.FIXED_TERM;
+      liquidityPremium = 0n;
+      stProtocolFee = 0n;
+      jtProtocolFee = 0n;
+      ltProtocolFee = 0n;
+    }
+  } else {
+    nextState = MarketState.FIXED_TERM;
+    liquidityPremium = 0n;
+    stProtocolFee = 0n;
+    jtProtocolFee = 0n;
+    ltProtocolFee = 0n;
+    if (initialState === MarketState.PERPETUAL) {
+      state.fixedTermEndSec = state.t + asSeconds(cfg.fixedTermDurationSec);
+    }
+  }
+
+  if (initialState === MarketState.PERPETUAL && nextState === MarketState.FIXED_TERM) {
+    push('enter-fixed-term', 'JT covered an ST drawdown — FIXED_TERM begins (ST redemptions & JT deposits blocked; YDM frozen).', 'warn');
+  }
+  if (initialState === MarketState.FIXED_TERM && nextState === MarketState.PERPETUAL) {
+    if (erased > dust) {
+      push(
+        'exit-fixed-term',
+        `Forced to PERPETUAL (${expired ? 'term expired' : breached ? 'liquidation breach' : 'ST impairment'}) — JT forfeits its recovery claim.`,
+        'danger',
+      );
+    } else {
+      push('exit-fixed-term', 'Drawdown fully recovered — back to PERPETUAL, JT made whole.', 'good');
+    }
+  }
+  if (erased > dust) {
+    push('jt-il-erased', `JT impermanent loss erased: ${fmt(erased)} realized as a JT loss.`, 'danger', erased);
+  }
+
+  let feeNAV = 0n;
+  if (nextState === MarketState.PERPETUAL) {
+    const preMintSeniorSupply = state.stShares;
+    const retainedSeniorNAV = saturatingSub(stEffective, liquidityPremium + stProtocolFee);
+    const premiumShares = sharesForValueWad(liquidityPremium, retainedSeniorNAV, preMintSeniorSupply);
+    const seniorFeeShares = sharesForValueWad(stProtocolFee, retainedSeniorNAV, preMintSeniorSupply);
+    state.stShares += premiumShares + seniorFeeShares;
+    state.protocolSTShares += seniorFeeShares;
+
+    // FeeAndLiquidityPremiumLogic attempts to reinvest the full premium. The
+    // market config chooses the deterministic outcome of that contract call;
+    // it does not choose or freeze the venue's variable yield/volume economics.
+    if (cfg.reinvestLiquidityPremium) state.pool.stShares += premiumShares;
+    else state.ltOwnedSTShares += premiumShares;
+
+    const juniorFeeShares = sharesForValueWad(
+      jtProtocolFee,
+      saturatingSub(jtEffective, jtProtocolFee),
+      state.jtShares,
+    );
+    state.jtShares += juniorFeeShares;
+    state.protocolJTShares += juniorFeeShares;
+
+    // Fee shares price against LT effective NAV after the premium reinvestment.
+    state.stRawNAV = newStRaw;
+    state.jtRawNAV = newJtRaw;
+    state.stEffectiveNAV = stEffective;
+    state.jtEffectiveNAV = jtEffective;
+    const ltNAVBeforeFeeMint = ltEffectiveNAVWad(state, cfg);
+    const liquidityFeeShares = sharesForValueWad(
+      ltProtocolFee,
+      saturatingSub(ltNAVBeforeFeeMint, ltProtocolFee),
+      state.ltShares,
+    );
+    state.ltShares += liquidityFeeShares;
+    state.protocolLTShares += liquidityFeeShares;
+    feeNAV = stProtocolFee + jtProtocolFee + ltProtocolFee;
+  }
+
+  if (premiumsPaid) {
+    state.twRiskShareSeconds = 0n;
+    state.twLiqShareSeconds = 0n;
+    state.lastPremiumPaymentSec = state.t;
+  }
+  state.stRawNAV = newStRaw;
+  state.jtRawNAV = newJtRaw;
+  state.stEffectiveNAV = stEffective;
+  state.jtEffectiveNAV = jtEffective;
+  state.stImpermanentLoss = stImpermanentLoss;
+  state.jtImpermanentLoss = jtImpermanentLoss;
+  state.marketState = nextState;
+
+  return {
+    protocolFeeNAVAdded: fromWad(feeNAV),
+    riskShare: fromWad(riskShareUsed),
+    liqShare: fromWad(liquidityShareUsed),
+    contractValues: {
+      liquidityPremium,
+      stProtocolFee,
+      jtProtocolFee,
+      ltProtocolFee,
+    },
+    events,
+  };
+}
+
+export type ContractOperation =
+  | 'ST_DEPOSIT'
+  | 'ST_REDEEM'
+  | 'JT_DEPOSIT'
+  | 'JT_REDEEM'
+  | 'LT_DEPOSIT'
+  | 'LT_REDEEM';
+
+export interface PostOpAccountingResult {
+  stRaw: bigint;
+  jtRaw: bigint;
+  ltRaw: bigint;
+  stEffective: bigint;
+  jtEffective: bigint;
+  jtIL: bigint;
+  coverageUtilWAD: bigint;
+  liquidityUtilWAD: bigint;
+}
+
+/** Wei-exact mirror of RoycoDayAccountant.postOpSyncTrancheAccounting. */
+export function postOpAccountingWad(
+  state: Pick<LiveState, 'stRawNAV' | 'jtRawNAV' | 'stEffectiveNAV' | 'jtEffectiveNAV' | 'jtImpermanentLoss'>,
+  cfg: Pick<MarketConfig, 'beta' | 'coverage' | 'minLiquidity'>,
+  input: {
+    operation: ContractOperation;
+    stRaw: bigint;
+    jtRaw: bigint;
+    ltRaw: bigint;
+    previousLTRaw: bigint;
+    bonus: bigint;
+    enforce: boolean;
+  },
+): PostOpAccountingResult {
+  const deltaST = input.stRaw - state.stRawNAV;
+  const deltaJT = input.jtRaw - state.jtRawNAV;
+  const deltaLT = input.ltRaw - input.previousLTRaw;
+  let stEffective = state.stEffectiveNAV;
+  let jtEffective = state.jtEffectiveNAV;
+  let jtIL = state.jtImpermanentLoss;
+  const invalid = (): never => { throw new Error('INVALID_POST_OP_STATE'); };
+
+  if (input.operation === 'ST_DEPOSIT') {
+    if (deltaST <= 0n || deltaJT !== 0n || deltaLT !== 0n || input.bonus !== 0n) invalid();
+    stEffective += deltaST;
+  } else if (input.operation === 'JT_DEPOSIT') {
+    if (deltaJT <= 0n || deltaST !== 0n || deltaLT !== 0n || input.bonus !== 0n) invalid();
+    jtEffective += deltaJT;
+  } else if (input.operation === 'LT_DEPOSIT') {
+    if (deltaLT <= 0n || deltaST < 0n || deltaJT !== 0n || input.bonus !== 0n) invalid();
+    stEffective += deltaST;
+  } else {
+    if (deltaST > 0n || deltaJT > 0n) invalid();
+    const totalRedemption = -deltaST + -deltaJT;
+    if (input.operation === 'ST_REDEEM' || input.operation === 'LT_REDEEM') {
+      if (input.operation === 'LT_REDEEM') {
+        if (deltaLT > 0n) invalid();
+      } else if (deltaLT !== 0n || totalRedemption <= 0n) invalid();
+      if (input.bonus > jtEffective || totalRedemption < input.bonus) invalid();
+      jtEffective -= input.bonus;
+      stEffective -= totalRedemption - input.bonus;
+    } else {
+      if (deltaLT !== 0n || totalRedemption <= 0n || input.bonus !== 0n) invalid();
+      const oldJTEffective = jtEffective;
+      jtEffective -= totalRedemption;
+      if (jtIL !== 0n) jtIL = mulDiv(jtIL, jtEffective, oldJTEffective);
+    }
+  }
+
+  if (input.stRaw + input.jtRaw !== stEffective + jtEffective) {
+    throw new Error('NAV_CONSERVATION_VIOLATION');
+  }
+  const coverageUtilWAD = coverageUtilizationWad(
+    input.stRaw,
+    input.jtRaw,
+    cfg.beta,
+    toWad(cfg.coverage),
+    jtEffective,
+  );
+  const liquidityUtilWAD = liquidityUtilizationWad(
+    stEffective,
+    toWad(cfg.minLiquidity),
+    input.ltRaw,
+  );
+  if (input.enforce) {
+    if (
+      (input.operation === 'ST_DEPOSIT' || input.operation === 'LT_DEPOSIT' || input.operation === 'JT_REDEEM') &&
+      coverageUtilWAD > WAD
+    ) throw new Error('COVERAGE_REQUIREMENT_VIOLATED');
+    if (
+      (input.operation === 'ST_DEPOSIT' || input.operation === 'LT_DEPOSIT' || input.operation === 'LT_REDEEM') &&
+      liquidityUtilWAD > WAD
+    ) throw new Error('LIQUIDITY_REQUIREMENT_VIOLATED');
+  }
+  return {
+    stRaw: input.stRaw,
+    jtRaw: input.jtRaw,
+    ltRaw: input.ltRaw,
+    stEffective,
+    jtEffective,
+    jtIL,
+    coverageUtilWAD,
+    liquidityUtilWAD,
+  };
+}
+
+export interface SelfLiquidationWadInput {
+  bonusWAD: bigint;
+  stRaw: bigint;
+  jtRaw: bigint;
+  stEffective: bigint;
+  jtEffective: bigint;
+  coverageUtilWAD: bigint;
+  liquidationUtilWAD: bigint;
+  jtCoinvested: boolean;
+  claimST: bigint;
+  claimJT: bigint;
+  claimNAV: bigint;
+}
+
+/** Wei-exact mirror of SelfLiquidationLogic for a precomputed Senior claim. */
+export function selfLiquidationClaimWad(input: SelfLiquidationWadInput): {
+  bonus: bigint;
+  claimST: bigint;
+  claimJT: bigint;
+  claimNAV: bigint;
+} {
+  if (input.coverageUtilWAD < input.liquidationUtilWAD || input.jtEffective === 0n) {
+    return { bonus: 0n, claimST: input.claimST, claimJT: input.claimJT, claimNAV: input.claimNAV };
+  }
+  const desired = mulDiv(input.claimNAV, input.bonusWAD, WAD);
+  const jtClaimOnST = saturatingSub(input.jtEffective, input.jtRaw);
+  const covered = input.stRaw + (input.jtCoinvested ? input.jtRaw : 0n);
+  const weightedClaim = input.claimST + (input.jtCoinvested ? input.claimJT : 0n);
+  if (weightedClaim === 0n) {
+    return { bonus: 0n, claimST: input.claimST, claimJT: input.claimJT, claimNAV: input.claimNAV };
+  }
+  const firstMax = mulDiv(weightedClaim, input.jtEffective, covered - input.jtEffective);
+  const utilizationNeutralMax = firstMax <= jtClaimOnST
+    ? firstMax
+    : mulDiv(
+        weightedClaim + (input.jtCoinvested ? 0n : jtClaimOnST),
+        input.jtEffective,
+        covered - (input.jtCoinvested ? input.jtEffective : 0n),
+      );
+  const bonus = minWad(desired, minWad(input.jtEffective, utilizationNeutralMax));
+  const fromST = minWad(bonus, jtClaimOnST);
+  return {
+    bonus,
+    claimST: input.claimST + fromST,
+    claimJT: input.claimJT + bonus - fromST,
+    claimNAV: input.claimNAV + bonus,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Kernel operations
+// ---------------------------------------------------------------------------
+
+export interface OpResult { ok: boolean; events: SimEvent[] }
+
+function blocked(state: LiveState, msg: string): OpResult {
+  return { ok: false, events: [{ t: Number(state.t), kind: 'blocked', msg, level: 'warn' }] };
+}
+
+export function stDeposit(state: LiveState, cfg: MarketConfig, amount: number): OpResult {
+  const amountWad = toWad(amount);
+  if (state.marketState !== MarketState.PERPETUAL) return blocked(state, 'ST deposit blocked: only enabled in PERPETUAL.');
+  if (amountWad <= 0n) return blocked(state, 'ST deposit blocked: amount must be positive.');
+  const coverageAfter = coverageUtilizationWad(
+    state.stRawNAV + amountWad,
+    state.jtRawNAV,
+    cfg.beta,
+    toWad(cfg.coverage),
+    state.jtEffectiveNAV,
+  );
+  if (coverageAfter > WAD) return blocked(state, `ST deposit blocked: coverage requirement violated (utilization ${(utilizationNumber(coverageAfter) * 100).toFixed(1)}% > 100%). JT buffer too thin.`);
+  const liquidityAfter = liquidityUtilizationWad(
+    state.stEffectiveNAV + amountWad,
+    toWad(cfg.minLiquidity),
+    ltRawNAVWad(state, cfg),
+  );
+  if (liquidityAfter > WAD) return blocked(state, `ST deposit blocked: liquidity requirement violated (utilization ${(utilizationNumber(liquidityAfter) * 100).toFixed(1)}% > 100%).`);
+  const shares = sharesForValueWad(amountWad, state.stEffectiveNAV, state.stShares);
+  state.stRawNAV += amountWad;
+  state.stEffectiveNAV += amountWad;
+  state.stShares += shares;
+  return { ok: true, events: [{ t: Number(state.t), kind: 'st-deposit', msg: `ST deposit ${fmt(amountWad)} → ${fromWad(shares).toFixed(2)} shares.`, level: 'info' }] };
+}
+
+export function jtDeposit(state: LiveState, _cfg: MarketConfig, amount: number): OpResult {
+  const amountWad = toWad(amount);
+  if (state.marketState !== MarketState.PERPETUAL) return blocked(state, 'JT deposit blocked: only enabled in PERPETUAL (protects existing JT during recovery).');
+  if (amountWad <= 0n) return blocked(state, 'JT deposit blocked: amount must be positive.');
+  const shares = sharesForValueWad(amountWad, state.jtEffectiveNAV, state.jtShares);
+  state.jtRawNAV += amountWad;
+  state.jtEffectiveNAV += amountWad;
+  state.jtShares += shares;
+  return { ok: true, events: [{ t: Number(state.t), kind: 'jt-deposit', msg: `JT deposit ${fmt(amountWad)} → ${fromWad(shares).toFixed(2)} shares.`, level: 'info' }] };
+}
+
+export function stRedeem(state: LiveState, cfg: MarketConfig, shareAmount: number, bypass = false): OpResult {
+  const dust = dustWad(cfg);
+  let shares = toWad(shareAmount);
+  if (state.marketState !== MarketState.PERPETUAL && !bypass) return blocked(state, 'ST redeem blocked: only enabled in PERPETUAL (the secondary pool is the intended exit in FIXED_TERM).');
+  if (shares <= 0n || state.stShares <= 0n) return blocked(state, 'ST redeem blocked: shares must be positive.');
+  if (shares > state.stShares) shares = state.stShares;
+  const redemptionNAV = mulDiv(shares, state.stEffectiveNAV, state.stShares);
+  const claims = rawNAVClaimsWad(state.stRawNAV, state.jtRawNAV, state.stEffectiveNAV, state.jtEffectiveNAV);
+  const baseSTClaim = mulDiv(claims.stClaimOnST, shares, state.stShares);
+  const baseJTClaim = mulDiv(claims.stClaimOnJT, shares, state.stShares);
+  const coverage = coverageUtilizationWad(state.stRawNAV, state.jtRawNAV, cfg.beta, toWad(cfg.coverage), state.jtEffectiveNAV);
+  let bonus = 0n;
+  let bonusFromST = 0n;
+  let bonusFromJT = 0n;
+  if (coverage >= toWad(cfg.liquidationUtilization) && cfg.stSelfLiquidationBonus > 0) {
+    const desired = mulDiv(redemptionNAV, toWad(cfg.stSelfLiquidationBonus), WAD);
+    const betaWad = toWad(cfg.beta);
+    const coveredExposure = state.stRawNAV + mulDiv(state.jtRawNAV, betaWad, WAD);
+    const weightedClaim = baseSTClaim + mulDiv(baseJTClaim, betaWad, WAD);
+    const caseOneDenominator = saturatingSub(coveredExposure, state.jtEffectiveNAV);
+    const caseOneCap = caseOneDenominator > 0n
+      ? mulDiv(weightedClaim, state.jtEffectiveNAV, caseOneDenominator)
+      : 0n;
+    let neutralCap = caseOneCap;
+    if (caseOneCap > claims.jtClaimOnST) {
+      const adjustedClaim = weightedClaim + (cfg.beta > 0 ? 0n : claims.jtClaimOnST);
+      const caseTwoDenominator = saturatingSub(coveredExposure, cfg.beta > 0 ? state.jtEffectiveNAV : 0n);
+      neutralCap = caseTwoDenominator > 0n
+        ? mulDiv(adjustedClaim, state.jtEffectiveNAV, caseTwoDenominator)
+        : 0n;
+    }
+    bonus = minWad(desired, minWad(state.jtEffectiveNAV, neutralCap));
+    bonusFromST = minWad(bonus, claims.jtClaimOnST);
+    bonusFromJT = bonus - bonusFromST;
+  }
+  state.stRawNAV -= baseSTClaim + bonusFromST;
+  state.jtRawNAV -= baseJTClaim + bonusFromJT;
   state.stEffectiveNAV -= redemptionNAV;
   state.stShares -= shares;
-  if (bonus > dust) {
-    state.jtEffectiveNAV -= bonus; // bonus sourced from JT effective NAV (delevers)
-    state.jtRawNAV -= bonus; // ...and the assets physically leave JT (conservation)
-  }
-  // proportional ST IL realization by the exiting senior LP
+  if (bonus > 0n) state.jtEffectiveNAV -= bonus;
   if (state.stImpermanentLoss > dust && state.stEffectiveNAV > dust) {
-    state.stImpermanentLoss *= (1 - frac);
+    state.stImpermanentLoss = mulDiv(state.stImpermanentLoss, state.stShares, state.stShares + shares);
   }
-  const events: SimEvent[] = [{ t: state.t, kind: "st-redeem", msg: `ST redeem ${shares.toFixed(2)} shares → ${fmt(redemptionNAV + bonus)}.`, level: "info" }];
-  if (bonus > dust) events.push({ t: state.t, kind: "self-liq-bonus", msg: `Self-liquidation bonus ${fmt(bonus)} paid from JT to delever (util ${(U * 100).toFixed(0)}% > liq threshold).`, level: "warn" });
+  const events: SimEvent[] = [{ t: Number(state.t), kind: 'st-redeem', msg: `ST redeem ${fromWad(shares).toFixed(2)} shares → ${fmt(redemptionNAV + bonus)}.`, level: 'info' }];
+  if (bonus > dust) events.push({ t: Number(state.t), kind: 'self-liq-bonus', msg: `Self-liquidation bonus ${fmt(bonus)} paid from JT to delever (util ${(utilizationNumber(coverage) * 100).toFixed(0)}% > liq threshold).`, level: 'warn' });
   return { ok: true, events };
 }
 
-export function jtRedeem(state: LiveState, cfg: MarketConfig, shares: number, bypass = false): OpResult {
-  const dust = cfg.dustTolerance;
-  if (shares > state.jtShares + dust) shares = state.jtShares;
-  const frac = shares / state.jtShares;
-  const redemptionNAV = frac * state.jtEffectiveNAV;
-  // simulate post-op coverage
-  const U = utilization(state.stRawNAV, state.jtRawNAV - redemptionNAV, cfg.beta, cfg.coverage, state.jtEffectiveNAV - redemptionNAV);
-  if (U > 1 + 1e-12 && !bypass)
-    return blocked(state, "jt-redeem", `JT redeem blocked: coverage requirement would break (utilization ${(U * 100).toFixed(1)}% > 100%).`);
-  state.jtRawNAV -= redemptionNAV;
+export function jtRedeem(state: LiveState, cfg: MarketConfig, shareAmount: number, bypass = false): OpResult {
+  let shares = toWad(shareAmount);
+  if (state.marketState !== MarketState.PERPETUAL && !bypass) return blocked(state, 'JT redeem blocked: only enabled in PERPETUAL.');
+  if (shares <= 0n || state.jtShares <= 0n) return blocked(state, 'JT redeem blocked: shares must be positive.');
+  if (shares > state.jtShares) shares = state.jtShares;
+  const redemptionNAV = mulDiv(shares, state.jtEffectiveNAV, state.jtShares);
+  const claims = rawNAVClaimsWad(state.stRawNAV, state.jtRawNAV, state.stEffectiveNAV, state.jtEffectiveNAV);
+  const stClaim = mulDiv(claims.jtClaimOnST, shares, state.jtShares);
+  const jtClaim = mulDiv(claims.jtClaimOnJT, shares, state.jtShares);
+  const coverageAfter = coverageUtilizationWad(
+    state.stRawNAV - stClaim,
+    state.jtRawNAV - jtClaim,
+    cfg.beta,
+    toWad(cfg.coverage),
+    state.jtEffectiveNAV - redemptionNAV,
+  );
+  if (coverageAfter > WAD && !bypass) return blocked(state, `JT redeem blocked: coverage requirement would break (utilization ${(utilizationNumber(coverageAfter) * 100).toFixed(1)}% > 100%).`);
+  const oldEffective = state.jtEffectiveNAV;
+  state.stRawNAV -= stClaim;
+  state.jtRawNAV -= jtClaim;
   state.jtEffectiveNAV -= redemptionNAV;
   state.jtShares -= shares;
-  // exiting JT realizes its proportional share of coverage IL & forfeits recovery optionality
-  if (state.jtImpermanentLoss > dust) state.jtImpermanentLoss *= 1 - frac;
-  return { ok: true, events: [{ t: state.t, kind: "jt-redeem", msg: `JT redeem ${shares.toFixed(2)} shares → ${fmt(redemptionNAV)}.`, level: "info" }] };
+  if (state.jtImpermanentLoss > 0n && oldEffective > 0n) {
+    state.jtImpermanentLoss = mulDiv(state.jtImpermanentLoss, state.jtEffectiveNAV, oldEffective);
+  }
+  return { ok: true, events: [{ t: Number(state.t), kind: 'jt-redeem', msg: `JT redeem ${fromWad(shares).toFixed(2)} shares → ${fmt(redemptionNAV)}.`, level: 'info' }] };
 }
 
-// LT deposit: add BPT worth `amountNAV`, split into the pool at current ratio.
-// Spec: "Deposits are enabled at all times."
-export function ltDeposit(state: LiveState, cfg: MarketConfig, amountNAV: number): OpResult {
-  const price = ltPrice(state, cfg);
-  const shares = amountNAV / price;
-  // Size the proportional add by the manipulation-resistant ORACLE NAV, not spot
-  // reserves. Shares are minted at the oracle ltPrice; scaling reserves by the same
-  // valuation (k = amountNAV / ltRawNAV) makes the added oracle NAV exactly amountNAV,
-  // so ltPrice is invariant across deposits at ANY composition. Using spot poolValue()
-  // here would transfer value between LT cohorts whenever the pool is off-peg.
-  const pv = ltRawNAV(state, cfg);
-  if (pv <= cfg.dustTolerance) {
-    // bootstrap pool at the target peg composition (10% ST / 90% stable)
-    state.pool.stShares += (amountNAV * LT_WEIGHT) / stPrice(state);
-    state.pool.stable += amountNAV * (1 - LT_WEIGHT);
+export function ltDeposit(state: LiveState, cfg: MarketConfig, amount: number): OpResult {
+  const amountWad = toWad(amount);
+  if (amountWad <= 0n) return blocked(state, 'LT deposit blocked: amount must be positive.');
+  const shares = sharesForValueWad(amountWad, ltEffectiveNAVWad(state, cfg), state.ltShares);
+  const rawBefore = ltRawNAVWad(state, cfg);
+  if (rawBefore <= dustWad(cfg)) {
+    state.pool.stShares += mulDiv(amountWad, LT_WEIGHT_WAD, stPriceWad(state));
+    state.pool.stable += mulDiv(amountWad, WAD - LT_WEIGHT_WAD, WAD);
   } else {
-    const k = amountNAV / pv; // proportional add keeps composition
-    state.pool.stShares += state.pool.stShares * k;
-    state.pool.stable += state.pool.stable * k;
+    state.pool.stShares += mulDiv(state.pool.stShares, amountWad, rawBefore);
+    state.pool.stable += mulDiv(state.pool.stable, amountWad, rawBefore);
   }
   state.ltShares += shares;
-  return { ok: true, events: [{ t: state.t, kind: "lt-deposit", msg: `LT deposit ${fmt(amountNAV)} BPT → ${shares.toFixed(2)} shares.`, level: "info" }] };
+  return { ok: true, events: [{ t: Number(state.t), kind: 'lt-deposit', msg: `LT deposit ${fmt(amountWad)} BPT → ${fromWad(shares).toFixed(2)} shares.`, level: 'info' }] };
 }
 
-// LT redeem (Day spec): enabled ONLY in PERPETUAL state AND only if
-// liquidityUtilization <= 100% AFTER the redemption. Both conditions are enforced
-// pre-op (state untouched on a block), so the "minimum secondary liquidity at all
-// times" guarantee (product requirement 2) cannot be breached on exit. Proceeds are
-// valued via the manipulation-resistant oracle (LT_RAW_NAV), matching the share price.
-export function ltRedeem(state: LiveState, cfg: MarketConfig, shares: number, bypass = false): OpResult {
-  const dust = cfg.dustTolerance;
-  if (state.marketState !== MarketState.PERPETUAL)
-    return blocked(state, "lt-redeem", "LT redeem blocked: only enabled in PERPETUAL (per spec).");
-  if (shares > state.ltShares + dust) shares = state.ltShares;
-  const frac = shares / state.ltShares;
-  // Post-redeem liquidity utilization via the oracle on the post-redeem balances
-  // (stEffectiveNAV is unchanged by an LT redeem). Block if it would breach 100%.
-  const poolAfter = { stShares: state.pool.stShares * (1 - frac), stable: state.pool.stable * (1 - frac) };
-  const ltRawAfter = ltRawNAV({ ...state, pool: poolAfter }, cfg);
-  const LuAfter = liquidityUtilization(state.stEffectiveNAV, cfg.minLiquidity, ltRawAfter);
-  if (LuAfter > 1 + 1e-12 && !bypass)
-    return blocked(state, "lt-redeem", `LT redeem blocked: secondary liquidity would fall below minimum (liqUtil ${(LuAfter * 100).toFixed(0)}% > 100% after redemption).`);
-  const bptOut = frac * ltRawNAV(state, cfg); // oracle-valued proceeds (matches ltPrice)
-  const premOut = frac * state.accruedLiquidityPremium;
-  state.pool.stShares = poolAfter.stShares;
-  state.pool.stable = poolAfter.stable;
-  state.accruedLiquidityPremium *= (1 - frac);
+export function ltRedeem(state: LiveState, cfg: MarketConfig, shareAmount: number, bypass = false): OpResult {
+  let shares = toWad(shareAmount);
+  if (state.marketState !== MarketState.PERPETUAL) return blocked(state, 'LT redeem blocked: only enabled in PERPETUAL (per spec).');
+  if (shares <= 0n || state.ltShares <= 0n) return blocked(state, 'LT redeem blocked: shares must be positive.');
+  if (shares > state.ltShares) shares = state.ltShares;
+  const remainingShares = state.ltShares - shares;
+  const poolAfter = {
+    stShares: mulDiv(state.pool.stShares, remainingShares, state.ltShares),
+    stable: mulDiv(state.pool.stable, remainingShares, state.ltShares),
+  };
+  const rawAfter = ltRawNAVWad({ ...state, pool: poolAfter }, cfg);
+  const liquidityAfter = liquidityUtilizationWad(state.stEffectiveNAV, toWad(cfg.minLiquidity), rawAfter);
+  const coverage = coverageUtilizationWad(state.stRawNAV, state.jtRawNAV, cfg.beta, toWad(cfg.coverage), state.jtEffectiveNAV);
+  const liquidationExemption = coverage >= toWad(cfg.liquidationUtilization);
+  if (liquidityAfter > WAD && !liquidationExemption && !bypass) return blocked(state, `LT redeem blocked: secondary liquidity would fall below minimum (liqUtil ${(utilizationNumber(liquidityAfter) * 100).toFixed(0)}% > 100% after redemption).`);
+  const bptOut = mulDiv(shares, ltRawNAVWad(state, cfg), state.ltShares);
+  const premiumSharesOut = mulDiv(shares, state.ltOwnedSTShares, state.ltShares);
+  const premiumValueOut = mulDiv(premiumSharesOut, stPriceWad(state), WAD);
+  state.pool = poolAfter;
+  state.ltOwnedSTShares -= premiumSharesOut;
   state.ltShares -= shares;
-  return { ok: true, events: [{ t: state.t, kind: "lt-redeem", msg: `LT redeem ${shares.toFixed(2)} shares → ${fmt(bptOut)} BPT + ${fmt(premOut)} premium (liqUtil ${(LuAfter * 100).toFixed(0)}% after).`, level: "info" }] };
+  return { ok: true, events: [{ t: Number(state.t), kind: 'lt-redeem', msg: `LT redeem ${fromWad(shares).toFixed(2)} shares → ${fmt(bptOut)} BPT + ${fromWad(premiumSharesOut).toFixed(2)} Senior shares (${fmt(premiumValueOut)}; liqUtil ${(utilizationNumber(liquidityAfter) * 100).toFixed(0)}% after).`, level: 'info' }] };
 }
 
-// Secondary sale: an ST holder exits by selling ST shares into the BPT instead of
-// primary redemption (the intended FIXED_TERM exit). This IS a swap, so it follows
-// the E-CLP curve and conserves the invariant — the seller bears slippage that
-// grows as the pool drains, and once the stable inventory is gone the rest cannot
-// fill (band floor). The pool fills with ST shares (wrong-way risk); when ST is
-// later impaired, the now-ST-heavy BPT loses far more than a balanced pool would.
-// ST tranche NAVs are untouched — the shares just move into the LT-held pool.
-export function secondarySell(state: LiveState, cfg: MarketConfig, sellNAV: number): OpResult {
-  const px = stPrice(state);
-  const X = state.pool.stShares * px; // ST leg NAV
-  const Y = state.pool.stable; // stable leg NAV
-  if (Y <= cfg.dustTolerance) return blocked(state, "secondary-sell", "Pool stablecoin exhausted — secondary exit liquidity is zero.");
-  const p = eclpParamsFor(cfg);
-  const { stableOut, filled } = eclpSellValue(p, X, Y, sellNAV);
-  const unfilled = sellNAV - filled;
-  const slip = filled > 0 ? 1 - stableOut / filled : 1;
-  state.pool.stShares += filled / px; // pool absorbs the ST it bought...
-  state.pool.stable -= stableOut; // ...and pays out the stable, along the curve
-  const events: SimEvent[] = [
-    { t: state.t, kind: "secondary-sell", msg: `Secondary sell ${fmt(filled)} ST → ${fmt(stableOut)} stable (${(slip * 100).toFixed(1)}% slippage). Pool now ${(poolPctST(state) * 100).toFixed(0)}% ST.`, level: slip > 0.05 ? "danger" : "info" },
-  ];
-  if (unfilled > cfg.dustTolerance) events.push({ t: state.t, kind: "secondary-sell", msg: `${fmt(unfilled)} of the sell could NOT fill — stable depleted, BPT is all-ST. Remaining sellers are stuck at primary redemption (blocked in FIXED_TERM).`, level: "danger" });
+export function secondarySell(state: LiveState, cfg: MarketConfig, amount: number): OpResult {
+  if (state.pool.stable <= dustWad(cfg)) return blocked(state, 'Pool stablecoin exhausted — secondary exit liquidity is zero.');
+  const quote = previewSecondarySell(state, cfg, amount);
+  const priceWad = stPriceWad(state);
+  const stableOut = toWad(quote.stableOutNAV);
+  const filled = toWad(quote.filledNAV);
+  const unfilled = toWad(quote.unfilledNAV);
+  state.pool.stShares += mulDiv(filled, WAD, priceWad);
+  state.pool.stable = saturatingSub(state.pool.stable, stableOut);
+  const events: SimEvent[] = [{ t: Number(state.t), kind: 'secondary-sell', msg: `Secondary sell ${fmt(filled)} ST → ${fmt(stableOut)} stable (${(quote.slippage * 100).toFixed(1)}% slippage). Pool now ${(poolPctST(state) * 100).toFixed(0)}% ST.`, level: quote.slippage > 0.05 ? 'danger' : 'info' }];
+  if (unfilled > dustWad(cfg)) events.push({ t: Number(state.t), kind: 'secondary-sell', msg: `${fmt(unfilled)} of the sell could NOT fill — stable depleted, BPT is all-ST. Remaining sellers are stuck at primary redemption (blocked in FIXED_TERM).`, level: 'danger' });
   return { ok: true, events };
+}
+
+/**
+ * Read-only E-CLP quote used by the simulator UI and tests. The returned WAD-
+ * quantized amounts are exactly the values `secondarySell` will apply.
+ */
+export function previewSecondarySell(
+  state: LiveState,
+  cfg: MarketConfig,
+  amount: number,
+): SecondaryExitQuote {
+  const requested = toWad(Math.max(0, amount));
+  const priceWad = stPriceWad(state);
+  if (requested === 0n || priceWad === 0n || state.pool.stable === 0n) {
+    return {
+      requestedNAV: fromWad(requested),
+      filledNAV: 0,
+      stableOutNAV: 0,
+      unfilledNAV: fromWad(requested),
+      executionPrice: 0,
+      slippage: 1,
+      poolPctSTAfter: poolPctST(state),
+    };
+  }
+  const seniorLeg = mulDiv(state.pool.stShares, priceWad, WAD);
+  const params = eclpParamsFor(cfg);
+  const rawQuote = eclpSellValue(
+    params,
+    fromWad(seniorLeg),
+    fromWad(state.pool.stable),
+    fromWad(requested),
+  );
+  const stableOut = toWad(rawQuote.stableOut);
+  const filled = toWad(rawQuote.filled);
+  const unfilled = saturatingSub(requested, filled);
+  const poolAfter: LiveState = {
+    ...state,
+    pool: {
+      stShares: state.pool.stShares + mulDiv(filled, WAD, priceWad),
+      stable: saturatingSub(state.pool.stable, stableOut),
+    },
+  };
+  return {
+    requestedNAV: fromWad(requested),
+    filledNAV: fromWad(filled),
+    stableOutNAV: fromWad(stableOut),
+    unfilledNAV: fromWad(unfilled),
+    executionPrice: filled > 0n ? fromWad(stableOut) / fromWad(filled) : 0,
+    slippage: filled > 0n ? 1 - fromWad(stableOut) / fromWad(filled) : 1,
+    poolPctSTAfter: poolPctST(poolAfter),
+  };
 }
 
 export function poolPctST(state: LiveState): number {
-  const pv = poolValue(state);
-  if (pv <= 0) return 0;
-  return (state.pool.stShares * stPrice(state)) / pv;
+  const total = poolValueWad(state);
+  return total > 0n ? fromWad(mulDiv(mulDiv(state.pool.stShares, stPriceWad(state), WAD), WAD, total)) : 0;
+}
+
+export function accruePoolCarry(state: LiveState, cfg: MarketConfig, dtSec: number): void {
+  const dt = asSeconds(dtSec);
+  if (dt <= 0n) return;
+  const swapAPY = toWad((cfg.poolTurnoverPerYear * cfg.swapFeeBps) / 10_000);
+  const stableAPY = toWad(cfg.stableYield);
+  const swapIncome = mulDiv(mulDiv(poolValueWad(state), swapAPY, WAD), dt, BigInt(YEAR_SEC));
+  const stableIncome = mulDiv(mulDiv(state.pool.stable, stableAPY, WAD), dt, BigInt(YEAR_SEC));
+  state.pool.stable += swapIncome + stableIncome;
 }
 
 // ---------------------------------------------------------------------------
-// Pool carry: swap fees + stable-leg yield accrue to the pool each step.
+// Number-facing adapters
 // ---------------------------------------------------------------------------
-export function accruePoolCarry(state: LiveState, cfg: MarketConfig, dtSec: number) {
-  const yrs = dtSec / YEAR_SEC;
-  // swap yield = fee × volume   (volume = turnover × pool value)
-  const swapAPY = (cfg.poolTurnoverPerYear * cfg.swapFeeBps) / 10000;
-  const swapIncome = poolValue(state) * swapAPY * yrs;
-  // T-bill rate on the stable leg
-  const stableIncome = state.pool.stable * cfg.stableYield * yrs;
-  state.pool.stable += swapIncome + stableIncome; // realized into the stable leg
+
+export function protocolFeeValue(state: LiveState, cfg: MarketConfig): number {
+  return fromWad(
+    mulDiv(state.protocolSTShares, stPriceWad(state), WAD) +
+    mulDiv(state.protocolJTShares, jtPriceWad(state), WAD) +
+    mulDiv(state.protocolLTShares, ltPriceWad(state, cfg), WAD),
+  );
 }
 
-// ---------------------------------------------------------------------------
-// Snapshot + conservation check
-// ---------------------------------------------------------------------------
-export function conservationResidual(state: LiveState, protocolFeeNAV: number): number {
-  return state.stRawNAV + state.jtRawNAV - (state.stEffectiveNAV + state.jtEffectiveNAV + state.accruedLiquidityPremium + protocolFeeNAV);
-}
+export const conservationResidualWad = (state: LiveState): bigint =>
+  state.stRawNAV + state.jtRawNAV - state.stEffectiveNAV - state.jtEffectiveNAV;
+export const conservationResidual = (state: LiveState): number => fromWad(conservationResidualWad(state));
 
-export function snapshot(state: LiveState, cfg: MarketConfig, protocolFeeNAV: number, riskShare: number, liqShare: number): Snapshot {
-  const rawLT = ltRawNAV(state, cfg); // manipulation-resistant BPT value (EclpLPOracle)
-  const spotLT = poolValue(state); // naive spot value of reserves (for divergence)
-  const U = utilization(state.stRawNAV, state.jtRawNAV, cfg.beta, cfg.coverage, state.jtEffectiveNAV);
-  const Lu = liquidityUtilization(state.stEffectiveNAV, cfg.minLiquidity, rawLT); // spec: LT_RAW_NAV
+export function snapshot(state: LiveState, cfg: MarketConfig, riskShare: number, liqShare: number): Snapshot {
+  const rawLiquidity = ltRawNAVWad(state, cfg);
+  const spotLiquidity = poolValueWad(state);
+  const premium = ltOwnedSTValueWad(state);
+  const poolSenior = mulDiv(state.pool.stShares, stPriceWad(state), WAD);
+  const coverageRequired = mulDiv(
+    state.stRawNAV + mulDiv(state.jtRawNAV, toWad(cfg.beta), WAD),
+    toWad(cfg.coverage),
+    WAD,
+    Rounding.Ceil,
+  );
+  const liquidityRequired = mulDiv(
+    state.stEffectiveNAV,
+    toWad(cfg.minLiquidity),
+    WAD,
+    Rounding.Ceil,
+  );
+  const coverage = coverageUtilizationWad(state.stRawNAV, state.jtRawNAV, cfg.beta, toWad(cfg.coverage), state.jtEffectiveNAV);
+  const liquidity = liquidityUtilizationWad(state.stEffectiveNAV, toWad(cfg.minLiquidity), rawLiquidity);
   return {
-    t: state.t,
+    t: Number(state.t),
     state: state.marketState,
-    fixedTermRemaining: Math.max(0, state.fixedTermEndSec - state.t),
-    stRawNAV: state.stRawNAV,
-    jtRawNAV: state.jtRawNAV,
-    stEffectiveNAV: state.stEffectiveNAV,
-    jtEffectiveNAV: state.jtEffectiveNAV,
-    ltNAV: rawLT + state.accruedLiquidityPremium,
-    ltRawNAV: rawLT,
-    poolValue: spotLT,
-    accruedLiquidityPremium: state.accruedLiquidityPremium,
-    stIL: state.stImpermanentLoss,
-    jtIL: state.jtImpermanentLoss,
-    utilization: U,
-    liquidityUtilization: Lu,
-    coverageOK: U <= 1 + 1e-9,
-    stPrice: stPrice(state),
-    jtPrice: jtPrice(state),
-    ltPrice: ltPrice(state, cfg),
+    fixedTermRemaining: Number(state.fixedTermEndSec > state.t ? state.fixedTermEndSec - state.t : 0n),
+    stRawNAV: fromWad(state.stRawNAV),
+    jtRawNAV: fromWad(state.jtRawNAV),
+    stEffectiveNAV: fromWad(state.stEffectiveNAV),
+    jtEffectiveNAV: fromWad(state.jtEffectiveNAV),
+    ltNAV: fromWad(rawLiquidity + premium),
+    ltRawNAV: fromWad(rawLiquidity),
+    poolValue: fromWad(spotLiquidity),
+    accruedLiquidityPremium: fromWad(premium),
+    stIL: fromWad(state.stImpermanentLoss),
+    jtIL: fromWad(state.jtImpermanentLoss),
+    coverageRequiredNAV: fromWad(coverageRequired),
+    liquidityRequiredNAV: fromWad(liquidityRequired),
+    utilization: utilizationNumber(coverage),
+    liquidityUtilization: utilizationNumber(liquidity),
+    coverageOK: coverage <= WAD,
+    stPrice: fromWad(stPriceWad(state)),
+    jtPrice: fromWad(jtPriceWad(state)),
+    ltPrice: fromWad(ltPriceWad(state, cfg)),
     riskShare,
     liqShare,
+    poolSeniorNAV: fromWad(poolSenior),
+    poolStableNAV: fromWad(state.pool.stable),
     poolPctST: poolPctST(state),
-    conservationResidual: conservationResidual(state, protocolFeeNAV),
+    conservationResidual: fromWad(conservationResidualWad(state)),
   };
 }
 
-// ---------------------------------------------------------------------------
-// Bootstrap a fresh market with initial deposits.
-// ---------------------------------------------------------------------------
-export function newMarket(cfg: MarketConfig, init: { st: number; jt: number; lt: number }): LiveState {
-  const state: LiveState = {
-    t: 0,
-    marketState: MarketState.PERPETUAL,
-    fixedTermEndSec: 0,
-    stRawNAV: 0,
-    jtRawNAV: 0,
-    stEffectiveNAV: 0,
-    jtEffectiveNAV: 0,
-    stImpermanentLoss: 0,
-    jtImpermanentLoss: 0,
-    stShares: 0,
-    jtShares: 0,
-    ltShares: 0,
-    pool: { stShares: 0, stable: 0 },
-    accruedLiquidityPremium: 0,
-    riskYTarget: cfg.riskYDM.yTarget,
-    liqYTarget: cfg.liqYDM.yTarget,
-    lastYDMUpdateSec: 0,
+export function publicState(state: LiveState): PublicLiveState {
+  return {
+    t: Number(state.t),
+    marketState: state.marketState,
+    fixedTermEndSec: Number(state.fixedTermEndSec),
+    stRawNAV: fromWad(state.stRawNAV),
+    jtRawNAV: fromWad(state.jtRawNAV),
+    stEffectiveNAV: fromWad(state.stEffectiveNAV),
+    jtEffectiveNAV: fromWad(state.jtEffectiveNAV),
+    stImpermanentLoss: fromWad(state.stImpermanentLoss),
+    jtImpermanentLoss: fromWad(state.jtImpermanentLoss),
+    stShares: fromWad(state.stShares),
+    jtShares: fromWad(state.jtShares),
+    ltShares: fromWad(state.ltShares),
+    protocolSTShares: fromWad(state.protocolSTShares),
+    protocolJTShares: fromWad(state.protocolJTShares),
+    protocolLTShares: fromWad(state.protocolLTShares),
+    pool: { stShares: fromWad(state.pool.stShares), stable: fromWad(state.pool.stable) },
+    ltOwnedSTShares: fromWad(state.ltOwnedSTShares),
+    riskYTarget: fromWad(state.riskYTarget),
+    liqYTarget: fromWad(state.liqYTarget),
+    lastYDMUpdateSec: Number(state.lastYDMUpdateSec),
+    lastPremiumPaymentSec: Number(state.lastPremiumPaymentSec),
+    twRiskShareSeconds: fromWad(state.twRiskShareSeconds),
+    twLiqShareSeconds: fromWad(state.twLiqShareSeconds),
+    yieldShareAccrualInitialized: state.yieldShareAccrualInitialized,
   };
-  // JT first (so coverage is available), then ST, then LT.
-  jtDeposit(state, cfg, init.jt);
-  stDeposit(state, cfg, init.st);
-  ltDeposit(state, cfg, init.lt);
+}
+
+export function newMarket(cfg: MarketConfig, init: { st: number; jt: number; lt: number }): LiveState {
+  const st = toWad(init.st);
+  const jt = toWad(init.jt);
+  const liquidity = toWad(init.lt);
+  const state: LiveState = {
+    t: 0n,
+    marketState: MarketState.PERPETUAL,
+    fixedTermEndSec: 0n,
+    stRawNAV: st,
+    jtRawNAV: jt,
+    stEffectiveNAV: st,
+    jtEffectiveNAV: jt,
+    stImpermanentLoss: 0n,
+    jtImpermanentLoss: 0n,
+    stShares: st,
+    jtShares: jt,
+    ltShares: liquidity,
+    protocolSTShares: 0n,
+    protocolJTShares: 0n,
+    protocolLTShares: 0n,
+    pool: {
+      stShares: mulDiv(liquidity, LT_WEIGHT_WAD, WAD),
+      stable: mulDiv(liquidity, WAD - LT_WEIGHT_WAD, WAD),
+    },
+    ltOwnedSTShares: 0n,
+    riskYTarget: toWad(cfg.riskYDM.yTarget),
+    liqYTarget: toWad(cfg.liqYDM.yTarget),
+    lastYDMUpdateSec: 0n,
+    lastPremiumPaymentSec: 0n,
+    twRiskShareSeconds: 0n,
+    twLiqShareSeconds: 0n,
+    yieldShareAccrualInitialized: false,
+  };
+  const coverage = coverageUtilizationWad(st, jt, cfg.beta, toWad(cfg.coverage), jt);
+  const liquidityUtil = liquidityUtilizationWad(st, toWad(cfg.minLiquidity), ltRawNAVWad(state, cfg));
+  if (coverage > WAD || liquidityUtil > WAD) {
+    throw new Error('INVALID_INITIAL_MARKET: initial coverage or liquidity requirement is violated');
+  }
   return state;
 }
-
-const fmt = (x: number) => "$" + (Math.abs(x) >= 1e6 ? (x / 1e6).toFixed(2) + "M" : Math.abs(x) >= 1e3 ? (x / 1e3).toFixed(1) + "k" : x.toFixed(0));

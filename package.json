@@ -7,9 +7,19 @@
     "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint",
-    "test": "npx tsx lib/day/engine/engine.test.ts && npx tsx lib/hybond/timeframe.test.ts && npx tsx lib/hybond/permalink.test.ts",
+    "test": "npx tsx lib/day/engine/engine.test.ts && npx tsx lib/day-simulator-template/erasure.test.ts && npx tsx lib/day-simulator-template/explainer.test.ts && npx tsx lib/hybond/timeframe.test.ts && npx tsx lib/hybond/permalink.test.ts",
     "parity": "npx tsx lib/try/parity.ts && npx tsx lib/hybond/parity.ts",
-    "audit:v2-math": "node scripts/v2-math-invariants.mjs"
+    "audit:v2-math": "node scripts/v2-math-invariants.mjs",
+    "sim:new": "node scripts/simulator/create.mjs",
+    "sim:source-test": "node scripts/simulator/source.test.mjs",
+    "sim:verify": "node scripts/simulator/verify.mjs",
+    "sim:preview": "node scripts/simulator/preview.mjs",
+    "sim:certify": "node scripts/simulator/certify.mjs",
+    "day-sim:verify": "node scripts/day-simulator/verify.mjs",
+    "day-sim:parity": "npx tsx lib/day/engine/parity.ts",
+    "day-sim:vectors:generate": "node scripts/day-simulator/generate-day-vectors.mjs",
+    "day-sim:preview": "node scripts/day-simulator/preview.mjs",
+    "day-sim:certify": "node scripts/day-simulator/certify.mjs"
   },
   "dependencies": {
     "next": "16.0.7",

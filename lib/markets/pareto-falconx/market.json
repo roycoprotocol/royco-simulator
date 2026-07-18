@@ -1,0 +1,70 @@
+{
+  "id": "pareto-falconx",
+  "route": "/pareto-falconx-sim",
+  "dataCadence": "daily",
+  "copy": {
+    "marketEyebrow": "ROYCO · PARETO FALCONX MARKET",
+    "title": "Pareto FalconX Sim",
+    "hero": "A hypothetical Royco Senior/Junior market over the FalconX Credit Vault (AA_FalconXUSDC). Senior is protected by Junior's first-loss buffer; Junior earns yield for taking that risk.",
+    "loadedMarket": "FalconX Credit Vault (AA_FalconXUSDC, daily NAV data)",
+    "strategyLegend": "AA_FalconXUSDC",
+    "seniorTrancheName": "Pareto FalconX Senior",
+    "seniorTrancheSymbol": "srRoyAA_FALCONXUSDC",
+    "juniorTrancheName": "Pareto FalconX Junior",
+    "juniorTrancheSymbol": "jrRoyAA_FALCONXUSDC",
+    "integrationLabel": "PARETO_FALCONX",
+    "footerParagraphs": [
+      "The underlying series contains 371 daily NAV observations from 2025-07-10 through 2026-07-15. Source: RWA.xyz FalconX Credit Vault / AA_FalconXUSDC export. NAV values are treated as fee-inclusive per the supplied brief.",
+      "This is a counterfactual mechanism illustration, not a track record or announced product.",
+      "Backtest math uses the shared Royco Day accountant engine and the repository parity suite. Parameters are illustrative."
+    ]
+  },
+  "defaults": {
+    "depositST": 1000,
+    "exitBufferPct": 1,
+    "linkJuniorToFirstLoss": true,
+    "minCoveragePct": 3,
+    "observationDays": 7,
+    "seniorShareToJuniorPct": 6,
+    "yieldShareAtFullUtilPct": 18,
+    "selfLiquidationBonusPct": 1
+  },
+  "presets": {
+    "conservative": {
+      "minimumCoveragePct": 5,
+      "observationDays": 14,
+      "seniorYieldShareToJuniorPct": 4,
+      "yieldShareAtFullUtilPct": 12,
+      "exitBufferPct": 2,
+      "selfLiquidationBonusPct": 0.5
+    },
+    "balanced": {
+      "minimumCoveragePct": 3,
+      "observationDays": 7,
+      "seniorYieldShareToJuniorPct": 6,
+      "yieldShareAtFullUtilPct": 18,
+      "exitBufferPct": 1,
+      "selfLiquidationBonusPct": 1
+    },
+    "aggressive": {
+      "minimumCoveragePct": 3,
+      "observationDays": 7,
+      "seniorYieldShareToJuniorPct": 8,
+      "yieldShareAtFullUtilPct": 24,
+      "exitBufferPct": 1,
+      "selfLiquidationBonusPct": 1.5
+    }
+  },
+  "certification": {
+    "label": "Shared accountant engine",
+    "detail": "Backtest math uses the shared Royco Day accountant engine and must pass the repository parity suite before publication."
+  },
+  "provenance": {
+    "source": "RWA.xyz export: FalconX Credit Vault / AA_FalconXUSDC Net Asset Value (Dollar)",
+    "sourceUrl": "https://app.rwa.xyz/assets/AA_FalconXUSDC",
+    "retrievedAt": "2026-07-16",
+    "priceType": "nav",
+    "feesIncluded": true,
+    "notes": "371 daily calendar-date NAV observations from 2025-07-10 through 2026-07-15. CSV columns are Timestamp, Date, Measure, and FalconX Credit Vault. Timestamp values match the Date column at UTC midnight. Fee inclusion is user-confirmed."
+  }
+}

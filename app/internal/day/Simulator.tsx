@@ -148,7 +148,6 @@ export default function Simulator() {
   const [minLiq, setMinLiq] = useState(0.12);
   const [riskYDM, setRiskYDM] = useState<YDMConfig>({ mode: "static", y0: 0.25, yTarget: 0.35, y100: 0.55 });
   const [liqYDM, setLiqYDM] = useState<YDMConfig>({ mode: "static", y0: 0.08, yTarget: 0.12, y100: 0.2 });
-  const [priority, setPriority] = useState<MarketConfig["premiumPriority"]>("jtPriority");
   const [stableYield, setStableYield] = useState(0.035);
   const [swapBps, setSwapBps] = useState(10);
   const [turnover, setTurnover] = useState(8);
@@ -164,10 +163,10 @@ export default function Simulator() {
   const cfg: MarketConfig = useMemo(
     () => defaultConfig({
       coverage, beta, liquidationUtilization: liqUtil, fixedTermDurationSec: termDays * 86400,
-      minLiquidity: minLiq, riskYDM, liqYDM, premiumPriority: priority,
+      minLiquidity: minLiq, riskYDM, liqYDM,
       stableYield, swapFeeBps: swapBps, poolTurnoverPerYear: turnover, eclpBandWidth: bandWidth, stSelfLiquidationBonus: selfLiq,
     }),
-    [coverage, beta, liqUtil, termDays, minLiq, riskYDM, liqYDM, priority, stableYield, swapBps, turnover, bandWidth, selfLiq],
+    [coverage, beta, liqUtil, termDays, minLiq, riskYDM, liqYDM, stableYield, swapBps, turnover, bandWidth, selfLiq],
   );
 
   const sim = useMemo(() => {
@@ -190,7 +189,7 @@ export default function Simulator() {
       <div className="flex items-end justify-between flex-wrap gap-3 mb-3">
         <div>
           <h1 className="text-[22px] font-semibold tracking-tight">Royco Day — high-fidelity simulator</h1>
-          <p style={{ color: C.mut }} className="text-[11.5px] mt-0.5">Time-stepped Dawn accountant + the Liquidity Tranche. Loss waterfall, dual YDM, fixed-term state machine, self-liquidation, and a concentrated E-CLP BPT (10% ST / 90% T-bill) — all live.</p>
+          <p style={{ color: C.mut }} className="text-[11.5px] mt-0.5">Time-stepped Dawn accountant + the LP tranche. Loss waterfall, dual YDM, fixed-term state machine, self-liquidation, and a concentrated E-CLP BPT (10% ST / 90% T-bill) — all live.</p>
         </div>
         <div style={{ background: worstResidual < 1e-3 ? "rgba(79,180,119,0.1)" : "rgba(229,83,75,0.12)", border: `1px solid ${worstResidual < 1e-3 ? C.pos : C.neg}` }} className="rounded px-2.5 py-1.5 font-mono text-[10.5px]">
           <span style={{ color: C.mut }}>NAV conservation </span>
@@ -224,14 +223,13 @@ export default function Simulator() {
           <Panel title="Premiums (two YDMs)">
             <YDMEditor name="risk premium → JT" cfg={riskYDM} onChange={setRiskYDM} accent={C.jt} />
             <div className="my-2" style={{ borderTop: `1px solid ${C.line}` }} />
-            <YDMEditor name="liquidity premium → LT" cfg={liqYDM} onChange={setLiqYDM} accent={C.lt} />
+            <YDMEditor name="LP premium → LT" cfg={liqYDM} onChange={setLiqYDM} accent={C.lt} />
             <div className="mt-2 pt-2" style={{ borderTop: `1px solid ${C.line}` }}>
-              <Field label="priority if Σ>100%" hint="spec gap: who wins when both premiums exceed senior yield"><Seg value={priority} options={[{ v: "jtPriority", l: "JT first" }, { v: "proRata", l: "pro-rata" }]} onChange={setPriority} /></Field>
             </div>
           </Panel>
 
-          <Panel title="Liquidity tranche (E-CLP BPT)">
-            <Field label="min liquidity" hint="% of senior pool-backed"><NumIn value={minLiq} scale={100} step={1} suffix="%" onChange={setMinLiq} /></Field>
+          <Panel title="LP tranche (E-CLP BPT)">
+            <Field label="min LP" hint="% of senior pool-backed"><NumIn value={minLiq} scale={100} step={1} suffix="%" onChange={setMinLiq} /></Field>
             <Field label="T-bill stable yield" hint="90% leg in tokenized treasuries"><NumIn value={stableYield} scale={100} step={0.5} suffix="%" onChange={setStableYield} /></Field>
             <Field label="swap fee"><NumIn value={swapBps} scale={1} step={1} suffix="bps" onChange={setSwapBps} /></Field>
             <Field label="turnover /yr"><NumIn value={turnover} scale={1} step={1} suffix="×" onChange={setTurnover} /></Field>
@@ -241,7 +239,7 @@ export default function Simulator() {
           <Panel title="Initial deposits">
             <Field label="senior (ST)"><NumIn value={initST} step={1_000_000} w={96} onChange={setInitST} /></Field>
             <Field label="junior (JT)"><NumIn value={initJT} step={1_000_000} w={96} onChange={setInitJT} /></Field>
-            <Field label="liquidity (LT)"><NumIn value={initLT} step={500_000} w={96} onChange={setInitLT} /></Field>
+            <Field label="LP (LT)"><NumIn value={initLT} step={500_000} w={96} onChange={setInitLT} /></Field>
           </Panel>
         </div>
 
@@ -265,7 +263,7 @@ export default function Simulator() {
                 { l: "ST effective", v: usd(cur.stEffectiveNAV), c: C.sr, sub: `price ${cur.stPrice.toFixed(4)}` },
                 { l: "JT effective", v: usd(cur.jtEffectiveNAV), c: C.jt, sub: `price ${cur.jtPrice.toFixed(4)}` },
                 { l: "LT value", v: usd(cur.ltNAV), c: C.lt, sub: `pool ${pct(cur.poolPctST)} ST` },
-                { l: "liquidity premium", v: usd(cur.accruedLiquidityPremium), c: C.lt, sub: "accrued to LT" },
+                { l: "LP premium", v: usd(cur.accruedLiquidityPremium), c: C.lt, sub: "accrued to LT" },
                 { l: "ST IL", v: usd(cur.stIL), c: cur.stIL > 1e-6 ? C.neg : C.dim, sub: "senior impairment" },
                 { l: "JT IL", v: usd(cur.jtIL), c: cur.jtIL > 1e-6 ? C.warn : C.dim, sub: "coverage claim" },
                 { l: "BPT oracle value", v: usd(cur.ltRawNAV), c: C.lt, sub: `pool ${pct(cur.poolPctST)} ST (EclpLPOracle)` },
@@ -297,19 +295,19 @@ export default function Simulator() {
               series={[{ label: "utilization", color: C.sr, data: H.map((h) => h.utilization) }]} />
           </Panel>
 
-          <Panel title="Liquidity utilization — secondary-market health">
+          <Panel title="LP utilization — secondary-market health">
             <LineChart xs={xs} cursor={cursorX} yFmt={(y) => pct(y)} xFmt={xFmt} height={130} y0={0} yMaxClamp={2}
-              bands={[{ y: 1, color: C.neg, label: "min liquidity breached" }, { y: cfg.liqTargetUtilization, color: C.dim, label: "target" }]}
-              series={[{ label: "liquidity utilization", color: C.lt, data: H.map((h) => h.liquidityUtilization) }]} />
+              bands={[{ y: 1, color: C.neg, label: "min LP breached" }, { y: cfg.liqTargetUtilization, color: C.dim, label: "target" }]}
+              series={[{ label: "LP utilization", color: C.lt, data: H.map((h) => h.liquidityUtilization) }]} />
           </Panel>
 
           <Panel title="Premium shares (YDM output)">
             <LineChart xs={xs} cursor={cursorX} yFmt={(y) => pct(y)} xFmt={xFmt} height={120} y0={0}
               series={[
                 { label: "risk share → JT", color: C.jt, data: H.map((h) => h.riskShare) },
-                { label: "liquidity share → LT", color: C.lt, data: H.map((h) => h.liqShare) },
+                { label: "LP share → LT", color: C.lt, data: H.map((h) => h.liqShare) },
               ]} />
-            <Legend items={[["risk → JT", C.jt], ["liquidity → LT", C.lt]]} />
+            <Legend items={[["risk → JT", C.jt], ["LP → LT", C.lt]]} />
           </Panel>
 
           <Panel>

@@ -244,7 +244,7 @@ export default function DaySimulator() {
 
   // --- operating utilization (drives premium shares → APYs / split bar / chart dots) ---
   const [covUtil, setCovUtil] = useState(90); // coverage utilization %, 0–100
-  const [lqUtil, setLqUtil] = useState(90); // liquidity utilization %, 0–100
+  const [lqUtil, setLqUtil] = useState(90); // LP utilization %, 0–100
 
   // --- advanced inputs ---
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -381,7 +381,6 @@ export default function DaySimulator() {
         minLiquidity: minLiq,
         riskYDM,
         liqYDM,
-        premiumPriority: 'jtPriority',
         stableYield,
         swapFeeBps: swapBps,
         poolTurnoverPerYear: turnover,
@@ -452,7 +451,7 @@ export default function DaySimulator() {
   // ---------------------------------------------------------------------------
   // YDM chart data — 101 points sweeping each curve over its OWN utilization
   // axis. The risk YDM (→JT) is keyed on coverage utilization; the liquidity
-  // YDM (→LT) is keyed on liquidity utilization. These two utilizations move
+  // YDM (→LT) is keyed on LP utilization. These two utilizations move
   // independently, so each curve gets its own chart and axis.
   // ---------------------------------------------------------------------------
   const riskCurveData = useMemo(() => {
@@ -571,7 +570,7 @@ export default function DaySimulator() {
                     Key Takeaway
                   </div>
                   <p className="text-sm text-[var(--secondary-text)]">
-                    Day adds a Liquidity Tranche (LT) that backs senior redemptions via an E-CLP BPT pool, earning swap fees and a liquidity premium from the YDM.
+                    Day adds an LP tranche (LT) that backs senior redemptions via an E-CLP BPT pool, earning swap fees and an LP premium from the YDM.
                   </p>
                 </div>
               </div>
@@ -588,7 +587,7 @@ export default function DaySimulator() {
                     </p>
                   </div>
                   <p className="text-sm text-[var(--secondary-text)] leading-relaxed">
-                    Senior (ST) = paid first, protected. Junior (JT) = first-loss buffer. Liquidity (LT) = pool-backed redemption layer.
+                    Senior (ST) = paid first, protected. Junior (JT) = first-loss buffer. LP (LT) = pool-backed redemption layer.
                   </p>
                 </div>
 
@@ -602,7 +601,7 @@ export default function DaySimulator() {
                     </p>
                   </div>
                   <p className="text-sm text-[var(--secondary-text)] leading-relaxed">
-                    Utilization drives a <span className="font-medium text-[var(--info)]">risk premium to JT</span> and a separate <span className="font-medium text-[var(--insight)]">liquidity premium to LT</span>. Senior keeps what remains. Combined, the two premiums are capped at 100% of senior yield — raising one reduces the other, so senior yield never goes negative.
+                    Utilization drives a <span className="font-medium text-[var(--info)]">risk premium to JT</span> and a separate <span className="font-medium text-[var(--insight)]">LP premium to LT</span>. Senior keeps what remains. Combined, the two premiums are capped at 100% of senior yield — raising one reduces the other, so senior yield never goes negative.
                   </p>
                 </div>
 
@@ -616,7 +615,7 @@ export default function DaySimulator() {
                     </p>
                   </div>
                   <p className="text-sm text-[var(--secondary-text)] leading-relaxed">
-                    The pool targets a concentrated mix — roughly <strong>10% senior shares to 90% tokenized T-bills</strong> by default — but the actual split shifts with market conditions and the E-CLP concentration band (advanced). Min liquidity = the % of senior assets that must stay pool-backed.
+                    The pool targets a concentrated mix — roughly <strong>10% senior shares to 90% tokenized T-bills</strong> by default — but the actual split shifts with market conditions and the E-CLP concentration band (advanced). Min LP = the % of senior assets that must stay pool-backed.
                   </p>
                 </div>
 
@@ -626,11 +625,11 @@ export default function DaySimulator() {
                       4
                     </span>
                     <p className="text-sm font-medium text-[var(--primary-text)]">
-                      Liquidity slice (LT)
+                      LP slice (LT)
                     </p>
                   </div>
                   <p className="text-sm text-[var(--secondary-text)] leading-relaxed">
-                    LT earns swap fees + T-bill yield + net senior yield on its ST leg + a liquidity premium routed by the liquidity YDM.
+                    LT earns swap fees + T-bill yield + net senior yield on its ST leg + an LP premium routed by the LP YDM.
                   </p>
                 </div>
               </div>
@@ -664,7 +663,7 @@ export default function DaySimulator() {
                 <div className="bg-[var(--theme-background)] rounded-xl border border-[var(--insight)] p-4 flex items-center justify-between shadow-[0_8px_24px_rgba(0,0,0,0.04)]">
                   <div>
                     <p className="text-xs uppercase tracking-wide text-[var(--insight)]">
-                      Liquidity slice (LT)
+                      LP slice (LT)
                     </p>
                     <p className="text-base font-medium text-[var(--primary-text)]">
                       Backs redemptions
@@ -683,13 +682,13 @@ export default function DaySimulator() {
                 </p>
                 <div className="space-y-2">
                   <div className="rounded-xl border border-[var(--warning)] bg-[var(--warning-background)] px-4 py-3 text-xs text-[var(--warning)]">
-                    <span className="font-medium">TBD — needs input:</span> Exact utilization threshold / governance rule at which LT redemptions are blocked versus allowed (the simulation blocks when liquidityUtilization exceeds 1 but the on-chain threshold and any override path are not yet specified).
+                    <span className="font-medium">TBD — needs input:</span> Exact utilization threshold / governance rule at which LT redemptions are blocked versus allowed (the simulation blocks when LP utilization exceeds 1 but the on-chain threshold and any override path are not yet specified).
                   </div>
                   <div className="rounded-xl border border-[var(--warning)] bg-[var(--warning-background)] px-4 py-3 text-xs text-[var(--warning)]">
-                    <span className="font-medium">TBD — needs input:</span> LP-facing fee-split framing and headline-APY presentation beyond the formula above (swap fee + T-bill yield + net senior yield on the ST leg + liquidity premium).
+                    <span className="font-medium">TBD — needs input:</span> LP-facing fee-split framing and headline-APY presentation beyond the formula above (swap fee + T-bill yield + net senior yield on the ST leg + LP premium).
                   </div>
                   <div className="rounded-xl border border-[var(--warning)] bg-[var(--warning-background)] px-4 py-3 text-xs text-[var(--warning)]">
-                    <span className="font-medium">TBD — needs input:</span> Lock-up period, secondary-market access, and &apos;run&apos; mitigation narrative for LT holders beyond what the scenario engine models.
+                    <span className="font-medium">TBD — needs input:</span> Lock-up period, secondary-market access, and &apos;run&apos; mitigation narrative for LP holders beyond what the scenario engine models.
                   </div>
                 </div>
               </div>
@@ -731,7 +730,7 @@ export default function DaySimulator() {
             <Field label="Coverage" hint="min senior protection">
               <NumIn value={coverage} scale={100} step={1} suffix="%" onChange={setCoverage} />
             </Field>
-            <Field label="Min liquidity" hint="% of senior that must be pool-backed">
+            <Field label="Min LP" hint="% of senior that must be pool-backed">
               <NumIn value={minLiq} scale={100} step={1} suffix="%" onChange={setMinLiq} />
             </Field>
           </Card>
@@ -743,7 +742,7 @@ export default function DaySimulator() {
             <Field label="Junior (JT)">
               <NumIn value={initJT} step={1_000_000} w={96} onChange={setInitJT} />
             </Field>
-            <Field label="Liquidity (LT)">
+              <Field label="LP (LT)">
               <NumIn value={initLT} step={500_000} w={96} onChange={setInitLT} />
             </Field>
           </Card>
@@ -784,7 +783,7 @@ export default function DaySimulator() {
               <div>
                 <div className="flex items-center justify-between mb-1">
                   <span className="text-[10.5px] uppercase tracking-wider text-[var(--secondary-text)]">
-                    Liquidity utilization
+                    LP utilization
                   </span>
                   <span
                     className="text-[11px] tabular-nums font-medium"
@@ -804,7 +803,7 @@ export default function DaySimulator() {
                   style={{ accentColor: '#f92672', background: '#f92672' }}
                 />
                 <p className="mt-0.5 text-[9px] text-[var(--tertiary-text)]">
-                  &#x2192; liquidity premium {Math.round(liqShare * 100)}% of senior yield
+                  &#x2192; LP premium {Math.round(liqShare * 100)}% of senior yield
                 </p>
               </div>
             </div>
@@ -825,7 +824,7 @@ export default function DaySimulator() {
             </div>
             <div>
               <AnchorSlider
-                label="Liquidity premium → LT"
+                label="LP premium → LT"
                 value={liqYDM.yTarget}
                 accent="#f92672"
                 onChange={(v) => setLiqAnchor('yTarget', v)}
@@ -850,7 +849,7 @@ export default function DaySimulator() {
               />
             </div>
             <p className="mt-1.5 text-[12px] text-[var(--tertiary-text)]">
-              Premium budget &#8212; <span className="tabular-nums">{budgetPct}%</span> of senior yield allocated at target, <span className="tabular-nums">{budgetKeptPct}%</span> kept by senior. Risk + liquidity premiums can never exceed 100% combined &#8212; at any utilization.
+              Premium budget &#8212; <span className="tabular-nums">{budgetPct}%</span> of senior yield allocated at target, <span className="tabular-nums">{budgetKeptPct}%</span> kept by senior. Risk + LP premiums can never exceed 100% combined &#8212; at any utilization.
             </p>
           </div>
         </Card>
@@ -863,7 +862,7 @@ export default function DaySimulator() {
             </p>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {/* Pool / LT */}
-              <Card title="Liquidity Tranche (E-CLP BPT)">
+              <Card title="LP Tranche (E-CLP BPT)">
                 <Field label="T-bill stable yield" hint="yield on the tokenized-treasury leg (≈90% of the pool at the default peg)">
                   <NumIn value={stableYield} scale={100} step={0.5} suffix="%" onChange={setStableYield} />
                 </Field>
@@ -895,7 +894,7 @@ export default function DaySimulator() {
                     onChange={(v) => setRiskAnchor('y100', v)}
                   />
                   <div className="border-t border-[var(--theme-border)] my-1" />
-                  <p className="text-[9px] uppercase tracking-wider text-[var(--insight)] mb-0.5">Liquidity premium → LT</p>
+                  <p className="text-[9px] uppercase tracking-wider text-[var(--insight)] mb-0.5">LP premium → LT</p>
                   <AnchorSlider
                     label="@0% util"
                     value={liqYDM.y0}
@@ -975,7 +974,7 @@ export default function DaySimulator() {
                 </div>
                 <p className="text-[10px] text-[var(--tertiary-text)] -mt-1">paid to JT</p>
                 <div className="flex items-start justify-between gap-3">
-                  <span className="text-[11px] text-[var(--secondary-text)] flex-shrink-0 whitespace-nowrap">&#8722; Liquidity premium</span>
+                      <span className="text-[11px] text-[var(--secondary-text)] flex-shrink-0 whitespace-nowrap">&#8722; LP premium</span>
                   <span className="text-[11px] text-right" style={{ color: 'var(--success)' }}>{Math.round(liqShare * 100)}% &#215; APY</span>
                 </div>
                 <p className="text-[10px] text-[var(--tertiary-text)] -mt-1">paid to LT</p>
@@ -1016,13 +1015,13 @@ export default function DaySimulator() {
           <div className="group relative kpi-flash bg-[var(--theme-background)] rounded-xl border border-[var(--theme-border)] p-4 shadow-sm">
             <div className="flex items-center gap-2 mb-1">
               <span className="w-2 h-2 rounded-full" style={{ background: 'var(--insight)' }} />
-              <span className="text-[13px] text-[var(--secondary-text)]">Liquidity · LT</span>
+                <span className="text-[13px] text-[var(--secondary-text)]">LP · LT</span>
             </div>
             <p className="tabular-nums text-4xl sm:text-5xl leading-none text-[var(--insight)]" style={{ fontWeight: 500 }}>
               {(ltAPY * 100).toFixed(1)}
               <span className="text-2xl sm:text-3xl">%</span>
             </p>
-            <p className="text-[12px] text-[var(--tertiary-text)] mt-1.5">backs redemptions · earns liquidity premium</p>
+                <p className="text-[12px] text-[var(--tertiary-text)] mt-1.5">backs redemptions · earns LP premium</p>
             {/* Hover breakdown */}
             <div className="hidden group-hover:block absolute right-0 top-full mt-2 z-20 w-80 text-left bg-[var(--theme-background)] border border-[var(--theme-border)] rounded-xl shadow-lg p-3">
               <p className="text-[12px] font-medium text-[var(--primary-text)]">
@@ -1031,7 +1030,7 @@ export default function DaySimulator() {
               <p className="text-[11px] text-[var(--secondary-text)] mt-0.5">(liq &#215; APY) &#247; LT size + swap + BPT carry</p>
               <div className="mt-2 space-y-1.5">
                 <div className="flex items-start justify-between gap-3">
-                  <span className="text-[11px] text-[var(--secondary-text)] flex-shrink-0 whitespace-nowrap">Liquidity premium</span>
+                      <span className="text-[11px] text-[var(--secondary-text)] flex-shrink-0 whitespace-nowrap">LP premium</span>
                   <span className="text-[11px] text-right" style={{ color: 'var(--insight)' }}>{Math.round(liqShare * 100)}%&#215;APY&#247;LT size {(ltSize * 100).toFixed(1)}%</span>
                 </div>
                 <div className="flex items-start justify-between gap-3">
@@ -1119,7 +1118,7 @@ export default function DaySimulator() {
                 </div>
               );
             })()}
-            {/* Segment: Liquidity → LT — hidden when 0% */}
+            {/* Segment: LP → LT — hidden when 0% */}
             {liqShareFrac > 0.005 && (() => {
               const w = segWidths[2];
               return (
@@ -1142,7 +1141,7 @@ export default function DaySimulator() {
                 >
                   {w >= 96 ? (
                     <>
-                      <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.85)', lineHeight: 1.2 }}>Liquidity &#x2192; LT</span>
+                      <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.85)', lineHeight: 1.2 }}>LP &#x2192; LT</span>
                       <span style={{ fontSize: 15, fontWeight: 600, color: '#fff', lineHeight: 1.2 }}>{liqSharePct}%</span>
                     </>
                   ) : w >= 36 ? (
@@ -1163,7 +1162,7 @@ export default function DaySimulator() {
             </span>
             <span className="flex items-center gap-1.5 text-[12px] text-[var(--secondary-text)]">
               <span className="w-2 h-2 rounded-full" style={{ background: 'var(--insight)' }} />
-              Liquidity &#x2192; LT <span className="tabular-nums font-medium text-[var(--primary-text)]">{liqSharePct}%</span>
+              LP &#x2192; LT <span className="tabular-nums font-medium text-[var(--primary-text)]">{liqSharePct}%</span>
             </span>
           </div>
         </div>
@@ -1184,7 +1183,7 @@ export default function DaySimulator() {
           Premium share of senior yield vs. Utilization
         </p>
         <p className="text-xs text-[var(--secondary-text)] mb-4">
-          JT&apos;s risk premium tracks coverage utilization; LT&apos;s liquidity premium tracks liquidity utilization. These two utilizations move independently — each premium responds only to its own.
+          JT&apos;s risk premium tracks coverage utilization; LT&apos;s LP premium tracks LP utilization. These two utilizations move independently — each premium responds only to its own.
         </p>
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Chart 1 — Risk premium → JT (vs coverage utilization) */}
@@ -1290,12 +1289,12 @@ export default function DaySimulator() {
               </ResponsiveContainerNoSSR>
             </div>
           </div>
-          {/* Chart 2 — Liquidity premium → LT (vs liquidity utilization) */}
+          {/* Chart 2 — LP premium → LT (vs LP utilization) */}
           <div>
             <p className="text-sm font-medium text-[var(--insight)] mb-0.5">
-              Liquidity premium → LT
+              LP premium → LT
             </p>
-            <p className="text-xs text-[var(--secondary-text)] mb-2">vs liquidity utilization</p>
+            <p className="text-xs text-[var(--secondary-text)] mb-2">vs LP utilization</p>
             <div className="h-64">
               <ResponsiveContainerNoSSR width="100%" height="100%" minWidth={0} minHeight={256}>
                 <LineChart
@@ -1309,7 +1308,7 @@ export default function DaySimulator() {
                     domain={[0, 100]}
                     ticks={[0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100]}
                     label={{
-                      value: 'Liquidity utilization (%)',
+                      value: 'LP utilization (%)',
                       position: 'insideBottom',
                       offset: -10,
                       fill: '#908b78',
@@ -1343,10 +1342,10 @@ export default function DaySimulator() {
                         return (
                           <div className="bg-[var(--theme-background)] p-3 rounded-xl border-2 border-[var(--theme-border)] shadow-lg">
                             <p className="text-xs font-medium text-[var(--primary-text)] mb-1">
-                              At {d.x.toFixed(0)}% liquidity utilization
+                              At {d.x.toFixed(0)}% LP utilization
                             </p>
                             <div className="flex justify-between gap-4 text-sm">
-                              <span className="text-[var(--insight)]">Liq share (LT):</span>
+                              <span className="text-[var(--insight)]">LP share (LT):</span>
                               <span className="font-medium text-[var(--insight)]">
                                 {d.share.toFixed(2)}%
                               </span>
