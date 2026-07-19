@@ -666,6 +666,119 @@ function CoverageLossDiagram({
   );
 }
 
+function GuidedChartGuide() {
+  const itemStyle = {
+    alignItems: 'center',
+    display: 'flex',
+    gap: 9,
+    minWidth: 0,
+  } as const;
+  const copyStyle = {
+    color: C.muted,
+    fontSize: 11.5,
+    lineHeight: 1.35,
+  } as const;
+  return (
+    <div
+      className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4"
+      style={{ borderBottom: `1px solid ${C.border}`, borderTop: `1px solid ${C.border}`, gap: 12, padding: '10px 0' }}
+    >
+      <div style={itemStyle}>
+        <svg aria-hidden="true" height="24" viewBox="0 0 42 24" width="42">
+          <line x1="1" x2="19" y1="7" y2="7" stroke={C.seniorLine} strokeWidth="2" />
+          <line x1="23" x2="41" y1="7" y2="7" stroke={C.juniorLine} strokeWidth="2" />
+          <line x1="1" x2="19" y1="17" y2="17" stroke={C.olive} strokeWidth="2" />
+          <line x1="23" x2="41" y1="17" y2="17" stroke={C.strategyLine} strokeWidth="2" />
+        </svg>
+        <span style={copyStyle}>Lines show how $100 in each position changes.</span>
+      </div>
+      <div style={itemStyle}>
+        <span aria-hidden="true" style={{ background: C.obsFill, height: 24, opacity: 0.32, width: 28 }} />
+        <span style={copyStyle}>A shaded band is an observation period.</span>
+      </div>
+      <div style={itemStyle}>
+        <span aria-hidden="true" style={{ background: C.danger, borderRadius: 9999, height: 9, width: 9 }} />
+        <span style={copyStyle}>A Junior mark means covered loss became permanent.</span>
+      </div>
+      <div style={itemStyle}>
+        <span aria-hidden="true" style={{ border: `2px solid ${C.danger}`, borderRadius: 9999, height: 10, width: 10 }} />
+        <span style={copyStyle}>A Senior mark means loss reached Senior.</span>
+      </div>
+    </div>
+  );
+}
+
+function GuidedObservationSteps({ days }: { days: number }) {
+  const steps = [
+    {
+      number: '1',
+      title: 'Drawdown',
+      body: 'Junior covers Senior first. The covered amount is tracked for possible recovery.',
+      art: (
+        <svg aria-hidden="true" className="mt-3 w-full" viewBox="0 0 210 54">
+          <line x1="5" x2="205" y1="15" y2="15" stroke={C.kpiLabel} strokeDasharray="4 4" />
+          <polyline points="5,15 48,14 86,20 124,38 164,31 205,27" fill="none" stroke={C.juniorLine} strokeWidth="2" />
+          <polyline points="5,15 48,15 86,16 124,18 164,18 205,18" fill="none" stroke={C.seniorLine} strokeWidth="2" />
+        </svg>
+      ),
+    },
+    {
+      number: '2',
+      title: `${days}-day observation`,
+      body: 'Direct Senior and Junior deposits/redemptions pause; LP withdrawals pause. Senior can still sell through the LP.',
+      art: (
+        <svg aria-hidden="true" className="mt-3 w-full" viewBox="0 0 210 54">
+          <rect x="72" y="2" width="70" height="48" fill={C.obsFill} fillOpacity="0.32" />
+          <line x1="5" x2="205" y1="15" y2="15" stroke={C.kpiLabel} strokeDasharray="4 4" />
+          <polyline points="5,15 48,16 84,24 111,38 144,29 174,24 205,22" fill="none" stroke={C.juniorLine} strokeWidth="2" />
+          <polyline points="5,15 48,15 84,17 111,18 144,18 174,18 205,18" fill="none" stroke={C.seniorLine} strokeWidth="2" />
+        </svg>
+      ),
+    },
+    {
+      number: '3',
+      title: 'Recover or finalize',
+      body: "Recovery restores Junior first. If the window ends before recovery, Junior's covered loss becomes permanent.",
+      art: (
+        <svg aria-hidden="true" className="mt-3 w-full" viewBox="0 0 210 54">
+          <line x1="5" x2="95" y1="15" y2="15" stroke={C.kpiLabel} strokeDasharray="4 4" />
+          <polyline points="5,15 28,18 49,34 72,23 95,10" fill="none" stroke={C.olive} strokeWidth="2" />
+          <text x="105" y="30" fill={C.kpiLabel} fontFamily={MONO} fontSize="9" textAnchor="middle">OR</text>
+          <line x1="116" x2="205" y1="15" y2="15" stroke={C.kpiLabel} strokeDasharray="4 4" />
+          <polyline points="116,15 140,19 162,34 184,34 205,34" fill="none" stroke={C.juniorLine} strokeWidth="2" />
+          <circle cx="184" cy="34" r="4" fill={C.danger} />
+        </svg>
+      ),
+    },
+  ];
+  return (
+    <div className="mt-4 grid grid-cols-1 lg:grid-cols-3" style={{ border: `1px solid ${C.border}` }}>
+      {steps.map((step, index) => (
+        <div
+          key={step.number}
+          className={index === 0 ? undefined : 'border-t lg:border-l lg:border-t-0'}
+          style={{ borderColor: C.border, minHeight: 154, padding: 12 }}
+        >
+          <div className="flex items-start gap-3">
+            <span
+              style={{ background: C.accent, color: C.cardBg, flex: '0 0 auto', fontFamily: MONO, fontSize: 15, height: 28, lineHeight: '28px', textAlign: 'center', width: 28 }}
+            >
+              {step.number}
+            </span>
+            <div>
+              <p style={{ color: C.eyebrow, fontFamily: MONO, fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                {step.title}
+              </p>
+              <p className="mt-1" style={{ color: C.muted, fontSize: 11.5, lineHeight: 1.4 }}>{step.body}</p>
+            </div>
+          </div>
+          {step.art}
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function SliderControl({
   label,
   value,
@@ -733,8 +846,15 @@ const pct = (value: number, digits = 1) =>
 const usd0 = (value: number) => `$${Math.round(value).toLocaleString('en-US')}`;
 const signColor = (value: number) => (value < 0 ? C.danger : C.text);
 
-export default function DayMarketSimulator({ market }: { market?: DayMarket }) {
+export default function DayMarketSimulator({
+  market,
+  variant = 'standard',
+}: {
+  market?: DayMarket;
+  variant?: 'standard' | 'guided';
+}) {
   const activeMarket = market ?? FALLBACK_MARKET;
+  const isGuided = variant === 'guided';
   const defaults = activeMarket.defaults;
   const [showInputs, setShowInputs] = useState(false);
   const [showReview, setShowReview] = useState(true);
@@ -1248,12 +1368,19 @@ export default function DayMarketSimulator({ market }: { market?: DayMarket }) {
           {activeMarket.copy.title}
         </h1>
         <p className="max-w-3xl" style={{ color: C.muted, fontSize: 12.5, lineHeight: 1.38, margin: '0 0 12px' }}>
-          {activeMarket.copy.description}
+          {isGuided
+            ? 'See how one yield strategy can support three different positions.'
+            : activeMarket.copy.description}
         </p>
       </section>
 
       <section style={{ ...cardStyle, padding: 16 }}>
         <Eyebrow>How Day works</Eyebrow>
+        {isGuided && (
+          <h2 className="mt-2" style={{ color: C.text, fontFamily: SERIF, fontSize: 22, fontWeight: 400, lineHeight: 1.12 }}>
+            One strategy. Three positions. Each is paid for a different role.
+          </h2>
+        )}
         <div
           className="mt-3 grid grid-cols-1 xl:grid-cols-[minmax(0,2.3fr)_minmax(290px,1fr)]"
           style={{ gap: 8, alignItems: 'center' }}
@@ -1496,11 +1623,22 @@ export default function DayMarketSimulator({ market }: { market?: DayMarket }) {
         <div style={{ ...cardStyle, padding: 14 }}>
           <Eyebrow>Liquidity</Eyebrow>
           <LiquidityExecutionDiagram metrics={result.explainer.liquidity} />
+          {isGuided && (
+            <p style={{ color: C.muted, fontSize: 11.5, lineHeight: 1.45 }}>
+              Senior can exit through the LP. Larger atomic sales move farther down the curve and create a larger arbitrage opportunity.
+            </p>
+          )}
         </div>
 
         <div style={{ ...cardStyle, padding: 14 }}>
           <Eyebrow>Coverage</Eyebrow>
           <CoverageLossDiagram metrics={result.explainer.coverage} />
+          {isGuided && (
+            <p style={{ color: C.muted, fontSize: 11.5, lineHeight: 1.45 }}>
+              Coverage is Junior&apos;s first-loss buffer. At the current starting balance, Junior can absorb about{' '}
+              {(result.explainer.coverage.coverageLossLimit * 100).toFixed(1)}% of strategy losses before Senior declines.
+            </p>
+          )}
         </div>
       </section>
 
@@ -1509,10 +1647,12 @@ export default function DayMarketSimulator({ market }: { market?: DayMarket }) {
           <div>
             <Eyebrow>Backtest</Eyebrow>
             <h2 className="mt-2" style={{ color: C.text, fontFamily: SERIF, fontSize: 22, fontWeight: 400, lineHeight: 1.08 }}>
-              {LOCKED_COPY.reviewTitle}
+              {isGuided ? 'See the rules play out over time.' : LOCKED_COPY.reviewTitle}
             </h2>
             <p className="mt-1" style={{ color: C.muted, fontSize: 12.5, lineHeight: 1.38 }}>
-              {LOCKED_COPY.reviewDescription}
+              {isGuided
+                ? 'Use the chart to see when Junior coverage is active, when a loss can still recover, and when it becomes permanent.'
+                : LOCKED_COPY.reviewDescription}
             </p>
           </div>
           <button
@@ -1538,6 +1678,7 @@ export default function DayMarketSimulator({ market }: { market?: DayMarket }) {
 
         {showReview && (
           <div className="mt-4">
+            {isGuided && <GuidedChartGuide />}
             <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 mb-3" style={{ fontSize: 11.5, color: C.muted }}>
               <LegendSwatch color={C.seniorLine}>Senior share price</LegendSwatch>
               <LegendSwatch color={C.juniorLine}>Junior share price</LegendSwatch>
@@ -1709,6 +1850,8 @@ export default function DayMarketSimulator({ market }: { market?: DayMarket }) {
                 </LineChart>
               </ResponsiveContainerNoSSR>
             </div>
+
+            {isGuided && <GuidedObservationSteps days={observationDays} />}
 
             <DayTimeframeBrush
               dates={allDates}

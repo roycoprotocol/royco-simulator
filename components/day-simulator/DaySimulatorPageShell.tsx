@@ -2,10 +2,18 @@ import SimulatorPageShell from "@/components/simulator/SimulatorPageShell";
 import DayMarketSimulator from "@/components/day-simulator/DayMarketSimulator";
 import type { DayMarket } from "@/lib/day-simulator-template/market";
 
-export default function DaySimulatorPageShell({ market }: { market?: DayMarket }) {
+export type DaySimulatorVariant = "standard" | "guided";
+
+export default function DaySimulatorPageShell({
+  market,
+  variant = "standard",
+}: {
+  market?: DayMarket;
+  variant?: DaySimulatorVariant;
+}) {
   return (
     <SimulatorPageShell>
-      <DayMarketSimulator market={market} />
+      <DayMarketSimulator market={market} variant={variant} />
     </SimulatorPageShell>
   );
 }
