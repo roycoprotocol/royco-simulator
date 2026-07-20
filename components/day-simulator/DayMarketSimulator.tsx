@@ -520,37 +520,56 @@ function LiquidityExecutionDiagram({
     end: { x: number; y: number },
     rect: { left: number; right: number; top: number; bottom: number },
   ) => {
+    if (start.x === end.x) {
+      return start.x >= rect.left
+        && start.x <= rect.right
+        && Math.max(start.y, end.y) >= rect.top
+        && Math.min(start.y, end.y) <= rect.bottom;
+    }
     const segmentLeft = Math.max(Math.min(start.x, end.x), rect.left);
     const segmentRight = Math.min(Math.max(start.x, end.x), rect.right);
     if (segmentLeft > segmentRight) return false;
     const yAt = (pointX: number) => {
-      if (start.x === end.x) return start.y;
       return start.y + ((pointX - start.x) / (end.x - start.x)) * (end.y - start.y);
     };
     const segmentTop = Math.min(yAt(segmentLeft), yAt(segmentRight));
     const segmentBottom = Math.max(yAt(segmentLeft), yAt(segmentRight));
     return segmentBottom >= rect.top && segmentTop <= rect.bottom;
   };
-  const labelY = (labelX: number, pointY: number, textWidth: number, anchor: 'start' | 'end') => {
-    if (!avoidLabelOverlap) return pointY - 13;
-    const left = anchor === 'start' ? labelX : labelX - textWidth;
-    const candidates = [pointY - 13, pointY - 34, pointY - 55, pointY + 28];
-    return candidates.find((candidate) => {
-      const rect = {
-        left: left - 4,
-        right: left + textWidth + 4,
-        top: candidate - 15,
-        bottom: candidate + 4,
-      };
-      if (rect.top < margin.top + 4 || rect.bottom > baseline - 4) return false;
-      return !curvePixels.some((point, index) =>
-        index > 0 && segmentIntersectsRect(curvePixels[index - 1], point, rect));
-    }) ?? Math.max(margin.top + 20, pointY - 34);
+  const labelPosition = (preferredX: number, pointY: number, textWidth: number, anchor: 'start' | 'end') => {
+    if (!avoidLabelOverlap) return { x: preferredX, y: pointY - 13 };
+    const horizontalOffsets = anchor === 'start' ? [0, 32, 64] : [0, -32, -64, -96, -128];
+    const verticalOffsets = [-13, -34, -55, -76, -97, 28];
+    for (const horizontalOffset of horizontalOffsets) {
+      const candidateX = preferredX + horizontalOffset;
+      const left = anchor === 'start' ? candidateX : candidateX - textWidth;
+      for (const verticalOffset of verticalOffsets) {
+        const candidateY = pointY + verticalOffset;
+        const rect = {
+          left: left - 4,
+          right: left + textWidth + 4,
+          top: candidateY - 15,
+          bottom: candidateY + 4,
+        };
+        if (
+          rect.left < margin.left + 4
+          || rect.right > margin.left + plotWidth - 4
+          || rect.top < margin.top + 4
+          || rect.bottom > baseline - 4
+        ) continue;
+        const intersectsCurve = curvePixels.some((point, index) =>
+          index > 0 && segmentIntersectsRect(curvePixels[index - 1], point, rect));
+        if (!intersectsCurve) return { x: candidateX, y: candidateY };
+      }
+    }
+    const fallbackX = anchor === 'end' ? preferredX - 96 : preferredX;
+    return {
+      x: fallbackX,
+      y: Math.max(margin.top + 20, pointY - 34),
+    };
   };
-  const referenceLabelX = referenceX + 12;
-  const boundaryLabelX = boundaryX - 10;
-  const referenceLabelY = labelY(referenceLabelX, referenceY, 104, 'start');
-  const boundaryLabelY = labelY(boundaryLabelX, boundaryY, 112, 'end');
+  const referenceLabel = labelPosition(referenceX + 12, referenceY, 104, 'start');
+  const boundaryLabel = labelPosition(boundaryX - 10, boundaryY, 112, 'end');
   const arbitrageArea = [
     `${x(0)},${y(1)}`,
     `${boundaryX},${y(1)}`,
@@ -593,8 +612,8 @@ function LiquidityExecutionDiagram({
           Arbitrage incentive grows →
         </text>
         <text
-          x={referenceLabelX}
-          y={referenceLabelY}
+          x={referenceLabel.x}
+          y={referenceLabel.y}
           fill={C.olive}
           fontFamily={MONO}
           fontSize={12.5}
@@ -602,7 +621,7 @@ function LiquidityExecutionDiagram({
         >
           {referenceSlippage.toFixed(1)}% slippage
         </text>
-        <text x={boundaryLabelX} y={boundaryLabelY} fill={C.danger} fontFamily={MONO} fontSize={12.5} fontWeight={600} textAnchor="end">
+        <text x={boundaryLabel.x} y={boundaryLabel.y} fill={C.danger} fontFamily={MONO} fontSize={12.5} fontWeight={600} textAnchor="end">
           {boundarySlippage.toFixed(1)}% slippage
         </text>
         <text x={referenceX} y={height - 37} fill={C.olive} fontFamily={MONO} fontSize={13} fontWeight={600} textAnchor="middle">
@@ -1451,7 +1470,7 @@ export default function DayMarketSimulator({
           <div className="mt-3 grid grid-cols-1 md:grid-cols-3" style={{ gap: 8 }}>
             <ExecutiveMetric label="Senior average yield" value={`${pct(result.seniorApy)}/yr`} valueColor={C.accent} />
             <ExecutiveMetric label="Contract-enforced coverage" value={`${coveragePct.toFixed(0)}% minimum`} valueColor={C.juniorLine} />
-            <ExecutiveMetric label="Dedicated exit liquidity" value={`${minLiquidityPct.toFixed(0)}% minimum`} valueColor={C.olive} />
+            <ExecutiveMetric label="Dedicated liquidity" value={`${minLiquidityPct.toFixed(0)}% minimum`} valueColor={C.olive} />
           </div>
         </section>
       )}
@@ -1487,7 +1506,7 @@ export default function DayMarketSimulator({
               </p>
             </div>
             <div style={{ background: C.pageBg, border: `1px solid ${C.olive}`, minHeight: 178, padding: 14 }}>
-              <Eyebrow>LP · exit liquidity</Eyebrow>
+              <Eyebrow>LP · dedicated liquidity</Eyebrow>
               <p className="mt-3" style={{ color: C.olive, fontFamily: MONO, fontSize: 26, fontWeight: 700 }}>
                 {pct(result.liquidityApy)}/yr
               </p>
