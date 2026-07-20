@@ -10,7 +10,7 @@ const PARTNERS = [
   {
     name: "Pareto FalconX",
     asset: "FalconX",
-    href: "/falconx-v3",
+    href: "/falconx",
   },
   {
     name: "Makina",
