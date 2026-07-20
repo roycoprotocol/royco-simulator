@@ -121,6 +121,11 @@ for (const geometryContract of [
   'width={finalizationObservationEndX - 116}',
   'points="5,15 28,18 49,34 72,23 83,15 95,10"',
   '<circle cx={finalizationObservationEndX} cy="34"',
+  'const narrowSeniorZone = (metrics.displayMaxLoss - metrics.coverageLossLimit) / metrics.displayMaxLoss < 0.18',
+  'const juniorZoneLabelPosition = placeCoverageLabel',
+  'const seniorZoneLabelPosition = placeCoverageLabel',
+  'const coveredBalanceLabelPosition = placeCoverageLabel',
+  'segmentIntersectsRect(curvePixels[index - 1], point, rect)',
 ]) {
   if (!simulator.includes(geometryContract)) {
     failures.push(`Day simulator missing locked shared-diagram geometry: ${geometryContract}`);

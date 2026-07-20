@@ -187,6 +187,26 @@ const cardStyle = {
 
 const estimateText = (text: string): number => text.length * 6;
 
+type SvgPoint = { x: number; y: number };
+type SvgRect = { left: number; right: number; top: number; bottom: number };
+
+const segmentIntersectsRect = (start: SvgPoint, end: SvgPoint, rect: SvgRect) => {
+  if (start.x === end.x) {
+    return start.x >= rect.left
+      && start.x <= rect.right
+      && Math.max(start.y, end.y) >= rect.top
+      && Math.min(start.y, end.y) <= rect.bottom;
+  }
+  const segmentLeft = Math.max(Math.min(start.x, end.x), rect.left);
+  const segmentRight = Math.min(Math.max(start.x, end.x), rect.right);
+  if (segmentLeft > segmentRight) return false;
+  const yAt = (pointX: number) =>
+    start.y + ((pointX - start.x) / (end.x - start.x)) * (end.y - start.y);
+  const segmentTop = Math.min(yAt(segmentLeft), yAt(segmentRight));
+  const segmentBottom = Math.max(yAt(segmentLeft), yAt(segmentRight));
+  return segmentBottom >= rect.top && segmentTop <= rect.bottom;
+};
+
 function ErasureIBeam(props: {
   x1?: number;
   y1?: number;
@@ -542,27 +562,6 @@ function LiquidityExecutionDiagram({
   const boundarySellPct = metrics.boundarySellShareOfSenior * 100;
   const curvePixels = curve.map((point) => ({ x: x(point.sellNAV), y: y(point.executionPrice) }));
   const curveLine = curvePixels.map((point) => `${point.x},${point.y}`).join(' ');
-  const segmentIntersectsRect = (
-    start: { x: number; y: number },
-    end: { x: number; y: number },
-    rect: { left: number; right: number; top: number; bottom: number },
-  ) => {
-    if (start.x === end.x) {
-      return start.x >= rect.left
-        && start.x <= rect.right
-        && Math.max(start.y, end.y) >= rect.top
-        && Math.min(start.y, end.y) <= rect.bottom;
-    }
-    const segmentLeft = Math.max(Math.min(start.x, end.x), rect.left);
-    const segmentRight = Math.min(Math.max(start.x, end.x), rect.right);
-    if (segmentLeft > segmentRight) return false;
-    const yAt = (pointX: number) => {
-      return start.y + ((pointX - start.x) / (end.x - start.x)) * (end.y - start.y);
-    };
-    const segmentTop = Math.min(yAt(segmentLeft), yAt(segmentRight));
-    const segmentBottom = Math.max(yAt(segmentLeft), yAt(segmentRight));
-    return segmentBottom >= rect.top && segmentTop <= rect.bottom;
-  };
   const labelPosition = (preferredX: number, pointY: number, textWidth: number, anchor: 'start' | 'end') => {
     if (!avoidLabelOverlap) return { x: preferredX, y: pointY - 13 };
     const horizontalOffsets = anchor === 'start' ? [0, 32, 64] : [0, -32, -64, -96, -128];
@@ -695,11 +694,54 @@ function CoverageLossDiagram({
   const yRange = Math.max(1, yMax - yMin);
   const x = (loss: number) => margin.left + (loss / metrics.displayMaxLoss) * plotWidth;
   const y = (balance: number) => margin.top + ((yMax - balance) / yRange) * plotHeight;
-  const line = metrics.points.map((point) => `${x(point.loss)},${y(point.seniorBalancePer100)}`).join(' ');
+  const curvePixels = metrics.points.map((point) => ({
+    x: x(point.loss),
+    y: y(point.seniorBalancePer100),
+  }));
+  const line = curvePixels.map((point) => `${point.x},${point.y}`).join(' ');
   const breakpointX = x(metrics.coverageLossLimit);
   const endpointX = x(metrics.displayMaxLoss);
   const endpointY = y(metrics.endingSeniorBalancePer100);
   const narrowCoverageZone = metrics.coverageLossLimit / metrics.displayMaxLoss < 0.18;
+  const narrowSeniorZone = (metrics.displayMaxLoss - metrics.coverageLossLimit) / metrics.displayMaxLoss < 0.18;
+  type CoverageLabelCandidate = { x: number; y: number; anchor: 'start' | 'middle' | 'end' };
+  const placeCoverageLabel = (text: string, candidates: CoverageLabelCandidate[]) => {
+    const textWidth = estimateText(text);
+    for (const candidate of candidates) {
+      const left = candidate.anchor === 'start'
+        ? candidate.x
+        : candidate.anchor === 'end'
+          ? candidate.x - textWidth
+          : candidate.x - textWidth / 2;
+      const rect = {
+        left: left - 5,
+        right: left + textWidth + 5,
+        top: candidate.y - 15,
+        bottom: candidate.y + 4,
+      };
+      const staysInsidePlotWidth = rect.left >= margin.left + 4 && rect.right <= endpointX - 4;
+      const staysInsideViewBoxHeight = rect.top >= 4 && rect.bottom <= margin.top + plotHeight - 4;
+      const intersectsCurve = curvePixels.some((point, index) =>
+        index > 0 && segmentIntersectsRect(curvePixels[index - 1], point, rect));
+      if (staysInsidePlotWidth && staysInsideViewBoxHeight && !intersectsCurve) return candidate;
+    }
+    return candidates[candidates.length - 1];
+  };
+  const juniorZoneLabel = 'Junior absorbs loss';
+  const seniorZoneLabel = 'Senior absorbs excess';
+  const coveredBalanceLabel = '$100 covered';
+  const juniorZoneLabelPosition = placeCoverageLabel(juniorZoneLabel, [
+    { x: (margin.left + breakpointX) / 2, y: margin.top + 27, anchor: 'middle' },
+    { x: margin.left + 10, y: margin.top - 10, anchor: 'start' },
+  ]);
+  const seniorZoneLabelPosition = placeCoverageLabel(seniorZoneLabel, [
+    { x: (breakpointX + endpointX) / 2, y: margin.top + 27, anchor: 'middle' },
+    { x: endpointX - 10, y: margin.top - 10, anchor: 'end' },
+  ]);
+  const coveredBalanceLabelPosition = placeCoverageLabel(coveredBalanceLabel, [
+    { x: breakpointX - 12, y: y(100) + 56, anchor: 'end' },
+    { x: margin.left + 10, y: margin.top + plotHeight - 16, anchor: 'start' },
+  ]);
   return (
     <div data-accountant-source="buildDayExplainerMetrics.coverage">
       <svg
@@ -741,12 +783,12 @@ function CoverageLossDiagram({
         <text x={14} y={margin.top + plotHeight + 4} fill={C.kpiLabel} fontFamily={MONO} fontSize={12}>${yMin}</text>
         <text x={margin.left} y={height - 32} fill={C.kpiLabel} fontFamily={MONO} fontSize={12}>0%</text>
         <text
-          x={breakpointX}
-          y={narrowCoverageZone ? height - 47 : height - 32}
+          x={narrowSeniorZone ? breakpointX - 4 : breakpointX}
+          y={narrowCoverageZone || narrowSeniorZone ? height - 47 : height - 32}
           fill={C.eyebrow}
           fontFamily={MONO}
           fontSize={12}
-          textAnchor={narrowCoverageZone ? 'start' : 'middle'}
+          textAnchor={narrowCoverageZone ? 'start' : narrowSeniorZone ? 'end' : 'middle'}
         >
           {(metrics.coverageLossLimit * 100).toFixed(1)}%
         </text>
@@ -754,28 +796,35 @@ function CoverageLossDiagram({
           {(metrics.displayMaxLoss * 100).toFixed(1)}%
         </text>
         <text
-          x={narrowCoverageZone ? margin.left + 10 : (margin.left + breakpointX) / 2}
-          y={margin.top + 27}
+          x={juniorZoneLabelPosition.x}
+          y={juniorZoneLabelPosition.y}
           fill={C.olive}
           fontSize={12.5}
           fontWeight={600}
-          textAnchor={narrowCoverageZone ? 'start' : 'middle'}
+          textAnchor={juniorZoneLabelPosition.anchor}
         >
-          Junior absorbs loss
-        </text>
-        <text x={(breakpointX + endpointX) / 2} y={margin.top + 27} fill={C.danger} fontSize={12.5} fontWeight={600} textAnchor="middle">
-          Senior absorbs excess
+          {juniorZoneLabel}
         </text>
         <text
-          x={narrowCoverageZone ? breakpointX + 12 : breakpointX - 12}
-          y={y(100) + 56}
+          x={seniorZoneLabelPosition.x}
+          y={seniorZoneLabelPosition.y}
+          fill={C.danger}
+          fontSize={12.5}
+          fontWeight={600}
+          textAnchor={seniorZoneLabelPosition.anchor}
+        >
+          {seniorZoneLabel}
+        </text>
+        <text
+          x={coveredBalanceLabelPosition.x}
+          y={coveredBalanceLabelPosition.y}
           fill={C.olive}
           fontFamily={MONO}
           fontSize={12.5}
           fontWeight={600}
-          textAnchor={narrowCoverageZone ? 'start' : 'end'}
+          textAnchor={coveredBalanceLabelPosition.anchor}
         >
-          $100 covered
+          {coveredBalanceLabel}
         </text>
         <text
           x={endpointX - 7}
