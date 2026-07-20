@@ -428,6 +428,27 @@ function Kpi({
   );
 }
 
+function ExecutiveMetric({
+  label,
+  value,
+  valueColor,
+}: {
+  label: string;
+  value: string;
+  valueColor: string;
+}) {
+  return (
+    <div style={{ background: C.cardBg, border: `1px solid ${C.border}`, minHeight: 88, padding: '14px 16px' }}>
+      <p style={{ color: C.kpiLabel, fontSize: 8.8, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase' }}>
+        {label}
+      </p>
+      <p className="mt-2" style={{ color: valueColor, fontFamily: MONO, fontSize: 28, fontWeight: 600, letterSpacing: '-0.05em' }}>
+        {value}
+      </p>
+    </div>
+  );
+}
+
 function FlowBox({
   eyebrow,
   value,
@@ -463,8 +484,10 @@ function FlowBox({
 
 function LiquidityExecutionDiagram({
   metrics,
+  avoidLabelOverlap = false,
 }: {
   metrics: DayExplainerMetrics['liquidity'];
+  avoidLabelOverlap?: boolean;
 }) {
   const width = 520;
   const height = 400;
@@ -490,7 +513,44 @@ function LiquidityExecutionDiagram({
   const boundarySlippage = metrics.boundaryQuote.slippage * 100;
   const referenceSellPct = metrics.referenceSellShareOfSenior * 100;
   const boundarySellPct = metrics.boundarySellShareOfSenior * 100;
-  const curveLine = curve.map((point) => `${x(point.sellNAV)},${y(point.executionPrice)}`).join(' ');
+  const curvePixels = curve.map((point) => ({ x: x(point.sellNAV), y: y(point.executionPrice) }));
+  const curveLine = curvePixels.map((point) => `${point.x},${point.y}`).join(' ');
+  const segmentIntersectsRect = (
+    start: { x: number; y: number },
+    end: { x: number; y: number },
+    rect: { left: number; right: number; top: number; bottom: number },
+  ) => {
+    const segmentLeft = Math.max(Math.min(start.x, end.x), rect.left);
+    const segmentRight = Math.min(Math.max(start.x, end.x), rect.right);
+    if (segmentLeft > segmentRight) return false;
+    const yAt = (pointX: number) => {
+      if (start.x === end.x) return start.y;
+      return start.y + ((pointX - start.x) / (end.x - start.x)) * (end.y - start.y);
+    };
+    const segmentTop = Math.min(yAt(segmentLeft), yAt(segmentRight));
+    const segmentBottom = Math.max(yAt(segmentLeft), yAt(segmentRight));
+    return segmentBottom >= rect.top && segmentTop <= rect.bottom;
+  };
+  const labelY = (labelX: number, pointY: number, textWidth: number, anchor: 'start' | 'end') => {
+    if (!avoidLabelOverlap) return pointY - 13;
+    const left = anchor === 'start' ? labelX : labelX - textWidth;
+    const candidates = [pointY - 13, pointY - 34, pointY - 55, pointY + 28];
+    return candidates.find((candidate) => {
+      const rect = {
+        left: left - 4,
+        right: left + textWidth + 4,
+        top: candidate - 15,
+        bottom: candidate + 4,
+      };
+      if (rect.top < margin.top + 4 || rect.bottom > baseline - 4) return false;
+      return !curvePixels.some((point, index) =>
+        index > 0 && segmentIntersectsRect(curvePixels[index - 1], point, rect));
+    }) ?? Math.max(margin.top + 20, pointY - 34);
+  };
+  const referenceLabelX = referenceX + 12;
+  const boundaryLabelX = boundaryX - 10;
+  const referenceLabelY = labelY(referenceLabelX, referenceY, 104, 'start');
+  const boundaryLabelY = labelY(boundaryLabelX, boundaryY, 112, 'end');
   const arbitrageArea = [
     `${x(0)},${y(1)}`,
     `${boundaryX},${y(1)}`,
@@ -533,8 +593,8 @@ function LiquidityExecutionDiagram({
           Arbitrage incentive grows →
         </text>
         <text
-          x={referenceX + 12}
-          y={referenceY - 13}
+          x={referenceLabelX}
+          y={referenceLabelY}
           fill={C.olive}
           fontFamily={MONO}
           fontSize={12.5}
@@ -542,7 +602,7 @@ function LiquidityExecutionDiagram({
         >
           {referenceSlippage.toFixed(1)}% slippage
         </text>
-        <text x={boundaryX - 10} y={boundaryY - 13} fill={C.danger} fontFamily={MONO} fontSize={12.5} fontWeight={600} textAnchor="end">
+        <text x={boundaryLabelX} y={boundaryLabelY} fill={C.danger} fontFamily={MONO} fontSize={12.5} fontWeight={600} textAnchor="end">
           {boundarySlippage.toFixed(1)}% slippage
         </text>
         <text x={referenceX} y={height - 37} fill={C.olive} fontFamily={MONO} fontSize={13} fontWeight={600} textAnchor="middle">
@@ -708,7 +768,13 @@ function GuidedChartGuide() {
   );
 }
 
-function GuidedObservationSteps({ days }: { days: number }) {
+function GuidedObservationSteps({
+  days,
+  generalizeObservation = false,
+}: {
+  days: number;
+  generalizeObservation?: boolean;
+}) {
   const steps = [
     {
       number: '1',
@@ -724,8 +790,10 @@ function GuidedObservationSteps({ days }: { days: number }) {
     },
     {
       number: '2',
-      title: `${days}-day observation`,
-      body: 'Direct Senior and Junior deposits/redemptions pause; LP withdrawals pause. Senior can still sell through the LP.',
+      title: generalizeObservation ? 'Observation period' : `${days}-day observation`,
+      body: generalizeObservation
+        ? `Its duration is market-specific (${days} days here). Direct Senior and Junior deposits/redemptions pause; LP withdrawals pause. Senior can still sell through the LP.`
+        : 'Direct Senior and Junior deposits/redemptions pause; LP withdrawals pause. Senior can still sell through the LP.',
       art: (
         <svg aria-hidden="true" className="mt-3 w-full" viewBox="0 0 210 54">
           <rect x="72" y="2" width="70" height="48" fill={C.obsFill} fillOpacity="0.32" />
@@ -851,10 +919,11 @@ export default function DayMarketSimulator({
   variant = 'standard',
 }: {
   market?: DayMarket;
-  variant?: 'standard' | 'guided';
+  variant?: 'standard' | 'guided' | 'executive';
 }) {
   const activeMarket = market ?? FALLBACK_MARKET;
   const isGuided = variant === 'guided';
+  const isExecutive = variant === 'executive';
   const defaults = activeMarket.defaults;
   const [showInputs, setShowInputs] = useState(false);
   const [showReview, setShowReview] = useState(true);
@@ -1365,16 +1434,90 @@ export default function DayMarketSimulator({
             margin: '12px 0 6px',
           }}
         >
-          {activeMarket.copy.title}
+          {isExecutive ? 'Make illiquid yield easier to own.' : activeMarket.copy.title}
         </h1>
         <p className="max-w-3xl" style={{ color: C.muted, fontSize: 12.5, lineHeight: 1.38, margin: '0 0 12px' }}>
-          {isGuided
+          {isExecutive
+            ? 'Royco Day gives Senior holders first-loss coverage and a dedicated exit pool. Junior and LP participants earn additional yield for providing those benefits.'
+            : isGuided
             ? 'See how one yield strategy can support three different positions.'
             : activeMarket.copy.description}
         </p>
       </section>
 
-      <section style={{ ...cardStyle, padding: 16 }}>
+      {isExecutive && (
+        <section style={{ ...cardStyle, padding: 16 }}>
+          <Eyebrow>What Senior receives</Eyebrow>
+          <div className="mt-3 grid grid-cols-1 md:grid-cols-3" style={{ gap: 8 }}>
+            <ExecutiveMetric label="Senior average yield" value={`${pct(result.seniorApy)}/yr`} valueColor={C.accent} />
+            <ExecutiveMetric label="Contract-enforced coverage" value={`${coveragePct.toFixed(0)}% minimum`} valueColor={C.juniorLine} />
+            <ExecutiveMetric label="Dedicated exit liquidity" value={`${minLiquidityPct.toFixed(0)}% minimum`} valueColor={C.olive} />
+          </div>
+        </section>
+      )}
+
+      {isExecutive && (
+        <section style={{ ...cardStyle, padding: 16 }}>
+          <Eyebrow>One opportunity · three roles</Eyebrow>
+          <h2 className="mt-2" style={{ color: C.text, fontFamily: SERIF, fontSize: 24, fontWeight: 400, lineHeight: 1.12 }}>
+            One investment opportunity becomes three specialized positions.
+          </h2>
+          <p className="mt-2" style={{ color: C.muted, fontSize: 12.5, lineHeight: 1.45 }}>
+            Each position earns yield for doing a different job. Senior pays premiums for coverage and liquidity, and Junior and LP earn those premiums for providing them.
+          </p>
+          <div className="mt-4 grid grid-cols-1 md:grid-cols-3" style={{ gap: 8 }}>
+            <div style={{ background: C.pageBg, border: `1px solid ${C.seniorLine}`, minHeight: 178, padding: 14 }}>
+              <Eyebrow>Senior · yield and liquidity</Eyebrow>
+              <p className="mt-3" style={{ color: C.accent, fontFamily: MONO, fontSize: 26, fontWeight: 700 }}>
+                {pct(result.seniorApy)}/yr
+              </p>
+              <p className="mt-2" style={{ color: C.text, fontFamily: SERIF, fontSize: 18 }}>Senior takes losses only after Junior.</p>
+              <p className="mt-2" style={{ color: C.muted, fontSize: 11.5, lineHeight: 1.45 }}>
+                Senior keeps the remaining strategy yield and can exit through the dedicated LP before the underlying asset matures.
+              </p>
+            </div>
+            <div style={{ background: C.pageBg, border: `1px solid ${C.juniorLine}`, minHeight: 178, padding: 14 }}>
+              <Eyebrow>Junior · first-loss capital</Eyebrow>
+              <p className="mt-3" style={{ color: C.juniorLine, fontFamily: MONO, fontSize: 26, fontWeight: 700 }}>
+                {pct(result.juniorApy)}/yr
+              </p>
+              <p className="mt-2" style={{ color: C.text, fontFamily: SERIF, fontSize: 18 }}>Gets paid to take losses first.</p>
+              <p className="mt-2" style={{ color: C.muted, fontSize: 11.5, lineHeight: 1.45 }}>
+                Earns a risk premium because Junior takes investment losses before Senior does.
+              </p>
+            </div>
+            <div style={{ background: C.pageBg, border: `1px solid ${C.olive}`, minHeight: 178, padding: 14 }}>
+              <Eyebrow>LP · exit liquidity</Eyebrow>
+              <p className="mt-3" style={{ color: C.olive, fontFamily: MONO, fontSize: 26, fontWeight: 700 }}>
+                {pct(result.liquidityApy)}/yr
+              </p>
+              <p className="mt-2" style={{ color: C.text, fontFamily: SERIF, fontSize: 18 }}>Gets paid to fund exits.</p>
+              <p className="mt-2" style={{ color: C.muted, fontSize: 11.5, lineHeight: 1.45 }}>
+                Earns a liquidity premium by providing the assets Senior holders can sell into.
+              </p>
+            </div>
+          </div>
+          <div className="mt-3 grid grid-cols-1 md:grid-cols-[1fr_56px_1fr]" style={{ alignItems: 'center', gap: 8 }}>
+            <div style={{ background: `${C.strategyLine}12`, border: `1px solid ${C.border}`, padding: 12 }}>
+              <p style={{ color: C.kpiLabel, fontFamily: MONO, fontSize: 9.5, letterSpacing: '0.1em', textTransform: 'uppercase' }}>Underlying opportunity</p>
+              <p className="mt-1" style={{ color: C.strategyLine, fontFamily: SERIF, fontSize: 18 }}>FalconX base yield</p>
+            </div>
+            <div className="hidden items-center justify-center md:flex" aria-hidden="true" style={{ color: C.faint, fontFamily: MONO, fontSize: 20 }}>→</div>
+            <div className="grid grid-cols-1 sm:grid-cols-2" style={{ gap: 8 }}>
+              <div style={{ borderLeft: `3px solid ${C.eyebrow}`, padding: '7px 10px' }}>
+                <p style={{ color: C.eyebrow, fontFamily: MONO, fontSize: 9.5, fontWeight: 700, textTransform: 'uppercase' }}>Risk premium → Junior</p>
+                <p className="mt-1" style={{ color: C.muted, fontSize: 11 }}>Pays for first-loss coverage.</p>
+              </div>
+              <div style={{ borderLeft: `3px solid ${C.olive}`, padding: '7px 10px' }}>
+                <p style={{ color: C.olive, fontFamily: MONO, fontSize: 9.5, fontWeight: 700, textTransform: 'uppercase' }}>Liquidity premium → LP</p>
+                <p className="mt-1" style={{ color: C.muted, fontSize: 11 }}>Pays for dedicated liquidity.</p>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {!isExecutive && <section style={{ ...cardStyle, padding: 16 }}>
         <Eyebrow>How Day works</Eyebrow>
         {isGuided && (
           <h2 className="mt-2" style={{ color: C.text, fontFamily: SERIF, fontSize: 22, fontWeight: 400, lineHeight: 1.12 }}>
@@ -1497,7 +1640,7 @@ export default function DayMarketSimulator({
             </div>
           </div>
         </div>
-      </section>
+      </section>}
 
       <section style={{ ...cardStyle, padding: '10px 12px' }}>
         <div className="flex items-center justify-between gap-4">
@@ -1610,47 +1753,84 @@ export default function DayMarketSimulator({
         )}
       </section>
 
-      <section style={{ ...cardStyle, padding: 14 }}>
+      {!isExecutive && <section style={{ ...cardStyle, padding: 14 }}>
         <Eyebrow>APYs</Eyebrow>
         <div className="mt-3 grid grid-cols-1 md:grid-cols-3" style={{ gap: 8 }}>
           <Kpi label="Senior avg/yr" value={`${pct(result.seniorApy)}/yr`} valueColor={C.accent} />
           <Kpi label="Junior avg/yr" value={`${pct(result.juniorApy)}/yr`} valueColor={C.text} />
           <Kpi label="LP avg/yr" value={`${pct(result.liquidityApy)}/yr`} valueColor={C.olive} />
         </div>
-      </section>
+      </section>}
 
       <section className="grid grid-cols-1 md:grid-cols-2" style={{ gap: 10 }}>
         <div style={{ ...cardStyle, padding: 14 }}>
-          <Eyebrow>Liquidity</Eyebrow>
-          <LiquidityExecutionDiagram metrics={result.explainer.liquidity} />
-          {isGuided && (
+          {isExecutive ? <Eyebrow>If a Senior wants to exit</Eyebrow> : <Eyebrow>Liquidity</Eyebrow>}
+          {isExecutive && (
+            <>
+              <h2 className="mt-2" style={{ color: C.text, fontFamily: SERIF, fontSize: 22, fontWeight: 400, lineHeight: 1.12 }}>
+                Sell through the dedicated LP.
+              </h2>
+              <p className="mt-2" style={{ color: C.muted, fontSize: 11.5, lineHeight: 1.45 }}>
+                Senior does not have to wait for the underlying asset to mature.
+              </p>
+            </>
+          )}
+          <LiquidityExecutionDiagram metrics={result.explainer.liquidity} avoidLabelOverlap={isExecutive} />
+          {(isGuided || isExecutive) && (
             <p style={{ color: C.muted, fontSize: 11.5, lineHeight: 1.45 }}>
-              Senior can exit through the LP. Larger atomic sales move farther down the curve and create a larger arbitrage opportunity.
+              {isExecutive
+                ? 'Larger sale → larger discount → stronger arbitrage incentive to buy below underlying redemption value.'
+                : 'Senior can exit through the LP. Larger atomic sales move farther down the curve and create a larger arbitrage opportunity.'}
             </p>
           )}
         </div>
 
         <div style={{ ...cardStyle, padding: 14 }}>
-          <Eyebrow>Coverage</Eyebrow>
+          {isExecutive ? <Eyebrow>If the investment loses money</Eyebrow> : <Eyebrow>Coverage</Eyebrow>}
+          {isExecutive && (
+            <>
+              <h2 className="mt-2" style={{ color: C.text, fontFamily: SERIF, fontSize: 22, fontWeight: 400, lineHeight: 1.12 }}>
+                Junior absorbs loss first.
+              </h2>
+              <p className="mt-2" style={{ color: C.muted, fontSize: 11.5, lineHeight: 1.45 }}>
+                Contracts require a minimum Junior buffer behind Senior, providing first-loss coverage.
+              </p>
+            </>
+          )}
           <CoverageLossDiagram metrics={result.explainer.coverage} />
-          {isGuided && (
+          {(isGuided || isExecutive) && (
             <p style={{ color: C.muted, fontSize: 11.5, lineHeight: 1.45 }}>
-              Coverage is Junior&apos;s first-loss buffer. At the current starting balance, Junior can absorb about{' '}
-              {(result.explainer.coverage.coverageLossLimit * 100).toFixed(1)}% of strategy losses before Senior declines.
+              {isExecutive ? 'At the current starting balance, ' : 'Coverage is Junior\'s first-loss buffer. At the current starting balance, '}
+              Junior can absorb about {(result.explainer.coverage.coverageLossLimit * 100).toFixed(1)}% of strategy losses before Senior declines.
             </p>
           )}
         </div>
       </section>
+
+      {isExecutive && (
+        <section style={{ ...cardStyle, padding: 16 }}>
+          <Eyebrow>What is an observation period?</Eyebrow>
+          <h2 className="mt-2" style={{ color: C.text, fontFamily: SERIF, fontSize: 24, fontWeight: 400, lineHeight: 1.12 }}>
+            A defined recovery window after Junior begins covering a loss.
+          </h2>
+          <p className="mt-2 max-w-3xl" style={{ color: C.muted, fontSize: 12.5, lineHeight: 1.45 }}>
+            The window gives the strategy time to recover before Junior&apos;s covered loss becomes permanent. Senior can still sell through the LP while direct Senior and Junior deposits and redemptions are paused.
+          </p>
+          <GuidedObservationSteps days={observationDays} generalizeObservation />
+        </section>
+      )}
 
       <section style={cardStyle}>
         <div className="flex items-start justify-between gap-4">
           <div>
             <Eyebrow>Backtest</Eyebrow>
             <h2 className="mt-2" style={{ color: C.text, fontFamily: SERIF, fontSize: 22, fontWeight: 400, lineHeight: 1.08 }}>
-              {isGuided ? 'See the rules play out over time.' : LOCKED_COPY.reviewTitle}
+              {isExecutive ? 'See it in the market history.' : isGuided ? 'See the rules play out over time.' : LOCKED_COPY.reviewTitle}
             </h2>
             <p className="mt-1" style={{ color: C.muted, fontSize: 12.5, lineHeight: 1.38 }}>
-              {isGuided
+              {isExecutive
+                ? 'The same accountant-backed chart shows each position, every observation period, and any loss that becomes permanent.'
+                : isGuided
                 ? 'Use the chart to see when Junior coverage is active, when a loss can still recover, and when it becomes permanent.'
                 : LOCKED_COPY.reviewDescription}
             </p>
