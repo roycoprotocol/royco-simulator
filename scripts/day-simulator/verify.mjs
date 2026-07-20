@@ -110,12 +110,10 @@ for (const contract of [
 }
 for (const geometryContract of [
   '<line x1={boundaryX} y1={boundaryY - 3} x2={boundaryX}',
-  'const drawdownObservationStartX = 48',
   'const observationStartX = 72',
   'const observationEndX = 142',
   'const recoveryObservationEndX = 83',
   'const finalizationObservationEndX = 194',
-  'width={205 - drawdownObservationStartX}',
   'width={observationEndX - observationStartX}',
   'width={recoveryObservationEndX - 5}',
   'width={finalizationObservationEndX - 116}',

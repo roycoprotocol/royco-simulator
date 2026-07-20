@@ -901,7 +901,6 @@ function GuidedObservationSteps({
   days: number;
   generalizeObservation?: boolean;
 }) {
-  const drawdownObservationStartX = 48;
   const observationStartX = 72;
   const observationEndX = 142;
   const recoveryObservationEndX = 83;
@@ -913,7 +912,6 @@ function GuidedObservationSteps({
       body: 'Junior covers Senior first. The covered amount is tracked for possible recovery.',
       art: (
         <svg aria-hidden="true" className="mt-3 w-full" viewBox="0 0 210 54">
-          <rect x={drawdownObservationStartX} y="2" width={205 - drawdownObservationStartX} height="48" fill={C.obsFill} fillOpacity="0.32" />
           <line x1="5" x2="205" y1="15" y2="15" stroke={C.kpiLabel} strokeDasharray="4 4" />
           <polyline points="5,18 48,15 86,20 124,38 164,31 205,27" fill="none" stroke={C.juniorLine} strokeWidth="2" />
           <polyline points="5,18 48,15 205,15" fill="none" stroke={C.seniorLine} strokeWidth="2" />
