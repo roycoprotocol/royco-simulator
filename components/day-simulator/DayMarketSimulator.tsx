@@ -484,8 +484,10 @@ function FlowBox({
 
 function LiquidityExecutionDiagram({
   metrics,
+  protectLabels = false,
 }: {
   metrics: DayExplainerMetrics['liquidity'];
+  protectLabels?: boolean;
 }) {
   const width = 520;
   const height = 400;
@@ -553,7 +555,7 @@ function LiquidityExecutionDiagram({
         <text x={margin.left + plotWidth} y={margin.top - 15} fill={C.olive} fontSize={13} fontWeight={600} textAnchor="end">
           Arbitrage incentive grows →
         </text>
-        <rect x={referenceX + 6} y={referenceY - 31} width={112} height={22} fill={C.cardBg} />
+        {protectLabels && <rect x={referenceX + 6} y={referenceY - 31} width={112} height={22} fill={C.cardBg} />}
         <text
           x={referenceX + 12}
           y={referenceY - 13}
@@ -564,7 +566,7 @@ function LiquidityExecutionDiagram({
         >
           {referenceSlippage.toFixed(1)}% slippage
         </text>
-        <rect x={boundaryX - 130} y={boundaryY - 31} width={120} height={22} fill={C.cardBg} />
+        {protectLabels && <rect x={boundaryX - 130} y={boundaryY - 31} width={120} height={22} fill={C.cardBg} />}
         <text x={boundaryX - 10} y={boundaryY - 13} fill={C.danger} fontFamily={MONO} fontSize={12.5} fontWeight={600} textAnchor="end">
           {boundarySlippage.toFixed(1)}% slippage
         </text>
@@ -731,7 +733,13 @@ function GuidedChartGuide() {
   );
 }
 
-function GuidedObservationSteps({ days }: { days: number }) {
+function GuidedObservationSteps({
+  days,
+  generalizeObservation = false,
+}: {
+  days: number;
+  generalizeObservation?: boolean;
+}) {
   const steps = [
     {
       number: '1',
@@ -747,8 +755,10 @@ function GuidedObservationSteps({ days }: { days: number }) {
     },
     {
       number: '2',
-      title: 'Observation period',
-      body: `Its duration is market-specific (${days} days here). Direct Senior and Junior deposits/redemptions pause; LP withdrawals pause. Senior can still sell through the LP.`,
+      title: generalizeObservation ? 'Observation period' : `${days}-day observation`,
+      body: generalizeObservation
+        ? `Its duration is market-specific (${days} days here). Direct Senior and Junior deposits/redemptions pause; LP withdrawals pause. Senior can still sell through the LP.`
+        : 'Direct Senior and Junior deposits/redemptions pause; LP withdrawals pause. Senior can still sell through the LP.',
       art: (
         <svg aria-hidden="true" className="mt-3 w-full" viewBox="0 0 210 54">
           <rect x="72" y="2" width="70" height="48" fill={C.obsFill} fillOpacity="0.32" />
@@ -1730,7 +1740,7 @@ export default function DayMarketSimulator({
               </p>
             </>
           )}
-          <LiquidityExecutionDiagram metrics={result.explainer.liquidity} />
+          <LiquidityExecutionDiagram metrics={result.explainer.liquidity} protectLabels={isExecutive} />
           {(isGuided || isExecutive) && (
             <p style={{ color: C.muted, fontSize: 11.5, lineHeight: 1.45 }}>
               {isExecutive
@@ -1771,7 +1781,7 @@ export default function DayMarketSimulator({
           <p className="mt-2 max-w-3xl" style={{ color: C.muted, fontSize: 12.5, lineHeight: 1.45 }}>
             The window gives the strategy time to recover before Junior&apos;s covered loss becomes permanent. Senior can still sell through the LP while direct Senior and Junior deposits and redemptions are paused.
           </p>
-          <GuidedObservationSteps days={observationDays} />
+          <GuidedObservationSteps days={observationDays} generalizeObservation />
         </section>
       )}
 
