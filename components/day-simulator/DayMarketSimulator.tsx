@@ -553,6 +553,7 @@ function LiquidityExecutionDiagram({
         <text x={margin.left + plotWidth} y={margin.top - 15} fill={C.olive} fontSize={13} fontWeight={600} textAnchor="end">
           Arbitrage incentive grows →
         </text>
+        <rect x={referenceX + 6} y={referenceY - 31} width={112} height={22} fill={C.cardBg} />
         <text
           x={referenceX + 12}
           y={referenceY - 13}
@@ -563,6 +564,7 @@ function LiquidityExecutionDiagram({
         >
           {referenceSlippage.toFixed(1)}% slippage
         </text>
+        <rect x={boundaryX - 130} y={boundaryY - 31} width={120} height={22} fill={C.cardBg} />
         <text x={boundaryX - 10} y={boundaryY - 13} fill={C.danger} fontFamily={MONO} fontSize={12.5} fontWeight={600} textAnchor="end">
           {boundarySlippage.toFixed(1)}% slippage
         </text>
@@ -745,8 +747,8 @@ function GuidedObservationSteps({ days }: { days: number }) {
     },
     {
       number: '2',
-      title: `${days}-day observation`,
-      body: 'Direct Senior and Junior deposits/redemptions pause; LP withdrawals pause. Senior can still sell through the LP.',
+      title: 'Observation period',
+      body: `Its duration is market-specific (${days} days here). Direct Senior and Junior deposits/redemptions pause; LP withdrawals pause. Senior can still sell through the LP.`,
       art: (
         <svg aria-hidden="true" className="mt-3 w-full" viewBox="0 0 210 54">
           <rect x="72" y="2" width="70" height="48" fill={C.obsFill} fillOpacity="0.32" />
@@ -1391,7 +1393,7 @@ export default function DayMarketSimulator({
         </h1>
         <p className="max-w-3xl" style={{ color: C.muted, fontSize: 12.5, lineHeight: 1.38, margin: '0 0 12px' }}>
           {isExecutive
-            ? 'Pareto FalconX Day gives Senior holders first-loss coverage and a dedicated exit pool. Junior and LP participants earn additional yield for providing those benefits.'
+            ? 'Royco Day gives Senior holders first-loss coverage and a dedicated exit pool. Junior and LP participants earn additional yield for providing those benefits.'
             : isGuided
             ? 'See how one yield strategy can support three different positions.'
             : activeMarket.copy.description}
@@ -1416,7 +1418,7 @@ export default function DayMarketSimulator({
             One investment opportunity becomes three specialized positions.
           </h2>
           <p className="mt-2" style={{ color: C.muted, fontSize: 12.5, lineHeight: 1.45 }}>
-            Each position earns yield for doing a different job. Senior pays premiums for coverage and liquidity; Junior and LP earn those premiums for providing them.
+            Each position earns yield for doing a different job. Senior pays premiums for coverage and liquidity, and Junior and LP earn those premiums for providing them.
           </p>
           <div className="mt-4 grid grid-cols-1 md:grid-cols-3" style={{ gap: 8 }}>
             <div style={{ background: C.pageBg, border: `1px solid ${C.seniorLine}`, minHeight: 178, padding: 14 }}>
@@ -1463,7 +1465,7 @@ export default function DayMarketSimulator({
               </div>
               <div style={{ borderLeft: `3px solid ${C.olive}`, padding: '7px 10px' }}>
                 <p style={{ color: C.olive, fontFamily: MONO, fontSize: 9.5, fontWeight: 700, textTransform: 'uppercase' }}>Liquidity premium → LP</p>
-                <p className="mt-1" style={{ color: C.muted, fontSize: 11 }}>Pays for dedicated exit liquidity.</p>
+                <p className="mt-1" style={{ color: C.muted, fontSize: 11 }}>Pays for dedicated liquidity.</p>
               </div>
             </div>
           </div>
@@ -1724,7 +1726,7 @@ export default function DayMarketSimulator({
                 Sell through the dedicated LP.
               </h2>
               <p className="mt-2" style={{ color: C.muted, fontSize: 11.5, lineHeight: 1.45 }}>
-                Senior does not have to wait for the underlying asset to mature. Sale size determines the execution discount.
+                Senior does not have to wait for the underlying asset to mature.
               </p>
             </>
           )}
@@ -1743,10 +1745,10 @@ export default function DayMarketSimulator({
           {isExecutive && (
             <>
               <h2 className="mt-2" style={{ color: C.text, fontFamily: SERIF, fontSize: 22, fontWeight: 400, lineHeight: 1.12 }}>
-                Junior absorbs covered loss first.
+                Junior absorbs loss first.
               </h2>
               <p className="mt-2" style={{ color: C.muted, fontSize: 11.5, lineHeight: 1.45 }}>
-                The contracts require a minimum Junior buffer behind Senior and enforce it when capital enters or leaves.
+                Contracts require a minimum Junior buffer behind Senior, providing first-loss coverage.
               </p>
             </>
           )}
@@ -1811,7 +1813,7 @@ export default function DayMarketSimulator({
 
         {showReview && (
           <div className="mt-4">
-            {(isGuided || isExecutive) && <GuidedChartGuide />}
+            {isGuided && <GuidedChartGuide />}
             <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 mb-3" style={{ fontSize: 11.5, color: C.muted }}>
               <LegendSwatch color={C.seniorLine}>Senior share price</LegendSwatch>
               <LegendSwatch color={C.juniorLine}>Junior share price</LegendSwatch>
