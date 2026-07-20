@@ -648,13 +648,21 @@ function LiquidityExecutionDiagram({
         >
           {referenceSlippage.toFixed(1)}% slippage
         </text>
-        <text x={boundaryLabel.x} y={boundaryLabel.y} fill={C.danger} fontFamily={MONO} fontSize={12.5} fontWeight={600} textAnchor="end">
+        <text
+          x={boundaryLabel.x}
+          y={boundaryLabel.y}
+          fill={C.danger}
+          fontFamily={MONO}
+          fontSize={12.5}
+          fontWeight={600}
+          textAnchor="end"
+        >
           {boundarySlippage.toFixed(1)}% slippage
         </text>
-        <text x={referenceX} y={height - 37} fill={C.olive} fontFamily={MONO} fontSize={13} fontWeight={600} textAnchor="middle">
+        <text x={referenceX} y={height - 37} fill={C.olive} fontFamily={MONO} fontSize={15} fontWeight={700} textAnchor="middle">
           {referenceSellPct.toFixed(1)}%
         </text>
-        <text x={boundaryX} y={height - 37} fill={C.danger} fontFamily={MONO} fontSize={13} fontWeight={600} textAnchor="end">
+        <text x={boundaryX} y={height - 37} fill={C.danger} fontFamily={MONO} fontSize={15} fontWeight={700} textAnchor="end">
           {boundarySellPct.toFixed(1)}%
         </text>
         <text x={14} y={margin.top + 4} fill={C.olive} fontFamily={MONO} fontSize={11}>100%</text>
@@ -691,6 +699,7 @@ function CoverageLossDiagram({
   const breakpointX = x(metrics.coverageLossLimit);
   const endpointX = x(metrics.displayMaxLoss);
   const endpointY = y(metrics.endingSeniorBalancePer100);
+  const narrowCoverageZone = metrics.coverageLossLimit / metrics.displayMaxLoss < 0.18;
   return (
     <div data-accountant-source="buildDayExplainerMetrics.coverage">
       <svg
@@ -731,19 +740,41 @@ function CoverageLossDiagram({
         <text x={14} y={margin.top + 5} fill={C.kpiLabel} fontFamily={MONO} fontSize={12}>$100</text>
         <text x={14} y={margin.top + plotHeight + 4} fill={C.kpiLabel} fontFamily={MONO} fontSize={12}>${yMin}</text>
         <text x={margin.left} y={height - 32} fill={C.kpiLabel} fontFamily={MONO} fontSize={12}>0%</text>
-        <text x={breakpointX} y={height - 32} fill={C.eyebrow} fontFamily={MONO} fontSize={12} textAnchor="middle">
+        <text
+          x={breakpointX}
+          y={narrowCoverageZone ? height - 47 : height - 32}
+          fill={C.eyebrow}
+          fontFamily={MONO}
+          fontSize={12}
+          textAnchor={narrowCoverageZone ? 'start' : 'middle'}
+        >
           {(metrics.coverageLossLimit * 100).toFixed(1)}%
         </text>
         <text x={margin.left + plotWidth} y={height - 32} fill={C.kpiLabel} fontFamily={MONO} fontSize={12} textAnchor="end">
           {(metrics.displayMaxLoss * 100).toFixed(1)}%
         </text>
-        <text x={(margin.left + breakpointX) / 2} y={margin.top + 27} fill={C.olive} fontSize={12.5} fontWeight={600} textAnchor="middle">
+        <text
+          x={narrowCoverageZone ? margin.left + 10 : (margin.left + breakpointX) / 2}
+          y={margin.top + 27}
+          fill={C.olive}
+          fontSize={12.5}
+          fontWeight={600}
+          textAnchor={narrowCoverageZone ? 'start' : 'middle'}
+        >
           Junior absorbs loss
         </text>
         <text x={(breakpointX + endpointX) / 2} y={margin.top + 27} fill={C.danger} fontSize={12.5} fontWeight={600} textAnchor="middle">
           Senior absorbs excess
         </text>
-        <text x={breakpointX - 12} y={y(100) + 56} fill={C.olive} fontFamily={MONO} fontSize={12.5} fontWeight={600} textAnchor="end">
+        <text
+          x={narrowCoverageZone ? breakpointX + 12 : breakpointX - 12}
+          y={y(100) + 56}
+          fill={C.olive}
+          fontFamily={MONO}
+          fontSize={12.5}
+          fontWeight={600}
+          textAnchor={narrowCoverageZone ? 'start' : 'end'}
+        >
           $100 covered
         </text>
         <text
