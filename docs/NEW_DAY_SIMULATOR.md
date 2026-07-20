@@ -34,6 +34,14 @@ The source can be a local CSV/TSV, a public CSV/JSON API URL, a Google Sheet URL
 npm run day-sim:new -- <market-id> <source-file-or-url> <route>
 ```
 
+An explicitly authorized forward-only market with no historical series may use the branch-scoped published-APY input:
+
+```bash
+npm run day-sim:new -- <market-id> <source-url> <route> --published-apy <decimal>
+```
+
+This mode records zero historical observations, derives the forward input from the supplied APY, and uses the shared accountant-backed forward-series adapter for runtime outputs. It must hide `backtest` through the authorized customization manifest and must disclose that no historical performance series is supplied.
+
 The factory creates exactly four artifacts:
 
 ```text

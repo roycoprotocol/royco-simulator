@@ -1,0 +1,80 @@
+{
+  "id": "blockhouse",
+  "route": "/blockhouse",
+  "identity": {
+    "marketName": "Blockhouse Bedrock Strategies",
+    "displayAssetName": "Blockhouse Bedrock Strategy",
+    "underlyingAsset": "Blockhouse Bedrock Strategy",
+    "seniorName": "Sr_Bedrock",
+    "seniorSymbol": "Sr_Bedrock",
+    "juniorName": "Jr_Bedrock",
+    "juniorSymbol": "Jr_Bedrock"
+  },
+  "defaults": {
+    "sourceApy": 0.114,
+    "coverage": 0.15,
+    "minLiquidity": 0.15,
+    "liquidationUtilization": 100,
+    "observationDays": 30,
+    "exitBufferPct": 1,
+    "linkJuniorToFirstLoss": true,
+    "maintainCoverage": true,
+    "riskYDM": {
+      "mode": "static",
+      "y0": 0.06,
+      "yTarget": 0.095,
+      "y100": 0.18
+    },
+    "liqYDM": {
+      "mode": "static",
+      "y0": 0.08,
+      "yTarget": 0.13,
+      "y100": 0.2
+    },
+    "selfLiquidationBonus": 0.01,
+    "stProtocolFee": 0,
+    "jtProtocolFee": 0,
+    "jtYieldShareProtocolFee": 0,
+    "ltYieldShareProtocolFee": 0,
+    "stableYield": 0.035,
+    "swapFeeBps": 10,
+    "poolTurnoverPerYear": 8,
+    "eclpBandWidth": 0.1,
+    "reinvestLiquidityPremium": true,
+    "initialST": 1000,
+    "initialJT": 199.99999999999997,
+    "initialLT": 166.66666666666666
+  },
+  "targets": {
+    "seniorApyMin": 0.08,
+    "seniorApyMax": 0.1,
+    "juniorApyMin": 0.17,
+    "juniorApyMax": 0.3
+  },
+  "certification": {
+    "intakeConfirmed": true
+  },
+  "customization": {
+    "explicitlyAuthorized": true,
+    "authorizationNote": "User explicitly authorized hiding Backtest for the Blockhouse market and authorized forward modeling from the supplied 11.4% APY without historical observations.",
+    "hiddenSections": [
+      "backtest"
+    ],
+    "copyOverrides": {}
+  },
+  "provenance": {
+    "source": "Pareto Credit staging vault: Blockhouse Bedrock Strategies",
+    "sourceUrl": "https://app-staging.pareto.credit/vault/0x20Ae600f955073Fc28B25D88d6a77599047e9cd8",
+    "sourceProvider": "Pareto Credit",
+    "seriesPath": "lib/day-markets/blockhouse/series.json",
+    "dataMode": "published-apy-forward",
+    "dataCadence": "none",
+    "priceType": "published-apy",
+    "feesIncluded": true,
+    "observationCount": 0,
+    "firstDate": "not-applicable",
+    "lastDate": "not-applicable",
+    "publishedApy": 0.114,
+    "retrievedAt": "2026-07-20"
+  }
+}

@@ -42,6 +42,7 @@ import { shouldRefillJunior } from '@/lib/day-simulator-template/refill';
 import {
   buildDayInitialBalances,
   buildDayMarketConfig,
+  buildDayForwardSeries,
 } from '@/lib/day-simulator-template/runtime';
 import { DayTimeframeBrush } from '@/components/day-simulator/DayTimeframeBrush';
 
@@ -159,6 +160,7 @@ const FALLBACK_MANIFEST: DayMarketManifest = {
     source: 'Deterministic one-year template path',
     sourceUrl: 'https://github.com/roycoprotocol/dawn-simulator',
     sourceProvider: 'Royco',
+    dataMode: 'historical-series',
     dataCadence: 'monthly',
     priceType: 'nav',
     feesIncluded: true,
@@ -977,6 +979,16 @@ export default function DayMarketSimulator({
   const heroDescription = activeMarket.customization.copyOverrides.heroDescription
     ?? 'Royco Day gives Senior holders first-loss coverage and a dedicated exit pool. Junior and LP participants earn additional yield for providing those benefits.';
   const defaults = activeMarket.defaults;
+  const simulationSeries = useMemo(
+    () => activeMarket.provenance.dataMode === 'published-apy-forward'
+      ? buildDayForwardSeries(
+        defaults.sourceApy,
+        defaults.stableYield,
+        activeMarket.provenance.retrievedAt ?? '2026-01-01',
+      )
+      : activeMarket.series,
+    [activeMarket.provenance.dataMode, activeMarket.provenance.retrievedAt, activeMarket.series, defaults.sourceApy, defaults.stableYield],
+  );
   const [showInputs, setShowInputs] = useState(false);
   const [showReview, setShowReview] = useState(true);
   const [hoverDate, setHoverDate] = useState<string | null>(null);
@@ -991,7 +1003,7 @@ export default function DayMarketSimulator({
   const [maintainCoverage, setMaintainCoverage] = useState(defaults.maintainCoverage);
   const [range, setRange] = useState<IndexRange>({
     a: 0,
-    b: activeMarket.series.length - 1,
+    b: simulationSeries.length - 1,
   });
 
   useEffect(() => {
@@ -1008,14 +1020,14 @@ export default function DayMarketSimulator({
     return () => observer.disconnect();
   }, []);
 
-  const maxIndex = Math.max(0, activeMarket.series.length - 1);
+  const maxIndex = Math.max(0, simulationSeries.length - 1);
   const viewRange = useMemo(
     () => normalizeRange(range.a, range.b, maxIndex),
     [maxIndex, range],
   );
   const modeledSeries = useMemo(
-    () => calibrateSeriesApy(activeMarket.series, sourceApyPct / 100),
-    [activeMarket.series, sourceApyPct],
+    () => calibrateSeriesApy(simulationSeries, sourceApyPct / 100),
+    [simulationSeries, sourceApyPct],
   );
   const view = useMemo(
     () => modeledSeries.slice(viewRange.a, viewRange.b + 1),
@@ -1549,7 +1561,9 @@ export default function DayMarketSimulator({
             <FlowBox
               eyebrow="Underlying"
               value="Base yield"
-              note={`${activeMarket.provenance.feesIncluded ? 'Fee-inclusive' : 'Fee-exclusive'} source ${activeMarket.provenance.priceType.toUpperCase()} path`}
+              note={activeMarket.provenance.dataMode === 'published-apy-forward'
+                ? `Published ${(defaults.sourceApy * 100).toFixed(1)}% APY forward input`
+                : `${activeMarket.provenance.feesIncluded ? 'Fee-inclusive' : 'Fee-exclusive'} source ${activeMarket.provenance.priceType.toUpperCase()} path`}
               color={C.strategyLine}
             />
             <div className="flex items-center justify-center md:hidden" aria-hidden="true" style={{ height: 34 }}>
@@ -2123,7 +2137,9 @@ export default function DayMarketSimulator({
       >
         <p style={{ borderColor: C.border }}>
           <strong style={{ fontWeight: 600 }}>What this is, and what it is not.</strong>{' '}
-          The underlying is {activeMarket.provenance.source}, covering {startDate} through {endDate}.
+          {activeMarket.provenance.dataMode === 'published-apy-forward'
+            ? `The underlying is ${activeMarket.provenance.source}. This forward test uses the published ${(activeMarket.provenance.publishedApy ?? defaults.sourceApy) * 100}% APY and does not present historical performance.`
+            : `The underlying is ${activeMarket.provenance.source}, covering ${startDate} through ${endDate}.`}
         </p>
         <p className="mt-1">{activeMarket.copy.disclosure}</p>
         <p className="mt-1">

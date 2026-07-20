@@ -119,12 +119,24 @@ for (const lockedCopyReference of [
 for (const customizationContract of [
   "DAY_PRESENTATION_SECTION_IDS",
   "DAY_COPY_OVERRIDE_IDS",
+  "vaultTabs",
   "validateDayMarketCustomization",
   "describeDayMarketCustomizations",
   "isDaySectionVisible",
 ]) {
   if (!marketTemplate.includes(customizationContract)) {
     failures.push(`Day market customization contract missing: ${customizationContract}`);
+  }
+}
+for (const vaultTabWiring of [
+  "market.customization.vaultTabs?.group",
+  "candidate.customization.vaultTabs?.label",
+  'role="tablist"',
+  'role="tab"',
+  "key={activeMarket.id}",
+]) {
+  if (!shell.includes(vaultTabWiring)) {
+    failures.push(`Day strict shell missing vault-tab customization wiring: ${vaultTabWiring}`);
   }
 }
 for (const customizationWiring of [
@@ -241,7 +253,7 @@ for (const hiddenControl of [
   if (simulator.includes(hiddenControl)) failures.push(`Day simulator exposes backend-only or removed output: ${hiddenControl}`);
 }
 for (const invariant of [
-  'calibrateSeriesApy(activeMarket.series, sourceApyPct / 100)',
+  'calibrateSeriesApy(simulationSeries, sourceApyPct / 100)',
   'buildDayInitialBalances(defaults, { coverage, minLiquidity })',
   'buildDayMarketConfig(defaults, {',
   'const [maintainCoverage, setMaintainCoverage] = useState(defaults.maintainCoverage)',
@@ -465,7 +477,7 @@ if (marketId) {
       const total = market.defaults?.riskYDM?.[anchor] + market.defaults?.liqYDM?.[anchor];
       if (!Number.isFinite(total) || total > 1) failures.push(`combined ${anchor} premium shares must not exceed 100%`);
     }
-    for (const field of ["source", "sourceUrl", "sourceProvider", "seriesPath", "dataCadence", "priceType", "feesIncluded", "observationCount", "firstDate", "lastDate"]) {
+    for (const field of ["source", "sourceUrl", "sourceProvider", "seriesPath", "dataMode", "dataCadence", "priceType", "feesIncluded", "observationCount", "firstDate", "lastDate"]) {
       if (market.provenance?.[field] === undefined || market.provenance[field] === "") failures.push(`Day market provenance.${field} must be explicit`);
     }
     if (!/^https?:\/\//.test(market.provenance?.sourceUrl ?? "")) failures.push("Day market sourceUrl must be a complete http(s) URL");
@@ -476,15 +488,26 @@ if (marketId) {
       const first = sourceSeries[0];
       const last = sourceSeries.at(-1);
       if (sourceSeries.length !== market.provenance.observationCount) failures.push("Day market observationCount does not match its series");
-      if (first?.date !== market.provenance.firstDate || last?.date !== market.provenance.lastDate) failures.push("Day market provenance dates do not match its series");
+      const publishedApyForward = market.provenance.dataMode === "published-apy-forward";
+      if (publishedApyForward) {
+        if (market.provenance.dataCadence !== "none") failures.push("published-apy-forward markets must use dataCadence none");
+        if (market.provenance.priceType !== "published-apy") failures.push("published-apy-forward markets must use priceType published-apy");
+        if (market.provenance.observationCount !== 0 || sourceSeries.length !== 0) failures.push("published-apy-forward markets may not claim historical observations");
+        if (!Number.isFinite(market.provenance.publishedApy) || Math.abs(market.provenance.publishedApy - market.defaults.sourceApy) > 1e-12) failures.push("published APY must match defaults.sourceApy");
+      } else {
+        if (market.provenance.dataMode !== "historical-series") failures.push("Day market dataMode must be historical-series or published-apy-forward");
+        if (first?.date !== market.provenance.firstDate || last?.date !== market.provenance.lastDate) failures.push("Day market provenance dates do not match its series");
+      }
       for (let index = 0; index < sourceSeries.length; index += 1) {
         const point = sourceSeries[index];
         if (!/^\d{4}-\d{2}-\d{2}$/.test(point?.date ?? "") || !(point?.price > 0)) failures.push(`invalid date/price at series row ${index + 1}`);
         if (index > 0 && point.date <= sourceSeries[index - 1].date) failures.push(`series dates are not strictly increasing at row ${index + 1}`);
       }
-      const elapsedDays = (Date.parse(last?.date) - Date.parse(first?.date)) / 86_400_000;
-      const derivedApy = Math.pow(last?.price / first?.price, 365 / elapsedDays) - 1;
-      if (!Number.isFinite(derivedApy) || Math.abs(derivedApy - market.defaults.sourceApy) > 1e-12) failures.push("Day market sourceApy does not match its annualized source series");
+      if (market.provenance.dataMode !== "published-apy-forward") {
+        const elapsedDays = (Date.parse(last?.date) - Date.parse(first?.date)) / 86_400_000;
+        const derivedApy = Math.pow(last?.price / first?.price, 365 / elapsedDays) - 1;
+        if (!Number.isFinite(derivedApy) || Math.abs(derivedApy - market.defaults.sourceApy) > 1e-12) failures.push("Day market sourceApy does not match its annualized source series");
+      }
     }
     const marketFiles = (await readdir(marketDir)).sort();
     const allowedFiles = ["market.json", "market.ts", "series.json"];

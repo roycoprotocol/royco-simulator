@@ -30,6 +30,18 @@ try {
   assert.deepEqual(manifest.customization.hiddenSections, []);
   assert.deepEqual(manifest.customization.copyOverrides, {});
 
+  const apyOnly = spawnSync(process.execPath, [factory, "apy-test", "https://example.com/published-apy", "/apy-test", "--published-apy", "0.114"], {
+    cwd: sandbox,
+    encoding: "utf8",
+  });
+  assert.equal(apyOnly.status, 0, apyOnly.stderr || apyOnly.stdout);
+  const apyManifest = JSON.parse(await readFile(path.join(sandbox, "lib", "day-markets", "apy-test", "market.json"), "utf8"));
+  assert.equal(apyManifest.defaults.sourceApy, 0.114);
+  assert.equal(apyManifest.provenance.dataMode, "published-apy-forward");
+  assert.equal(apyManifest.provenance.observationCount, 0);
+  assert.equal(apyManifest.provenance.publishedApy, 0.114);
+  assert.deepEqual(JSON.parse(await readFile(path.join(sandbox, "lib", "day-markets", "apy-test", "series.json"), "utf8")), []);
+
   const second = spawnSync(process.execPath, [factory, "factory-test", source, "/factory-test"], {
     cwd: sandbox,
     encoding: "utf8",

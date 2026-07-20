@@ -66,6 +66,10 @@ export type DayMarketCustomization = {
     heroTitle?: string;
     heroDescription?: string;
   };
+  vaultTabs?: {
+    group: string;
+    label: string;
+  };
 };
 
 export function validateDayMarketCustomization(
@@ -81,6 +85,7 @@ export function validateDayMarketCustomization(
     "authorizationNote",
     "hiddenSections",
     "copyOverrides",
+    "vaultTabs",
   ]);
   for (const key of Object.keys(customization)) {
     if (!allowedCustomizationFields.has(key)) issues.push(`unsupported customization field: ${key}`);
@@ -95,6 +100,7 @@ export function validateDayMarketCustomization(
     && !Array.isArray(customization.copyOverrides)
     ? customization.copyOverrides
     : {};
+  const vaultTabs = customization.vaultTabs;
 
   if (!Array.isArray(customization.hiddenSections)) {
     issues.push("customization.hiddenSections must be an array");
@@ -119,7 +125,28 @@ export function validateDayMarketCustomization(
     }
   }
 
-  const hasDeviation = hiddenSections.length > 0 || Object.keys(copyOverrides).length > 0;
+  if (vaultTabs !== undefined) {
+    if (!vaultTabs || typeof vaultTabs !== "object" || Array.isArray(vaultTabs)) {
+      issues.push("customization.vaultTabs must be an object");
+    } else {
+      const allowedVaultTabFields = new Set(["group", "label"]);
+      for (const key of Object.keys(vaultTabs)) {
+        if (!allowedVaultTabFields.has(key)) {
+          issues.push(`unsupported customization.vaultTabs field: ${key}`);
+        }
+      }
+      if (typeof vaultTabs.group !== "string" || !vaultTabs.group.trim()) {
+        issues.push("customization.vaultTabs.group must be non-empty text");
+      }
+      if (typeof vaultTabs.label !== "string" || !vaultTabs.label.trim()) {
+        issues.push("customization.vaultTabs.label must be non-empty text");
+      }
+    }
+  }
+
+  const hasDeviation = hiddenSections.length > 0
+    || Object.keys(copyOverrides).length > 0
+    || vaultTabs !== undefined;
   if (hasDeviation && customization.explicitlyAuthorized !== true) {
     issues.push("market-specific presentation changes require explicit authorization");
   }
@@ -145,6 +172,9 @@ export function describeDayMarketCustomizations(
   return [
     ...customization.hiddenSections.map((section) => `hide section: ${section}`),
     ...Object.keys(customization.copyOverrides).map((key) => `replace copy: ${key}`),
+    ...(customization.vaultTabs
+      ? [`vault tab: ${customization.vaultTabs.label} in ${customization.vaultTabs.group}`]
+      : []),
   ];
 }
 
@@ -175,12 +205,14 @@ export type DayMarketManifest = {
     sourceUrl: string;
     sourceProvider: string;
     seriesPath?: string;
-    dataCadence: "daily" | "monthly" | "irregular";
-    priceType: "nav" | "price" | "total-return-index" | "unknown";
+    dataMode: "historical-series" | "published-apy-forward";
+    dataCadence: "daily" | "monthly" | "irregular" | "none";
+    priceType: "nav" | "price" | "total-return-index" | "published-apy" | "unknown";
     feesIncluded: boolean | "unknown";
     observationCount: number;
     firstDate: string;
     lastDate: string;
+    publishedApy?: number;
     retrievedAt?: string;
   };
 };
@@ -201,6 +233,7 @@ const priceTypeLabel = (priceType: DayMarketManifest["provenance"]["priceType"])
   if (priceType === "nav") return "NAV";
   if (priceType === "total-return-index") return "total-return";
   if (priceType === "price") return "price";
+  if (priceType === "published-apy") return "published APY";
   return "price/NAV";
 };
 
@@ -210,11 +243,14 @@ export function buildDayMarketCopy(manifest: DayMarketManifest): DayMarketCopy {
     : manifest.provenance.feesIncluded === false
       ? "fee-exclusive"
       : "fee-treatment-unknown";
+  const disclosure = manifest.provenance.dataMode === "published-apy-forward"
+    ? `The forward test uses the published ${(manifest.provenance.publishedApy ?? manifest.defaults.sourceApy) * 100}% APY supplied by ${manifest.provenance.sourceProvider}; no historical performance series is supplied. Simulator outputs are forward mechanism simulations, not historical backtests, forecasts, or an announced product.`
+    : `The source APY is derived from ${manifest.provenance.observationCount} ${feeTreatment} ${manifest.provenance.dataCadence} ${priceTypeLabel(manifest.provenance.priceType)} observations supplied by ${manifest.provenance.sourceProvider}. Simulator outputs are mechanism simulations, not historical backtests, forecasts, or an announced product.`;
   return {
     eyebrow: `ROYCO DAY · ${manifest.identity.marketName.toUpperCase()} MARKET`,
     title: `${manifest.identity.marketName} Day Simulator`,
     description: `Explore a hypothetical three-tranche Royco Day market over ${manifest.identity.underlyingAsset}. Senior receives first-loss coverage from Junior, while a ${percentage(manifest.defaults.minLiquidity)}% minimum liquidity requirement supports secondary-market exits.`,
-    disclosure: `The source APY is derived from ${manifest.provenance.observationCount} ${feeTreatment} ${manifest.provenance.dataCadence} ${priceTypeLabel(manifest.provenance.priceType)} observations supplied by ${manifest.provenance.sourceProvider}. Simulator outputs are mechanism simulations, not historical backtests, forecasts, or an announced product.`,
+    disclosure,
   };
 }
 

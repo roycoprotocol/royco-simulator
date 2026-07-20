@@ -2,9 +2,17 @@ import { access, mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import { inferCadence, loadSeriesSource } from "../simulator/source.mjs";
 
-const [id, source, requestedRoute] = process.argv.slice(2);
+const [id, source, requestedRoute, ...options] = process.argv.slice(2);
+const publishedApyOption = options.indexOf("--published-apy");
+const publishedApy = publishedApyOption >= 0
+  ? Number(options[publishedApyOption + 1])
+  : undefined;
 if (!id || !source) {
-  console.error("Usage: npm run day-sim:new -- <market-id> <date-price.csv-or-public-url> [route]");
+  console.error("Usage: npm run day-sim:new -- <market-id> <date-price.csv-or-public-url> [route] [--published-apy <decimal>]");
+  process.exit(1);
+}
+if (publishedApyOption >= 0 && !(Number.isFinite(publishedApy) && publishedApy > -1)) {
+  console.error("--published-apy must be a finite decimal greater than -1.");
   process.exit(1);
 }
 if (!/^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(id)) {
@@ -19,15 +27,19 @@ if (!/^\/[a-z0-9]+(?:-[a-z0-9]+)*(?:\/[a-z0-9]+(?:-[a-z0-9]+)*)*$/.test(route)) 
 }
 
 const root = process.cwd();
-const imported = await loadSeriesSource(source, { cwd: root });
+const imported = publishedApy !== undefined
+  ? { series: [], sourceUrl: source, sourceType: "published-apy" }
+  : await loadSeriesSource(source, { cwd: root });
 const series = imported.series;
-const cadence = inferCadence(series);
+const cadence = publishedApy !== undefined ? "none" : inferCadence(series);
 const first = series[0];
 const last = series.at(-1);
-const elapsedDays = (Date.parse(last.date) - Date.parse(first.date)) / 86_400_000;
-const sourceApy = elapsedDays > 0
-  ? Math.pow(last.price / first.price, 365 / elapsedDays) - 1
+const elapsedDays = publishedApy === undefined
+  ? (Date.parse(last.date) - Date.parse(first.date)) / 86_400_000
   : 0;
+const sourceApy = publishedApy ?? (elapsedDays > 0
+  ? Math.pow(last.price / first.price, 365 / elapsedDays) - 1
+  : 0);
 
 const marketDir = path.join(root, "lib", "day-markets", id);
 const routeDir = path.join(root, "app", ...route.slice(1).split("/"));
@@ -112,12 +124,14 @@ const manifest = {
     sourceUrl: imported.sourceUrl ?? "REPLACE_WITH_DATA_SOURCE_URL",
     sourceProvider: "REPLACE_WITH_DATA_SOURCE_PROVIDER",
     seriesPath: `lib/day-markets/${id}/series.json`,
+    dataMode: publishedApy !== undefined ? "published-apy-forward" : "historical-series",
     dataCadence: cadence,
-    priceType: "unknown",
+    priceType: publishedApy !== undefined ? "published-apy" : "unknown",
     feesIncluded: "unknown",
     observationCount: series.length,
-    firstDate: first.date,
-    lastDate: last.date,
+    firstDate: first?.date ?? "not-applicable",
+    lastDate: last?.date ?? "not-applicable",
+    ...(publishedApy !== undefined ? { publishedApy } : {}),
     ...(imported.sourceUrl ? { retrievedAt: new Date().toISOString().slice(0, 10) } : {}),
   },
 };
@@ -134,7 +148,9 @@ await writeFile(
 );
 
 console.log(`Created strict Day simulator ${id} at ${route}`);
-console.log(`Imported ${series.length} ${cadence} observations from ${imported.sourceUrl ?? source}`);
+console.log(publishedApy !== undefined
+  ? `Configured published APY forward input ${(publishedApy * 100).toFixed(2)}% from ${source}`
+  : `Imported ${series.length} ${cadence} observations from ${imported.sourceUrl ?? source}`);
 console.log(`Edit only: lib/day-markets/${id}/market.json`);
 console.log(`Calibrate: npm run day-sim:calibrate -- ${id}`);
 console.log(`Verify: npm run day-sim:verify -- ${id}`);

@@ -1,8 +1,28 @@
 import { Sim, defaultConfig, steadyYear } from "@/lib/day/engine/runner";
 import type { MarketConfig } from "@/lib/day/engine/types";
-import type { DaySimulatorDefaults } from "@/lib/day-simulator-template/market";
+import type { DaySeriesPoint, DaySimulatorDefaults } from "@/lib/day-simulator-template/market";
 
 export const DAY_TARGET_UTILIZATION = 0.9;
+
+export function buildDayForwardSeries(
+  sourceApy: number,
+  stableYield: number,
+  anchorDate: string,
+): DaySeriesPoint[] {
+  const anchorTime = Date.parse(`${anchorDate}T00:00:00Z`);
+  if (!Number.isFinite(anchorTime)) throw new Error(`Invalid forward-series anchor date: ${anchorDate}`);
+
+  let price = 1;
+  const points: DaySeriesPoint[] = [{ date: anchorDate, price }];
+  for (const [index, step] of steadyYear(sourceApy, 1, stableYield).entries()) {
+    price *= 1 + step.stReturn;
+    points.push({
+      date: new Date(anchorTime + step.dtSec * 1000 * (index + 1)).toISOString().slice(0, 10),
+      price,
+    });
+  }
+  return points;
+}
 
 export type DayEditableTerms = {
   coverage: number;

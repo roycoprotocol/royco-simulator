@@ -8,10 +8,12 @@ import {
   validateDayMarketCustomization,
 } from "./market";
 import {
+  buildDayForwardSeries,
   buildDayInitialBalances,
   buildDayMarketConfig,
   runDayTargetScenario,
 } from "./runtime";
+import { annualizedSeriesApy } from "./series";
 
 const market = manifest as DayMarketManifest;
 assert.deepEqual(validateDayMarketCustomization(market.customization), []);
@@ -22,11 +24,13 @@ const authorizedCustomization = {
   authorizationNote: "User explicitly authorized hiding Backtest for this market.",
   hiddenSections: ["backtest" as const],
   copyOverrides: { heroTitle: "A market-specific factual headline." },
+  vaultTabs: { group: "test-vaults", label: "Test vault" },
 };
 assert.deepEqual(validateDayMarketCustomization(authorizedCustomization), []);
 assert.deepEqual(describeDayMarketCustomizations(authorizedCustomization), [
   "hide section: backtest",
   "replace copy: heroTitle",
+  "vault tab: Test vault in test-vaults",
 ]);
 assert.equal(isDaySectionVisible(authorizedCustomization, "backtest"), false);
 assert.equal(isDaySectionVisible(authorizedCustomization, "roles"), true);
@@ -38,6 +42,10 @@ assert.ok(validateDayMarketCustomization({
   ...authorizedCustomization,
   hiddenSections: ["accounting" as never],
 }).some((issue) => issue.includes("unsupported hidden section")));
+assert.ok(validateDayMarketCustomization({
+  ...authorizedCustomization,
+  vaultTabs: { group: "", label: "Test vault" },
+}).some((issue) => issue.includes("vaultTabs.group")));
 const terms = {
   coverage: market.defaults.coverage,
   minLiquidity: market.defaults.minLiquidity,
@@ -77,7 +85,13 @@ assert.ok(Math.abs(yields.seniorApy - 0.07094948110446264) < 1e-12);
 assert.ok(Math.abs(yields.juniorApy - 0.26029190861047224) < 1e-12);
 assert.ok(Math.abs(yields.liquidityApy - 0.14334071663933146) < 1e-12);
 
+const forwardSeries = buildDayForwardSeries(0.114, market.defaults.stableYield, "2026-07-20");
+assert.equal(forwardSeries.length, 13);
+assert.ok(Math.abs(annualizedSeriesApy(forwardSeries) - 0.114) < 1e-12);
+assert.equal(forwardSeries[0].date, "2026-07-20");
+
 console.log("Strict Day market copy factory: PASS");
 console.log("Authorized Day presentation deviations: PASS");
 console.log("Strict Day shared runtime wiring: PASS");
 console.log("Pareto FalconX accountant outputs: PASS");
+console.log("Published APY forward-series adapter: PASS");

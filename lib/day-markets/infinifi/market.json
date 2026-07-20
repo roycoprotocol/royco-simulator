@@ -1,19 +1,19 @@
 {
-  "id": "pareto-falconx",
-  "route": "/falconx-v3",
+  "id": "infinifi",
+  "route": "/infinifi",
   "identity": {
-    "marketName": "Pareto FalconX",
-    "displayAssetName": "FalconX",
-    "underlyingAsset": "AA_FalconXUSDC",
-    "seniorName": "Senior",
-    "seniorSymbol": "srRoyAA_FALCONXUSDC",
-    "juniorName": "Junior",
-    "juniorSymbol": "jrRoyAA_FALCONXUSDC"
+    "marketName": "Infini-Fi 13w",
+    "displayAssetName": "InfiniFi 13-w",
+    "underlyingAsset": "liUSD-13w",
+    "seniorName": "Senior Infinifi 13-w",
+    "seniorSymbol": "SrliUSD-13w",
+    "juniorName": "Junior Infinifi 13-w",
+    "juniorSymbol": "JrliUSD-13w"
   },
   "defaults": {
-    "sourceApy": 0.09272332251507232,
-    "coverage": 0.03,
-    "minLiquidity": 0.15,
+    "sourceApy": 0.08928338608977526,
+    "coverage": 0.1,
+    "minLiquidity": 0.2,
     "liquidationUtilization": 100,
     "observationDays": 7,
     "exitBufferPct": 1,
@@ -42,14 +42,14 @@
     "eclpBandWidth": 0.1,
     "reinvestLiquidityPremium": true,
     "initialST": 1000,
-    "initialJT": 34.48275862068966,
-    "initialLT": 166.66666666666666
+    "initialJT": 125,
+    "initialLT": 222.22222222222223
   },
   "targets": {
-    "seniorApyMin": 0.07,
-    "seniorApyMax": 0.0725,
-    "juniorApyMin": 0.25,
-    "juniorApyMax": 0.27
+    "seniorApyMin": 0.06,
+    "seniorApyMax": 0.08,
+    "juniorApyMin": 0.12,
+    "juniorApyMax": 0.17
   },
   "certification": {
     "intakeConfirmed": true
@@ -61,16 +61,16 @@
     "copyOverrides": {}
   },
   "provenance": {
-    "source": "RWA.xyz export: FalconX Credit Vault / AA_FalconXUSDC Net Asset Value (Dollar)",
-    "sourceUrl": "https://app.rwa.xyz/assets/AA_FalconXUSDC",
-    "sourceProvider": "RWA.xyz",
-    "seriesPath": "lib/day-markets/pareto-falconx/series.json",
+    "source": "InfiniFi stats API: liUSD-13w historical exchange-rate history",
+    "sourceUrl": "https://eth-api.infinifi.xyz/api/protocol/rate-history/liUSD-13w?daysAgo=30",
+    "sourceProvider": "InfiniFi",
+    "seriesPath": "lib/day-markets/infinifi/series.json",
     "dataMode": "historical-series",
     "dataCadence": "daily",
     "priceType": "nav",
     "feesIncluded": true,
-    "observationCount": 371,
-    "firstDate": "2025-07-10",
-    "lastDate": "2026-07-15"
+    "observationCount": 31,
+    "firstDate": "2026-06-20",
+    "lastDate": "2026-07-20"
   }
 }
