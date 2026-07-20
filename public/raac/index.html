@@ -213,6 +213,11 @@ details[open]>.setupSummary:after{content:"-"}
           <input type="range" id="ys" min="20" max="80" step="1" value="75">
           <div class="hint" id="ysHint">Projection assumption only. Live markets price this through supply/demand and the YDM curve.</div>
         </div>
+        <div class="ctl">
+          <label>Underlying yield <b><span id="uyv">28</span>%/yr</b></label>
+          <input type="range" id="uy" min="0" max="60" step="1" value="28">
+          <div class="hint" id="uyHint">The base strategy's own yearly yield (its fees plus any Convex/StakeDAO rewards). Change it to see how a higher or lower paying market would look. It reshapes the whole chart and the outcomes.</div>
+        </div>
         <div class="ctl decisionControl">
           <label for="liqUtilInput">Junior buffer remaining for Senior exit <b><span id="liqUtilValue">5% buffer</span></b></label>
           <input id="liqUtilInput" type="range" min="1" max="99.91" step="0.0001" value="5">
@@ -1033,6 +1038,19 @@ function hydrateFromPermalink(){
 cov_.addEventListener('input',()=>{updateTermReadouts(); markPreset(); render(); syncPermalinkUrl();});
 obs_.addEventListener('input',()=>{updateTermReadouts(); markPreset(); render(); syncPermalinkUrl();});
 ys_.addEventListener('input',()=>{updateTermReadouts(); markPreset(); render(); syncPermalinkUrl();});
+/* ---------- Underlying yield: reshape the base strategy by its own yearly yield ---------- */
+const uy_=document.getElementById('uy'), uyv_=document.getElementById('uyv');
+const priceBaseCache={};
+function priceBaseOf(m){ if(priceBaseCache[m]) return priceBaseCache[m];
+  const d=DATA[m], cp=+d.coupon||0;
+  priceBaseCache[m]=d.P.map((p,i)=> cp? p/Math.pow(1+cp, d.off[i]/365) : p);
+  return priceBaseCache[m]; }
+function syncUnderlyingYield(){ if(!uy_||!DATA[MKT]) return; const cp=Math.round((+DATA[MKT].coupon||0)*100); uy_.value=cp; uyv_.textContent=cp; }
+function applyUnderlyingYield(){ if(!uy_) return; const pb=priceBaseOf(MKT), d=DATA[MKT], ny=(+uy_.value||0)/100;
+  d.P=pb.map((p,i)=> +(p*Math.pow(1+ny, d.off[i]/365)).toFixed(4)); d.coupon=ny; uyv_.textContent=uy_.value;
+  delete cache[MKT]; render();
+  const mcy=document.getElementById('mcYield'); if(mcy){ mcy.value=Math.round(ny*100); const mv=document.getElementById('mcYieldV'); if(mv) mv.textContent=Math.round(ny*100)+'%/yr'; try{ mcSig=''; }catch(e){} if(typeof scheduleMC==='function') scheduleMC(); } }
+if(uy_) uy_.addEventListener('input',applyUnderlyingYield);
 [liqUtilInput_,selfLiqBonusInput_].forEach(el=>{
   if(el) el.addEventListener('input',()=>{ updateExitControls(); render(); syncPermalinkUrl(); });
   if(el) el.addEventListener('change',()=>{ updateExitControls(); render(); syncPermalinkUrl(); });
@@ -1063,7 +1081,7 @@ if(chartDetails_) chartDetails_.addEventListener('toggle',()=>{ if(chartDetails_
 document.querySelectorAll('#presets button').forEach(b=>b.addEventListener('click',()=>setPreset(b.dataset.p)));
 function wireMktButtons(){ document.querySelectorAll('#mkt button').forEach(b=>{ b.onclick=()=>{
   setMarketButton(b.dataset.m); MKT=b.dataset.m; refreshPresetLabels();
-  setPreset(PRESET||DEFAULT_PRESET); if(typeof mcOnMarket==='function') mcOnMarket(); }; }); }
+  setPreset(PRESET||DEFAULT_PRESET); if(typeof syncUnderlyingYield==='function') syncUnderlyingYield(); if(typeof mcOnMarket==='function') mcOnMarket(); }; }); }
 buildMarketButtons(); wireMktButtons();
 
 /* ---------- Your market: paste a value history in (almost) any format ---------- */
@@ -1099,7 +1117,7 @@ function loadCustomMarket(){
   PRESETS[key]={Conservative:{cov:cl(aDD*1.4+8,12,60),obs:60,ys:60},Moderate:{cov:cl(aDD+5,10,50),obs:45,ys:65},Aggressive:{cov:cl(aDD*0.6+3,6,40),obs:20,ys:75}};
   delete cache[key];
   buildMarketButtons(); wireMktButtons();
-  setMarketButton(key); MKT=key; refreshPresetLabels(); setPreset('Moderate');
+  setMarketButton(key); MKT=key; refreshPresetLabels(); setPreset('Moderate'); if(typeof syncUnderlyingYield==='function') syncUnderlyingYield();
   if(typeof mcOnMarket==='function') mcOnMarket();
   msg.style.color='var(--green)'; msg.textContent='Loaded '+P.length+' points spanning '+(off[off.length-1]+1)+' days. Switched to it: unlock the Monte Carlo to see viability.';
 }
@@ -1132,6 +1150,7 @@ if(mcPwBtn){
 }
 
 hydrateFromPermalink();
+if(typeof syncUnderlyingYield==='function') syncUnderlyingYield();
 // The Monte Carlo never auto-loads: the team must enter the password every visit,
 // so it is never shown to a yield source (and a refresh re-locks it).
 </script></body></html>
