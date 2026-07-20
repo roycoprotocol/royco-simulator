@@ -110,13 +110,28 @@ for (const contract of [
 }
 for (const geometryContract of [
   '<line x1={boundaryX} y1={boundaryY - 3} x2={boundaryX}',
-  'const recoveryObservationEndX = 72 + ((23 - 15) / (23 - 10)) * (95 - 72)',
-  'const finalizationObservationEndX = 184',
+  'const drawdownObservationStartX = 48',
+  'const observationStartX = 72',
+  'const observationEndX = 142',
+  'const recoveryObservationEndX = 83',
+  'const finalizationObservationEndX = 194',
+  'width={205 - drawdownObservationStartX}',
+  'width={observationEndX - observationStartX}',
   'width={recoveryObservationEndX - 5}',
   'width={finalizationObservationEndX - 116}',
+  'points="5,15 28,18 49,34 72,23 83,15 95,10"',
+  '<circle cx={finalizationObservationEndX} cy="34"',
 ]) {
   if (!simulator.includes(geometryContract)) {
     failures.push(`Day simulator missing locked shared-diagram geometry: ${geometryContract}`);
+  }
+}
+for (const observationBoundSeniorPolyline of [
+  'points="5,18 48,15 205,15"',
+  'points="5,18 48,16 72,15 142,15 174,13 205,11"',
+]) {
+  if (!simulator.includes(observationBoundSeniorPolyline)) {
+    failures.push(`Day observation explainer must keep Senior flat only during the shaded observation window: ${observationBoundSeniorPolyline}`);
   }
 }
 for (const lockedCopyReference of [

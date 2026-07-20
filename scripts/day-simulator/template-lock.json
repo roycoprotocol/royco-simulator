@@ -2,7 +2,7 @@
   "app/globals.css": "9630f62f3e53beea7b27611c76d82affeea6dc86d29609a1b2a59a3dd9111782",
   "app/day-sim/page.tsx": "261923444d541a7c6052195fcf6ec29c96863745e4fc448ff6980c94cc7cdd51",
   "components/simulator/SimulatorPageShell.tsx": "38d1e86becdc19bb5880559757df58eb4e9a70a108495272819f73f61983eec9",
-  "components/day-simulator/DayMarketSimulator.tsx": "18022d37342c04c262a2e1f409ef89448d6e44e8e4d4cf0e98d943da0d2e7523",
+  "components/day-simulator/DayMarketSimulator.tsx": "3b5b66d01f51b09975e04cda11cde66d82a1e5c0cef58dda0a39fa56d09bdf1e",
   "components/day-simulator/DaySimulatorPageShell.tsx": "c9169c1631b03d1d1e50ae5951f656b4c82699e5a3b8dfd6a8c2c733d9fc2aea",
   "components/day-simulator/DayTimeframeBrush.tsx": "36805eb3c2279f43a5048d84feb33b90117af81ec854f0039d850eddc6a8d47f",
   "lib/day-simulator-template/erasure.test.ts": "4588133576ee254d862ad2dbf417ea0e637277c3d9966db30774bfa4e239409a",
@@ -37,7 +37,7 @@
   "scripts/day-simulator/generate-day-vectors.mjs": "ed5d1911b5f645bbac3892ae52c94e17252d6cde3c23b0ce10d407fa7ef1a4cd",
   "scripts/day-simulator/preview.mjs": "9cdfe3c04fb07c3b78434459cb43ec7cb713a1d9012775140c892665af2fc4af",
   "scripts/day-simulator/verify-runtime.ts": "27bb03709aee2ca754c6e3c6364d5cc782aa3f95d5e0ae01bdfc765f556fad56",
-  "scripts/day-simulator/verify.mjs": "0fb12b5a82f3281370ee50e4e86c792ad7e6ec335a92e15969df44a3d08d1407",
+  "scripts/day-simulator/verify.mjs": "7eb8ea9fec5c7fcd3764e880b92fa18a173161f610bc2fce22447f99cb7a83eb",
   "docs/NEW_DAY_SIMULATOR.md": "8710c994974e2526504e530791f6d1699e347eb1d68f46bcc8f7ff86054ff9a1",
   "package.json": "0ddeb6775e9ec1ee8bfa0210092e9edba5222ea289250cec94a9dc8a91d5f723"
 }
