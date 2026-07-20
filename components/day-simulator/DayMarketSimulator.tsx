@@ -614,7 +614,7 @@ function LiquidityExecutionDiagram({
         <text
           x={referenceLabel.x}
           y={referenceLabel.y}
-          fill={C.olive}
+          fill={C.danger}
           fontFamily={MONO}
           fontSize={12.5}
           fontWeight={600}
