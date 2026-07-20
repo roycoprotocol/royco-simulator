@@ -149,20 +149,20 @@ details[open]>.setupSummary:after{content:"-"}
 </div>
 <div id="addMktPanel" class="card" style="display:none;margin-bottom:12px;padding:15px">
   <div class="eyebrow">Run the model on your own market</div>
-  <p class="plain" style="margin:4px 0 10px">Paste your market's <b>value history</b> — one row per day. We normalize it to a $100 start and run the whole tool (chart, terms, and the Monte Carlo) on it. The format is flexible: it reads plain numbers, or <code>date, value</code>, CSV, or tab-separated; it ignores headers, <code>$</code>, <code>%</code> and thousands commas.</p>
+  <p class="plain" style="margin:4px 0 10px">Paste your market's <b>value history</b>: one row per day. We normalize it to a $100 start and run the whole tool (chart, terms, and the Monte Carlo) on it. The format is flexible: it reads plain numbers, or <code>date, value</code>, CSV, or tab-separated; it ignores headers, <code>$</code>, <code>%</code> and thousands commas.</p>
   <div class="builderGrid" style="grid-template-columns:minmax(0,2fr) minmax(0,1fr);align-items:start;gap:14px">
     <div>
-      <label class="hint" style="display:block;margin-bottom:4px"><b>Your data</b> — the daily value of the position (any unit; we rescale it)</label>
+      <label class="hint" style="display:block;margin-bottom:4px"><b>Your data</b>: the daily value of the position (any unit; we rescale it)</label>
       <textarea id="addMktData" rows="6" spellcheck="false" style="width:100%;font-family:'SFMono-Regular',Consolas,monospace;font-size:12px;border:1px solid var(--line);padding:8px;background:#fff" placeholder="2026-03-12, 100&#10;2026-03-13, 99.4&#10;2026-03-14, 101.2&#10;...&#10;&#10;(or just one value per line, no dates)"></textarea>
     </div>
     <div>
       <div class="ctl" style="margin-bottom:10px"><label style="text-transform:none;letter-spacing:0;font-size:12px">Market name</label><input id="addMktName" type="text" value="My market" style="width:100%;border:1px solid var(--line);padding:8px;font-size:13px"><div class="hint">Shown on the tab.</div></div>
-      <div class="ctl" style="margin-bottom:10px"><label style="text-transform:none;letter-spacing:0;font-size:12px">Extra yield APY (%) — optional</label><input id="addMktYield" type="number" value="0" step="1" style="width:100%;border:1px solid var(--line);padding:8px;font-size:13px"><div class="hint">If your data is <b>price only</b> and the position also earns a reward yield (e.g. Convex/StakeDAO), put that annual % here and we add it on top. If your data already includes the yield, leave 0.</div></div>
+      <div class="ctl" style="margin-bottom:10px"><label style="text-transform:none;letter-spacing:0;font-size:12px">Extra yield APY (%): optional</label><input id="addMktYield" type="number" value="0" step="1" style="width:100%;border:1px solid var(--line);padding:8px;font-size:13px"><div class="hint">If your data is <b>price only</b> and the position also earns a reward yield (e.g. Convex/StakeDAO), put that annual % here and we add it on top. If your data already includes the yield, leave 0.</div></div>
       <button type="button" class="copyBtn shareBtn" id="addMktLoad" style="width:100%">Load market</button>
       <div id="addMktMsg" style="font-size:12px;margin-top:6px;line-height:1.4"></div>
     </div>
   </div>
-  <p class="hint" style="margin:10px 0 0">Tip: the more history the better. Under ~90 days the volatility is unreliable and the Monte Carlo will warn you. Your data stays in your browser — nothing is uploaded.</p>
+  <p class="hint" style="margin:10px 0 0">Tip: the more history the better. Under ~90 days the volatility is unreliable and the Monte Carlo will warn you. Your data stays in your browser: nothing is uploaded.</p>
 </div>
 
 <div class="decisionShell">
@@ -175,8 +175,8 @@ details[open]>.setupSummary:after{content:"-"}
       </div>
     </div>
     <div class="outcomeGrid" aria-label="Current Senior and Junior projection summary">
-        <div class="miniMetric"><span>Senior avg/yr</span><b class="sr" id="sumSenior">—</b><small id="sumSeniorNote">No historical loss events</small></div>
-        <div class="miniMetric"><span>Junior avg/yr</span><b class="jr" id="sumJunior">—</b><small id="sumJuniorNote">Paid for taking first losses</small></div>
+        <div class="miniMetric"><span>Senior avg/yr</span><b class="sr" id="sumSenior"> </b><small id="sumSeniorNote">No historical loss events</small></div>
+        <div class="miniMetric"><span>Junior avg/yr</span><b class="jr" id="sumJunior"> </b><small id="sumJuniorNote">Paid for taking first losses</small></div>
     </div>
   </section>
 
@@ -260,8 +260,8 @@ details[open]>.setupSummary:after{content:"-"}
           </div>
           <div class="brushTicks" id="brushTicks"></div>
           <div class="brushReadout">
-            <span>Start <b id="timeStartLabel">—</b></span>
-            <span>End <b id="timeEndLabel">—</b></span>
+            <span>Start <b id="timeStartLabel"> </b></span>
+            <span>End <b id="timeEndLabel"> </b></span>
           </div>
         </div>
       </div>
@@ -279,13 +279,13 @@ details[open]>.setupSummary:after{content:"-"}
           <div class="row"><span class="dot" style="background:var(--sen)"></span><div>Senior is the protected side: losses reach Senior only after the Junior first-loss cushion is used first.</div></div>
           <div class="row"><span class="dot" style="background:var(--jun)"></span><div>Junior receives extra yield for taking first losses and can give up recoveries when the observation period expires before the strategy recovers.</div></div>
           <div class="row"><span class="dot" style="background:var(--mut)"></span><div>Loaded model inputs: Senior and Junior follow the same strategy path, beta is 1.00, and Junior starts with a modest extra cushion.</div></div>
-          <div class="sourceNote">Illustrative daily model, not a contract-exact implementation. It does not set or estimate any binding market parameter — it is a data-based estimate, and the final decision is always the team's, not Royco's. Base strategy = LP unit value in USD (external prices of both pool legs). Sources: Curve Prices API, DefiLlama.</div>
+          <div class="sourceNote">Illustrative daily model, not a contract-exact implementation. It does not set or estimate any binding market parameter: it is a data-based estimate, and the final decision is always the team's, not Royco's. Base strategy = LP unit value in USD (external prices of both pool legs). Sources: Curve Prices API, DefiLlama.</div>
         </div>
         <div class="notes">
           <div style="font-weight:600;margin-bottom:4px">Preset ladder</div>
-          <div class="row"><span class="dot" style="background:var(--green)"></span><div><b>Conservative</b> — larger Junior cushion and more recovery time. Lower Junior upside, fewer erased recovery claims.</div></div>
-          <div class="row"><span class="dot" style="background:var(--sen)"></span><div><b>Balanced</b> — middle setting: Senior stays protected historically, while Junior still gets meaningful upside.</div></div>
-          <div class="row"><span class="dot" style="background:var(--jun)"></span><div><b>Aggressive</b> — smaller Junior cushion and shorter recovery time. Higher Junior upside, more erased recovery claims.</div></div>
+          <div class="row"><span class="dot" style="background:var(--green)"></span><div><b>Conservative</b>: larger Junior cushion and more recovery time. Lower Junior upside, fewer erased recovery claims.</div></div>
+          <div class="row"><span class="dot" style="background:var(--sen)"></span><div><b>Balanced</b>: middle setting: Senior stays protected historically, while Junior still gets meaningful upside.</div></div>
+          <div class="row"><span class="dot" style="background:var(--jun)"></span><div><b>Aggressive</b>: smaller Junior cushion and shorter recovery time. Higher Junior upside, more erased recovery claims.</div></div>
           <div class="sourceNote">Scenarios keep Senior near a 7% annualized target and vary how much risk Junior takes. They are screened for no historical Senior loss events in this model.</div>
         </div>
       </div>
@@ -295,7 +295,7 @@ details[open]>.setupSummary:after{content:"-"}
       <summary class="setupSummary">
         <div>
           <div class="eyebrow">Viability · Monte Carlo</div>
-          <h2 class="setupTitle">Forward outlook — Royco team only</h2>
+          <h2 class="setupTitle">Forward outlook: Royco team only</h2>
           <p class="setupCopy">Forward projections are internal to the Royco team. They are not shown to onboarded yield sources and are not a promise of returns.</p>
         </div>
         <b class="summaryPill" id="mcPill">Team only</b>
@@ -530,7 +530,7 @@ function pathLine(arr,PX,PY,a,b){ let d='', open=false;
     d+=(open?'L':'M')+num(x)+' '+num(y)+' '; open=true; }
   return d.trim(); }
 function clamp(v,min,max){ return Math.max(min,Math.min(max,v)); }
-function dateShort(ds){ return ds ? ds.slice(5).replace('-','/')+'/'+ds.slice(2,4) : '—'; }
+function dateShort(ds){ return ds ? ds.slice(5).replace('-','/')+'/'+ds.slice(2,4) : ' '; }
 // The main chart always shows the WHOLE simulated window (S). Window selection
 // lives in the brush (viewA/viewB over the FULL history), not here.
 function currentView(){ if(!S) return {a:0,b:0,xMin:DEFAULT_XMIN,xMax:DEFAULT_XMAX,all:true};
@@ -782,12 +782,12 @@ function render(){ readMarketConfig(); const meta=MARKET_META[MKT], cFull=prep(M
     yrRow('Senior return',ysn,'sr')+nonObsPctRow('Non-observation %',yd,'base')+obsTriggerRow('Observation periods triggered',yt,'base');
   if(typeof scheduleMC==='function') scheduleMC(); }
 
-function pct(x){ if(x===null||x===undefined) return '—'; const s=(x>=0?'+':'−')+Math.abs(x*100).toFixed(1)+'%';
+function pct(x){ if(x===null||x===undefined) return ' '; const s=(x>=0?'+':'−')+Math.abs(x*100).toFixed(1)+'%';
   return '<span style="color:'+(x<0?'#8F4D42':'#171511')+'">'+s+'</span>'; }
 function yrRow(lab,o,cl){ return '<tr><td class="lab '+cl+'">'+lab+'</td>'+
   o.years.map(y=>'<td>'+pct(o[y])+'</td>').join('')+
   '<td><b>$'+o.end.toFixed(0)+'</b> <span style="color:#9E968A;font-size:11px;white-space:nowrap">'+o.ann.toFixed(1)+'% ann.</span></td></tr>'; }
-function nonObsPctRow(lab,o,cl){ const fmt=v=>v.total?((v.non/v.total)*100).toFixed(1)+'%':'—';
+function nonObsPctRow(lab,o,cl){ const fmt=v=>v.total?((v.non/v.total)*100).toFixed(1)+'%':' ';
   return '<tr><td class="lab '+cl+'">'+lab+'</td>'+
   o.years.map(y=>'<td>'+fmt(o[y])+'</td>').join('')+
   '<td><b>'+fmt(o.end)+'</b></td></tr>'; }
@@ -1101,7 +1101,7 @@ function loadCustomMarket(){
   buildMarketButtons(); wireMktButtons();
   setMarketButton(key); MKT=key; refreshPresetLabels(); setPreset('Moderate');
   if(typeof mcOnMarket==='function') mcOnMarket();
-  msg.style.color='var(--green)'; msg.textContent='Loaded '+P.length+' points spanning '+(off[off.length-1]+1)+' days. Switched to it — unlock the Monte Carlo to see viability.';
+  msg.style.color='var(--green)'; msg.textContent='Loaded '+P.length+' points spanning '+(off[off.length-1]+1)+' days. Switched to it: unlock the Monte Carlo to see viability.';
 }
 const addMktBtn_=document.getElementById('addMktBtn'), addMktPanel_=document.getElementById('addMktPanel');
 if(addMktBtn_) addMktBtn_.addEventListener('click',()=>{ addMktPanel_.style.display=addMktPanel_.style.display==='none'?'block':'none'; });

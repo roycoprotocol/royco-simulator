@@ -1,6 +1,6 @@
 <!DOCTYPE html>
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Dawn Market Builder — Plain-language legend</title>
+<title>Dawn Market Builder: Plain-language legend</title>
 <style>
 :root{--sen:#8E7355;--jun:#1B1A17;--ink:#171511;--mut:#6D6860;--line:#E8E2D8;--bg:#FBFAF7;--panel:#FFFDF9;--accent:#967756;--green:#319C61;--red:#8F4D42}
 *{box-sizing:border-box}
@@ -48,7 +48,7 @@ h2 .n{color:var(--accent);font-size:13px;font-family:-apple-system,sans-serif;fo
 <div class="term"><b class="jr">Junior tranche</b> <span class="tag">the risky side</span>
 <p>The first-loss slice. If the base strategy drops, the Junior absorbs the loss first to shield the Senior. In return it earns <em>extra</em> yield. It can do very well or get wiped out. Think of it as the investor who takes the risk for a bigger reward.</p></div>
 <div class="term"><b>First-loss cushion / coverage</b> <span class="tag">a % you set</span>
-<p>How big the Junior's protective buffer is, as a share of the market. A 40% cushion means the base strategy can fall about 40% before the Senior feels anything — the Junior eats that first. Bigger cushion = safer Senior, but a thinner Junior that swings more.</p></div>
+<p>How big the Junior's protective buffer is, as a share of the market. A 40% cushion means the base strategy can fall about 40% before the Senior feels anything: the Junior eats that first. Bigger cushion = safer Senior, but a thinner Junior that swings more.</p></div>
 </div>
 
 <h2><span class="n">The dials</span>Terms you choose</h2>
@@ -70,9 +70,9 @@ h2 .n{color:var(--accent);font-size:13px;font-family:-apple-system,sans-serif;fo
 <div class="term"><b>Yield</b>
 <p>The income the investment throws off over time (fees, rewards), separate from whether its price goes up or down.</p></div>
 <div class="term"><b>Amplified yield (Convex / StakeDAO)</b>
-<p>Convex and StakeDAO are services that sit on top of a Curve position and <em>boost</em> its yield with extra reward tokens — without changing the price risk. So the Junior can earn a much fatter return for taking the same drawdown. In this market that boost is the bulk of the yield.</p></div>
+<p>Convex and StakeDAO are services that sit on top of a Curve position and <em>boost</em> its yield with extra reward tokens: without changing the price risk. So the Junior can earn a much fatter return for taking the same drawdown. In this market that boost is the bulk of the yield.</p></div>
 <div class="term"><b>APY</b>
-<p>Annual Percentage Yield — the yield expressed as a per-year rate. 28% APY ≈ earning 28% over a year if it held.</p></div>
+<p>Annual Percentage Yield: the yield expressed as a per-year rate. 28% APY ≈ earning 28% over a year if it held.</p></div>
 </div>
 
 <h2><span class="n">The history chart</span>What the lines mean</h2>
@@ -80,7 +80,7 @@ h2 .n{color:var(--accent);font-size:13px;font-family:-apple-system,sans-serif;fo
 <div class="term"><b class="sr">Senior share price</b> &amp; <b class="jr">Junior share price</b>
 <p>What $100 put into each slice would be worth over time, given the historical ups and downs. The Senior line stays smoother; the Junior line swings much more.</p></div>
 <div class="term"><b>Base strategy line</b>
-<p>The underlying value before splitting — the raw material both slices are made from.</p></div>
+<p>The underlying value before splitting: the raw material both slices are made from.</p></div>
 <div class="term"><b>Observation period (shaded band)</b>
 <p>A stretch where the Junior was behind and inside its grace window, trying to recover.</p></div>
 <div class="term"><b>Junior recovery erased</b>
@@ -98,7 +98,7 @@ h2 .n{color:var(--accent);font-size:13px;font-family:-apple-system,sans-serif;fo
 <div class="term"><b>Senior loss events</b>
 <p>How many times the Senior was hit. <b>0 is the goal.</b></p></div>
 <div class="term"><b>avg/yr &amp; total (CAGR)</b>
-<p>The return expressed as an average per year, and over the whole period. Over very short histories the per-year number can look extreme — read it with the total.</p></div>
+<p>The return expressed as an average per year, and over the whole period. Over very short histories the per-year number can look extreme: read it with the total.</p></div>
 </div>
 
 <h2><span class="n">The crystal ball</span>Monte Carlo &amp; GO/NO-GO</h2>
@@ -113,10 +113,10 @@ h2 .n{color:var(--accent);font-size:13px;font-family:-apple-system,sans-serif;fo
 <p>Your assumption for the price's average <em>direction</em> over the horizon (yield aside). <b>0% = sideways</b> (goes nowhere on average, just wiggles). Positive = you expect it to rise; negative = to keep falling.</p></div>
 <div class="term"><b>Horizon</b>
 <p>How far into the future the simulation looks, in days. 365 = one year of possible futures.</p></div>
-<div class="term"><b>Fan chart &amp; 10–90% band</b>
+<div class="term"><b>Fan chart &amp; 10-90% band</b>
 <p>The shaded fan shows the range of outcomes: the middle line is the typical (median) path, and the band covers the middle 80% of futures (10th to 90th). A wide band = very uncertain.</p></div>
 <div class="term"><b>P(Senior loss)</b>
-<p>The chance, across all those simulated futures, that the Senior takes any loss. Lower is better — the launch rule wants this under 5%.</p></div>
+<p>The chance, across all those simulated futures, that the Senior takes any loss. Lower is better: the launch rule wants this under 5%.</p></div>
 <div class="term"><b>E[Junior] / Junior mean</b>
 <p>The average ending value of a $100 Junior across all futures. Above $100 means it's expected to make money.</p></div>
 <div class="term"><b>GO / NO-GO</b>
