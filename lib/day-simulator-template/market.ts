@@ -43,6 +43,118 @@ export type DayMarketCopy = {
   disclosure: string;
 };
 
+export const DAY_PRESENTATION_SECTION_IDS = [
+  "senior-summary",
+  "roles",
+  "market-inputs",
+  "liquidity-and-coverage",
+  "observation-period",
+  "backtest",
+  "junior-funding",
+  "disclosure",
+] as const;
+
+export const DAY_COPY_OVERRIDE_IDS = ["heroTitle", "heroDescription"] as const;
+
+export type DayPresentationSectionId = (typeof DAY_PRESENTATION_SECTION_IDS)[number];
+
+export type DayMarketCustomization = {
+  explicitlyAuthorized: boolean;
+  authorizationNote: string;
+  hiddenSections: DayPresentationSectionId[];
+  copyOverrides: {
+    heroTitle?: string;
+    heroDescription?: string;
+  };
+};
+
+export function validateDayMarketCustomization(
+  customization: DayMarketCustomization | undefined,
+): string[] {
+  if (!customization || typeof customization !== "object") {
+    return ["customization must be explicit in the market manifest"];
+  }
+
+  const issues: string[] = [];
+  const allowedCustomizationFields = new Set([
+    "explicitlyAuthorized",
+    "authorizationNote",
+    "hiddenSections",
+    "copyOverrides",
+  ]);
+  for (const key of Object.keys(customization)) {
+    if (!allowedCustomizationFields.has(key)) issues.push(`unsupported customization field: ${key}`);
+  }
+  const allowedSections = new Set<string>(DAY_PRESENTATION_SECTION_IDS);
+  const allowedCopy = new Set<string>(DAY_COPY_OVERRIDE_IDS);
+  const hiddenSections = Array.isArray(customization.hiddenSections)
+    ? customization.hiddenSections
+    : [];
+  const copyOverrides = customization.copyOverrides
+    && typeof customization.copyOverrides === "object"
+    && !Array.isArray(customization.copyOverrides)
+    ? customization.copyOverrides
+    : {};
+
+  if (!Array.isArray(customization.hiddenSections)) {
+    issues.push("customization.hiddenSections must be an array");
+  }
+  if (!customization.copyOverrides || typeof customization.copyOverrides !== "object" || Array.isArray(customization.copyOverrides)) {
+    issues.push("customization.copyOverrides must be an object");
+  }
+  const duplicateSections = hiddenSections.filter((section, index) =>
+    hiddenSections.indexOf(section) !== index);
+  if (duplicateSections.length) {
+    issues.push("customization.hiddenSections must not contain duplicates");
+  }
+  for (const section of hiddenSections) {
+    if (!allowedSections.has(section)) {
+      issues.push(`unsupported hidden section: ${String(section)}`);
+    }
+  }
+  for (const [key, value] of Object.entries(copyOverrides)) {
+    if (!allowedCopy.has(key)) issues.push(`unsupported copy override: ${key}`);
+    if (typeof value !== "string" || !value.trim()) {
+      issues.push(`customization.copyOverrides.${key} must be non-empty text`);
+    }
+  }
+
+  const hasDeviation = hiddenSections.length > 0 || Object.keys(copyOverrides).length > 0;
+  if (hasDeviation && customization.explicitlyAuthorized !== true) {
+    issues.push("market-specific presentation changes require explicit authorization");
+  }
+  if (hasDeviation && (
+    typeof customization.authorizationNote !== "string"
+    || customization.authorizationNote.trim().length < 10
+  )) {
+    issues.push("authorized presentation changes require a specific authorization note");
+  }
+  if (!hasDeviation && customization.explicitlyAuthorized === true) {
+    issues.push("explicit authorization is set but no market-specific presentation change is configured");
+  }
+  if (typeof customization.explicitlyAuthorized !== "boolean") {
+    issues.push("customization.explicitlyAuthorized must be boolean");
+  }
+
+  return issues;
+}
+
+export function describeDayMarketCustomizations(
+  customization: DayMarketCustomization,
+): string[] {
+  return [
+    ...customization.hiddenSections.map((section) => `hide section: ${section}`),
+    ...Object.keys(customization.copyOverrides).map((key) => `replace copy: ${key}`),
+  ];
+}
+
+export function isDaySectionVisible(
+  customization: DayMarketCustomization,
+  section: DayPresentationSectionId,
+): boolean {
+  return !customization.hiddenSections.includes(section);
+}
+
 export type DayMarketManifest = {
   id: string;
   route: string;
@@ -56,8 +168,8 @@ export type DayMarketManifest = {
   };
   certification: {
     intakeConfirmed: boolean;
-    templateExceptions: string[];
   };
+  customization: DayMarketCustomization;
   provenance: {
     source: string;
     sourceUrl: string;

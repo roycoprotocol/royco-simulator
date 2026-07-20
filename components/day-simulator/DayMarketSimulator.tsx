@@ -29,7 +29,10 @@ import type {
   DayMarketManifest,
   DaySeriesPoint,
 } from '@/lib/day-simulator-template/market';
-import { dayMarketFromManifest } from '@/lib/day-simulator-template/market';
+import {
+  dayMarketFromManifest,
+  isDaySectionVisible,
+} from '@/lib/day-simulator-template/market';
 import {
   buildDayErasureEvent,
   type DayErasureEvent,
@@ -145,7 +148,12 @@ const FALLBACK_MANIFEST: DayMarketManifest = {
   },
   certification: {
     intakeConfirmed: true,
-    templateExceptions: [],
+  },
+  customization: {
+    explicitlyAuthorized: false,
+    authorizationNote: '',
+    hiddenSections: [],
+    copyOverrides: {},
   },
   provenance: {
     source: 'Deterministic one-year template path',
@@ -962,6 +970,12 @@ export default function DayMarketSimulator({
   const activeMarket = market ?? FALLBACK_MARKET;
   const isGuided = variant === 'guided';
   const isExecutive = variant === 'executive';
+  const showSection = (section: (typeof activeMarket.customization.hiddenSections)[number]) =>
+    isDaySectionVisible(activeMarket.customization, section);
+  const heroTitle = activeMarket.customization.copyOverrides.heroTitle
+    ?? 'Make illiquid yield easier to own.';
+  const heroDescription = activeMarket.customization.copyOverrides.heroDescription
+    ?? 'Royco Day gives Senior holders first-loss coverage and a dedicated exit pool. Junior and LP participants earn additional yield for providing those benefits.';
   const defaults = activeMarket.defaults;
   const [showInputs, setShowInputs] = useState(false);
   const [showReview, setShowReview] = useState(true);
@@ -1434,18 +1448,18 @@ export default function DayMarketSimulator({
             margin: '12px 0 6px',
           }}
         >
-          {isExecutive ? 'Make illiquid yield easier to own.' : activeMarket.copy.title}
+          {isExecutive ? heroTitle : activeMarket.copy.title}
         </h1>
         <p className="max-w-3xl" style={{ color: C.muted, fontSize: 12.5, lineHeight: 1.38, margin: '0 0 12px' }}>
           {isExecutive
-            ? 'Royco Day gives Senior holders first-loss coverage and a dedicated exit pool. Junior and LP participants earn additional yield for providing those benefits.'
+            ? heroDescription
             : isGuided
             ? 'See how one yield strategy can support three different positions.'
             : activeMarket.copy.description}
         </p>
       </section>
 
-      {isExecutive && (
+      {isExecutive && showSection('senior-summary') && (
         <section style={{ ...cardStyle, padding: 16 }}>
           <Eyebrow>What Senior receives</Eyebrow>
           <div className="mt-3 grid grid-cols-1 md:grid-cols-3" style={{ gap: 8 }}>
@@ -1456,7 +1470,7 @@ export default function DayMarketSimulator({
         </section>
       )}
 
-      {isExecutive && (
+      {isExecutive && showSection('roles') && (
         <section style={{ ...cardStyle, padding: 16 }}>
           <Eyebrow>One opportunity · three roles</Eyebrow>
           <h2 className="mt-2" style={{ color: C.text, fontFamily: SERIF, fontSize: 24, fontWeight: 400, lineHeight: 1.12 }}>
@@ -1642,7 +1656,7 @@ export default function DayMarketSimulator({
         </div>
       </section>}
 
-      <section style={{ ...cardStyle, padding: '10px 12px' }}>
+      {showSection('market-inputs') && <section style={{ ...cardStyle, padding: '10px 12px' }}>
         <div className="flex items-center justify-between gap-4">
           <Eyebrow>Market inputs</Eyebrow>
           <button
@@ -1751,7 +1765,7 @@ export default function DayMarketSimulator({
             </div>
           </div>
         )}
-      </section>
+      </section>}
 
       {!isExecutive && <section style={{ ...cardStyle, padding: 14 }}>
         <Eyebrow>APYs</Eyebrow>
@@ -1762,7 +1776,7 @@ export default function DayMarketSimulator({
         </div>
       </section>}
 
-      <section className="grid grid-cols-1 md:grid-cols-2" style={{ gap: 10 }}>
+      {showSection('liquidity-and-coverage') && <section className="grid grid-cols-1 md:grid-cols-2" style={{ gap: 10 }}>
         <div style={{ ...cardStyle, padding: 14 }}>
           {isExecutive ? <Eyebrow>If a Senior wants to exit</Eyebrow> : <Eyebrow>Liquidity</Eyebrow>}
           {isExecutive && (
@@ -1805,9 +1819,9 @@ export default function DayMarketSimulator({
             </p>
           )}
         </div>
-      </section>
+      </section>}
 
-      {isExecutive && (
+      {isExecutive && showSection('observation-period') && (
         <section style={{ ...cardStyle, padding: 16 }}>
           <Eyebrow>What is an observation period?</Eyebrow>
           <h2 className="mt-2" style={{ color: C.text, fontFamily: SERIF, fontSize: 24, fontWeight: 400, lineHeight: 1.12 }}>
@@ -1820,7 +1834,7 @@ export default function DayMarketSimulator({
         </section>
       )}
 
-      <section style={cardStyle}>
+      {showSection('backtest') && <section style={cardStyle}>
         <div className="flex items-start justify-between gap-4">
           <div>
             <Eyebrow>Backtest</Eyebrow>
@@ -2078,9 +2092,9 @@ export default function DayMarketSimulator({
             </div>
           </div>
         )}
-      </section>
+      </section>}
 
-      <section style={{ ...cardStyle, borderLeft: `3px solid ${C.accent}` }}>
+      {showSection('junior-funding') && <section style={{ ...cardStyle, borderLeft: `3px solid ${C.accent}` }}>
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <Eyebrow>Junior funding</Eyebrow>
           <label className="flex items-center gap-2 cursor-pointer select-none" style={{ color: C.muted, fontSize: 12 }}>
@@ -2101,9 +2115,9 @@ export default function DayMarketSimulator({
         <p className="mt-3" style={{ color: C.kpiLabel, fontSize: 11, lineHeight: 1.45 }}>
           Illustrative parameters. Not an offer or investment advice.
         </p>
-      </section>
+      </section>}
 
-      <footer
+      {showSection('disclosure') && <footer
         style={{ color: C.kpiLabel, fontSize: 11, lineHeight: 1.45 }}
         className="pb-8 border-t pt-4"
       >
@@ -2116,7 +2130,7 @@ export default function DayMarketSimulator({
           Source:{' '}
           {activeMarket.provenance.sourceUrl}
         </p>
-      </footer>
+      </footer>}
     </div>
   );
 }

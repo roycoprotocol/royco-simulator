@@ -1,6 +1,12 @@
 import assert from "node:assert/strict";
 import manifest from "../day-markets/pareto-falconx/market.json";
-import { buildDayMarketCopy, type DayMarketManifest } from "./market";
+import {
+  buildDayMarketCopy,
+  describeDayMarketCustomizations,
+  isDaySectionVisible,
+  type DayMarketManifest,
+  validateDayMarketCustomization,
+} from "./market";
 import {
   buildDayInitialBalances,
   buildDayMarketConfig,
@@ -8,6 +14,30 @@ import {
 } from "./runtime";
 
 const market = manifest as DayMarketManifest;
+assert.deepEqual(validateDayMarketCustomization(market.customization), []);
+assert.deepEqual(describeDayMarketCustomizations(market.customization), []);
+
+const authorizedCustomization = {
+  explicitlyAuthorized: true,
+  authorizationNote: "User explicitly authorized hiding Backtest for this market.",
+  hiddenSections: ["backtest" as const],
+  copyOverrides: { heroTitle: "A market-specific factual headline." },
+};
+assert.deepEqual(validateDayMarketCustomization(authorizedCustomization), []);
+assert.deepEqual(describeDayMarketCustomizations(authorizedCustomization), [
+  "hide section: backtest",
+  "replace copy: heroTitle",
+]);
+assert.equal(isDaySectionVisible(authorizedCustomization, "backtest"), false);
+assert.equal(isDaySectionVisible(authorizedCustomization, "roles"), true);
+assert.ok(validateDayMarketCustomization({
+  ...authorizedCustomization,
+  explicitlyAuthorized: false,
+}).some((issue) => issue.includes("explicit authorization")));
+assert.ok(validateDayMarketCustomization({
+  ...authorizedCustomization,
+  hiddenSections: ["accounting" as never],
+}).some((issue) => issue.includes("unsupported hidden section")));
 const terms = {
   coverage: market.defaults.coverage,
   minLiquidity: market.defaults.minLiquidity,
@@ -48,5 +78,6 @@ assert.ok(Math.abs(yields.juniorApy - 0.26029190861047224) < 1e-12);
 assert.ok(Math.abs(yields.liquidityApy - 0.14334071663933146) < 1e-12);
 
 console.log("Strict Day market copy factory: PASS");
+console.log("Authorized Day presentation deviations: PASS");
 console.log("Strict Day shared runtime wiring: PASS");
 console.log("Pareto FalconX accountant outputs: PASS");

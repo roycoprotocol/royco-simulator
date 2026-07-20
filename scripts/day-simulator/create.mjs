@@ -100,7 +100,12 @@ const manifest = {
   },
   certification: {
     intakeConfirmed: false,
-    templateExceptions: [],
+  },
+  customization: {
+    explicitlyAuthorized: false,
+    authorizationNote: "",
+    hiddenSections: [],
+    copyOverrides: {},
   },
   provenance: {
     source: imported.sourceUrl ?? "REPLACE_WITH_DATA_SOURCE_LABEL",

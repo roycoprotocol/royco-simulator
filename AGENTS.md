@@ -21,12 +21,13 @@ Changes to `lib/try/engine.ts`, `lib/try/backtest.ts`, `components/simulator/`, 
 ## Day boundary
 
 1. A new Day market is a factory operation. Run `npm run day-sim:new`; then edit only `lib/day-markets/<market-id>/market.json`.
-2. Never edit shared Day components, styles, template files, scripts, the SHA-256 template lock, or `lib/day/engine` for market-specific work. Never add market-local React or CSS.
+2. Market-specific presentation changes must be declared in `market.json` under `customization`, explicitly authorized by the user, supported by the shared customization schema, and reported by verification. Never add market-local React or CSS.
 3. Day accounting flows through `lib/day/engine` and `lib/day-simulator-template/runtime.ts`. Never copy formulas into UI, routes, market files, calibration, or reports.
 4. Every public Day route must use `StrictDaySimulatorPageShell`. It may not pass variants, classes, styles, copy, or custom children.
-5. Copy, fonts, colors, borders, spacing, section order, charts, diagrams, responsive behavior, and controls are the approved Pareto FalconX v3 template and are byte-locked. Market manifests may change only identity, asset-related text, provenance/data, targets, and defaults.
-6. Never guess provenance, price type, fee treatment, desired yield ranges, hidden parameters, or exceptions. Incomplete intake must remain `unknown` and fail verification.
+5. Pareto FalconX v3 is the grounded default. Fonts, colors, borders, spacing, charts, diagrams, and behavior remain shared and byte-locked; an authorized market may use supported section-visibility or copy overrides without forking the component.
+6. Never guess provenance, price type, fee treatment, desired yield ranges, hidden parameters, or customization authority. Incomplete intake must remain `unknown` and fail verification.
 7. Calibrate with `npm run day-sim:calibrate -- <market-id>`; never calculate tranche outputs independently.
 8. Run `npm run day-sim:verify -- <market-id>` and `npm run day-sim:certify -- <market-id>` before requesting publication. Certification must pass all 74 Solidity vectors, tests, lint, and build.
-9. Do not create or merge a PR until verification and certification pass and the user approves the browser preview.
-10. Erasure annotations consume the accountant's structured erased amount and pre-refill Junior valuation. Never parse event copy or size erasure against a same-timestamp refill.
+9. If an explicitly authorized customization is not yet supported, extend the shared manifest-driven customization schema with tests; do not create a one-off market component. Updating the template lock is a maintainer action after full certification.
+10. Do not create or merge a PR until verification and certification pass and the user approves the browser preview.
+11. Erasure annotations consume the accountant's structured erased amount and pre-refill Junior valuation. Never parse event copy or size erasure against a same-timestamp refill.

@@ -26,6 +26,9 @@ try {
   assert.equal(manifest.provenance.observationCount, 3);
   assert.equal(manifest.certification.intakeConfirmed, false);
   assert.equal(manifest.identity.displayAssetName, "Factory Test");
+  assert.equal(manifest.customization.explicitlyAuthorized, false);
+  assert.deepEqual(manifest.customization.hiddenSections, []);
+  assert.deepEqual(manifest.customization.copyOverrides, {});
 
   const second = spawnSync(process.execPath, [factory, "factory-test", source, "/factory-test"], {
     cwd: sandbox,

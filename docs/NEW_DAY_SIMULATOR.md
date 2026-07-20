@@ -1,6 +1,6 @@
 # Strict Royco Day simulator factory
 
-The public Day simulator is a locked factory, not a page-building task. The approved Pareto FalconX v3 page is the reference implementation. Every market uses the same shared accountant, React tree, copy, typography, colors, borders, spacing, responsive behavior, charts, diagrams, and controls.
+The public Day simulator is a grounded factory, not a page-building task. The approved Pareto FalconX v3 page is the default implementation. Every market starts from the same shared accountant, React tree, copy, typography, colors, borders, spacing, responsive behavior, charts, diagrams, and controls. Explicitly authorized market differences are recorded as narrow manifest-driven customizations rather than one-off forks.
 
 Agents operate the factory. They do not recreate it.
 
@@ -22,7 +22,7 @@ Do not start until all fields below are answered. Never infer an unanswered fiel
 - **Desired minimum coverage**
 - **Anything that must differ from the standard template**
 
-If the last answer is not “nothing,” stop. A difference is a shared-template design decision and cannot be implemented as a market exception.
+If the last answer is not “nothing,” restate the exact requested difference and obtain explicit authorization. Record the authorization and rationale in `market.json`. Use an existing supported customization when possible. If the requested capability is not supported, extend the shared customization schema once, with tests and full template certification; never create a market-local component or stylesheet.
 
 ## One permitted workflow
 
@@ -49,7 +49,29 @@ It refuses to overwrite an existing market or route. It normalizes dates, valida
 
 Fill identity, provenance, target ranges, minimum coverage, and other approved backend defaults. Replace every placeholder and `unknown`, then set `certification.intakeConfirmed` to `true`.
 
-Do not edit `market.ts`, `series.json`, the route, any component, any stylesheet, any template file, or any accountant file. `templateExceptions` must remain an empty array.
+Do not edit `market.ts`, `series.json`, the route, any market-local component, any stylesheet, or any accountant file. Standard markets keep the generated customization block unchanged:
+
+```json
+"customization": {
+  "explicitlyAuthorized": false,
+  "authorizationNote": "",
+  "hiddenSections": [],
+  "copyOverrides": {}
+}
+```
+
+For an explicitly authorized presentation difference, use only supported manifest fields. For example, hiding Backtest for one market is:
+
+```json
+"customization": {
+  "explicitlyAuthorized": true,
+  "authorizationNote": "User explicitly authorized removing Backtest for the Blockhouse market.",
+  "hiddenSections": ["backtest"],
+  "copyOverrides": {}
+}
+```
+
+Supported hidden sections are `senior-summary`, `roles`, `market-inputs`, `liquidity-and-coverage`, `observation-period`, `backtest`, `junior-funding`, and `disclosure`. Supported copy overrides are `heroTitle` and `heroDescription`. Unsupported keys fail verification.
 
 Hidden defaults are still accountant inputs. Keep them explicit. Never guess a fee, curve endpoint, liquidity assumption, observation duration, refill rule, notional, or protocol parameter. Ask the user when a required value is missing.
 
@@ -74,9 +96,9 @@ npm run day-sim:verify -- <market-id>
 npm run day-sim:preview -- <market-id>
 ```
 
-Verification fails for incomplete intake, inaccurate provenance, malformed series, target misses, invalid contract parameters, market-local code/styles, a non-generated route, any market copy override, or a one-byte change to a locked shared template/accountant file.
+Verification fails for incomplete intake, inaccurate provenance, malformed series, target misses, invalid contract parameters, market-local code/styles, a non-generated route, silent or unsupported customizations, or a one-byte unauthorized change to a locked shared template/accountant file. Authorized differences are listed in the verification report.
 
-In the browser, compare the market with `/falconx-v3` at desktop, mobile, and high zoom. Only market identity, asset-related text, source disclosure, dates/data, values, and configured defaults may differ. Structure and styling must not differ.
+In the browser, compare the market with `/falconx-v3` at desktop, mobile, and high zoom. Market identity, asset-related text, source disclosure, dates/data, values, configured defaults, and the exact authorized presentation differences may vary. Everything else should match.
 
 ### 5. Certify
 
@@ -99,7 +121,7 @@ Do not request publication or open a PR unless every category passes and the use
 
 ## Immutable shared surface
 
-Market agents must never edit these locations:
+Market agents must never directly edit these locations for a one-off market:
 
 - `components/day-simulator/`
 - `components/simulator/SimulatorPageShell.tsx`
@@ -109,7 +131,7 @@ Market agents must never edit these locations:
 - `scripts/day-simulator/`
 - `scripts/day-simulator/template-lock.json`
 
-The SHA-256 lock file makes that boundary machine-verifiable. Only a deliberate shared-template change may update it, and that requires full repository tests, parity, lint, build, and visual comparison against the approved reference before regenerating the lock.
+The SHA-256 lock file makes that boundary machine-verifiable. It prevents a market agent from silently changing shared behavior. A maintainer may deliberately extend the shared customization schema after explicit authorization; that requires full repository tests, parity, lint, build, visual comparison against the approved reference, and regeneration of the lock.
 
 ## Accounting contract
 
@@ -121,23 +143,24 @@ LP stable yield, trading-fee income, turnover, and execution-liquidity economics
 
 ## Locked presentation contract
 
-The strict shell always renders the approved executive page. It includes the same section order, text, mechanism diagrams, expandable market-input bar, six sliders, three APY cards, liquidity diagram, loss waterfall, observation-period explainer, full accountant-backed history chart, ISO-date hover behavior, observation/erasure/loss annotations, unified two-handle backtest scrubber, month-over-month table, refill control, and source disclosure as Pareto FalconX v3.
+The strict shell renders the approved executive page by default. It includes the same section order, text, mechanism diagrams, expandable market-input bar, six sliders, three APY cards, liquidity diagram, loss waterfall, observation-period explainer, full accountant-backed history chart, ISO-date hover behavior, observation/erasure/loss annotations, unified two-handle backtest scrubber, month-over-month table, refill control, and source disclosure as Pareto FalconX v3.
 
-Fonts, palette, borders, radii, shadows, card dimensions, spacing, breakpoints, chart geometry, label placement, and mobile/high-zoom behavior are shared code. A market route cannot pass a variant, class, or style override. Market folders cannot contain React or CSS.
+Fonts, palette, borders, radii, shadows, card dimensions, spacing, breakpoints, chart geometry, label placement, and mobile/high-zoom behavior are shared code. A market route cannot pass a variant, class, or style override. Market folders cannot contain React or CSS. Supported market customizations flow through the manifest and shared component, so disabling a section does not alter or duplicate its accounting.
 
 ## Instructions for lower-cost agents
 
 Use this literal checklist:
 
 1. Read this file completely.
-2. Confirm every intake field; ask instead of guessing.
+2. Confirm every intake field and any requested difference; ask instead of guessing.
 3. Run `day-sim:new` once.
 4. Edit only the generated `market.json`.
 5. Run accountant calibration; do not write formulas.
-6. Run verification. Fix only market data/configuration failures.
-7. If verification reports a locked template change, stop—do not update the lock.
-8. Inspect screenshots against `/falconx-v3`; report differences, do not patch shared design.
-9. Run certification.
-10. Wait for preview approval before any PR.
+6. For a requested difference, record the explicit authorization note and use only supported `customization` fields.
+7. Run verification. Fix only market data/configuration/customization-manifest failures.
+8. If verification reports an unsupported customization or locked template change, stop and escalate to a maintainer; do not create a one-off component or update the lock.
+9. Inspect screenshots against `/falconx-v3`; confirm that every difference is either market data or explicitly authorized.
+10. Run certification.
+11. Wait for preview approval before any PR.
 
 Cheap and fast models may load data, run calibration searches, generate reports, and inspect screenshots. They may never independently rewrite accounting formulas or recreate the design.

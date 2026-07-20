@@ -52,8 +52,13 @@
     "juniorApyMax": 0.27
   },
   "certification": {
-    "intakeConfirmed": true,
-    "templateExceptions": []
+    "intakeConfirmed": true
+  },
+  "customization": {
+    "explicitlyAuthorized": false,
+    "authorizationNote": "",
+    "hiddenSections": [],
+    "copyOverrides": {}
   },
   "provenance": {
     "source": "RWA.xyz export: FalconX Credit Vault / AA_FalconXUSDC Net Asset Value (Dollar)",

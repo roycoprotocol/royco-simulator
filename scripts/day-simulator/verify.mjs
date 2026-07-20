@@ -18,6 +18,7 @@ const requiredFiles = [
   "lib/day-simulator-template/explainer.ts",
   "lib/day-simulator-template/explainer.test.ts",
   "lib/day-simulator-template/series.ts",
+  "lib/day-simulator-template/market.ts",
   "lib/day-simulator-template/runtime.ts",
   "lib/day/engine/engine.ts",
   "lib/day/engine/runner.ts",
@@ -70,6 +71,10 @@ const simulator = await readFile(
   path.join(root, "components/day-simulator/DayMarketSimulator.tsx"),
   "utf8",
 );
+const marketTemplate = await readFile(
+  path.join(root, "lib/day-simulator-template/market.ts"),
+  "utf8",
+);
 const dayLockedCopy = await readFile(
   path.join(root, "lib/day-simulator-template/locked-copy.ts"),
   "utf8",
@@ -110,6 +115,27 @@ for (const lockedCopyReference of [
   'DAY_LOCKED_COPY.coverageBenefit',
 ]) {
   if (!simulator.includes(lockedCopyReference)) failures.push(`Day simulator missing locked Dawn copy reference: ${lockedCopyReference}`);
+}
+for (const customizationContract of [
+  "DAY_PRESENTATION_SECTION_IDS",
+  "DAY_COPY_OVERRIDE_IDS",
+  "validateDayMarketCustomization",
+  "describeDayMarketCustomizations",
+  "isDaySectionVisible",
+]) {
+  if (!marketTemplate.includes(customizationContract)) {
+    failures.push(`Day market customization contract missing: ${customizationContract}`);
+  }
+}
+for (const customizationWiring of [
+  "activeMarket.customization.copyOverrides.heroTitle",
+  "activeMarket.customization.copyOverrides.heroDescription",
+  "isDaySectionVisible(activeMarket.customization, section)",
+  "showSection('backtest')",
+]) {
+  if (!simulator.includes(customizationWiring)) {
+    failures.push(`Day market customization wiring missing: ${customizationWiring}`);
+  }
 }
 for (const benefitCopy of [
   'Many yield opportunities are illiquid by design. Despite that, the LP design now allows ST to buy/sell their positions through a dedicated liquidity layer.',
@@ -402,10 +428,8 @@ if (marketId) {
     if (market.certification?.intakeConfirmed !== true) {
       failures.push("Day market intake must be explicitly confirmed before certification");
     }
-    if (!Array.isArray(market.certification?.templateExceptions)) {
-      failures.push("Day market templateExceptions must be an array");
-    } else if (market.certification.templateExceptions.length > 0) {
-      failures.push("Strict Day markets cannot publish with template exceptions; revise the shared template separately");
+    if (market.certification?.templateExceptions !== undefined) {
+      failures.push("legacy templateExceptions are unsupported; use the auditable customization manifest");
     }
     for (const field of ["seniorApyMin", "seniorApyMax", "juniorApyMin", "juniorApyMax"]) {
       if (!Number.isFinite(market.targets?.[field])) failures.push(`Day market targets.${field} must be explicit`);

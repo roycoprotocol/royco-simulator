@@ -2,7 +2,11 @@ import { Sim, steadyYear } from "../../lib/day/engine/runner";
 import { DAY_TEMPLATE_MANIFEST } from "../../lib/day-simulator-template/manifest";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
-import type { DayMarketManifest } from "../../lib/day-simulator-template/market";
+import {
+  describeDayMarketCustomizations,
+  type DayMarketManifest,
+  validateDayMarketCustomization,
+} from "../../lib/day-simulator-template/market";
 import {
   annualizedSeriesApy,
   calibrateSeriesApy,
@@ -108,6 +112,10 @@ async function main() {
     throw new Error("Day coverage-based exit threshold diverges from the Dawn exit-buffer rule");
   }
   if (market) {
+    const customizationIssues = validateDayMarketCustomization(market.customization);
+    if (customizationIssues.length) {
+      throw new Error(`Invalid Day market customization: ${customizationIssues.join("; ")}`);
+    }
     const target = runDayTargetScenario(market.defaults);
     if (
       target.seniorApy < market.targets.seniorApyMin
@@ -127,6 +135,13 @@ async function main() {
     }
     console.log(`${market.id} accountant Senior APY: ${(target.seniorApy * 100).toFixed(2)}% PASS`);
     console.log(`${market.id} accountant Junior APY: ${(target.juniorApy * 100).toFixed(2)}% PASS`);
+    const customizations = describeDayMarketCustomizations(market.customization);
+    if (customizations.length) {
+      console.log(`${market.id} authorized presentation changes: ${customizations.join(", ")} PASS`);
+      console.log(`${market.id} authorization note: ${market.customization.authorizationNote}`);
+    } else {
+      console.log(`${market.id} presentation: STANDARD TEMPLATE PASS`);
+    }
   }
 
   console.log("Day runtime defaults: PASS");
