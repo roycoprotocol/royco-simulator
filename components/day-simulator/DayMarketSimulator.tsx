@@ -1467,13 +1467,13 @@ export default function DayMarketSimulator({
           </p>
           <div className="mt-4 grid grid-cols-1 md:grid-cols-3" style={{ gap: 8 }}>
             <div style={{ background: C.pageBg, border: `1px solid ${C.seniorLine}`, minHeight: 178, padding: 14 }}>
-              <Eyebrow>Senior · covered yield</Eyebrow>
+              <Eyebrow>Senior · yield and liquidity</Eyebrow>
               <p className="mt-3" style={{ color: C.accent, fontFamily: MONO, fontSize: 26, fontWeight: 700 }}>
                 {pct(result.seniorApy)}/yr
               </p>
-              <p className="mt-2" style={{ color: C.text, fontFamily: SERIF, fontSize: 18 }}>Gets coverage and liquidity.</p>
+              <p className="mt-2" style={{ color: C.text, fontFamily: SERIF, fontSize: 18 }}>Senior takes losses only after Junior.</p>
               <p className="mt-2" style={{ color: C.muted, fontSize: 11.5, lineHeight: 1.45 }}>
-                Junior absorbs covered losses first, while the LP provides a dedicated path to exit before the underlying asset matures.
+                Senior keeps the remaining strategy yield and can exit through the dedicated LP before the underlying asset matures.
               </p>
             </div>
             <div style={{ background: C.pageBg, border: `1px solid ${C.juniorLine}`, minHeight: 178, padding: 14 }}>
@@ -1481,9 +1481,9 @@ export default function DayMarketSimulator({
               <p className="mt-3" style={{ color: C.juniorLine, fontFamily: MONO, fontSize: 26, fontWeight: 700 }}>
                 {pct(result.juniorApy)}/yr
               </p>
-              <p className="mt-2" style={{ color: C.text, fontFamily: SERIF, fontSize: 18 }}>Gets paid to cover Senior.</p>
+              <p className="mt-2" style={{ color: C.text, fontFamily: SERIF, fontSize: 18 }}>Gets paid to take losses first.</p>
               <p className="mt-2" style={{ color: C.muted, fontSize: 11.5, lineHeight: 1.45 }}>
-                Earns a risk premium in exchange for absorbing covered losses before they reach Senior.
+                Earns a risk premium because Junior takes investment losses before Senior does.
               </p>
             </div>
             <div style={{ background: C.pageBg, border: `1px solid ${C.olive}`, minHeight: 178, padding: 14 }}>
