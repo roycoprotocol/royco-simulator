@@ -44,9 +44,10 @@ h1{font-family:Georgia,"Times New Roman",serif;font-weight:400;font-size:clamp(2
 <div class="card">
   <div class="sliders">
     <div class="ctl"><label>Starting yield share <b id="ps0v">35%</b></label><input type="range" id="ps0" min="1" max="80" step="1" value="35"><div class="h">Where the Junior's share begins today.</div></div>
-    <div class="ctl"><label>Target utilization <b id="ptuv">90%</b></label><input type="range" id="ptu" min="30" max="99" step="1" value="90"><div class="h">The level the market is meant to sit at.</div></div>
-    <div class="ctl"><label>Utilization now <b id="puv">10%</b></label><input type="range" id="pu" min="0" max="100" step="1" value="10"><div class="h">Where utilization actually is, held there for the year.</div></div>
+    <div class="ctl"><label>Utilization now <b id="puv">95%</b></label><input type="range" id="pu" min="0" max="100" step="1" value="95"><div class="h">Where utilization actually is, held there for the year. Above 90% the share rises; below 90% it falls.</div></div>
+    <div class="ctl"><label>Re-rating speed <b id="pspv">1.0/yr</b></label><input type="range" id="psp" min="0.5" max="4" step="0.5" value="1"><div class="h">How fast this market re-rates toward target. A per-market setting, so not every market moves at the same pace.</div></div>
   </div>
+  <div style="margin-top:4px;font-size:12.5px;color:var(--mut)">Target utilization is fixed at <b style="color:var(--ink)">90%</b>. The share drifts toward it over time whenever utilization sits away from it.</div>
   <div class="why" id="why"></div>
 
   <div class="playrow">
@@ -64,20 +65,20 @@ h1{font-family:Georgia,"Times New Roman",serif;font-weight:400;font-size:clamp(2
 
 <script>
 /* Real Royco YDM drift (ported from lib/day/engine/ydm.ts, adaptYTarget) */
-const YEAR_SEC=365*24*60*60, DAY=86400, H=365, SPEED=2;
+const YEAR_SEC=365*24*60*60, DAY=86400, H=365, CAP=0.90;
 const clamp=(x,lo,hi)=>Math.max(lo,Math.min(hi,x));
-function adaptYTarget(yTarget,U,dtSec,targetUtil){
+function adaptYTarget(yTarget,U,dtSec,targetUtil,speedPerYear){
   const u=U>1?1:U;
   let delta = u>=targetUtil ? (u-targetUtil)/(1-targetUtil) : (u-targetUtil)/targetUtil;
   delta=clamp(delta,-1,1);
-  const speed=SPEED/YEAR_SEC;
-  return clamp(yTarget*Math.exp(speed*delta*dtSec), 0.01, 0.90);
+  const speed=speedPerYear/YEAR_SEC;
+  return clamp(yTarget*Math.exp(speed*delta*dtSec), 0.01, CAP);
 }
 
-const S={ s0:0.35, tu:0.90, u:0.10, day:0 };
+const S={ s0:0.35, tu:0.90, u:0.95, speed:1, day:0, hover:null };
 let PATH=null;
 function build(){ const a=[]; let y=S.s0; a.push(y);
-  for(let t=1;t<=H;t++){ y=adaptYTarget(y,S.u,DAY,S.tu); a.push(y); } return a; }
+  for(let t=1;t<=H;t++){ y=adaptYTarget(y,S.u,DAY,S.tu,S.speed); a.push(y); } return a; }
 
 const num=x=>Math.round(x*100)/100;
 const pct=x=>Math.round(x*100)+'%';
@@ -86,7 +87,9 @@ const monOf=d=>d/H*12;
 function draw(){
   const el=document.getElementById('chart'), box=el.parentElement, w=box.clientWidth||760, h=box.clientHeight||340;
   el.setAttribute('viewBox','0 0 '+w+' '+h);
-  const pad={l:46,r:16,t:18,b:34}, PX=d=>pad.l+d/H*(w-pad.l-pad.r), PY=s=>pad.t+(1-s)*(h-pad.t-pad.b);
+  const pad={l:46,r:52,t:22,b:34}, PX=d=>pad.l+d/H*(w-pad.l-pad.r), PY=s=>pad.t+(1-s)*(h-pad.t-pad.b), base=h-pad.b;
+  const rising = PATH[H] > PATH[0]+0.001, falling = PATH[H] < PATH[0]-0.001;
+  const col = rising? '#319C61' : falling? '#8F4D42' : '#1B1A17';
   const P=['<rect x="0" y="0" width="'+w+'" height="'+h+'" fill="#fff"/>'];
   for(let g=0;g<=100;g+=25){ const y=PY(g/100);
     P.push('<line x1="'+pad.l+'" y1="'+num(y)+'" x2="'+(w-pad.r)+'" y2="'+num(y)+'" stroke="#EEE8DE"/>');
@@ -94,20 +97,37 @@ function draw(){
   }
   for(let m=0;m<=12;m+=3){ const x=PX(m/12*H); P.push('<text x="'+num(x)+'" y="'+(h-12)+'" fill="#9E968A" font-size="10" text-anchor="middle">'+m+'m</text>'); }
   P.push('<text x="'+((pad.l+(w-pad.r))/2)+'" y="'+(h-1)+'" fill="#9E968A" font-size="10" text-anchor="middle">Months from today</text>');
-  // full path (faint) + up-to-today (bold)
+  // ceiling line at cap
+  P.push('<line x1="'+pad.l+'" y1="'+num(PY(CAP))+'" x2="'+(w-pad.r)+'" y2="'+num(PY(CAP))+'" stroke="#E0C9A8" stroke-dasharray="2 5"/>');
+  P.push('<text x="'+(w-pad.r-2)+'" y="'+num(PY(CAP)-4)+'" fill="#C9A87E" font-size="9" text-anchor="end">ceiling '+pct(CAP)+'</text>');
+  // reference line at starting share
+  P.push('<line x1="'+pad.l+'" y1="'+num(PY(PATH[0]))+'" x2="'+(w-pad.r)+'" y2="'+num(PY(PATH[0]))+'" stroke="#D9CFC0" stroke-dasharray="1 4"/>');
   const pts=PATH.map((s,d)=>[PX(d),PY(s)]);
-  const linAll=pts.map((p,i)=>(i?'L':'M')+num(p[0])+' '+num(p[1])).join(' ');
-  P.push('<path d="'+linAll+'" fill="none" stroke="#D9CFC0" stroke-width="2"/>');
-  const upto=pts.slice(0,S.day+1).map((p,i)=>(i?'L':'M')+num(p[0])+' '+num(p[1])).join(' ');
-  P.push('<path d="'+upto+'" fill="none" stroke="#1B1A17" stroke-width="3"/>');
-  // start marker
-  P.push('<circle cx="'+num(PX(0))+'" cy="'+num(PY(PATH[0]))+'" r="4" fill="#B4A896"/>');
-  // current marker + guides
+  // area under the full path
+  const area='M'+num(PX(0))+' '+num(base)+' '+pts.map(p=>'L'+num(p[0])+' '+num(p[1])).join(' ')+' L'+num(PX(H))+' '+num(base)+' Z';
+  P.push('<path d="'+area+'" fill="'+col+'" opacity="0.06"/>');
+  // full path faint, then bold up to today
+  P.push('<path d="'+pts.map((p,i)=>(i?'L':'M')+num(p[0])+' '+num(p[1])).join(' ')+'" fill="none" stroke="#D9CFC0" stroke-width="2"/>');
+  P.push('<path d="'+pts.slice(0,S.day+1).map((p,i)=>(i?'L':'M')+num(p[0])+' '+num(p[1])).join(' ')+'" fill="none" stroke="'+col+'" stroke-width="3.4"/>');
+  // start marker + label
+  P.push('<circle cx="'+num(PX(0))+'" cy="'+num(PY(PATH[0]))+'" r="4.5" fill="#fff" stroke="#B4A896" stroke-width="2"/>');
+  P.push('<text x="'+(pad.l)+'" y="'+num(PY(PATH[0])-9)+'" fill="#8A8073" font-size="10" font-family="monospace">start '+pct(PATH[0])+'</text>');
+  // end label at right edge
+  P.push('<text x="'+(w-pad.r+5)+'" y="'+num(PY(PATH[H])+3)+'" fill="'+col+'" font-size="11" font-weight="700" font-family="monospace">'+pct(PATH[H])+'</text>');
+  // hover
+  if(S.hover!=null){ const d=S.hover, hx=PX(d), hy=PY(PATH[d]);
+    P.push('<line x1="'+num(hx)+'" y1="'+pad.t+'" x2="'+num(hx)+'" y2="'+num(base)+'" stroke="#C9BEAE"/>');
+    P.push('<circle cx="'+num(hx)+'" cy="'+num(hy)+'" r="3.5" fill="none" stroke="#1B1A17" stroke-width="1.5"/>');
+    let tx=hx+8; if(tx>w-pad.r-96) tx=hx-96;
+    P.push('<rect x="'+num(tx)+'" y="'+(pad.t+2)+'" width="90" height="32" rx="3" fill="#1B1A17" opacity="0.92"/>');
+    P.push('<text x="'+num(tx+7)+'" y="'+(pad.t+16)+'" fill="#fff" font-size="10.5" font-family="monospace">month '+monOf(d).toFixed(1)+'</text>');
+    P.push('<text x="'+num(tx+7)+'" y="'+(pad.t+29)+'" fill="#fff" font-size="10.5" font-family="monospace">share '+pct(PATH[d])+'</text>');
+  }
+  // current marker (today / Play) + guides + big label
   const cx=PX(S.day), cy=PY(PATH[S.day]);
-  P.push('<line x1="'+num(cx)+'" y1="'+num(cy)+'" x2="'+num(cx)+'" y2="'+(h-pad.b)+'" stroke="#967756" stroke-dasharray="2 3"/>');
-  P.push('<line x1="'+pad.l+'" y1="'+num(cy)+'" x2="'+num(cx)+'" y2="'+num(cy)+'" stroke="#967756" stroke-dasharray="2 3"/>');
-  P.push('<circle cx="'+num(cx)+'" cy="'+num(cy)+'" r="6.5" fill="#967756" stroke="#fff" stroke-width="2"/>');
-  P.push('<text x="'+num(clamp(cx,pad.l+2,w-pad.r-44))+'" y="'+num(cy-12)+'" fill="#1B1A17" font-size="12" font-weight="700" font-family="monospace">'+pct(PATH[S.day])+'</text>');
+  P.push('<line x1="'+num(cx)+'" y1="'+num(cy)+'" x2="'+num(cx)+'" y2="'+num(base)+'" stroke="'+col+'" stroke-dasharray="2 3"/>');
+  P.push('<circle cx="'+num(cx)+'" cy="'+num(cy)+'" r="7" fill="'+col+'" stroke="#fff" stroke-width="2.5"/>');
+  P.push('<text x="'+num(clamp(cx,pad.l+2,w-pad.r-46))+'" y="'+num(cy-13)+'" fill="'+col+'" font-size="13" font-weight="700" font-family="monospace">'+pct(PATH[S.day])+'</text>');
   el.innerHTML=P.join('');
 }
 
@@ -121,9 +141,9 @@ function render(){
     box('Share in 12 months',pct(end));
   const gap=S.u-S.tu;
   let why;
-  if(Math.abs(gap)<0.02) why='Utilization is right at its <b>'+pct(S.tu)+'</b> target, so the share barely moves. It holds near <b>'+pct(S.s0)+'</b>.';
-  else if(gap<0) why='Utilization (<b>'+pct(S.u)+'</b>) is below the <b>'+pct(S.tu)+'</b> target, so the share <b>falls</b> over the year, from <b>'+pct(S.s0)+'</b> toward <b>'+pct(end)+'</b>. The wider the gap, the faster it falls.';
-  else why='Utilization (<b>'+pct(S.u)+'</b>) is above the <b>'+pct(S.tu)+'</b> target, so the share <b>rises</b> over the year, from <b>'+pct(S.s0)+'</b> toward <b>'+pct(end)+'</b>.';
+  if(Math.abs(gap)<0.02) why='Utilization is right at the <b>'+pct(S.tu)+'</b> target, so the share barely moves. It holds near <b>'+pct(S.s0)+'</b>.';
+  else if(gap<0) why='Utilization (<b>'+pct(S.u)+'</b>) is below the <b>'+pct(S.tu)+'</b> target, so the share <b>falls</b> over the year, from <b>'+pct(S.s0)+'</b> toward <b>'+pct(end)+'</b>. It falls faster when the gap is bigger or the re-rating speed is higher.';
+  else why='Utilization (<b>'+pct(S.u)+'</b>) is above the <b>'+pct(S.tu)+'</b> target, so the share <b>rises</b> over the year, from <b>'+pct(S.s0)+'</b> toward <b>'+pct(end)+'</b>, up to its <b>'+pct(CAP)+'</b> ceiling. It rises faster when the gap is bigger or the re-rating speed is higher.';
   document.getElementById('why').innerHTML=why;
   draw();
 }
@@ -131,8 +151,9 @@ function render(){
 function bind(id,valId,set){ const s=document.getElementById(id), v=document.getElementById(valId);
   s.addEventListener('input',()=>{ set(+s.value); v.textContent=(+s.value)+'%'; render(); }); }
 bind('ps0','ps0v',x=>S.s0=x/100);
-bind('ptu','ptuv',x=>S.tu=x/100);
 bind('pu','puv',x=>S.u=x/100);
+const spEl=document.getElementById('psp'), spV=document.getElementById('pspv');
+spEl.addEventListener('input',()=>{ S.speed=+spEl.value; spV.textContent=(+spEl.value).toFixed(1)+'/yr'; render(); });
 
 const monEl=document.getElementById('mon'), monLabel=document.getElementById('monLabel');
 function setMon(d){ S.day=clamp(Math.round(d),0,H); monEl.value=S.day; monLabel.textContent='month '+monOf(S.day).toFixed(1); }
@@ -145,6 +166,12 @@ function play(){ if(S.day>=H) setMon(0); playBtn.textContent='Pause'; playBtn.cl
   raf=requestAnimationFrame(step);
 }
 playBtn.addEventListener('click',()=>{ if(raf) stop(); else play(); });
+
+/* hover on chart */
+const chartEl=document.getElementById('chart');
+chartEl.addEventListener('mousemove',e=>{ const r=chartEl.getBoundingClientRect(), vbW=chartEl.viewBox.baseVal.width||r.width, sx=vbW/r.width, mx=(e.clientX-r.left)*sx;
+  const pad={l:46,r:52}; S.hover=Math.round(clamp((mx-pad.l)/(vbW-pad.l-pad.r),0,1)*H); draw(); });
+chartEl.addEventListener('mouseleave',()=>{ S.hover=null; draw(); });
 
 window.addEventListener('resize',render);
 playBtn.classList.add('paused'); setMon(0); render();
