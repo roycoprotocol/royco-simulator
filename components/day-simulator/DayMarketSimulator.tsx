@@ -852,6 +852,8 @@ function GuidedObservationSteps({
   days: number;
   generalizeObservation?: boolean;
 }) {
+  const recoveryObservationEndX = 72 + ((23 - 15) / (23 - 10)) * (95 - 72);
+  const finalizationObservationEndX = 184;
   const steps = [
     {
       number: '1',
@@ -888,8 +890,8 @@ function GuidedObservationSteps({
         : "Recovery restores Junior first. If the window ends before recovery, Junior's covered loss becomes permanent.",
       art: (
         <svg aria-hidden="true" className="mt-3 w-full" viewBox="0 0 210 54">
-          <rect x="5" y="2" width="90" height="48" fill={C.obsFill} fillOpacity="0.32" />
-          <rect x="116" y="2" width="89" height="48" fill={C.obsFill} fillOpacity="0.32" />
+          <rect x="5" y="2" width={recoveryObservationEndX - 5} height="48" fill={C.obsFill} fillOpacity="0.32" />
+          <rect x="116" y="2" width={finalizationObservationEndX - 116} height="48" fill={C.obsFill} fillOpacity="0.32" />
           <line x1="5" x2="95" y1="15" y2="15" stroke={C.kpiLabel} strokeDasharray="4 4" />
           <polyline points="5,15 28,18 49,34 72,23 95,10" fill="none" stroke={C.olive} strokeWidth="2" />
           <text x="105" y="30" fill={C.kpiLabel} fontFamily={MONO} fontSize="9" textAnchor="middle">OR</text>

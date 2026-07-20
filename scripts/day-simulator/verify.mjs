@@ -110,8 +110,10 @@ for (const contract of [
 }
 for (const geometryContract of [
   '<line x1={boundaryX} y1={boundaryY - 3} x2={boundaryX}',
-  '<rect x="5" y="2" width="90" height="48" fill={C.obsFill}',
-  '<rect x="116" y="2" width="89" height="48" fill={C.obsFill}',
+  'const recoveryObservationEndX = 72 + ((23 - 15) / (23 - 10)) * (95 - 72)',
+  'const finalizationObservationEndX = 184',
+  'width={recoveryObservationEndX - 5}',
+  'width={finalizationObservationEndX - 116}',
 ]) {
   if (!simulator.includes(geometryContract)) {
     failures.push(`Day simulator missing locked shared-diagram geometry: ${geometryContract}`);
