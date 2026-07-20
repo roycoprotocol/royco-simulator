@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Yield Share vs Utilization</title>
+<style>
+:root{--sen:#8E7355;--jun:#1B1A17;--ink:#171511;--mut:#6D6860;--line:#E8E2D8;--bg:#FBFAF7;--panel:#FFFDF9;--accent:#967756;--green:#319C61;--red:#8F4D42}
+*{box-sizing:border-box}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--ink);
+background-color:var(--bg);background-image:linear-gradient(rgba(150,119,86,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(150,119,86,.05) 1px,transparent 1px);
+background-size:42px 42px;font-size:14px;line-height:1.45;border-top:6px solid #11100E}
+.wrap{max-width:1080px;margin:0 auto;padding:20px 20px 60px}
+.topline{display:flex;align-items:center;gap:9px;color:var(--accent);font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.26em;margin-bottom:8px}
+.topline span{width:7px;height:7px;border-radius:50%;background:var(--green);display:inline-block}
+h1{font-family:Georgia,"Times New Roman",serif;font-weight:400;font-size:clamp(30px,3.6vw,44px);line-height:1.02;letter-spacing:-.02em;margin:0 0 8px}
+.lede{color:var(--mut);font-size:15px;max-width:680px;margin:0 0 12px}
+.oneline{background:rgba(150,119,86,.07);border-left:3px solid var(--accent);padding:11px 15px;font-size:15px;color:var(--ink);max-width:700px;margin:0 0 6px}
+.oneline b{font-weight:600}
+.card{background:var(--panel);border:1px solid var(--line);padding:16px;margin-top:16px;box-shadow:0 22px 50px rgba(60,45,28,.05)}
+.eyebrow{font-size:9.5px;text-transform:uppercase;letter-spacing:.22em;color:var(--accent);font-weight:700;margin-bottom:8px}
+.controlGroup{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px}
+.controlGroup>span{font-size:10.5px;text-transform:uppercase;letter-spacing:.2em;color:var(--accent);font-weight:700}
+.seg{display:inline-flex;border:1px solid var(--line);background:rgba(255,253,249,.75)}
+.seg button{border:0;border-left:1px solid var(--line);background:transparent;padding:9px 14px;font-weight:500;font-size:11px;color:var(--mut);cursor:pointer;text-transform:uppercase;letter-spacing:.06em}
+.seg button:first-child{border-left:0}
+.seg button.on{background:var(--panel);color:var(--ink);box-shadow:inset 0 -2px 0 var(--accent)}
+.hint{color:var(--mut);font-size:12px;line-height:1.4;margin:0 0 10px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+@media(max-width:760px){.grid2{grid-template-columns:1fr}}
+.chartTitle{font-family:Georgia,serif;font-size:16px;margin:0 0 2px}
+.chartSub{color:var(--mut);font-size:11.5px;margin:0 0 8px}
+.chartbox{position:relative;height:280px;width:100%}
+.chartbox svg{width:100%;height:100%;display:block}
+.legend{display:flex;flex-wrap:wrap;gap:12px;font-size:11.5px;margin:8px 2px 0}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.sw{width:16px;height:2px;display:inline-block}
+.stat{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-top:14px}
+.box{border:1px solid var(--line);background:rgba(255,253,249,.78);padding:9px 11px}
+.box .t{font-size:9px;color:#A49B90;text-transform:uppercase;letter-spacing:.14em;font-weight:700}
+.box .v{font-size:20px;font-weight:600;font-variant-numeric:tabular-nums;margin-top:2px;font-family:"SFMono-Regular",Consolas,monospace;letter-spacing:-.04em}
+.foot{margin-top:22px;color:var(--mut);font-size:11.5px;border-top:1px solid var(--line);padding-top:12px;max-width:760px}
+</style></head><body>
+<div class="wrap">
+<div class="topline"><span></span>Royco · Dawn Market Design</div>
+<h1>Yield Share vs Utilization</h1>
+<p class="lede">How much of the Senior's yield the Junior earns depends on how used the Junior's cushion is. This shows the curve, and how the Junior's share moves as utilization changes over time.</p>
+<div class="oneline">In one line: the more the market's safety cushion gets used, the bigger the slice of yield the Junior earns for taking that risk.</div>
+
+<div class="card">
+  <div class="controlGroup">
+    <span>Utilization path</span>
+    <div class="seg" id="scen">
+      <button data-s="stable" class="on">Stable</button>
+      <button data-s="rising">Rising</button>
+      <button data-s="spike">Spike</button>
+    </div>
+    <span style="margin-left:8px">Yield rule</span>
+    <div class="seg" id="mode">
+      <button data-m="static" class="on">Fixed</button>
+      <button data-m="adaptive">Self-adjusting</button>
+    </div>
+  </div>
+  <p class="hint" id="scenHint">Stable: utilization sits at the 90% target and stays there, so the Junior's share holds steady.</p>
+  <p class="hint" id="modeHint">Fixed rule: the curve never moves. The Junior's share changes only because utilization slides along it.</p>
+  <div class="stat" id="stat"></div>
+  <div class="grid2" style="margin-top:16px">
+    <div>
+      <div class="chartTitle">The curve: share vs utilization</div>
+      <div class="chartSub">More utilization, bigger Junior share. The dot is where the market is now.</div>
+      <div class="chartbox"><svg id="curve" xmlns="http://www.w3.org/2000/svg"></svg></div>
+    </div>
+    <div>
+      <div class="chartTitle">Over time</div>
+      <div class="chartSub">Utilization drives the Junior's yield share day by day.</div>
+      <div class="chartbox"><svg id="time" xmlns="http://www.w3.org/2000/svg"></svg></div>
+      <div class="legend"><span><span class="sw" style="background:var(--accent)"></span>Utilization</span><span><span class="sw" style="background:var(--jun)"></span>Junior yield share</span></div>
+    </div>
+  </div>
+</div>
+
+<div class="foot">Illustrative model of Royco's Yield Distribution Mechanism (YDM). The curve maps utilization to the share of Senior yield paid to the Junior, through anchors at 0%, the 90% target, and 100%. The self-adjusting rule drifts the target share over time toward wherever utilization pushes it. Not investment advice.</div>
+</div>
+
+<script>
+/* Real Royco YDM math (ported from lib/day/engine/ydm.ts) */
+const YEAR_SEC=365*24*60*60;
+const clamp=(x,lo,hi)=>Math.max(lo,Math.min(hi,x));
+function ydmShare(y0,yTarget,y100,U,targetUtil){
+  const FD=yTarget-y0, FP=y100-yTarget, u=U>1?1:U;
+  let delta = u>=targetUtil ? (u-targetUtil)/(1-targetUtil) : (u-targetUtil)/targetUtil;
+  if(delta<-1) delta=-1;
+  const spread = delta<0?FD:FP;
+  return clamp(yTarget+delta*spread,0,1);
+}
+function adaptYTarget(yTarget,U,dtSec,targetUtil,speedPerYear,minYT,maxYT){
+  const u=U>1?1:U;
+  let delta = u>=targetUtil ? (u-targetUtil)/(1-targetUtil) : (u-targetUtil)/targetUtil;
+  delta=clamp(delta,-1,1);
+  const speed=(speedPerYear==null?2:speedPerYear)/YEAR_SEC;
+  return clamp(yTarget*Math.exp(speed*delta*dtSec), minYT==null?0.01:minYT, maxYT==null?0.9:maxYT);
+}
+
+/* Config (real defaults) */
+const CFG={y0:0.25,yTarget:0.35,y100:0.55,targetUtil:0.90,speed:2,minYT:0.01,maxYT:0.90};
+let SCEN='stable', MODE='static';
+const H=365, DAY=86400;
+
+function utilPath(scen){
+  const U=[];
+  for(let t=0;t<=H;t++){
+    let u;
+    if(scen==='stable') u=0.90;
+    else if(scen==='rising') u=0.55+(0.99-0.55)*(t/H);
+    else { // spike
+      u=0.72; const c=Math.round(H*0.5);
+      if(t>=c-18 && t<=c+18) u=0.72+(1.0-0.72)*(1-Math.abs(t-c)/18);
+    }
+    U.push(clamp(u,0,1));
+  }
+  return U;
+}
+function simulate(){
+  const U=utilPath(SCEN), share=[], yt=[]; let y=CFG.yTarget;
+  for(let t=0;t<=H;t++){
+    if(MODE==='adaptive' && t>0) y=adaptYTarget(y,U[t],DAY,CFG.targetUtil,CFG.speed,CFG.minYT,CFG.maxYT);
+    yt.push(y); share.push(ydmShare(CFG.y0,y,CFG.y100,U[t],CFG.targetUtil));
+  }
+  return {U,share,yt};
+}
+
+const num=x=>(Math.round(x*100)/100);
+function svgLine(pts){ return pts.map((p,i)=>(i?'L':'M')+num(p[0])+' '+num(p[1])).join(' '); }
+
+function drawCurve(sim){
+  const el=document.getElementById('curve'), box=el.parentElement, w=box.clientWidth||500, h=box.clientHeight||280;
+  el.setAttribute('viewBox','0 0 '+w+' '+h);
+  const pad={l:44,r:14,t:12,b:30}, PX=u=>pad.l+u*(w-pad.l-pad.r), PY=s=>pad.t+(1-s)*(h-pad.t-pad.b);
+  const yEnd=sim.yt[sim.yt.length-1], uNow=sim.U[sim.U.length-1], sNow=sim.share[sim.share.length-1];
+  const parts=['<rect x="0" y="0" width="'+w+'" height="'+h+'" fill="#fff"/>'];
+  for(let g=0;g<=100;g+=25){ const y=PY(g/100), x=PX(g/100);
+    parts.push('<line x1="'+pad.l+'" y1="'+num(y)+'" x2="'+(w-pad.r)+'" y2="'+num(y)+'" stroke="'+ '#EEE8DE'+'"/>');
+    parts.push('<text x="'+(pad.l-6)+'" y="'+num(y+3)+'" fill="#9E968A" font-size="10" text-anchor="end">'+g+'%</text>');
+    parts.push('<text x="'+num(x)+'" y="'+(h-10)+'" fill="#9E968A" font-size="10" text-anchor="middle">'+g+'%</text>');
+  }
+  parts.push('<text x="'+((pad.l+(w-pad.r))/2)+'" y="'+(h-1)+'" fill="#9E968A" font-size="10" text-anchor="middle">Utilization</text>');
+  // curve
+  const pts=[]; for(let i=0;i<=100;i++){ const u=i/100; pts.push([PX(u),PY(ydmShare(CFG.y0,yEnd,CFG.y100,u,CFG.targetUtil))]); }
+  parts.push('<path d="'+svgLine(pts)+'" fill="none" stroke="'+ '#1B1A17'+'" stroke-width="2.4"/>');
+  // kink marker (target util)
+  parts.push('<line x1="'+num(PX(CFG.targetUtil))+'" y1="'+pad.t+'" x2="'+num(PX(CFG.targetUtil))+'" y2="'+(h-pad.b)+'" stroke="#DED6CA" stroke-dasharray="3 4"/>');
+  parts.push('<text x="'+num(PX(CFG.targetUtil))+'" y="'+(pad.t+10)+'" fill="#A49B90" font-size="9" text-anchor="middle">target 90%</text>');
+  // current point
+  parts.push('<circle cx="'+num(PX(uNow))+'" cy="'+num(PY(sNow))+'" r="6" fill="'+ '#967756'+'" stroke="#fff" stroke-width="2"/>');
+  el.innerHTML=parts.join('');
+}
+function drawTime(sim){
+  const el=document.getElementById('time'), box=el.parentElement, w=box.clientWidth||500, h=box.clientHeight||280;
+  el.setAttribute('viewBox','0 0 '+w+' '+h);
+  const pad={l:40,r:14,t:12,b:24}, PX=t=>pad.l+t/H*(w-pad.l-pad.r), PY=v=>pad.t+(1-v)*(h-pad.t-pad.b);
+  const parts=['<rect x="0" y="0" width="'+w+'" height="'+h+'" fill="#fff"/>'];
+  for(let g=0;g<=100;g+=25){ const y=PY(g/100); parts.push('<line x1="'+pad.l+'" y1="'+num(y)+'" x2="'+(w-pad.r)+'" y2="'+num(y)+'" stroke="#EEE8DE"/>'); parts.push('<text x="'+(pad.l-6)+'" y="'+num(y+3)+'" fill="#9E968A" font-size="10" text-anchor="end">'+g+'%</text>'); }
+  const uPts=sim.U.map((u,t)=>[PX(t),PY(u)]), sPts=sim.share.map((s,t)=>[PX(t),PY(s)]);
+  parts.push('<path d="'+svgLine(uPts)+'" fill="none" stroke="'+ '#967756'+'" stroke-width="2"/>');
+  parts.push('<path d="'+svgLine(sPts)+'" fill="none" stroke="'+ '#1B1A17'+'" stroke-width="2.4"/>');
+  parts.push('<text x="'+pad.l+'" y="'+(h-6)+'" fill="#9E968A" font-size="10">day 0</text>');
+  parts.push('<text x="'+(w-pad.r)+'" y="'+(h-6)+'" fill="#9E968A" font-size="10" text-anchor="end">day 365</text>');
+  el.innerHTML=parts.join('');
+}
+function render(){
+  const sim=simulate();
+  const uNow=sim.U[sim.U.length-1], sNow=sim.share[sim.share.length-1], sStart=sim.share[0];
+  const box=(t,v)=>'<div class="box"><div class="t">'+t+'</div><div class="v">'+v+'</div></div>';
+  document.getElementById('stat').innerHTML=
+    box('Utilization now',(uNow*100).toFixed(0)+'%')+
+    box('Junior share at start',(sStart*100).toFixed(0)+'%')+
+    box('Junior share now',(sNow*100).toFixed(0)+'%');
+  drawCurve(sim); drawTime(sim);
+}
+const SCEN_HINT={
+  stable:'Stable: utilization sits at the 90% target and stays there, so the Junior share holds steady.',
+  rising:'Rising: the market fills up over the year, so utilization climbs and the Junior share grows with it.',
+  spike:'Spike: a calm market gets a sudden surge of demand mid-year, then settles back down.'
+};
+document.querySelectorAll('#scen button').forEach(b=>b.addEventListener('click',()=>{ SCEN=b.dataset.s; document.querySelectorAll('#scen button').forEach(x=>x.classList.toggle('on',x===b));
+  document.getElementById('scenHint').textContent=SCEN_HINT[SCEN]; render(); }));
+document.querySelectorAll('#mode button').forEach(b=>b.addEventListener('click',()=>{ MODE=b.dataset.m; document.querySelectorAll('#mode button').forEach(x=>x.classList.toggle('on',x===b));
+  document.getElementById('modeHint').textContent = MODE==='adaptive' ? 'Self-adjusting rule: the curve itself drifts over time toward wherever utilization is pushing it, so the target share moves too.' : 'Fixed rule: the curve never moves. The Junior share changes only because utilization slides along it.';
+  render(); }));
+window.addEventListener('resize',render);
+render();
+</script></body></html>
