@@ -825,7 +825,9 @@ function GuidedObservationSteps({
     {
       number: '3',
       title: 'Recover or finalize',
-      body: "Recovery restores Junior first. If the window ends before recovery, Junior's covered loss becomes permanent.",
+      body: generalizeObservation
+        ? "A full recovery restores Junior. If the window ends before full recovery, Junior's covered loss becomes permanent."
+        : "Recovery restores Junior first. If the window ends before recovery, Junior's covered loss becomes permanent.",
       art: (
         <svg aria-hidden="true" className="mt-3 w-full" viewBox="0 0 210 54">
           <line x1="5" x2="95" y1="15" y2="15" stroke={C.kpiLabel} strokeDasharray="4 4" />
@@ -1805,7 +1807,7 @@ export default function DayMarketSimulator({
         </div>
 
         <div style={{ ...cardStyle, padding: 14 }}>
-          {isExecutive ? <Eyebrow>If the investment loses money</Eyebrow> : <Eyebrow>Coverage</Eyebrow>}
+          {isExecutive ? <Eyebrow>Loss waterfall</Eyebrow> : <Eyebrow>Coverage</Eyebrow>}
           {isExecutive && (
             <>
               <h2 className="mt-2" style={{ color: C.text, fontFamily: SERIF, fontSize: 22, fontWeight: 400, lineHeight: 1.12 }}>
@@ -1848,7 +1850,7 @@ export default function DayMarketSimulator({
             </h2>
             <p className="mt-1" style={{ color: C.muted, fontSize: 12.5, lineHeight: 1.38 }}>
               {isExecutive
-                ? 'The same accountant-backed chart shows each position, every observation period, and any loss that becomes permanent.'
+                ? 'This accountant-backed chart shows each position, every observation period, and any loss that becomes permanent.'
                 : isGuided
                 ? 'Use the chart to see when Junior coverage is active, when a loss can still recover, and when it becomes permanent.'
                 : LOCKED_COPY.reviewDescription}
