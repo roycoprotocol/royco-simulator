@@ -15,7 +15,7 @@ import {
   usePlotArea,
 } from 'recharts';
 
-import { Sim, defaultConfig } from '@/lib/day/engine/runner';
+import { Sim } from '@/lib/day/engine/runner';
 import { MarketState } from '@/lib/day/engine/types';
 import { DAY_LOCKED_COPY } from '@/lib/day-simulator-template/locked-copy';
 import { LOCKED_COPY } from '@/lib/simulator-template/locked-copy';
@@ -29,12 +29,17 @@ import type {
   DayMarketManifest,
   DaySeriesPoint,
 } from '@/lib/day-simulator-template/market';
+import { dayMarketFromManifest } from '@/lib/day-simulator-template/market';
 import {
   buildDayErasureEvent,
   type DayErasureEvent,
 } from '@/lib/day-simulator-template/erasure';
 import { calibrateSeriesApy } from '@/lib/day-simulator-template/series';
 import { shouldRefillJunior } from '@/lib/day-simulator-template/refill';
+import {
+  buildDayInitialBalances,
+  buildDayMarketConfig,
+} from '@/lib/day-simulator-template/runtime';
 import { DayTimeframeBrush } from '@/components/day-simulator/DayTimeframeBrush';
 
 const ResponsiveContainerNoSSR = dynamic(
@@ -98,11 +103,14 @@ type DaySeniorLossEvent = {
 const FALLBACK_MANIFEST: DayMarketManifest = {
   id: 'day',
   route: '/day-sim',
-  copy: {
-    eyebrow: DAY_LOCKED_COPY.eyebrow,
-    title: DAY_LOCKED_COPY.title,
-    description: DAY_LOCKED_COPY.description,
-    disclosure: DAY_LOCKED_COPY.disclosure,
+  identity: {
+    marketName: 'Royco Day',
+    displayAssetName: 'Template strategy',
+    underlyingAsset: 'the template strategy',
+    seniorName: 'Senior',
+    seniorSymbol: 'ST',
+    juniorName: 'Junior',
+    juniorSymbol: 'JT',
   },
   defaults: {
     sourceApy: 0.12,
@@ -129,9 +137,21 @@ const FALLBACK_MANIFEST: DayMarketManifest = {
     initialJT: 10_000_000,
     initialLT: 6_000_000,
   },
+  targets: {
+    seniorApyMin: 0,
+    seniorApyMax: 1,
+    juniorApyMin: 0,
+    juniorApyMax: 10,
+  },
+  certification: {
+    intakeConfirmed: true,
+    templateExceptions: [],
+  },
   provenance: {
     source: 'Deterministic one-year template path',
     sourceUrl: 'https://github.com/roycoprotocol/dawn-simulator',
+    sourceProvider: 'Royco',
+    dataCadence: 'monthly',
     priceType: 'nav',
     feesIncluded: true,
     observationCount: 13,
@@ -145,10 +165,7 @@ const FALLBACK_SERIES: DaySeriesPoint[] = Array.from({ length: 13 }, (_, index) 
   price: Math.pow(1.12, index / 12),
 }));
 
-const FALLBACK_MARKET: DayMarket = {
-  ...FALLBACK_MANIFEST,
-  series: FALLBACK_SERIES,
-};
+const FALLBACK_MARKET: DayMarket = dayMarketFromManifest(FALLBACK_MANIFEST, FALLBACK_SERIES);
 
 const cardStyle = {
   background: C.cardBg,
@@ -957,11 +974,6 @@ export default function DayMarketSimulator({
   const [riskSharePct, setRiskSharePct] = useState(defaults.riskYDM.yTarget * 100);
   const [liqSharePct, setLiqSharePct] = useState(defaults.liqYDM.yTarget * 100);
   const [observationDays, setObservationDays] = useState(defaults.observationDays);
-  const riskFullPct = defaults.riskYDM.y100 * 100;
-  const exitBufferPct = defaults.exitBufferPct;
-  const seniorDeposit = defaults.initialST;
-  const manualJuniorDeposit = defaults.initialJT;
-  const linkJuniorToFirstLoss = defaults.linkJuniorToFirstLoss;
   const [maintainCoverage, setMaintainCoverage] = useState(defaults.maintainCoverage);
   const [range, setRange] = useState<IndexRange>({
     a: 0,
@@ -1000,43 +1012,15 @@ export default function DayMarketSimulator({
     const run = (series: DaySeriesPoint[]) => {
     const coverage = coveragePct / 100;
     const minLiquidity = minLiquidityPct / 100;
-    const ltRatio = minLiquidity / 0.9;
-    const jtRatio = coverage / Math.max(0.9 - coverage, 0.001);
-    const initial = {
-      st: seniorDeposit,
-      jt: linkJuniorToFirstLoss ? seniorDeposit * jtRatio : manualJuniorDeposit,
-      lt: seniorDeposit * ltRatio,
-    };
     const riskTarget = riskSharePct / 100;
     const liqTarget = liqSharePct / 100;
-    const cfg = defaultConfig({
+    const initial = buildDayInitialBalances(defaults, { coverage, minLiquidity });
+    const cfg = buildDayMarketConfig(defaults, {
       coverage,
-      beta: 1,
       minLiquidity,
-      riskYDM: {
-        ...defaults.riskYDM,
-        y0: Math.min(defaults.riskYDM.y0, riskTarget),
-        yTarget: riskTarget,
-        y100: Math.max(riskFullPct / 100, riskTarget),
-      },
-      liqYDM: {
-        ...defaults.liqYDM,
-        y0: Math.min(defaults.liqYDM.y0, liqTarget),
-        yTarget: liqTarget,
-        y100: Math.max(defaults.liqYDM.y100, liqTarget),
-      },
-      fixedTermDurationSec: observationDays * DAY,
-      liquidationUtilization: 100 / Math.max(exitBufferPct, 0.01),
-      stSelfLiquidationBonus: defaults.selfLiquidationBonus,
-      stProtocolFee: defaults.stProtocolFee,
-      jtProtocolFee: defaults.jtProtocolFee,
-      yieldShareProtocolFee: defaults.jtYieldShareProtocolFee,
-      ltYieldShareProtocolFee: defaults.ltYieldShareProtocolFee,
-      stableYield: defaults.stableYield,
-      swapFeeBps: defaults.swapFeeBps,
-      poolTurnoverPerYear: defaults.poolTurnoverPerYear,
-      eclpBandWidth: defaults.eclpBandWidth,
-      reinvestLiquidityPremium: defaults.reinvestLiquidityPremium,
+      observationDays,
+      riskYieldShare: riskTarget,
+      liquidityYieldShare: liqTarget,
     });
     const sim = new Sim(cfg, initial);
     const snapshots = [sim.last()];
@@ -1271,17 +1255,12 @@ export default function DayMarketSimulator({
   }, [
     coveragePct,
     defaults,
-    exitBufferPct,
-    linkJuniorToFirstLoss,
     liqSharePct,
     maintainCoverage,
-    manualJuniorDeposit,
     modeledSeries,
     minLiquidityPct,
     observationDays,
-    riskFullPct,
     riskSharePct,
-    seniorDeposit,
     view,
     viewRange,
     maxIndex,
@@ -1521,7 +1500,7 @@ export default function DayMarketSimulator({
           <div className="mt-3 grid grid-cols-1 md:grid-cols-[1fr_56px_1fr]" style={{ alignItems: 'center', gap: 8 }}>
             <div style={{ background: `${C.strategyLine}12`, border: `1px solid ${C.border}`, padding: 12 }}>
               <p style={{ color: C.kpiLabel, fontFamily: MONO, fontSize: 9.5, letterSpacing: '0.1em', textTransform: 'uppercase' }}>Underlying opportunity</p>
-              <p className="mt-1" style={{ color: C.strategyLine, fontFamily: SERIF, fontSize: 18 }}>FalconX base yield</p>
+              <p className="mt-1" style={{ color: C.strategyLine, fontFamily: SERIF, fontSize: 18 }}>{activeMarket.identity.displayAssetName} base yield</p>
             </div>
             <div className="hidden items-center justify-center md:flex" aria-hidden="true" style={{ color: C.faint, fontFamily: MONO, fontSize: 20 }}>→</div>
             <div className="grid grid-cols-1 sm:grid-cols-2" style={{ gap: 8 }}>

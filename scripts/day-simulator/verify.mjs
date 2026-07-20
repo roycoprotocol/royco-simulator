@@ -1,6 +1,7 @@
 import { access, readFile, readdir } from "node:fs/promises";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
+import { createHash } from "node:crypto";
 
 const root = process.cwd();
 const marketId = process.argv[2];
@@ -17,9 +18,14 @@ const requiredFiles = [
   "lib/day-simulator-template/explainer.ts",
   "lib/day-simulator-template/explainer.test.ts",
   "lib/day-simulator-template/series.ts",
+  "lib/day-simulator-template/runtime.ts",
   "lib/day/engine/engine.ts",
   "lib/day/engine/runner.ts",
   "lib/day/engine/engine.test.ts",
+  "scripts/day-simulator/create.mjs",
+  "scripts/day-simulator/calibrate.ts",
+  "scripts/day-simulator/factory.test.mjs",
+  "scripts/day-simulator/template-lock.json",
 ];
 
 for (const relativePath of requiredFiles) {
@@ -27,6 +33,17 @@ for (const relativePath of requiredFiles) {
     await access(path.join(root, relativePath));
   } catch {
     failures.push(`missing required file: ${relativePath}`);
+  }
+}
+
+const templateLock = JSON.parse(
+  await readFile(path.join(root, "scripts/day-simulator/template-lock.json"), "utf8"),
+);
+for (const [relativePath, expectedHash] of Object.entries(templateLock)) {
+  const contents = await readFile(path.join(root, relativePath));
+  const actualHash = createHash("sha256").update(contents).digest("hex");
+  if (actualHash !== expectedHash) {
+    failures.push(`locked Day template changed: ${relativePath}; market agents may not modify shared design or accounting files`);
   }
 }
 
@@ -44,6 +61,9 @@ if (!shell.includes("SimulatorPageShell")) {
 }
 if (!shell.includes("DayMarketSimulator")) {
   failures.push("Day page shell must render the Tenbin-styled Day market simulator");
+}
+if (!shell.includes("StrictDaySimulatorPageShell")) {
+  failures.push("Day page shell must export the strict executive template shell");
 }
 
 const simulator = await readFile(
@@ -196,11 +216,9 @@ for (const hiddenControl of [
 }
 for (const invariant of [
   'calibrateSeriesApy(activeMarket.series, sourceApyPct / 100)',
-  'fixedTermDurationSec: observationDays * DAY',
-  'liquidationUtilization: 100 / Math.max(exitBufferPct, 0.01)',
-  'const linkJuniorToFirstLoss = defaults.linkJuniorToFirstLoss',
+  'buildDayInitialBalances(defaults, { coverage, minLiquidity })',
+  'buildDayMarketConfig(defaults, {',
   'const [maintainCoverage, setMaintainCoverage] = useState(defaults.maintainCoverage)',
-  'stSelfLiquidationBonus: defaults.selfLiquidationBonus',
   "op: { type: 'jtDeposit', amount: refill }",
   'previousSnapshot.state === MarketState.FIXED_TERM',
   'postReturn.state === MarketState.PERPETUAL',
@@ -210,6 +228,23 @@ for (const invariant of [
   'buildDayExplainerMetrics(result.cfg, result.initial)',
 ]) {
   if (!simulator.includes(invariant)) failures.push(`Day simulator missing Dawn behavior invariant: ${invariant}`);
+}
+for (const strictExecutiveContract of [
+  "variant === 'executive'",
+  "'Make illiquid yield easier to own.'",
+  "'Royco Day gives Senior holders first-loss coverage and a dedicated exit pool. Junior and LP participants earn additional yield for providing those benefits.'",
+  '<Eyebrow>What Senior receives</Eyebrow>',
+  '<Eyebrow>One opportunity · three roles</Eyebrow>',
+  '<Eyebrow>Senior · yield and liquidity</Eyebrow>',
+  '<Eyebrow>Junior · first-loss capital</Eyebrow>',
+  '<Eyebrow>LP · dedicated liquidity</Eyebrow>',
+  '<Eyebrow>Loss waterfall</Eyebrow>',
+  "'This accountant-backed chart shows each position, every observation period, and any loss that becomes permanent.'",
+  'generalizeObservation',
+]) {
+  if (!simulator.includes(strictExecutiveContract)) {
+    failures.push(`strict Day business template contract missing: ${strictExecutiveContract}`);
+  }
 }
 for (const explainerContract of [
   'export const ARBITRAGE_REFERENCE_SLIPPAGE = 0.01',
@@ -340,141 +375,119 @@ if (marketId) {
   const marketDir = path.join(root, "lib", "day-markets", marketId);
   const marketPath = path.join(marketDir, "market.json");
   let market;
+  let marketText = "";
   try {
-    market = JSON.parse(await readFile(marketPath, "utf8"));
+    marketText = await readFile(marketPath, "utf8");
+    market = JSON.parse(marketText);
   } catch {
     failures.push(`missing or invalid Day market manifest: lib/day-markets/${marketId}/market.json`);
   }
 
   if (market) {
+    if (/REPLACE_WITH_|\bunknown\b|null/i.test(marketText)) {
+      failures.push("Day market intake is incomplete; placeholders, unknown values, and nulls are forbidden");
+    }
     if (market.id !== marketId) failures.push("Day market id does not match its folder");
-    if (market.route !== `/${marketId}-sim`) failures.push("Day market route must match /<market-id>-sim");
-    if (!(market.defaults?.minLiquidity > 0 && market.defaults.minLiquidity < 1)) {
-      failures.push("Day market LP ratio must be a fraction between 0 and 1");
+    if (!/^\/[a-z0-9]+(?:-[a-z0-9]+)*(?:\/[a-z0-9]+(?:-[a-z0-9]+)*)*$/.test(market.route ?? "")) {
+      failures.push("Day market route must be a lowercase absolute path");
     }
-    if (!(market.defaults?.sourceApy > -1 && Number.isFinite(market.defaults.sourceApy))) {
-      failures.push("Day market sourceApy must be finite and greater than -100%");
+    if (market.copy !== undefined || market.presets !== undefined) {
+      failures.push("Day markets may not override locked copy or add scenario presets");
     }
-    if (!(market.defaults?.observationDays >= 7 && market.defaults.observationDays <= 194)) {
-      failures.push("Day market observationDays must preserve the Dawn 7–194 day range");
+    for (const field of ["marketName", "displayAssetName", "underlyingAsset", "seniorName", "seniorSymbol", "juniorName", "juniorSymbol"]) {
+      if (typeof market.identity?.[field] !== "string" || !market.identity[field].trim()) {
+        failures.push(`Day market identity.${field} must be explicit`);
+      }
     }
-    if (!(market.defaults?.exitBufferPct >= 1 && market.defaults.exitBufferPct <= 99.91)) {
-      failures.push("Day market exitBufferPct must preserve the Dawn 1–99.91% range");
+    if (market.certification?.intakeConfirmed !== true) {
+      failures.push("Day market intake must be explicitly confirmed before certification");
     }
+    if (!Array.isArray(market.certification?.templateExceptions)) {
+      failures.push("Day market templateExceptions must be an array");
+    } else if (market.certification.templateExceptions.length > 0) {
+      failures.push("Strict Day markets cannot publish with template exceptions; revise the shared template separately");
+    }
+    for (const field of ["seniorApyMin", "seniorApyMax", "juniorApyMin", "juniorApyMax"]) {
+      if (!Number.isFinite(market.targets?.[field])) failures.push(`Day market targets.${field} must be explicit`);
+    }
+    if (market.targets?.seniorApyMin > market.targets?.seniorApyMax) failures.push("Senior APY target range is reversed");
+    if (market.targets?.juniorApyMin > market.targets?.juniorApyMax) failures.push("Junior APY target range is reversed");
+    if (!(market.defaults?.minLiquidity > 0 && market.defaults.minLiquidity < 1)) failures.push("Day market LP ratio must be a fraction between 0 and 1");
+    if (!(market.defaults?.coverage > 0 && market.defaults.coverage < 0.9)) failures.push("Day market coverage must be a fraction between 0 and 90%");
+    if (!(market.defaults?.sourceApy > -1 && Number.isFinite(market.defaults.sourceApy))) failures.push("Day market sourceApy must be finite and greater than -100%");
+    if (!(market.defaults?.observationDays >= 7 && market.defaults.observationDays <= 194)) failures.push("Day market observationDays must preserve the 7–194 day range");
+    if (!(market.defaults?.exitBufferPct >= 1 && market.defaults.exitBufferPct <= 99.91)) failures.push("Day market exitBufferPct must preserve the 1–99.91% range");
     for (const feeField of ["stProtocolFee", "jtProtocolFee", "jtYieldShareProtocolFee", "ltYieldShareProtocolFee"]) {
       const value = market.defaults?.[feeField];
-      if (!(Number.isFinite(value) && value >= 0 && value <= 1)) {
-        failures.push(`Day market ${feeField} must be explicit and within [0,1]`);
-      }
+      if (!(Number.isFinite(value) && value >= 0 && value <= 1)) failures.push(`Day market ${feeField} must be explicit and within [0,1]`);
     }
     for (const modelField of ["stableYield", "swapFeeBps", "poolTurnoverPerYear", "eclpBandWidth"]) {
-      if (!Number.isFinite(market.defaults?.[modelField])) {
-        failures.push(`Day market ${modelField} must be explicit`);
-      }
+      if (!Number.isFinite(market.defaults?.[modelField])) failures.push(`Day market ${modelField} must be explicit`);
     }
-    if (typeof market.defaults?.reinvestLiquidityPremium !== "boolean") {
-      failures.push("Day market reinvestLiquidityPremium must be explicit");
-    }
-    if (market.defaults?.linkJuniorToFirstLoss !== true) {
-      failures.push("Day market backend Junior sizing must be linked to coverage");
-    }
-    if (market.defaults?.maintainCoverage !== true) {
-      failures.push("Day market backend must explicitly enable Junior coverage replenishment");
-    }
-    const genesisCoverageUtilization =
-      (market.defaults.coverage * (market.defaults.initialST + market.defaults.initialJT)) /
-      market.defaults.initialJT;
-    if (Math.abs(genesisCoverageUtilization - 0.9) > 1e-9) {
-      failures.push("Day market linked Junior sizing must land exactly at 90% Dawn coverage utilization");
-    }
-    if (Math.abs(market.defaults.liquidationUtilization - 100 / market.defaults.exitBufferPct) > 1e-9) {
-      failures.push("Day market coverage-based exit utilization must derive from exitBufferPct");
-    }
-    if (market.presets !== undefined) {
-      failures.push("Day market manifests must use one editable default configuration, not scenario presets");
-    }
-    if (marketId === "pareto-falconx") {
-      if (Math.abs(market.defaults.minLiquidity - 0.15) > 1e-12) {
-        failures.push("Pareto FalconX Day minimum LP ratio must remain 15%");
-      }
-      if (
-        market.defaults.coverage !== 0.03 ||
-        market.defaults.riskYDM?.yTarget !== 0.06 ||
-        market.defaults.liqYDM?.yTarget !== 0.17 ||
-        market.defaults.minLiquidity !== 0.15 ||
-        market.defaults.observationDays !== 7 ||
-        market.defaults.riskYDM?.y100 !== 0.18 ||
-        market.defaults.exitBufferPct !== 1 ||
-        market.defaults.selfLiquidationBonus !== 0.01
-      ) {
-        failures.push("Pareto FalconX editable defaults and backend terms must retain the approved Balanced values");
-      }
-    }
+    if (typeof market.defaults?.reinvestLiquidityPremium !== "boolean") failures.push("Day market reinvestLiquidityPremium must be explicit");
+    if (market.defaults?.linkJuniorToFirstLoss !== true) failures.push("Day market Junior sizing must remain linked to coverage");
+    if (market.defaults?.maintainCoverage !== true) failures.push("Day market must explicitly enable Junior coverage replenishment");
+    const expectedJT = (market.defaults?.initialST * market.defaults?.coverage) / (0.9 - market.defaults?.coverage);
+    const expectedLT = (market.defaults?.initialST * market.defaults?.minLiquidity) / 0.9;
+    if (Math.abs(market.defaults?.initialJT - expectedJT) > 1e-9) failures.push("Day market initial Junior balance must be accountant-sized at 90% utilization");
+    if (Math.abs(market.defaults?.initialLT - expectedLT) > 1e-9) failures.push("Day market initial LP balance must be accountant-sized at 90% utilization");
+    if (Math.abs(market.defaults?.liquidationUtilization - 100 / market.defaults?.exitBufferPct) > 1e-9) failures.push("Day market exit utilization must derive from exitBufferPct");
     for (const curveName of ["riskYDM", "liqYDM"]) {
       const curve = market.defaults?.[curveName];
-      if (!curve || ![curve.y0, curve.yTarget, curve.y100].every(Number.isFinite)) {
-        failures.push(`${curveName} must provide finite y0, yTarget, and y100 anchors`);
-      } else if (!(curve.y0 <= curve.yTarget && curve.yTarget <= curve.y100)) {
-        failures.push(`${curveName} anchors must be monotonic`);
-      }
+      if (!curve || ![curve.y0, curve.yTarget, curve.y100].every(Number.isFinite)) failures.push(`${curveName} must provide finite y0, yTarget, and y100 anchors`);
+      else if (!(curve.y0 <= curve.yTarget && curve.yTarget <= curve.y100)) failures.push(`${curveName} anchors must be monotonic`);
     }
     for (const anchor of ["y0", "yTarget", "y100"]) {
       const total = market.defaults?.riskYDM?.[anchor] + market.defaults?.liqYDM?.[anchor];
       if (!Number.isFinite(total) || total > 1) failures.push(`combined ${anchor} premium shares must not exceed 100%`);
     }
-    if (market.targets) {
-      const sourceApy = market.defaults.sourceApy;
-      const coverage = market.defaults.coverage;
-      const jtSize = coverage / (0.9 - coverage);
-      const riskShare = market.defaults.riskYDM.yTarget;
-      const liqShare = market.defaults.liqYDM.yTarget;
-      const seniorApy = sourceApy * (1 - riskShare - liqShare);
-      const juniorApy = sourceApy + (riskShare * sourceApy) / jtSize;
-      if (seniorApy < market.targets.seniorApyMin || seniorApy > market.targets.seniorApyMax) {
-        failures.push(`target Senior APY ${(seniorApy * 100).toFixed(2)}% is outside its market guardrail`);
-      }
-      if (juniorApy < market.targets.juniorApyMin || juniorApy > market.targets.juniorApyMax) {
-        failures.push(`target Junior APY ${(juniorApy * 100).toFixed(2)}% is outside its market guardrail`);
-      }
-      console.log(`${marketId} target Senior APY: ${(seniorApy * 100).toFixed(2)}%`);
-      console.log(`${marketId} target Junior APY: ${(juniorApy * 100).toFixed(2)}%`);
+    for (const field of ["source", "sourceUrl", "sourceProvider", "seriesPath", "dataCadence", "priceType", "feesIncluded", "observationCount", "firstDate", "lastDate"]) {
+      if (market.provenance?.[field] === undefined || market.provenance[field] === "") failures.push(`Day market provenance.${field} must be explicit`);
     }
-    if (!/^https?:\/\//.test(market.provenance?.sourceUrl ?? "")) {
-      failures.push("Day market sourceUrl must be a complete http(s) URL");
-    }
+    if (!/^https?:\/\//.test(market.provenance?.sourceUrl ?? "")) failures.push("Day market sourceUrl must be a complete http(s) URL");
+    const expectedSeriesPath = `lib/day-markets/${marketId}/series.json`;
+    if (market.provenance?.seriesPath !== expectedSeriesPath) failures.push(`Day market seriesPath must be ${expectedSeriesPath}`);
     if (market.provenance?.seriesPath) {
-      const sourceSeries = JSON.parse(
-        await readFile(path.join(root, market.provenance.seriesPath), "utf8"),
-      );
+      const sourceSeries = JSON.parse(await readFile(path.join(root, market.provenance.seriesPath), "utf8"));
       const first = sourceSeries[0];
-      const last = sourceSeries[sourceSeries.length - 1];
-      if (sourceSeries.length !== market.provenance.observationCount) {
-        failures.push("Day market observationCount does not match its source series");
-      }
-      if (first?.date !== market.provenance.firstDate || last?.date !== market.provenance.lastDate) {
-        failures.push("Day market provenance dates do not match its source series");
+      const last = sourceSeries.at(-1);
+      if (sourceSeries.length !== market.provenance.observationCount) failures.push("Day market observationCount does not match its series");
+      if (first?.date !== market.provenance.firstDate || last?.date !== market.provenance.lastDate) failures.push("Day market provenance dates do not match its series");
+      for (let index = 0; index < sourceSeries.length; index += 1) {
+        const point = sourceSeries[index];
+        if (!/^\d{4}-\d{2}-\d{2}$/.test(point?.date ?? "") || !(point?.price > 0)) failures.push(`invalid date/price at series row ${index + 1}`);
+        if (index > 0 && point.date <= sourceSeries[index - 1].date) failures.push(`series dates are not strictly increasing at row ${index + 1}`);
       }
       const elapsedDays = (Date.parse(last?.date) - Date.parse(first?.date)) / 86_400_000;
       const derivedApy = Math.pow(last?.price / first?.price, 365 / elapsedDays) - 1;
-      if (!Number.isFinite(derivedApy) || Math.abs(derivedApy - market.defaults.sourceApy) > 1e-12) {
-        failures.push("Day market sourceApy does not match the annualized source NAV series");
-      }
+      if (!Number.isFinite(derivedApy) || Math.abs(derivedApy - market.defaults.sourceApy) > 1e-12) failures.push("Day market sourceApy does not match its annualized source series");
     }
-    const marketFiles = await readdir(marketDir);
-    if (marketFiles.some((file) => file.endsWith(".css") || file.endsWith(".tsx"))) {
-      failures.push("Day market folders may not contain CSS or React components");
+    const marketFiles = (await readdir(marketDir)).sort();
+    const allowedFiles = ["market.json", "market.ts", "series.json"];
+    if (marketFiles.join("\n") !== allowedFiles.sort().join("\n")) failures.push("Day market folder must contain exactly market.json, market.ts, and series.json");
+    const marketModule = await readFile(path.join(marketDir, "market.ts"), "utf8");
+    for (const contract of ['import series from "./series.json"', "dayMarketFromManifest", "type DayMarketManifest"]) {
+      if (!marketModule.includes(contract)) failures.push(`Day market module must use factory contract: ${contract}`);
     }
-  }
+    if (marketModule.includes("defaultConfig") || marketModule.includes("function ") || marketModule.includes("<")) failures.push("Day market module may not contain accounting or UI logic");
 
-  const marketRoute = await readFile(path.join(root, "app", `${marketId}-sim`, "page.tsx"), "utf8");
-  if (!marketRoute.includes("DaySimulatorPageShell")) {
-    failures.push("Day market route must use the shared Day page shell");
-  }
-  if (
-    marketRoute.includes("@/components/simulator/MarketSimulator") ||
-    marketRoute.includes("@/components/simulator/SimulatorPageShell")
-  ) {
-    failures.push("Day market route must not use the Dawn simulator components");
+    const routePath = path.join(root, "app", ...market.route.slice(1).split("/"), "page.tsx");
+    let marketRoute = "";
+    try {
+      marketRoute = await readFile(routePath, "utf8");
+    } catch {
+      failures.push(`missing Day route: ${market.route}`);
+    }
+    if (!marketRoute.includes("StrictDaySimulatorPageShell") || !marketRoute.includes(`@/lib/day-markets/${marketId}/market`)) failures.push("Day route must be the generated strict shell wrapper");
+    if (marketRoute.includes("variant=") || marketRoute.includes("style=") || marketRoute.includes("className=")) failures.push("Day route may not override the strict template design");
+
+    if (marketId === "pareto-falconx" && (
+      market.route !== "/falconx-v3" ||
+      market.defaults.coverage !== 0.03 || market.defaults.minLiquidity !== 0.15 ||
+      market.defaults.riskYDM?.yTarget !== 0.06 || market.defaults.liqYDM?.yTarget !== 0.17 ||
+      market.defaults.observationDays !== 7 || market.defaults.riskYDM?.y100 !== 0.18 ||
+      market.defaults.exitBufferPct !== 1 || market.defaults.selfLiquidationBonus !== 0.01
+    )) failures.push("Pareto FalconX must retain the approved strict-template reference configuration");
   }
 }
 

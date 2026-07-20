@@ -1,4 +1,4 @@
-import { Sim, defaultConfig, steadyYear } from "../../lib/day/engine/runner";
+import { Sim, steadyYear } from "../../lib/day/engine/runner";
 import { DAY_TEMPLATE_MANIFEST } from "../../lib/day-simulator-template/manifest";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
@@ -7,6 +7,11 @@ import {
   annualizedSeriesApy,
   calibrateSeriesApy,
 } from "../../lib/day-simulator-template/series";
+import {
+  buildDayInitialBalances,
+  buildDayMarketConfig,
+  runDayTargetScenario,
+} from "../../lib/day-simulator-template/runtime";
 
 async function main() {
   const marketId = process.argv[2];
@@ -17,36 +22,40 @@ async function main() {
     ) as DayMarketManifest;
   }
 
-  const cfg = defaultConfig({
-  ...DAY_TEMPLATE_MANIFEST.defaults,
-  ...(market
-    ? {
-        coverage: market.defaults.coverage,
-        minLiquidity: market.defaults.minLiquidity,
-        fixedTermDurationSec: market.defaults.observationDays * 86_400,
-        liquidationUtilization: 100 / market.defaults.exitBufferPct,
-        riskYDM: market.defaults.riskYDM,
-        liqYDM: market.defaults.liqYDM,
-        stSelfLiquidationBonus: market.defaults.selfLiquidationBonus,
-        stProtocolFee: market.defaults.stProtocolFee,
-        jtProtocolFee: market.defaults.jtProtocolFee,
-        yieldShareProtocolFee: market.defaults.jtYieldShareProtocolFee,
-        ltYieldShareProtocolFee: market.defaults.ltYieldShareProtocolFee,
-        stableYield: market.defaults.stableYield,
-        swapFeeBps: market.defaults.swapFeeBps,
-        poolTurnoverPerYear: market.defaults.poolTurnoverPerYear,
-        eclpBandWidth: market.defaults.eclpBandWidth,
-        reinvestLiquidityPremium: market.defaults.reinvestLiquidityPremium,
-      }
-    : {}),
-  });
-  const initial = market
-  ? {
-      st: market.defaults.initialST,
-      jt: market.defaults.initialJT,
-      lt: market.defaults.initialLT,
-    }
-  : { st: 40_000_000, jt: 10_000_000, lt: 6_000_000 };
+  const runtimeDefaults = market?.defaults ?? {
+    sourceApy: 0.12,
+    coverage: DAY_TEMPLATE_MANIFEST.defaults.coverage,
+    minLiquidity: DAY_TEMPLATE_MANIFEST.defaults.minLiquidity,
+    liquidationUtilization: DAY_TEMPLATE_MANIFEST.defaults.liquidationUtilization,
+    observationDays: 30,
+    exitBufferPct: 66.67,
+    linkJuniorToFirstLoss: true,
+    maintainCoverage: true,
+    riskYDM: { mode: "static" as const, y0: 0.25, yTarget: 0.35, y100: 0.55 },
+    liqYDM: { mode: "static" as const, y0: 0.08, yTarget: 0.12, y100: 0.2 },
+    selfLiquidationBonus: 0.02,
+    stProtocolFee: 0,
+    jtProtocolFee: 0,
+    jtYieldShareProtocolFee: 0,
+    ltYieldShareProtocolFee: 0,
+    stableYield: 0.035,
+    swapFeeBps: 10,
+    poolTurnoverPerYear: 8,
+    eclpBandWidth: 0.1,
+    reinvestLiquidityPremium: true,
+    initialST: 40_000_000,
+    initialJT: 10_000_000,
+    initialLT: 6_000_000,
+  };
+  const terms = {
+    coverage: runtimeDefaults.coverage,
+    minLiquidity: runtimeDefaults.minLiquidity,
+    observationDays: runtimeDefaults.observationDays,
+    riskYieldShare: runtimeDefaults.riskYDM.yTarget,
+    liquidityYieldShare: runtimeDefaults.liqYDM.yTarget,
+  };
+  const cfg = buildDayMarketConfig(runtimeDefaults, terms);
+  const initial = buildDayInitialBalances(runtimeDefaults, terms);
   const sourceApy = market?.defaults.sourceApy ?? 0.12;
   if (market?.provenance.seriesPath) {
     const sourceSeries = JSON.parse(
@@ -97,6 +106,27 @@ async function main() {
   }
   if (market && cfg.liquidationUtilization !== 100 / market.defaults.exitBufferPct) {
     throw new Error("Day coverage-based exit threshold diverges from the Dawn exit-buffer rule");
+  }
+  if (market) {
+    const target = runDayTargetScenario(market.defaults);
+    if (
+      target.seniorApy < market.targets.seniorApyMin
+      || target.seniorApy > market.targets.seniorApyMax
+    ) {
+      throw new Error(
+        `Day accountant Senior APY ${(target.seniorApy * 100).toFixed(2)}% is outside the configured target range`,
+      );
+    }
+    if (
+      target.juniorApy < market.targets.juniorApyMin
+      || target.juniorApy > market.targets.juniorApyMax
+    ) {
+      throw new Error(
+        `Day accountant Junior APY ${(target.juniorApy * 100).toFixed(2)}% is outside the configured target range`,
+      );
+    }
+    console.log(`${market.id} accountant Senior APY: ${(target.seniorApy * 100).toFixed(2)}% PASS`);
+    console.log(`${market.id} accountant Junior APY: ${(target.juniorApy * 100).toFixed(2)}% PASS`);
   }
 
   console.log("Day runtime defaults: PASS");

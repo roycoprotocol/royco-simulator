@@ -4,6 +4,14 @@ import type { DayMarket } from "@/lib/day-simulator-template/market";
 
 export type DaySimulatorVariant = "standard" | "guided" | "executive";
 
+export function StrictDaySimulatorPageShell({ market }: { market: DayMarket }) {
+  return (
+    <SimulatorPageShell>
+      <DayMarketSimulator market={market} variant="executive" />
+    </SimulatorPageShell>
+  );
+}
+
 export default function DaySimulatorPageShell({
   market,
   variant = "standard",

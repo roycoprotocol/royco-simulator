@@ -20,11 +20,13 @@ Changes to `lib/try/engine.ts`, `lib/try/backtest.ts`, `components/simulator/`, 
 
 ## Day boundary
 
-1. Day accounting flows through `lib/day/engine`; never copy its formulas into UI or market files.
-2. Day UI and template work belongs in `components/day-simulator` and `lib/day-simulator-template`. Do not modify Dawn accounting or design files for a Day change.
-3. Day mechanism scenarios are not historical price/NAV backtests and must not be described as forecasts.
-4. Run `npm run day-sim:verify` and `npm run day-sim:certify` before requesting publication.
-5. Day invariant certification is not Solidity parity. Do not claim contract parity until authoritative golden vectors are present and pass.
-6. Public Day simulators must use the Dawn/Tenbin visual contract: `SimulatorPageShell`, the approved cream/brown/black/green palette, Georgia headings, system body text, SFMono numeric text, square cards, locked section order, and locked section headings. The legacy dark Day frontend is internal-only and may never be used for a public Day market.
-7. Day keeps Dawn accounting and chart behavior but exposes a deliberately compact public surface. Display six sliders—Base strategy APY, minimum coverage, minimum liquidity, Junior yield share, LP yield share, and observation-period duration—plus the Conservative/Balanced/Aggressive ladder and a plain-language Junior-refill checkbox. Protected exit, Junior sizing, curve endpoints, notional sizing, liquidation bonus, fees, and pool mechanics are backend market configuration. The overview contains exactly the three tranche-yield cards. Base-strategy and tranche returns appear in the month-over-month table beneath the full-detail chart. Retain the deploy handoff.
-8. Erasure annotations must consume the accountant's exact structured erased amount and the pre-refill Junior valuation. Never parse formatted event copy or size an erasure against a same-timestamp Junior refill. The synthetic expiry-with-refill regression must pass.
+1. A new Day market is a factory operation. Run `npm run day-sim:new`; then edit only `lib/day-markets/<market-id>/market.json`.
+2. Never edit shared Day components, styles, template files, scripts, the SHA-256 template lock, or `lib/day/engine` for market-specific work. Never add market-local React or CSS.
+3. Day accounting flows through `lib/day/engine` and `lib/day-simulator-template/runtime.ts`. Never copy formulas into UI, routes, market files, calibration, or reports.
+4. Every public Day route must use `StrictDaySimulatorPageShell`. It may not pass variants, classes, styles, copy, or custom children.
+5. Copy, fonts, colors, borders, spacing, section order, charts, diagrams, responsive behavior, and controls are the approved Pareto FalconX v3 template and are byte-locked. Market manifests may change only identity, asset-related text, provenance/data, targets, and defaults.
+6. Never guess provenance, price type, fee treatment, desired yield ranges, hidden parameters, or exceptions. Incomplete intake must remain `unknown` and fail verification.
+7. Calibrate with `npm run day-sim:calibrate -- <market-id>`; never calculate tranche outputs independently.
+8. Run `npm run day-sim:verify -- <market-id>` and `npm run day-sim:certify -- <market-id>` before requesting publication. Certification must pass all 74 Solidity vectors, tests, lint, and build.
+9. Do not create or merge a PR until verification and certification pass and the user approves the browser preview.
+10. Erasure annotations consume the accountant's structured erased amount and pre-refill Junior valuation. Never parse event copy or size erasure against a same-timestamp refill.
