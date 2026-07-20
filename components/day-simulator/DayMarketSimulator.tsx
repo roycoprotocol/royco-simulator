@@ -484,10 +484,10 @@ function FlowBox({
 
 function LiquidityExecutionDiagram({
   metrics,
-  protectLabels = false,
+  avoidLabelOverlap = false,
 }: {
   metrics: DayExplainerMetrics['liquidity'];
-  protectLabels?: boolean;
+  avoidLabelOverlap?: boolean;
 }) {
   const width = 520;
   const height = 400;
@@ -513,7 +513,44 @@ function LiquidityExecutionDiagram({
   const boundarySlippage = metrics.boundaryQuote.slippage * 100;
   const referenceSellPct = metrics.referenceSellShareOfSenior * 100;
   const boundarySellPct = metrics.boundarySellShareOfSenior * 100;
-  const curveLine = curve.map((point) => `${x(point.sellNAV)},${y(point.executionPrice)}`).join(' ');
+  const curvePixels = curve.map((point) => ({ x: x(point.sellNAV), y: y(point.executionPrice) }));
+  const curveLine = curvePixels.map((point) => `${point.x},${point.y}`).join(' ');
+  const segmentIntersectsRect = (
+    start: { x: number; y: number },
+    end: { x: number; y: number },
+    rect: { left: number; right: number; top: number; bottom: number },
+  ) => {
+    const segmentLeft = Math.max(Math.min(start.x, end.x), rect.left);
+    const segmentRight = Math.min(Math.max(start.x, end.x), rect.right);
+    if (segmentLeft > segmentRight) return false;
+    const yAt = (pointX: number) => {
+      if (start.x === end.x) return start.y;
+      return start.y + ((pointX - start.x) / (end.x - start.x)) * (end.y - start.y);
+    };
+    const segmentTop = Math.min(yAt(segmentLeft), yAt(segmentRight));
+    const segmentBottom = Math.max(yAt(segmentLeft), yAt(segmentRight));
+    return segmentBottom >= rect.top && segmentTop <= rect.bottom;
+  };
+  const labelY = (labelX: number, pointY: number, textWidth: number, anchor: 'start' | 'end') => {
+    if (!avoidLabelOverlap) return pointY - 13;
+    const left = anchor === 'start' ? labelX : labelX - textWidth;
+    const candidates = [pointY - 13, pointY - 34, pointY - 55, pointY + 28];
+    return candidates.find((candidate) => {
+      const rect = {
+        left: left - 4,
+        right: left + textWidth + 4,
+        top: candidate - 15,
+        bottom: candidate + 4,
+      };
+      if (rect.top < margin.top + 4 || rect.bottom > baseline - 4) return false;
+      return !curvePixels.some((point, index) =>
+        index > 0 && segmentIntersectsRect(curvePixels[index - 1], point, rect));
+    }) ?? Math.max(margin.top + 20, pointY - 34);
+  };
+  const referenceLabelX = referenceX + 12;
+  const boundaryLabelX = boundaryX - 10;
+  const referenceLabelY = labelY(referenceLabelX, referenceY, 104, 'start');
+  const boundaryLabelY = labelY(boundaryLabelX, boundaryY, 112, 'end');
   const arbitrageArea = [
     `${x(0)},${y(1)}`,
     `${boundaryX},${y(1)}`,
@@ -555,10 +592,9 @@ function LiquidityExecutionDiagram({
         <text x={margin.left + plotWidth} y={margin.top - 15} fill={C.olive} fontSize={13} fontWeight={600} textAnchor="end">
           Arbitrage incentive grows →
         </text>
-        {protectLabels && <rect x={referenceX + 6} y={referenceY - 31} width={112} height={22} fill={C.cardBg} />}
         <text
-          x={referenceX + 12}
-          y={referenceY - 13}
+          x={referenceLabelX}
+          y={referenceLabelY}
           fill={C.olive}
           fontFamily={MONO}
           fontSize={12.5}
@@ -566,8 +602,7 @@ function LiquidityExecutionDiagram({
         >
           {referenceSlippage.toFixed(1)}% slippage
         </text>
-        {protectLabels && <rect x={boundaryX - 130} y={boundaryY - 31} width={120} height={22} fill={C.cardBg} />}
-        <text x={boundaryX - 10} y={boundaryY - 13} fill={C.danger} fontFamily={MONO} fontSize={12.5} fontWeight={600} textAnchor="end">
+        <text x={boundaryLabelX} y={boundaryLabelY} fill={C.danger} fontFamily={MONO} fontSize={12.5} fontWeight={600} textAnchor="end">
           {boundarySlippage.toFixed(1)}% slippage
         </text>
         <text x={referenceX} y={height - 37} fill={C.olive} fontFamily={MONO} fontSize={13} fontWeight={600} textAnchor="middle">
@@ -1432,13 +1467,13 @@ export default function DayMarketSimulator({
           </p>
           <div className="mt-4 grid grid-cols-1 md:grid-cols-3" style={{ gap: 8 }}>
             <div style={{ background: C.pageBg, border: `1px solid ${C.seniorLine}`, minHeight: 178, padding: 14 }}>
-              <Eyebrow>Senior · steady yield</Eyebrow>
+              <Eyebrow>Senior · covered yield</Eyebrow>
               <p className="mt-3" style={{ color: C.accent, fontFamily: MONO, fontSize: 26, fontWeight: 700 }}>
                 {pct(result.seniorApy)}/yr
               </p>
-              <p className="mt-2" style={{ color: C.text, fontFamily: SERIF, fontSize: 18 }}>Owns the simpler position.</p>
+              <p className="mt-2" style={{ color: C.text, fontFamily: SERIF, fontSize: 18 }}>Gets coverage and liquidity.</p>
               <p className="mt-2" style={{ color: C.muted, fontSize: 11.5, lineHeight: 1.45 }}>
-                Keeps residual strategy yield after paying for first-loss coverage and dedicated exit liquidity.
+                Junior absorbs covered losses first, while the LP provides a dedicated path to exit before the underlying asset matures.
               </p>
             </div>
             <div style={{ background: C.pageBg, border: `1px solid ${C.juniorLine}`, minHeight: 178, padding: 14 }}>
@@ -1740,7 +1775,7 @@ export default function DayMarketSimulator({
               </p>
             </>
           )}
-          <LiquidityExecutionDiagram metrics={result.explainer.liquidity} protectLabels={isExecutive} />
+          <LiquidityExecutionDiagram metrics={result.explainer.liquidity} avoidLabelOverlap={isExecutive} />
           {(isGuided || isExecutive) && (
             <p style={{ color: C.muted, fontSize: 11.5, lineHeight: 1.45 }}>
               {isExecutive
