@@ -628,8 +628,8 @@ function LiquidityExecutionDiagram({
         <polyline points={curveLine} fill="none" stroke={C.seniorLine} strokeWidth={4} strokeLinejoin="round" strokeLinecap="round" />
         <line x1={referenceX} y1={referenceY - 3} x2={referenceX} y2={y(1) + 10} stroke={C.olive} strokeWidth={2} />
         <path d={`M ${referenceX - 5} ${y(1) + 17} L ${referenceX} ${y(1) + 9} L ${referenceX + 5} ${y(1) + 17}`} fill="none" stroke={C.olive} strokeWidth={2} />
-        <line x1={boundaryX - 6} y1={boundaryY - 3} x2={boundaryX - 6} y2={y(1) + 10} stroke={C.olive} strokeWidth={3} />
-        <path d={`M ${boundaryX - 12} ${y(1) + 19} L ${boundaryX - 6} ${y(1) + 9} L ${boundaryX} ${y(1) + 19}`} fill="none" stroke={C.olive} strokeWidth={3} />
+        <line x1={boundaryX} y1={boundaryY - 3} x2={boundaryX} y2={y(1) + 10} stroke={C.olive} strokeWidth={3} />
+        <path d={`M ${boundaryX - 6} ${y(1) + 19} L ${boundaryX} ${y(1) + 9} L ${boundaryX + 6} ${y(1) + 19}`} fill="none" stroke={C.olive} strokeWidth={3} />
         <circle cx={referenceX} cy={referenceY} r={5} fill={C.cardBg} stroke={C.olive} strokeWidth={2.5} />
         <circle cx={boundaryX} cy={boundaryY} r={6} fill={C.cardBg} stroke={C.danger} strokeWidth={3} />
         <text x={margin.left + 8} y={margin.top - 15} fill={C.olive} fontSize={13} fontWeight={600}>
@@ -888,6 +888,8 @@ function GuidedObservationSteps({
         : "Recovery restores Junior first. If the window ends before recovery, Junior's covered loss becomes permanent.",
       art: (
         <svg aria-hidden="true" className="mt-3 w-full" viewBox="0 0 210 54">
+          <rect x="5" y="2" width="90" height="48" fill={C.obsFill} fillOpacity="0.32" />
+          <rect x="116" y="2" width="89" height="48" fill={C.obsFill} fillOpacity="0.32" />
           <line x1="5" x2="95" y1="15" y2="15" stroke={C.kpiLabel} strokeDasharray="4 4" />
           <polyline points="5,15 28,18 49,34 72,23 95,10" fill="none" stroke={C.olive} strokeWidth="2" />
           <text x="105" y="30" fill={C.kpiLabel} fontFamily={MONO} fontSize="9" textAnchor="middle">OR</text>

@@ -108,6 +108,15 @@ for (const contract of [
 ]) {
   if (!simulator.includes(contract)) failures.push(`Day simulator violates Dawn/Tenbin design token: ${contract}`);
 }
+for (const geometryContract of [
+  '<line x1={boundaryX} y1={boundaryY - 3} x2={boundaryX}',
+  '<rect x="5" y="2" width="90" height="48" fill={C.obsFill}',
+  '<rect x="116" y="2" width="89" height="48" fill={C.obsFill}',
+]) {
+  if (!simulator.includes(geometryContract)) {
+    failures.push(`Day simulator missing locked shared-diagram geometry: ${geometryContract}`);
+  }
+}
 for (const lockedCopyReference of [
   'LOCKED_COPY.reviewTitle',
   'LOCKED_COPY.reviewDescription',
