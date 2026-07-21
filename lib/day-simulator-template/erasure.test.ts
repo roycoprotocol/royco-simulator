@@ -1,6 +1,6 @@
 import { Sim, defaultConfig } from '../day/engine/runner';
 import { MarketState } from '../day/engine/types';
-import { buildDayErasureEvent } from './erasure';
+import { buildDayErasureEvent, formatDayErasureLabel } from './erasure';
 import { shouldRefillJunior } from './refill';
 
 let passed = 0;
@@ -103,7 +103,18 @@ check(
   'I-beam lower endpoint lands on the Junior index',
   approx(event.top - event.forfeitIndexPts, juniorIndex),
 );
-check('Dawn percentage label is shown for a material erasure', event.forfeitPctOfJuniorNav >= 4);
+check(
+  'material erasures retain the Dawn percentage label',
+  formatDayErasureLabel(event.forfeitPctOfJuniorNav) === `erased −${event.forfeitPctOfJuniorNav.toFixed(0)}%`,
+);
+check(
+  'sub-4% realized losses still receive an erased label',
+  formatDayErasureLabel(0.1) === 'erased −0.1%',
+);
+check(
+  'very small realized losses never render as erased −0%',
+  formatDayErasureLabel(0.004) === 'erased <0.01%',
+);
 
 console.log(`\nResult: ${passed} passed, ${failed} failed`);
 if (failed > 0) process.exitCode = 1;

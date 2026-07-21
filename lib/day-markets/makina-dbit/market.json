@@ -1,0 +1,85 @@
+{
+  "id": "makina-dbit",
+  "route": "/makina/dbit",
+  "identity": {
+    "marketName": "Makina",
+    "displayAssetName": "Dialectic BTC",
+    "underlyingAsset": "DBIT",
+    "seniorName": "Senior Dialectic BTC",
+    "seniorSymbol": "SrDBIT",
+    "juniorName": "Junior Dialectic BTC",
+    "juniorSymbol": "JrDBIT"
+  },
+  "defaults": {
+    "sourceApy": 0.0344,
+    "coverage": 0.15,
+    "minLiquidity": 0.1,
+    "liquidationUtilization": 100,
+    "observationDays": 7,
+    "exitBufferPct": 1,
+    "linkJuniorToFirstLoss": true,
+    "maintainCoverage": true,
+    "riskYDM": {
+      "mode": "static",
+      "y0": 0.06,
+      "yTarget": 0.155,
+      "y100": 0.18
+    },
+    "liqYDM": {
+      "mode": "static",
+      "y0": 0.05,
+      "yTarget": 0.05,
+      "y100": 0.2
+    },
+    "selfLiquidationBonus": 0.01,
+    "stProtocolFee": 0,
+    "jtProtocolFee": 0,
+    "jtYieldShareProtocolFee": 0,
+    "ltYieldShareProtocolFee": 0,
+    "stableYield": 0.035,
+    "swapFeeBps": 10,
+    "poolTurnoverPerYear": 8,
+    "eclpBandWidth": 0.1,
+    "reinvestLiquidityPremium": true,
+    "initialST": 1000,
+    "initialJT": 200,
+    "initialLT": 111.11111111111111
+  },
+  "targets": {
+    "seniorApyMin": 0.025,
+    "seniorApyMax": 0.03,
+    "juniorApyMin": 0.05,
+    "juniorApyMax": 0.1
+  },
+  "certification": {
+    "intakeConfirmed": true
+  },
+  "customization": {
+    "explicitlyAuthorized": true,
+    "authorizationNote": "User explicitly authorized four Makina vault pill tabs, the published 30-day incentive-inclusive APY, restoration of the Backtest using official Machine NAV history, and a BTC return-basis label on 2026-07-20.",
+    "hiddenSections": [],
+    "copyOverrides": {},
+    "vaultTabs": {
+      "group": "makina",
+      "label": "DBIT"
+    },
+    "backtestDisplay": {
+      "returnUnit": "BTC"
+    }
+  },
+  "provenance": {
+    "source": "Makina DBIT official Machine share NAV in WBTC, with a 3.44% published 30-day Live APY input (0.46% base yield plus 2.98% $MAK reward)",
+    "sourceUrl": "https://makina.finance/strategy/dbit",
+    "sourceProvider": "Makina official API and onchain Machine accounting",
+    "seriesPath": "lib/day-markets/makina-dbit/series.json",
+    "dataMode": "historical-series-with-published-apy",
+    "dataCadence": "irregular",
+    "priceType": "nav",
+    "feesIncluded": true,
+    "observationCount": 40,
+    "firstDate": "2025-10-23",
+    "lastDate": "2026-07-20",
+    "publishedApy": 0.0344,
+    "retrievedAt": "2026-07-20"
+  }
+}

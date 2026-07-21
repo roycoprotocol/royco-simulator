@@ -1,5 +1,5 @@
 import type { Metadata } from 'next';
-import DaySimulatorPageShell from '@/components/day-simulator/DaySimulatorPageShell';
+import { StrictDaySimulatorPageShell } from '@/components/day-simulator/DaySimulatorPageShell';
 import { PARETO_FALCONX_DAY_MARKET } from '@/lib/day-markets/pareto-falconx/market';
 
 export const metadata: Metadata = {
@@ -8,5 +8,5 @@ export const metadata: Metadata = {
 };
 
 export default function Page() {
-  return <DaySimulatorPageShell market={PARETO_FALCONX_DAY_MARKET} />;
+  return <StrictDaySimulatorPageShell market={PARETO_FALCONX_DAY_MARKET} />;
 }

@@ -2,6 +2,7 @@ import { Sim } from '@/lib/day/engine/runner';
 import type { MarketConfig, SecondaryExitQuote } from '@/lib/day/engine/types';
 
 export const ARBITRAGE_REFERENCE_SLIPPAGE = 0.01;
+export const DAY_COVERAGE_COMPARISON_MAX_LOSS = 0.75;
 
 export type DayInitialState = { st: number; jt: number; lt: number };
 
@@ -116,7 +117,10 @@ export function buildDayExplainerMetrics(
   curve.sort((a, b) => a.sellNAV - b.sellNAV);
 
   const coverageLossLimit = findCoverageLossLimit(cfg, initial);
-  const displayMaxLoss = Math.min(1, Math.max(0.1, coverageLossLimit * 3));
+  const boundarySellShareOfSenior = openingSeniorNAV > 0
+    ? boundaryQuote.filledNAV / openingSeniorNAV
+    : 0;
+  const displayMaxLoss = Math.max(DAY_COVERAGE_COMPARISON_MAX_LOSS, coverageLossLimit);
   const losses = Array.from({ length: 41 }, (_, index) => (displayMaxLoss * index) / 40);
   losses.push(coverageLossLimit);
   losses.sort((a, b) => a - b);
@@ -134,7 +138,7 @@ export function buildDayExplainerMetrics(
       referenceSellShareOfSenior: openingSeniorNAV > 0 ? reference.sellNAV / openingSeniorNAV : 0,
       referenceQuote: reference.quote,
       boundarySellNAV: boundaryQuote.filledNAV,
-      boundarySellShareOfSenior: openingSeniorNAV > 0 ? boundaryQuote.filledNAV / openingSeniorNAV : 0,
+      boundarySellShareOfSenior,
       boundaryQuote: opening.previewSecondarySell(boundaryQuote.filledNAV),
       curve,
     },

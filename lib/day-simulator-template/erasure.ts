@@ -17,6 +17,22 @@ export type DayErasureInput = {
   reason: string;
 };
 
+export function formatDayErasureLabel(forfeitPctOfJuniorNav: number): string {
+  const pct = Number.isFinite(forfeitPctOfJuniorNav)
+    ? Math.max(0, forfeitPctOfJuniorNav)
+    : 0;
+  const formatted = pct >= 1
+    ? pct.toFixed(0)
+    : pct >= 0.1
+      ? pct.toFixed(1)
+      : pct >= 0.01
+        ? pct.toFixed(2)
+        : '<0.01';
+  return formatted.startsWith('<')
+    ? `erased ${formatted}%`
+    : `erased −${formatted}%`;
+}
+
 /**
  * Convert an exact accountant erasure into Dawn's chart geometry.
  *

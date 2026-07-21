@@ -1,11 +1,14 @@
 {
   "id": "pareto-falconx",
-  "route": "/pareto-falconx-sim",
-  "copy": {
-    "eyebrow": "ROYCO DAY · PARETO FALCONX MARKET",
-    "title": "Pareto FalconX Day Simulator",
-    "description": "Explore a hypothetical three-tranche Royco Day market over AA_FalconXUSDC. Senior receives first-loss coverage from Junior, while a 15% minimum liquidity requirement supports secondary-market exits.",
-    "disclosure": "The source APY is derived from 371 fee-inclusive daily NAV observations supplied by RWA.xyz. Simulator outputs are mechanism simulations, not historical backtests, forecasts, or an announced product."
+  "route": "/falconx-v3",
+  "identity": {
+    "marketName": "Pareto FalconX",
+    "displayAssetName": "FalconX",
+    "underlyingAsset": "AA_FalconXUSDC",
+    "seniorName": "Senior",
+    "seniorSymbol": "srRoyAA_FALCONXUSDC",
+    "juniorName": "Junior",
+    "juniorSymbol": "jrRoyAA_FALCONXUSDC"
   },
   "defaults": {
     "sourceApy": 0.09272332251507232,
@@ -42,10 +45,28 @@
     "initialJT": 34.48275862068966,
     "initialLT": 166.66666666666666
   },
+  "targets": {
+    "seniorApyMin": 0.07,
+    "seniorApyMax": 0.0725,
+    "juniorApyMin": 0.25,
+    "juniorApyMax": 0.27
+  },
+  "certification": {
+    "intakeConfirmed": true
+  },
+  "customization": {
+    "explicitlyAuthorized": false,
+    "authorizationNote": "",
+    "hiddenSections": [],
+    "copyOverrides": {}
+  },
   "provenance": {
     "source": "RWA.xyz export: FalconX Credit Vault / AA_FalconXUSDC Net Asset Value (Dollar)",
     "sourceUrl": "https://app.rwa.xyz/assets/AA_FalconXUSDC",
-    "seriesPath": "lib/markets/pareto-falconx/series.json",
+    "sourceProvider": "RWA.xyz",
+    "seriesPath": "lib/day-markets/pareto-falconx/series.json",
+    "dataMode": "historical-series",
+    "dataCadence": "daily",
     "priceType": "nav",
     "feesIncluded": true,
     "observationCount": 371,

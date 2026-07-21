@@ -15,7 +15,7 @@ import {
   usePlotArea,
 } from 'recharts';
 
-import { Sim, defaultConfig } from '@/lib/day/engine/runner';
+import { Sim } from '@/lib/day/engine/runner';
 import { MarketState } from '@/lib/day/engine/types';
 import { DAY_LOCKED_COPY } from '@/lib/day-simulator-template/locked-copy';
 import { LOCKED_COPY } from '@/lib/simulator-template/locked-copy';
@@ -30,11 +30,21 @@ import type {
   DaySeriesPoint,
 } from '@/lib/day-simulator-template/market';
 import {
+  dayMarketFromManifest,
+  isDaySectionVisible,
+} from '@/lib/day-simulator-template/market';
+import {
   buildDayErasureEvent,
+  formatDayErasureLabel,
   type DayErasureEvent,
 } from '@/lib/day-simulator-template/erasure';
 import { calibrateSeriesApy } from '@/lib/day-simulator-template/series';
 import { shouldRefillJunior } from '@/lib/day-simulator-template/refill';
+import {
+  buildDayInitialBalances,
+  buildDayMarketConfig,
+  buildDayForwardSeries,
+} from '@/lib/day-simulator-template/runtime';
 import { DayTimeframeBrush } from '@/components/day-simulator/DayTimeframeBrush';
 
 const ResponsiveContainerNoSSR = dynamic(
@@ -98,11 +108,14 @@ type DaySeniorLossEvent = {
 const FALLBACK_MANIFEST: DayMarketManifest = {
   id: 'day',
   route: '/day-sim',
-  copy: {
-    eyebrow: DAY_LOCKED_COPY.eyebrow,
-    title: DAY_LOCKED_COPY.title,
-    description: DAY_LOCKED_COPY.description,
-    disclosure: DAY_LOCKED_COPY.disclosure,
+  identity: {
+    marketName: 'Royco Day',
+    displayAssetName: 'Template strategy',
+    underlyingAsset: 'the template strategy',
+    seniorName: 'Senior',
+    seniorSymbol: 'ST',
+    juniorName: 'Junior',
+    juniorSymbol: 'JT',
   },
   defaults: {
     sourceApy: 0.12,
@@ -129,9 +142,27 @@ const FALLBACK_MANIFEST: DayMarketManifest = {
     initialJT: 10_000_000,
     initialLT: 6_000_000,
   },
+  targets: {
+    seniorApyMin: 0,
+    seniorApyMax: 1,
+    juniorApyMin: 0,
+    juniorApyMax: 10,
+  },
+  certification: {
+    intakeConfirmed: true,
+  },
+  customization: {
+    explicitlyAuthorized: false,
+    authorizationNote: '',
+    hiddenSections: [],
+    copyOverrides: {},
+  },
   provenance: {
     source: 'Deterministic one-year template path',
     sourceUrl: 'https://github.com/roycoprotocol/dawn-simulator',
+    sourceProvider: 'Royco',
+    dataMode: 'historical-series',
+    dataCadence: 'monthly',
     priceType: 'nav',
     feesIncluded: true,
     observationCount: 13,
@@ -145,10 +176,7 @@ const FALLBACK_SERIES: DaySeriesPoint[] = Array.from({ length: 13 }, (_, index) 
   price: Math.pow(1.12, index / 12),
 }));
 
-const FALLBACK_MARKET: DayMarket = {
-  ...FALLBACK_MANIFEST,
-  series: FALLBACK_SERIES,
-};
+const FALLBACK_MARKET: DayMarket = dayMarketFromManifest(FALLBACK_MANIFEST, FALLBACK_SERIES);
 
 const cardStyle = {
   background: C.cardBg,
@@ -159,6 +187,26 @@ const cardStyle = {
 } as const;
 
 const estimateText = (text: string): number => text.length * 6;
+
+type SvgPoint = { x: number; y: number };
+type SvgRect = { left: number; right: number; top: number; bottom: number };
+
+const segmentIntersectsRect = (start: SvgPoint, end: SvgPoint, rect: SvgRect) => {
+  if (start.x === end.x) {
+    return start.x >= rect.left
+      && start.x <= rect.right
+      && Math.max(start.y, end.y) >= rect.top
+      && Math.min(start.y, end.y) <= rect.bottom;
+  }
+  const segmentLeft = Math.max(Math.min(start.x, end.x), rect.left);
+  const segmentRight = Math.min(Math.max(start.x, end.x), rect.right);
+  if (segmentLeft > segmentRight) return false;
+  const yAt = (pointX: number) =>
+    start.y + ((pointX - start.x) / (end.x - start.x)) * (end.y - start.y);
+  const segmentTop = Math.min(yAt(segmentLeft), yAt(segmentRight));
+  const segmentBottom = Math.max(yAt(segmentLeft), yAt(segmentRight));
+  return segmentBottom >= rect.top && segmentTop <= rect.bottom;
+};
 
 function ErasureIBeam(props: {
   x1?: number;
@@ -234,13 +282,61 @@ function SeniorLossMark(props: { cx?: number; cy?: number; clipPath?: string }) 
   );
 }
 
-function EndValueTag(props: { cx?: number; cy?: number; text?: string; color?: string }) {
+function distributeEndTagYs(targetYs: number[], minY: number, maxY: number, gap: number): number[] {
+  if (!targetYs.length) return [];
+
+  const order = targetYs.map((target, index) => ({ target, index })).sort((a, b) => a.target - b.target);
+  const placed = new Array<number>(targetYs.length);
+
+  let previous = minY - gap;
+  for (const item of order) {
+    const y = Math.max(item.target, previous + gap);
+    placed[item.index] = y;
+    previous = y;
+  }
+
+  const overflow = placed[order[order.length - 1].index] - maxY;
+  if (overflow > 0) {
+    for (let index = 0; index < placed.length; index += 1) placed[index] -= overflow;
+  }
+
+  const underflow = minY - placed[order[0].index];
+  if (underflow > 0) {
+    for (let index = 0; index < placed.length; index += 1) placed[index] += underflow;
+  }
+
+  return placed;
+}
+
+function EndValueTag(props: {
+  cx?: number;
+  cy?: number;
+  text?: string;
+  color?: string;
+  tagIndex?: number;
+  peerValues?: number[];
+  yMin?: number;
+  yMax?: number;
+}) {
   const plot = usePlotArea();
-  const { cx, cy, text, color } = props;
+  const { cx, cy, text, color, tagIndex = 0, peerValues = [], yMin = 0, yMax = 1 } = props;
   if (!Number.isFinite(cx) || !Number.isFinite(cy) || !text) return null;
-  const x = plot ? Math.min((cx as number) + 4, plot.x + plot.width - 28) : (cx as number) + 4;
+
+  const targetYs = plot && peerValues.length > 0
+    ? peerValues.map((peerValue) => {
+        const boundedValue = Math.max(yMin, Math.min(yMax, peerValue));
+        return plot.y + plot.height * (1 - (boundedValue - yMin) / (yMax - yMin));
+      })
+    : [];
+  const tagYs = plot
+    ? distributeEndTagYs(targetYs, plot.y + 8, plot.y + plot.height - 8, 16)
+    : [];
+  const y = tagYs[tagIndex] ?? (cy as number);
+  // Keep labels in a reserved gutter to the right of the terminal point. The
+  // line ends at the point, so its stroke cannot run through the text.
+  const x = plot ? plot.x + plot.width + 7 : (cx as number) + 7;
   return (
-    <text x={x} y={cy} fill={color} fontSize={11} fontWeight={600} dominantBaseline="middle">
+    <text x={x} y={y} fill={color} fontSize={11} fontWeight={600} dominantBaseline="middle">
       {text}
     </text>
   );
@@ -428,6 +524,27 @@ function Kpi({
   );
 }
 
+function ExecutiveMetric({
+  label,
+  value,
+  valueColor,
+}: {
+  label: string;
+  value: string;
+  valueColor: string;
+}) {
+  return (
+    <div style={{ background: C.cardBg, border: `1px solid ${C.border}`, minHeight: 88, padding: '14px 16px' }}>
+      <p style={{ color: C.kpiLabel, fontSize: 8.8, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase' }}>
+        {label}
+      </p>
+      <p className="mt-2" style={{ color: valueColor, fontFamily: MONO, fontSize: 28, fontWeight: 600, letterSpacing: '-0.05em' }}>
+        {value}
+      </p>
+    </div>
+  );
+}
+
 function FlowBox({
   eyebrow,
   value,
@@ -463,8 +580,10 @@ function FlowBox({
 
 function LiquidityExecutionDiagram({
   metrics,
+  avoidLabelOverlap = false,
 }: {
   metrics: DayExplainerMetrics['liquidity'];
+  avoidLabelOverlap?: boolean;
 }) {
   const width = 520;
   const height = 400;
@@ -490,7 +609,42 @@ function LiquidityExecutionDiagram({
   const boundarySlippage = metrics.boundaryQuote.slippage * 100;
   const referenceSellPct = metrics.referenceSellShareOfSenior * 100;
   const boundarySellPct = metrics.boundarySellShareOfSenior * 100;
-  const curveLine = curve.map((point) => `${x(point.sellNAV)},${y(point.executionPrice)}`).join(' ');
+  const curvePixels = curve.map((point) => ({ x: x(point.sellNAV), y: y(point.executionPrice) }));
+  const curveLine = curvePixels.map((point) => `${point.x},${point.y}`).join(' ');
+  const labelPosition = (preferredX: number, pointY: number, textWidth: number, anchor: 'start' | 'end') => {
+    if (!avoidLabelOverlap) return { x: preferredX, y: pointY - 13 };
+    const horizontalOffsets = anchor === 'start' ? [0, 32, 64] : [0, -32, -64, -96, -128];
+    const verticalOffsets = [-13, -34, -55, -76, -97, 28];
+    for (const horizontalOffset of horizontalOffsets) {
+      const candidateX = preferredX + horizontalOffset;
+      const left = anchor === 'start' ? candidateX : candidateX - textWidth;
+      for (const verticalOffset of verticalOffsets) {
+        const candidateY = pointY + verticalOffset;
+        const rect = {
+          left: left - 4,
+          right: left + textWidth + 4,
+          top: candidateY - 15,
+          bottom: candidateY + 4,
+        };
+        if (
+          rect.left < margin.left + 4
+          || rect.right > margin.left + plotWidth - 4
+          || rect.top < margin.top + 4
+          || rect.bottom > baseline - 4
+        ) continue;
+        const intersectsCurve = curvePixels.some((point, index) =>
+          index > 0 && segmentIntersectsRect(curvePixels[index - 1], point, rect));
+        if (!intersectsCurve) return { x: candidateX, y: candidateY };
+      }
+    }
+    const fallbackX = anchor === 'end' ? preferredX - 96 : preferredX;
+    return {
+      x: fallbackX,
+      y: Math.max(margin.top + 20, pointY - 34),
+    };
+  };
+  const referenceLabel = labelPosition(referenceX + 12, referenceY, 104, 'start');
+  const boundaryLabel = labelPosition(boundaryX - 10, boundaryY, 112, 'end');
   const arbitrageArea = [
     `${x(0)},${y(1)}`,
     `${boundaryX},${y(1)}`,
@@ -522,8 +676,8 @@ function LiquidityExecutionDiagram({
         <polyline points={curveLine} fill="none" stroke={C.seniorLine} strokeWidth={4} strokeLinejoin="round" strokeLinecap="round" />
         <line x1={referenceX} y1={referenceY - 3} x2={referenceX} y2={y(1) + 10} stroke={C.olive} strokeWidth={2} />
         <path d={`M ${referenceX - 5} ${y(1) + 17} L ${referenceX} ${y(1) + 9} L ${referenceX + 5} ${y(1) + 17}`} fill="none" stroke={C.olive} strokeWidth={2} />
-        <line x1={boundaryX - 6} y1={boundaryY - 3} x2={boundaryX - 6} y2={y(1) + 10} stroke={C.olive} strokeWidth={3} />
-        <path d={`M ${boundaryX - 12} ${y(1) + 19} L ${boundaryX - 6} ${y(1) + 9} L ${boundaryX} ${y(1) + 19}`} fill="none" stroke={C.olive} strokeWidth={3} />
+        <line x1={boundaryX} y1={boundaryY - 3} x2={boundaryX} y2={y(1) + 10} stroke={C.olive} strokeWidth={3} />
+        <path d={`M ${boundaryX - 6} ${y(1) + 19} L ${boundaryX} ${y(1) + 9} L ${boundaryX + 6} ${y(1) + 19}`} fill="none" stroke={C.olive} strokeWidth={3} />
         <circle cx={referenceX} cy={referenceY} r={5} fill={C.cardBg} stroke={C.olive} strokeWidth={2.5} />
         <circle cx={boundaryX} cy={boundaryY} r={6} fill={C.cardBg} stroke={C.danger} strokeWidth={3} />
         <text x={margin.left + 8} y={margin.top - 15} fill={C.olive} fontSize={13} fontWeight={600}>
@@ -533,22 +687,30 @@ function LiquidityExecutionDiagram({
           Arbitrage incentive grows →
         </text>
         <text
-          x={referenceX + 12}
-          y={referenceY - 13}
-          fill={C.olive}
+          x={referenceLabel.x}
+          y={referenceLabel.y}
+          fill={C.danger}
           fontFamily={MONO}
           fontSize={12.5}
           fontWeight={600}
         >
           {referenceSlippage.toFixed(1)}% slippage
         </text>
-        <text x={boundaryX - 10} y={boundaryY - 13} fill={C.danger} fontFamily={MONO} fontSize={12.5} fontWeight={600} textAnchor="end">
+        <text
+          x={boundaryLabel.x}
+          y={boundaryLabel.y}
+          fill={C.danger}
+          fontFamily={MONO}
+          fontSize={12.5}
+          fontWeight={600}
+          textAnchor="end"
+        >
           {boundarySlippage.toFixed(1)}% slippage
         </text>
-        <text x={referenceX} y={height - 37} fill={C.olive} fontFamily={MONO} fontSize={13} fontWeight={600} textAnchor="middle">
+        <text x={referenceX} y={height - 37} fill={C.olive} fontFamily={MONO} fontSize={15} fontWeight={700} textAnchor="middle">
           {referenceSellPct.toFixed(1)}%
         </text>
-        <text x={boundaryX} y={height - 37} fill={C.danger} fontFamily={MONO} fontSize={13} fontWeight={600} textAnchor="end">
+        <text x={boundaryX} y={height - 37} fill={C.danger} fontFamily={MONO} fontSize={15} fontWeight={700} textAnchor="end">
           {boundarySellPct.toFixed(1)}%
         </text>
         <text x={14} y={margin.top + 4} fill={C.olive} fontFamily={MONO} fontSize={11}>100%</text>
@@ -581,10 +743,54 @@ function CoverageLossDiagram({
   const yRange = Math.max(1, yMax - yMin);
   const x = (loss: number) => margin.left + (loss / metrics.displayMaxLoss) * plotWidth;
   const y = (balance: number) => margin.top + ((yMax - balance) / yRange) * plotHeight;
-  const line = metrics.points.map((point) => `${x(point.loss)},${y(point.seniorBalancePer100)}`).join(' ');
+  const curvePixels = metrics.points.map((point) => ({
+    x: x(point.loss),
+    y: y(point.seniorBalancePer100),
+  }));
+  const line = curvePixels.map((point) => `${point.x},${point.y}`).join(' ');
   const breakpointX = x(metrics.coverageLossLimit);
   const endpointX = x(metrics.displayMaxLoss);
   const endpointY = y(metrics.endingSeniorBalancePer100);
+  const narrowCoverageZone = metrics.coverageLossLimit / metrics.displayMaxLoss < 0.18;
+  const narrowSeniorZone = (metrics.displayMaxLoss - metrics.coverageLossLimit) / metrics.displayMaxLoss < 0.18;
+  type CoverageLabelCandidate = { x: number; y: number; anchor: 'start' | 'middle' | 'end' };
+  const placeCoverageLabel = (text: string, candidates: CoverageLabelCandidate[]) => {
+    const textWidth = estimateText(text);
+    for (const candidate of candidates) {
+      const left = candidate.anchor === 'start'
+        ? candidate.x
+        : candidate.anchor === 'end'
+          ? candidate.x - textWidth
+          : candidate.x - textWidth / 2;
+      const rect = {
+        left: left - 5,
+        right: left + textWidth + 5,
+        top: candidate.y - 15,
+        bottom: candidate.y + 4,
+      };
+      const staysInsidePlotWidth = rect.left >= margin.left + 4 && rect.right <= endpointX - 4;
+      const staysInsideViewBoxHeight = rect.top >= 4 && rect.bottom <= margin.top + plotHeight - 4;
+      const intersectsCurve = curvePixels.some((point, index) =>
+        index > 0 && segmentIntersectsRect(curvePixels[index - 1], point, rect));
+      if (staysInsidePlotWidth && staysInsideViewBoxHeight && !intersectsCurve) return candidate;
+    }
+    return candidates[candidates.length - 1];
+  };
+  const juniorZoneLabel = 'Junior absorbs loss';
+  const seniorZoneLabel = 'Senior absorbs excess';
+  const coveredBalanceLabel = '$100 covered';
+  const juniorZoneLabelPosition = placeCoverageLabel(juniorZoneLabel, [
+    { x: (margin.left + breakpointX) / 2, y: margin.top + 27, anchor: 'middle' },
+    { x: margin.left + 10, y: margin.top - 10, anchor: 'start' },
+  ]);
+  const seniorZoneLabelPosition = placeCoverageLabel(seniorZoneLabel, [
+    { x: (breakpointX + endpointX) / 2, y: margin.top + 27, anchor: 'middle' },
+    { x: endpointX - 10, y: margin.top - 10, anchor: 'end' },
+  ]);
+  const coveredBalanceLabelPosition = placeCoverageLabel(coveredBalanceLabel, [
+    { x: breakpointX - 12, y: y(100) + 56, anchor: 'end' },
+    { x: margin.left + 10, y: margin.top + plotHeight - 16, anchor: 'start' },
+  ]);
   return (
     <div data-accountant-source="buildDayExplainerMetrics.coverage">
       <svg
@@ -625,20 +831,49 @@ function CoverageLossDiagram({
         <text x={14} y={margin.top + 5} fill={C.kpiLabel} fontFamily={MONO} fontSize={12}>$100</text>
         <text x={14} y={margin.top + plotHeight + 4} fill={C.kpiLabel} fontFamily={MONO} fontSize={12}>${yMin}</text>
         <text x={margin.left} y={height - 32} fill={C.kpiLabel} fontFamily={MONO} fontSize={12}>0%</text>
-        <text x={breakpointX} y={height - 32} fill={C.eyebrow} fontFamily={MONO} fontSize={12} textAnchor="middle">
+        <text
+          x={narrowSeniorZone ? breakpointX - 4 : breakpointX}
+          y={narrowCoverageZone || narrowSeniorZone ? height - 47 : height - 32}
+          fill={C.eyebrow}
+          fontFamily={MONO}
+          fontSize={12}
+          textAnchor={narrowCoverageZone ? 'start' : narrowSeniorZone ? 'end' : 'middle'}
+        >
           {(metrics.coverageLossLimit * 100).toFixed(1)}%
         </text>
         <text x={margin.left + plotWidth} y={height - 32} fill={C.kpiLabel} fontFamily={MONO} fontSize={12} textAnchor="end">
           {(metrics.displayMaxLoss * 100).toFixed(1)}%
         </text>
-        <text x={(margin.left + breakpointX) / 2} y={margin.top + 27} fill={C.olive} fontSize={12.5} fontWeight={600} textAnchor="middle">
-          Junior absorbs loss
+        <text
+          x={juniorZoneLabelPosition.x}
+          y={juniorZoneLabelPosition.y}
+          fill={C.olive}
+          fontSize={12.5}
+          fontWeight={600}
+          textAnchor={juniorZoneLabelPosition.anchor}
+        >
+          {juniorZoneLabel}
         </text>
-        <text x={(breakpointX + endpointX) / 2} y={margin.top + 27} fill={C.danger} fontSize={12.5} fontWeight={600} textAnchor="middle">
-          Senior absorbs excess
+        <text
+          x={seniorZoneLabelPosition.x}
+          y={seniorZoneLabelPosition.y}
+          fill={C.danger}
+          fontSize={12.5}
+          fontWeight={600}
+          textAnchor={seniorZoneLabelPosition.anchor}
+        >
+          {seniorZoneLabel}
         </text>
-        <text x={breakpointX - 12} y={y(100) + 56} fill={C.olive} fontFamily={MONO} fontSize={12.5} fontWeight={600} textAnchor="end">
-          $100 covered
+        <text
+          x={coveredBalanceLabelPosition.x}
+          y={coveredBalanceLabelPosition.y}
+          fill={C.olive}
+          fontFamily={MONO}
+          fontSize={12.5}
+          fontWeight={600}
+          textAnchor={coveredBalanceLabelPosition.anchor}
+        >
+          {coveredBalanceLabel}
         </text>
         <text
           x={endpointX - 7}
@@ -708,7 +943,17 @@ function GuidedChartGuide() {
   );
 }
 
-function GuidedObservationSteps({ days }: { days: number }) {
+function GuidedObservationSteps({
+  days,
+  generalizeObservation = false,
+}: {
+  days: number;
+  generalizeObservation?: boolean;
+}) {
+  const observationStartX = 72;
+  const observationEndX = 142;
+  const recoveryObservationEndX = 83;
+  const finalizationObservationEndX = 194;
   const steps = [
     {
       number: '1',
@@ -717,36 +962,45 @@ function GuidedObservationSteps({ days }: { days: number }) {
       art: (
         <svg aria-hidden="true" className="mt-3 w-full" viewBox="0 0 210 54">
           <line x1="5" x2="205" y1="15" y2="15" stroke={C.kpiLabel} strokeDasharray="4 4" />
-          <polyline points="5,15 48,14 86,20 124,38 164,31 205,27" fill="none" stroke={C.juniorLine} strokeWidth="2" />
-          <polyline points="5,15 48,15 86,16 124,18 164,18 205,18" fill="none" stroke={C.seniorLine} strokeWidth="2" />
+          <polyline points="5,18 48,15 86,20 124,38 164,31 205,27" fill="none" stroke={C.juniorLine} strokeWidth="2" />
+          <polyline points="5,18 48,15 205,15" fill="none" stroke={C.seniorLine} strokeWidth="2" />
         </svg>
       ),
     },
     {
       number: '2',
-      title: `${days}-day observation`,
-      body: 'Direct Senior and Junior deposits/redemptions pause; LP withdrawals pause. Senior can still sell through the LP.',
+      title: generalizeObservation ? 'Observation period' : `${days}-day observation`,
+      body: generalizeObservation
+        ? `Its duration is market-specific (${days} days here). Direct Senior and Junior deposits/redemptions pause; LP withdrawals pause. Senior can still sell through the LP.`
+        : 'Direct Senior and Junior deposits/redemptions pause; LP withdrawals pause. Senior can still sell through the LP.',
       art: (
-        <svg aria-hidden="true" className="mt-3 w-full" viewBox="0 0 210 54">
-          <rect x="72" y="2" width="70" height="48" fill={C.obsFill} fillOpacity="0.32" />
+        <svg aria-hidden="true" className="mt-3 w-full" viewBox="0 0 210 66">
+          <rect x={observationStartX} y="2" width={observationEndX - observationStartX} height="48" fill={C.obsFill} fillOpacity="0.32" />
           <line x1="5" x2="205" y1="15" y2="15" stroke={C.kpiLabel} strokeDasharray="4 4" />
-          <polyline points="5,15 48,16 84,24 111,38 144,29 174,24 205,22" fill="none" stroke={C.juniorLine} strokeWidth="2" />
-          <polyline points="5,15 48,15 84,17 111,18 144,18 174,18 205,18" fill="none" stroke={C.seniorLine} strokeWidth="2" />
+          <polyline points="5,18 48,16 72,15 84,24 111,38 142,30 174,24 205,22" fill="none" stroke={C.juniorLine} strokeWidth="2" />
+          <polyline points="5,18 48,16 72,15 142,15 174,13 205,11" fill="none" stroke={C.seniorLine} strokeWidth="2" />
+          <text x={(observationStartX + observationEndX) / 2} y="63" fill={C.eyebrow} fontFamily={MONO} fontSize="9" textAnchor="middle">
+            {days}d
+          </text>
         </svg>
       ),
     },
     {
       number: '3',
       title: 'Recover or finalize',
-      body: "Recovery restores Junior first. If the window ends before recovery, Junior's covered loss becomes permanent.",
+      body: generalizeObservation
+        ? "A full recovery restores Junior. If the window ends before full recovery, Junior's covered loss becomes permanent."
+        : "Recovery restores Junior first. If the window ends before recovery, Junior's covered loss becomes permanent.",
       art: (
         <svg aria-hidden="true" className="mt-3 w-full" viewBox="0 0 210 54">
+          <rect x="5" y="2" width={recoveryObservationEndX - 5} height="48" fill={C.obsFill} fillOpacity="0.32" />
+          <rect x="116" y="2" width={finalizationObservationEndX - 116} height="48" fill={C.obsFill} fillOpacity="0.32" />
           <line x1="5" x2="95" y1="15" y2="15" stroke={C.kpiLabel} strokeDasharray="4 4" />
-          <polyline points="5,15 28,18 49,34 72,23 95,10" fill="none" stroke={C.olive} strokeWidth="2" />
+          <polyline points="5,15 28,18 49,34 72,23 83,15 95,10" fill="none" stroke={C.olive} strokeWidth="2" />
           <text x="105" y="30" fill={C.kpiLabel} fontFamily={MONO} fontSize="9" textAnchor="middle">OR</text>
           <line x1="116" x2="205" y1="15" y2="15" stroke={C.kpiLabel} strokeDasharray="4 4" />
-          <polyline points="116,15 140,19 162,34 184,34 205,34" fill="none" stroke={C.juniorLine} strokeWidth="2" />
-          <circle cx="184" cy="34" r="4" fill={C.danger} />
+          <polyline points="116,15 140,19 162,34 194,34 205,34" fill="none" stroke={C.juniorLine} strokeWidth="2" />
+          <circle cx={finalizationObservationEndX} cy="34" r="4" fill={C.danger} />
         </svg>
       ),
     },
@@ -851,11 +1105,31 @@ export default function DayMarketSimulator({
   variant = 'standard',
 }: {
   market?: DayMarket;
-  variant?: 'standard' | 'guided';
+  variant?: 'standard' | 'guided' | 'executive';
 }) {
   const activeMarket = market ?? FALLBACK_MARKET;
   const isGuided = variant === 'guided';
+  const isExecutive = variant === 'executive';
+  const showSection = (section: (typeof activeMarket.customization.hiddenSections)[number]) =>
+    isDaySectionVisible(activeMarket.customization, section);
+  const heroTitle = activeMarket.customization.copyOverrides.heroTitle
+    ?? 'Make illiquid yield easier to own.';
+  const heroDescription = activeMarket.customization.copyOverrides.heroDescription
+    ?? 'Royco Day gives Senior holders first-loss coverage and a dedicated exit pool. Junior and LP participants earn additional yield for providing those benefits.';
   const defaults = activeMarket.defaults;
+  const backtestDisplay = activeMarket.customization.backtestDisplay;
+  const returnUnit = backtestDisplay?.returnUnit ?? 'USD';
+  const isNativeReturnUnit = returnUnit !== 'USD';
+  const simulationSeries = useMemo(
+    () => activeMarket.provenance.dataMode === 'published-apy-forward'
+      ? buildDayForwardSeries(
+        defaults.sourceApy,
+        defaults.stableYield,
+        activeMarket.provenance.retrievedAt ?? '2026-01-01',
+      )
+      : activeMarket.series,
+    [activeMarket.provenance.dataMode, activeMarket.provenance.retrievedAt, activeMarket.series, defaults.sourceApy, defaults.stableYield],
+  );
   const [showInputs, setShowInputs] = useState(false);
   const [showReview, setShowReview] = useState(true);
   const [hoverDate, setHoverDate] = useState<string | null>(null);
@@ -867,15 +1141,10 @@ export default function DayMarketSimulator({
   const [riskSharePct, setRiskSharePct] = useState(defaults.riskYDM.yTarget * 100);
   const [liqSharePct, setLiqSharePct] = useState(defaults.liqYDM.yTarget * 100);
   const [observationDays, setObservationDays] = useState(defaults.observationDays);
-  const riskFullPct = defaults.riskYDM.y100 * 100;
-  const exitBufferPct = defaults.exitBufferPct;
-  const seniorDeposit = defaults.initialST;
-  const manualJuniorDeposit = defaults.initialJT;
-  const linkJuniorToFirstLoss = defaults.linkJuniorToFirstLoss;
   const [maintainCoverage, setMaintainCoverage] = useState(defaults.maintainCoverage);
   const [range, setRange] = useState<IndexRange>({
     a: 0,
-    b: activeMarket.series.length - 1,
+    b: simulationSeries.length - 1,
   });
 
   useEffect(() => {
@@ -892,14 +1161,14 @@ export default function DayMarketSimulator({
     return () => observer.disconnect();
   }, []);
 
-  const maxIndex = Math.max(0, activeMarket.series.length - 1);
+  const maxIndex = Math.max(0, simulationSeries.length - 1);
   const viewRange = useMemo(
     () => normalizeRange(range.a, range.b, maxIndex),
     [maxIndex, range],
   );
   const modeledSeries = useMemo(
-    () => calibrateSeriesApy(activeMarket.series, sourceApyPct / 100),
-    [activeMarket.series, sourceApyPct],
+    () => calibrateSeriesApy(simulationSeries, sourceApyPct / 100),
+    [simulationSeries, sourceApyPct],
   );
   const view = useMemo(
     () => modeledSeries.slice(viewRange.a, viewRange.b + 1),
@@ -910,43 +1179,15 @@ export default function DayMarketSimulator({
     const run = (series: DaySeriesPoint[]) => {
     const coverage = coveragePct / 100;
     const minLiquidity = minLiquidityPct / 100;
-    const ltRatio = minLiquidity / 0.9;
-    const jtRatio = coverage / Math.max(0.9 - coverage, 0.001);
-    const initial = {
-      st: seniorDeposit,
-      jt: linkJuniorToFirstLoss ? seniorDeposit * jtRatio : manualJuniorDeposit,
-      lt: seniorDeposit * ltRatio,
-    };
     const riskTarget = riskSharePct / 100;
     const liqTarget = liqSharePct / 100;
-    const cfg = defaultConfig({
+    const initial = buildDayInitialBalances(defaults, { coverage, minLiquidity });
+    const cfg = buildDayMarketConfig(defaults, {
       coverage,
-      beta: 1,
       minLiquidity,
-      riskYDM: {
-        ...defaults.riskYDM,
-        y0: Math.min(defaults.riskYDM.y0, riskTarget),
-        yTarget: riskTarget,
-        y100: Math.max(riskFullPct / 100, riskTarget),
-      },
-      liqYDM: {
-        ...defaults.liqYDM,
-        y0: Math.min(defaults.liqYDM.y0, liqTarget),
-        yTarget: liqTarget,
-        y100: Math.max(defaults.liqYDM.y100, liqTarget),
-      },
-      fixedTermDurationSec: observationDays * DAY,
-      liquidationUtilization: 100 / Math.max(exitBufferPct, 0.01),
-      stSelfLiquidationBonus: defaults.selfLiquidationBonus,
-      stProtocolFee: defaults.stProtocolFee,
-      jtProtocolFee: defaults.jtProtocolFee,
-      yieldShareProtocolFee: defaults.jtYieldShareProtocolFee,
-      ltYieldShareProtocolFee: defaults.ltYieldShareProtocolFee,
-      stableYield: defaults.stableYield,
-      swapFeeBps: defaults.swapFeeBps,
-      poolTurnoverPerYear: defaults.poolTurnoverPerYear,
-      eclpBandWidth: defaults.eclpBandWidth,
-      reinvestLiquidityPremium: defaults.reinvestLiquidityPremium,
+      observationDays,
+      riskYieldShare: riskTarget,
+      liquidityYieldShare: liqTarget,
     });
     const sim = new Sim(cfg, initial);
     const snapshots = [sim.last()];
@@ -1181,17 +1422,12 @@ export default function DayMarketSimulator({
   }, [
     coveragePct,
     defaults,
-    exitBufferPct,
-    linkJuniorToFirstLoss,
     liqSharePct,
     maintainCoverage,
-    manualJuniorDeposit,
     modeledSeries,
     minLiquidityPct,
     observationDays,
-    riskFullPct,
     riskSharePct,
-    seniorDeposit,
     view,
     viewRange,
     maxIndex,
@@ -1290,20 +1526,27 @@ export default function DayMarketSimulator({
     }
     return Array.from(new Set(tickIndices)).map((index) => dates[index]);
   }, [chartTickCount, result.chart, yearMarks]);
-  const yMax = useMemo(() => {
-    let maximum = 0;
+  const yMin = useMemo(() => {
+    let minimum = Number.POSITIVE_INFINITY;
+    let maximum = Number.NEGATIVE_INFINITY;
     for (const point of result.chart) {
-      maximum = Math.max(
-        maximum,
-        point.strategy,
-        point.senior,
-        point.junior,
-        point.liquidity,
-      );
+      minimum = Math.min(minimum, point.strategy, point.senior, point.junior, point.liquidity);
+      maximum = Math.max(maximum, point.strategy, point.senior, point.junior, point.liquidity);
+    }
+    const range = Math.max(1, maximum - minimum);
+    const padding = Math.max(2, range * 0.08);
+    return Math.max(0, Math.floor((minimum - padding) / 5) * 5);
+  }, [result.chart]);
+  const chartYMax = useMemo(() => {
+    let maximum = Number.NEGATIVE_INFINITY;
+    for (const point of result.chart) {
+      maximum = Math.max(maximum, point.strategy, point.senior, point.junior, point.liquidity);
     }
     for (const event of result.erasureEvents) maximum = Math.max(maximum, event.top);
-    return Math.max(Math.ceil((maximum * 1.04) / 10) * 10, 110);
-  }, [result.chart, result.erasureEvents]);
+    const range = Math.max(1, maximum - yMin);
+    const padding = Math.max(2, range * 0.08);
+    return Math.ceil((maximum + padding) / 5) * 5;
+  }, [result.chart, result.erasureEvents, yMin]);
   const dateIndex = useMemo(() => {
     const index = new Map<string, number>();
     result.chart.forEach((point, pointIndex) => index.set(point.date, pointIndex));
@@ -1365,16 +1608,90 @@ export default function DayMarketSimulator({
             margin: '12px 0 6px',
           }}
         >
-          {activeMarket.copy.title}
+          {isExecutive ? heroTitle : activeMarket.copy.title}
         </h1>
         <p className="max-w-3xl" style={{ color: C.muted, fontSize: 12.5, lineHeight: 1.38, margin: '0 0 12px' }}>
-          {isGuided
+          {isExecutive
+            ? heroDescription
+            : isGuided
             ? 'See how one yield strategy can support three different positions.'
             : activeMarket.copy.description}
         </p>
       </section>
 
-      <section style={{ ...cardStyle, padding: 16 }}>
+      {isExecutive && showSection('senior-summary') && (
+        <section style={{ ...cardStyle, padding: 16 }}>
+          <Eyebrow>What Senior receives</Eyebrow>
+          <div className="mt-3 grid grid-cols-1 md:grid-cols-3" style={{ gap: 8 }}>
+            <ExecutiveMetric label="Senior average yield" value={`${pct(result.seniorApy)}/yr`} valueColor={C.accent} />
+            <ExecutiveMetric label="Contract-enforced coverage" value={`${coveragePct.toFixed(0)}% minimum`} valueColor={C.juniorLine} />
+            <ExecutiveMetric label="Dedicated liquidity" value={`${minLiquidityPct.toFixed(0)}% minimum`} valueColor={C.olive} />
+          </div>
+        </section>
+      )}
+
+      {isExecutive && showSection('roles') && (
+        <section style={{ ...cardStyle, padding: 16 }}>
+          <Eyebrow>One opportunity · three roles</Eyebrow>
+          <h2 className="mt-2" style={{ color: C.text, fontFamily: SERIF, fontSize: 24, fontWeight: 400, lineHeight: 1.12 }}>
+            One investment opportunity becomes three specialized positions.
+          </h2>
+          <p className="mt-2" style={{ color: C.muted, fontSize: 12.5, lineHeight: 1.45 }}>
+            Each position earns yield for doing a different job. Senior pays premiums for coverage and liquidity, and Junior and LP earn those premiums for providing them.
+          </p>
+          <div className="mt-4 grid grid-cols-1 md:grid-cols-3" style={{ gap: 8 }}>
+            <div style={{ background: C.pageBg, border: `1px solid ${C.seniorLine}`, minHeight: 178, padding: 14 }}>
+              <Eyebrow>Senior · yield and liquidity</Eyebrow>
+              <p className="mt-3" style={{ color: C.accent, fontFamily: MONO, fontSize: 26, fontWeight: 700 }}>
+                {pct(result.seniorApy)}/yr
+              </p>
+              <p className="mt-2" style={{ color: C.text, fontFamily: SERIF, fontSize: 18 }}>Senior takes losses only after Junior.</p>
+              <p className="mt-2" style={{ color: C.muted, fontSize: 11.5, lineHeight: 1.45 }}>
+                Senior keeps the remaining strategy yield and can exit through the dedicated LP before the underlying asset matures.
+              </p>
+            </div>
+            <div style={{ background: C.pageBg, border: `1px solid ${C.juniorLine}`, minHeight: 178, padding: 14 }}>
+              <Eyebrow>Junior · first-loss capital</Eyebrow>
+              <p className="mt-3" style={{ color: C.juniorLine, fontFamily: MONO, fontSize: 26, fontWeight: 700 }}>
+                {pct(result.juniorApy)}/yr
+              </p>
+              <p className="mt-2" style={{ color: C.text, fontFamily: SERIF, fontSize: 18 }}>Gets paid to take losses first.</p>
+              <p className="mt-2" style={{ color: C.muted, fontSize: 11.5, lineHeight: 1.45 }}>
+                Earns a risk premium because Junior takes investment losses before Senior does.
+              </p>
+            </div>
+            <div style={{ background: C.pageBg, border: `1px solid ${C.olive}`, minHeight: 178, padding: 14 }}>
+              <Eyebrow>LP · dedicated liquidity</Eyebrow>
+              <p className="mt-3" style={{ color: C.olive, fontFamily: MONO, fontSize: 26, fontWeight: 700 }}>
+                {pct(result.liquidityApy)}/yr
+              </p>
+              <p className="mt-2" style={{ color: C.text, fontFamily: SERIF, fontSize: 18 }}>Gets paid to fund exits.</p>
+              <p className="mt-2" style={{ color: C.muted, fontSize: 11.5, lineHeight: 1.45 }}>
+                Earns a liquidity premium by providing the assets Senior holders can sell into.
+              </p>
+            </div>
+          </div>
+          <div className="mt-3 grid grid-cols-1 md:grid-cols-[1fr_56px_1fr]" style={{ alignItems: 'center', gap: 8 }}>
+            <div style={{ background: `${C.strategyLine}12`, border: `1px solid ${C.border}`, padding: 12 }}>
+              <p style={{ color: C.kpiLabel, fontFamily: MONO, fontSize: 9.5, letterSpacing: '0.1em', textTransform: 'uppercase' }}>Underlying opportunity</p>
+              <p className="mt-1" style={{ color: C.strategyLine, fontFamily: SERIF, fontSize: 18 }}>{activeMarket.identity.displayAssetName} base yield</p>
+            </div>
+            <div className="hidden items-center justify-center md:flex" aria-hidden="true" style={{ color: C.faint, fontFamily: MONO, fontSize: 20 }}>→</div>
+            <div className="grid grid-cols-1 sm:grid-cols-2" style={{ gap: 8 }}>
+              <div style={{ borderLeft: `3px solid ${C.eyebrow}`, padding: '7px 10px' }}>
+                <p style={{ color: C.eyebrow, fontFamily: MONO, fontSize: 9.5, fontWeight: 700, textTransform: 'uppercase' }}>Risk premium → Junior</p>
+                <p className="mt-1" style={{ color: C.muted, fontSize: 11 }}>Pays for first-loss coverage.</p>
+              </div>
+              <div style={{ borderLeft: `3px solid ${C.olive}`, padding: '7px 10px' }}>
+                <p style={{ color: C.olive, fontFamily: MONO, fontSize: 9.5, fontWeight: 700, textTransform: 'uppercase' }}>Liquidity premium → LP</p>
+                <p className="mt-1" style={{ color: C.muted, fontSize: 11 }}>Pays for dedicated liquidity.</p>
+              </div>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {!isExecutive && <section style={{ ...cardStyle, padding: 16 }}>
         <Eyebrow>How Day works</Eyebrow>
         {isGuided && (
           <h2 className="mt-2" style={{ color: C.text, fontFamily: SERIF, fontSize: 22, fontWeight: 400, lineHeight: 1.12 }}>
@@ -1392,7 +1709,9 @@ export default function DayMarketSimulator({
             <FlowBox
               eyebrow="Underlying"
               value="Base yield"
-              note={`${activeMarket.provenance.feesIncluded ? 'Fee-inclusive' : 'Fee-exclusive'} source ${activeMarket.provenance.priceType.toUpperCase()} path`}
+              note={activeMarket.provenance.dataMode === 'published-apy-forward'
+                ? `Published ${(defaults.sourceApy * 100).toFixed(1)}% APY forward input`
+                : `${activeMarket.provenance.feesIncluded ? 'Fee-inclusive' : 'Fee-exclusive'} source ${activeMarket.provenance.priceType.toUpperCase()} path`}
               color={C.strategyLine}
             />
             <div className="flex items-center justify-center md:hidden" aria-hidden="true" style={{ height: 34 }}>
@@ -1497,9 +1816,9 @@ export default function DayMarketSimulator({
             </div>
           </div>
         </div>
-      </section>
+      </section>}
 
-      <section style={{ ...cardStyle, padding: '10px 12px' }}>
+      {showSection('market-inputs') && <section style={{ ...cardStyle, padding: '10px 12px' }}>
         <div className="flex items-center justify-between gap-4">
           <Eyebrow>Market inputs</Eyebrow>
           <button
@@ -1608,49 +1927,86 @@ export default function DayMarketSimulator({
             </div>
           </div>
         )}
-      </section>
+      </section>}
 
-      <section style={{ ...cardStyle, padding: 14 }}>
+      {!isExecutive && <section style={{ ...cardStyle, padding: 14 }}>
         <Eyebrow>APYs</Eyebrow>
         <div className="mt-3 grid grid-cols-1 md:grid-cols-3" style={{ gap: 8 }}>
           <Kpi label="Senior avg/yr" value={`${pct(result.seniorApy)}/yr`} valueColor={C.accent} />
           <Kpi label="Junior avg/yr" value={`${pct(result.juniorApy)}/yr`} valueColor={C.text} />
           <Kpi label="LP avg/yr" value={`${pct(result.liquidityApy)}/yr`} valueColor={C.olive} />
         </div>
-      </section>
+      </section>}
 
-      <section className="grid grid-cols-1 md:grid-cols-2" style={{ gap: 10 }}>
+      {showSection('liquidity-and-coverage') && <section className="grid grid-cols-1 md:grid-cols-2" style={{ gap: 10 }}>
         <div style={{ ...cardStyle, padding: 14 }}>
-          <Eyebrow>Liquidity</Eyebrow>
-          <LiquidityExecutionDiagram metrics={result.explainer.liquidity} />
-          {isGuided && (
+          {isExecutive ? <Eyebrow>If a Senior wants to exit</Eyebrow> : <Eyebrow>Liquidity</Eyebrow>}
+          {isExecutive && (
+            <>
+              <h2 className="mt-2" style={{ color: C.text, fontFamily: SERIF, fontSize: 22, fontWeight: 400, lineHeight: 1.12 }}>
+                Sell through the dedicated LP.
+              </h2>
+              <p className="mt-2" style={{ color: C.muted, fontSize: 11.5, lineHeight: 1.45 }}>
+                Senior does not have to wait for the underlying asset to mature.
+              </p>
+            </>
+          )}
+          <LiquidityExecutionDiagram metrics={result.explainer.liquidity} avoidLabelOverlap={isExecutive} />
+          {(isGuided || isExecutive) && (
             <p style={{ color: C.muted, fontSize: 11.5, lineHeight: 1.45 }}>
-              Senior can exit through the LP. Larger atomic sales move farther down the curve and create a larger arbitrage opportunity.
+              {isExecutive
+                ? 'Larger sale → larger discount → stronger arbitrage incentive to buy below underlying redemption value.'
+                : 'Senior can exit through the LP. Larger atomic sales move farther down the curve and create a larger arbitrage opportunity.'}
             </p>
           )}
         </div>
 
         <div style={{ ...cardStyle, padding: 14 }}>
-          <Eyebrow>Coverage</Eyebrow>
+          {isExecutive ? <Eyebrow>Loss waterfall</Eyebrow> : <Eyebrow>Coverage</Eyebrow>}
+          {isExecutive && (
+            <>
+              <h2 className="mt-2" style={{ color: C.text, fontFamily: SERIF, fontSize: 22, fontWeight: 400, lineHeight: 1.12 }}>
+                Junior absorbs loss first.
+              </h2>
+              <p className="mt-2" style={{ color: C.muted, fontSize: 11.5, lineHeight: 1.45 }}>
+                Contracts require a minimum Junior buffer behind Senior, providing first-loss coverage.
+              </p>
+            </>
+          )}
           <CoverageLossDiagram metrics={result.explainer.coverage} />
-          {isGuided && (
+          {(isGuided || isExecutive) && (
             <p style={{ color: C.muted, fontSize: 11.5, lineHeight: 1.45 }}>
-              Coverage is Junior&apos;s first-loss buffer. At the current starting balance, Junior can absorb about{' '}
-              {(result.explainer.coverage.coverageLossLimit * 100).toFixed(1)}% of strategy losses before Senior declines.
+              {isExecutive ? 'At the current starting balance, ' : 'Coverage is Junior\'s first-loss buffer. At the current starting balance, '}
+              Junior can absorb about {(result.explainer.coverage.coverageLossLimit * 100).toFixed(1)}% of strategy losses before Senior declines.
             </p>
           )}
         </div>
-      </section>
+      </section>}
 
-      <section style={cardStyle}>
+      {isExecutive && showSection('observation-period') && (
+        <section style={{ ...cardStyle, padding: 16 }}>
+          <Eyebrow>What is an observation period?</Eyebrow>
+          <h2 className="mt-2" style={{ color: C.text, fontFamily: SERIF, fontSize: 24, fontWeight: 400, lineHeight: 1.12 }}>
+            A defined recovery window after Junior begins covering a loss.
+          </h2>
+          <p className="mt-2 max-w-3xl" style={{ color: C.muted, fontSize: 12.5, lineHeight: 1.45 }}>
+            The window gives the strategy time to recover before Junior&apos;s covered loss becomes permanent. Senior can still sell through the LP while direct Senior and Junior deposits and redemptions are paused.
+          </p>
+          <GuidedObservationSteps days={observationDays} generalizeObservation />
+        </section>
+      )}
+
+      {showSection('backtest') && <section style={cardStyle}>
         <div className="flex items-start justify-between gap-4">
           <div>
             <Eyebrow>Backtest</Eyebrow>
             <h2 className="mt-2" style={{ color: C.text, fontFamily: SERIF, fontSize: 22, fontWeight: 400, lineHeight: 1.08 }}>
-              {isGuided ? 'See the rules play out over time.' : LOCKED_COPY.reviewTitle}
+              {isExecutive ? 'See it in the market history.' : isGuided ? 'See the rules play out over time.' : LOCKED_COPY.reviewTitle}
             </h2>
             <p className="mt-1" style={{ color: C.muted, fontSize: 12.5, lineHeight: 1.38 }}>
-              {isGuided
+              {isExecutive
+                ? 'This accountant-backed chart shows each position, every observation period, and any loss that becomes permanent.'
+                : isGuided
                 ? 'Use the chart to see when Junior coverage is active, when a loss can still recover, and when it becomes permanent.'
                 : LOCKED_COPY.reviewDescription}
             </p>
@@ -1694,12 +2050,17 @@ export default function DayMarketSimulator({
                 <span style={{ width: 18, height: 10, background: C.obsFill, opacity: 0.32, display: 'inline-block' }} />
                 observation period
               </span>
+              {isNativeReturnUnit && (
+                <span style={{ color: C.eyebrow, fontFamily: MONO, fontWeight: 600 }}>
+                  Return basis: {returnUnit}
+                </span>
+              )}
             </div>
             <div ref={chartContainerRef} style={{ width: '100%', minWidth: 0, height: 360, minHeight: 360 }}>
               <ResponsiveContainerNoSSR>
                 <LineChart
                   data={result.chart}
-                  margin={{ top: 8, right: chartTickCount <= 3 ? 36 : 16, bottom: 8, left: 0 }}
+                  margin={{ top: 8, right: 68, bottom: 8, left: 0 }}
                   onMouseMove={(state: { activeLabel?: string | number }) =>
                     setHoverDate(typeof state?.activeLabel === 'string' ? state.activeLabel : null)
                   }
@@ -1747,14 +2108,22 @@ export default function DayMarketSimulator({
                   <YAxis
                     tick={{ fill: C.kpiLabel, fontSize: 11 }}
                     stroke={C.border}
-                    domain={[0, yMax]}
-                    label={{
-                      value: '$ per $100 deposited',
-                      angle: -90,
-                      position: 'insideLeft',
-                      fill: C.kpiLabel,
-                      fontSize: 11,
-                    }}
+                    domain={[yMin, chartYMax]}
+                    label={isNativeReturnUnit
+                      ? {
+                        value: `${returnUnit}-relative index (start = 100)`,
+                        angle: -90,
+                        position: 'insideLeft',
+                        fill: C.kpiLabel,
+                        fontSize: 11,
+                      }
+                      : {
+                        value: '$ per $100 deposited',
+                        angle: -90,
+                        position: 'insideLeft',
+                        fill: C.kpiLabel,
+                        fontSize: 11,
+                      }}
                     width={64}
                   />
                   <Tooltip
@@ -1798,11 +2167,7 @@ export default function DayMarketSimulator({
                       zIndex={600}
                       shape={
                         <ErasureIBeam
-                          beamLabel={
-                            event.forfeitPctOfJuniorNav >= 4
-                              ? `erased −${event.forfeitPctOfJuniorNav.toFixed(0)}%`
-                              : null
-                          }
+                          beamLabel={formatDayErasureLabel(event.forfeitPctOfJuniorNav)}
                         />
                       }
                     />
@@ -1820,21 +2185,48 @@ export default function DayMarketSimulator({
                     <ReferenceDot
                       x={endStep.date}
                       y={endStep.junior}
-                      shape={<EndValueTag text={`Jr ${endStep.junior.toFixed(0)}`} color={C.juniorLine} />}
+                      shape={
+                        <EndValueTag
+                          text={`Jr ${endStep.junior.toFixed(0)}`}
+                          color={C.juniorLine}
+                          tagIndex={0}
+                          peerValues={[endStep.junior, endStep.senior, endStep.liquidity]}
+                          yMin={yMin}
+                          yMax={chartYMax}
+                        />
+                      }
                     />
                   )}
                   {endStep && (
                     <ReferenceDot
                       x={endStep.date}
                       y={endStep.senior}
-                      shape={<EndValueTag text={`Sr ${endStep.senior.toFixed(0)}`} color={C.seniorLine} />}
+                      shape={
+                        <EndValueTag
+                          text={`Sr ${endStep.senior.toFixed(0)}`}
+                          color={C.seniorLine}
+                          tagIndex={1}
+                          peerValues={[endStep.junior, endStep.senior, endStep.liquidity]}
+                          yMin={yMin}
+                          yMax={chartYMax}
+                        />
+                      }
                     />
                   )}
                   {endStep && (
                     <ReferenceDot
                       x={endStep.date}
                       y={endStep.liquidity}
-                      shape={<EndValueTag text={`LP ${endStep.liquidity.toFixed(0)}`} color={C.olive} />}
+                      shape={
+                        <EndValueTag
+                          text={`LP ${endStep.liquidity.toFixed(0)}`}
+                          color={C.olive}
+                          tagIndex={2}
+                          peerValues={[endStep.junior, endStep.senior, endStep.liquidity]}
+                          yMin={yMin}
+                          yMax={chartYMax}
+                        />
+                      }
                     />
                   )}
                   {hoverChip && (
@@ -1850,6 +2242,12 @@ export default function DayMarketSimulator({
                 </LineChart>
               </ResponsiveContainerNoSSR>
             </div>
+
+            {backtestDisplay?.footnote && (
+              <p className="mt-2" style={{ color: C.kpiLabel, fontSize: 10.5, lineHeight: 1.45 }}>
+                {backtestDisplay.footnote}
+              </p>
+            )}
 
             {isGuided && <GuidedObservationSteps days={observationDays} />}
 
@@ -1884,23 +2282,25 @@ export default function DayMarketSimulator({
                       </th>
                     ))}
                     <th className="text-right" style={{ borderBottom: `1px solid ${C.border}`, padding: '6px 7px', whiteSpace: 'nowrap' }}>
-                      end $100 → avg/yr
+                      {isNativeReturnUnit
+                        ? `end index → avg/yr (${returnUnit})`
+                        : 'end $100 → avg/yr'}
                     </th>
                   </tr>
                 </thead>
                 <tbody>
-                  <ReturnRow label="Base strategy" values={result.monthly.map((row) => row.strategyReturn)} end={endStep?.strategy ?? 100} annualized={result.strategyApy} />
-                  <ReturnRow label="Senior return" values={result.monthly.map((row) => row.seniorReturn)} end={endStep?.senior ?? 100} annualized={result.seniorApy} />
-                  <ReturnRow label="Junior return" values={result.monthly.map((row) => row.juniorReturn)} end={endStep?.junior ?? 100} annualized={result.juniorApy} />
-                  <ReturnRow label="LP return" values={result.monthly.map((row) => row.liquidityReturn)} end={endStep?.liquidity ?? 100} annualized={result.liquidityApy} />
+                  <ReturnRow label="Base strategy" values={result.monthly.map((row) => row.strategyReturn)} end={endStep?.strategy ?? 100} annualized={result.strategyApy} showCurrency={!isNativeReturnUnit} />
+                  <ReturnRow label="Senior return" values={result.monthly.map((row) => row.seniorReturn)} end={endStep?.senior ?? 100} annualized={result.seniorApy} showCurrency={!isNativeReturnUnit} />
+                  <ReturnRow label="Junior return" values={result.monthly.map((row) => row.juniorReturn)} end={endStep?.junior ?? 100} annualized={result.juniorApy} showCurrency={!isNativeReturnUnit} />
+                  <ReturnRow label="LP return" values={result.monthly.map((row) => row.liquidityReturn)} end={endStep?.liquidity ?? 100} annualized={result.liquidityApy} showCurrency={!isNativeReturnUnit} />
                 </tbody>
               </table>
             </div>
           </div>
         )}
-      </section>
+      </section>}
 
-      <section style={{ ...cardStyle, borderLeft: `3px solid ${C.accent}` }}>
+      {showSection('junior-funding') && <section style={{ ...cardStyle, borderLeft: `3px solid ${C.accent}` }}>
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <Eyebrow>Junior funding</Eyebrow>
           <label className="flex items-center gap-2 cursor-pointer select-none" style={{ color: C.muted, fontSize: 12 }}>
@@ -1921,22 +2321,24 @@ export default function DayMarketSimulator({
         <p className="mt-3" style={{ color: C.kpiLabel, fontSize: 11, lineHeight: 1.45 }}>
           Illustrative parameters. Not an offer or investment advice.
         </p>
-      </section>
+      </section>}
 
-      <footer
+      {showSection('disclosure') && <footer
         style={{ color: C.kpiLabel, fontSize: 11, lineHeight: 1.45 }}
         className="pb-8 border-t pt-4"
       >
         <p style={{ borderColor: C.border }}>
           <strong style={{ fontWeight: 600 }}>What this is, and what it is not.</strong>{' '}
-          The underlying is {activeMarket.provenance.source}, covering {startDate} through {endDate}.
+          {activeMarket.provenance.dataMode === 'published-apy-forward'
+            ? `The underlying is ${activeMarket.provenance.source}. This forward test uses the published ${(activeMarket.provenance.publishedApy ?? defaults.sourceApy) * 100}% APY and does not present historical performance.`
+            : `The underlying is ${activeMarket.provenance.source}, covering ${startDate} through ${endDate}.`}
         </p>
         <p className="mt-1">{activeMarket.copy.disclosure}</p>
         <p className="mt-1">
           Source:{' '}
           {activeMarket.provenance.sourceUrl}
         </p>
-      </footer>
+      </footer>}
     </div>
   );
 }
@@ -1946,11 +2348,13 @@ function ReturnRow({
   values,
   end,
   annualized,
+  showCurrency,
 }: {
   label: string;
   values: number[];
   end: number;
   annualized: number;
+  showCurrency: boolean;
 }) {
   return (
     <tr style={{ borderTop: `1px solid ${C.border}` }}>
@@ -1967,7 +2371,7 @@ function ReturnRow({
         </td>
       ))}
       <td className="text-right" style={{ padding: '6px 7px', borderBottom: `1px solid ${C.border}`, color: C.text, whiteSpace: 'nowrap' }}>
-        <b>${end.toFixed(0)}</b>{' '}
+        <b>{showCurrency ? '$' : ''}{end.toFixed(0)}</b>{' '}
         <span style={{ color: C.kpiLabel, fontSize: 11 }}>
           {pct(annualized)} ann.
         </span>

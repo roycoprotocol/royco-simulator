@@ -1,5 +1,8 @@
 import { defaultConfig } from '@/lib/day/engine/runner';
-import { buildDayExplainerMetrics } from './explainer';
+import {
+  buildDayExplainerMetrics,
+  DAY_COVERAGE_COMPARISON_MAX_LOSS,
+} from './explainer';
 
 let passed = 0;
 let failed = 0;
@@ -78,6 +81,61 @@ check(
   'coverage curve is monotone non-increasing',
   metrics.coverage.points.every(
     (point, index) => index === 0 || point.seniorBalancePer100 <= metrics.coverage.points[index - 1].seniorBalancePer100 + 1e-9,
+  ),
+);
+
+const liquidityComparisons = [0.1, 0.15, 0.2].map((minLiquidity) => {
+  const comparisonConfig = defaultConfig({
+    coverage: 0.03,
+    beta: 1,
+    minLiquidity,
+    eclpBandWidth: 0.1,
+  });
+  const comparisonInitial = {
+    st: 1000,
+    jt: initial.jt,
+    lt: (1000 * minLiquidity) / 0.9,
+  };
+  return buildDayExplainerMetrics(comparisonConfig, comparisonInitial);
+});
+check(
+  'more minimum liquidity increases the displayed maximum atomic-exit percentage',
+  liquidityComparisons.every(
+    (comparison, index) => index === 0
+      || comparison.liquidity.boundarySellShareOfSenior
+        > liquidityComparisons[index - 1].liquidity.boundarySellShareOfSenior,
+  ),
+);
+
+const coverageComparisons = [0.03, 0.06, 0.12].map((coverage) => {
+  const comparisonConfig = defaultConfig({
+    coverage,
+    beta: 1,
+    minLiquidity: 0.15,
+    eclpBandWidth: 0.1,
+  });
+  const comparisonInitial = {
+    st: 1000,
+    jt: (1000 * coverage) / (0.9 - coverage),
+    lt: initial.lt,
+  };
+  return buildDayExplainerMetrics(comparisonConfig, comparisonInitial);
+});
+check(
+  'fixed coverage comparison axis stays constant across coverage settings',
+  coverageComparisons.every(
+    (comparison) => approx(
+      comparison.coverage.displayMaxLoss,
+      DAY_COVERAGE_COMPARISON_MAX_LOSS,
+    ),
+  ),
+);
+check(
+  'more minimum coverage moves the Senior-loss breakpoint right on the fixed axis',
+  coverageComparisons.every(
+    (comparison, index) => index === 0
+      || comparison.coverage.coverageLossLimit
+        > coverageComparisons[index - 1].coverage.coverageLossLimit,
   ),
 );
 

@@ -1,0 +1,76 @@
+{
+  "id": "infinifi",
+  "route": "/infinifi",
+  "identity": {
+    "marketName": "Infini-Fi 13w",
+    "displayAssetName": "InfiniFi 13-w",
+    "underlyingAsset": "liUSD-13w",
+    "seniorName": "Senior Infinifi 13-w",
+    "seniorSymbol": "SrliUSD-13w",
+    "juniorName": "Junior Infinifi 13-w",
+    "juniorSymbol": "JrliUSD-13w"
+  },
+  "defaults": {
+    "sourceApy": 0.08928338608977526,
+    "coverage": 0.1,
+    "minLiquidity": 0.2,
+    "liquidationUtilization": 100,
+    "observationDays": 7,
+    "exitBufferPct": 1,
+    "linkJuniorToFirstLoss": true,
+    "maintainCoverage": true,
+    "riskYDM": {
+      "mode": "static",
+      "y0": 0.06,
+      "yTarget": 0.06,
+      "y100": 0.18
+    },
+    "liqYDM": {
+      "mode": "static",
+      "y0": 0.08,
+      "yTarget": 0.17,
+      "y100": 0.2
+    },
+    "selfLiquidationBonus": 0.01,
+    "stProtocolFee": 0,
+    "jtProtocolFee": 0,
+    "jtYieldShareProtocolFee": 0,
+    "ltYieldShareProtocolFee": 0,
+    "stableYield": 0.035,
+    "swapFeeBps": 10,
+    "poolTurnoverPerYear": 8,
+    "eclpBandWidth": 0.1,
+    "reinvestLiquidityPremium": true,
+    "initialST": 1000,
+    "initialJT": 125,
+    "initialLT": 222.22222222222223
+  },
+  "targets": {
+    "seniorApyMin": 0.06,
+    "seniorApyMax": 0.08,
+    "juniorApyMin": 0.12,
+    "juniorApyMax": 0.17
+  },
+  "certification": {
+    "intakeConfirmed": true
+  },
+  "customization": {
+    "explicitlyAuthorized": false,
+    "authorizationNote": "",
+    "hiddenSections": [],
+    "copyOverrides": {}
+  },
+  "provenance": {
+    "source": "InfiniFi stats API: liUSD-13w historical exchange-rate history",
+    "sourceUrl": "https://eth-api.infinifi.xyz/api/protocol/rate-history/liUSD-13w?daysAgo=30",
+    "sourceProvider": "InfiniFi",
+    "seriesPath": "lib/day-markets/infinifi/series.json",
+    "dataMode": "historical-series",
+    "dataCadence": "daily",
+    "priceType": "nav",
+    "feesIncluded": true,
+    "observationCount": 31,
+    "firstDate": "2026-06-20",
+    "lastDate": "2026-07-20"
+  }
+}
