@@ -29,6 +29,10 @@ h1{font-family:Georgia,"Times New Roman",serif;font-weight:400;font-size:clamp(2
 .mkSummary b{color:var(--ink)}
 .howto{font-size:12px;color:var(--mut);line-height:1.5;margin:6px 0 2px;max-width:740px;border-top:1px solid var(--line);padding-top:10px}
 .howto b{color:var(--ink)}
+.howto .lead{font-weight:600;color:var(--ink);margin:0 0 3px}
+.howto ul{margin:0;padding-left:18px}
+.howto li{margin:0 0 4px}
+.howto li:last-child{margin-bottom:0}
 .mkgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin-top:14px}
 @media(max-width:680px){.mkgrid{grid-template-columns:1fr}}
 .mk{position:relative;border:1px solid var(--line);background:rgba(255,253,249,.82);padding:14px}
@@ -71,6 +75,11 @@ h1{font-family:Georgia,"Times New Roman",serif;font-weight:400;font-size:clamp(2
 .note p{color:var(--mut);font-size:13.5px;line-height:1.5;margin:0 0 10px;max-width:680px}
 .note p b{color:var(--ink)}
 .note+.note{margin-top:22px;border-top:1px solid var(--line);padding-top:18px}
+.note .lead{font-size:13.5px;color:var(--ink);font-weight:600;margin:0 0 4px}
+.note ul{margin:6px 0 0;padding-left:18px}
+.note li{margin:0 0 6px;font-size:13px;line-height:1.5;color:var(--mut)}
+.note li:last-child{margin-bottom:0}
+.note li b{color:var(--ink)}
 table.ref{width:100%;border-collapse:collapse;font-size:13px;margin:8px 0 10px}
 table.ref th,table.ref td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line)}
 table.ref th{font-size:9.5px;text-transform:uppercase;letter-spacing:.12em;color:var(--accent);font-weight:700}
@@ -120,28 +129,44 @@ table.ref td.na{color:#A49B90}
 <div class="card notes">
   <div class="note">
     <h3>How these numbers update</h3>
-    <p>They are not on a clock. Royco recomputes the Junior's yield share whenever the market is <b>synced</b>, and a sync happens on any interaction with the market: a Senior or Junior <b>deposit</b>, a <b>redemption</b>, or a yield accrual. Between two interactions the share is held as a <b>time-weighted average</b> of what it was, so it only moves when something actually happens.</p>
-    <p>So a new deposit is exactly one of the events that refreshes utilization and re-reads the share. It is lazy and event-driven, not per-block and not fixed-daily.</p>
+    <p class="lead">Not on a clock. The share updates on any market interaction.</p>
+    <ul>
+      <li>Recomputed on every <b>sync</b>: a deposit, a redemption, or a yield accrual.</li>
+      <li>Between events, held as a <b>time-weighted average</b>.</li>
+      <li>So a new deposit refreshes utilization and re-reads the share. Event-driven, not per-block.</li>
+    </ul>
   </div>
   <div class="note">
     <h3>How fast the share re-rates</h3>
-    <p>The pace scales with how far utilization is from the <b>90%</b> target: gentle near the target, and fast the further away it gets. This is the same idea as Morpho's adaptive interest rate, applied to the split of yield instead of a borrow rate.</p>
-    <p>The real numbers, from the deployed Royco Dawn contracts: the adaptation runs at up to <b>100 per year</b> at the extremes of utilization, and the share is bounded between <b>0.01%</b> and <b>100%</b>. That speed is a shared constant across the current markets, not a per-market dial. The takeaway: a market that drifts even a few points off 90% re-rates within days, not months.</p>
+    <p class="lead">Fast, and it scales with distance from 90%.</p>
+    <ul>
+      <li>Gentle near 90%, fast at the extremes. Like Morpho's adaptive rate, on the yield split.</li>
+      <li>Real speed: up to <b>100 per year</b> at the extremes. A shared constant, not a per-market dial.</li>
+      <li>Bounded <b>0.01%</b> to <b>100%</b>.</li>
+      <li>A few points off 90% re-rates within <b>days</b>, not months.</li>
+    </ul>
   </div>
   <div class="note">
     <h3>What this view simplifies</h3>
-    <p>The re-rating acts on the curve's <b>target share</b>, and what the Junior actually earns is that target share plus a fixed premium for utilization above 90%. The deployed markets are flat below target, so <b>below 90% the share shown here is exact</b>; above 90% a small fixed premium rides on top, largest near full utilization where the share is near its cap anyway.</p>
-    <p>Two more: the Forecast holds each market's utilization flat, and re-rating pauses while a market sits in a drawdown recovery state. These keep the picture simple without changing the direction or the pace.</p>
+    <p class="lead">Three simplifications. None change the direction or the pace.</p>
+    <ul>
+      <li>The drift acts on the <b>target share</b>; the paid share adds a fixed premium above 90%. Markets are flat below 90%, so <b>below target this is exact</b>.</li>
+      <li>The Forecast holds each market's utilization flat.</li>
+      <li>Re-rating pauses during a drawdown recovery.</li>
+    </ul>
   </div>
 </div>
 
 </div><!-- /tab-sim -->
 
 <div id="tab-markets" class="panel" style="display:none">
-  <p class="lede">Real Royco Dawn markets, and how their utilization has moved over the last month. Every Dawn market targets <b>90%</b> utilization; the Junior's yield share follows where utilization actually sits. Live data from the Royco API.</p>
+  <p class="lede">Real Royco Dawn markets. How utilization has moved over the last month, against the <b>90%</b> target. Live data from the Royco API.</p>
   <div class="card">
     <p class="mkSummary" id="mkSummary"></p>
-    <p class="howto">How to read each card: the line is <b>utilization</b> over the last month, at its 30-day average, 7-day average, and now, against the dashed <b>90% target</b>. Below it, <b>Util now</b> is where utilization sits, <b>Junior share</b> is the slice of yield paid to the Junior at that utilization, and <b>Coverage</b> is the size of the Junior cushion.</p>
+    <div class="howto"><p class="lead">How to read each card:</p><ul>
+      <li><b>Line</b>: utilization over the last month (30-day avg, 7-day avg, now) vs the dashed 90% target.</li>
+      <li><b>Util now</b>: where utilization sits. <b>Junior share</b>: yield paid to the Junior there. <b>Coverage</b>: size of the Junior cushion.</li>
+    </ul></div>
     <div class="mkgrid" id="mkgrid"></div>
   </div>
 </div><!-- /tab-markets -->
@@ -150,7 +175,10 @@ table.ref td.na{color:#A49B90}
   <p class="lede">How each market's Junior share would re-rate over the <b>next 30 days</b> if utilization held at today's level, at Royco's real speed. Above 90% it drifts up, below 90% it drifts down. A projection: real utilization keeps moving.</p>
   <div class="card">
     <p class="mkSummary" id="fcSummary"></p>
-    <p class="howto">How to read each card: the line is the Junior's <b>yield share</b> drifting over the next 30 days if utilization stayed at today's level. <b style="color:#319C61">Green</b> rises, <b style="color:#8F4D42">red</b> falls. The tiles show the share now, in 30 days, and the change in percentage points.</p>
+    <div class="howto"><p class="lead">How to read each card:</p><ul>
+      <li><b>Line</b>: the Junior's share drifting over 30 days at today's utilization. <b style="color:#319C61">Green</b> rises, <b style="color:#8F4D42">red</b> falls.</li>
+      <li><b>Tiles</b>: share now, in 30 days, and the change in percentage points.</li>
+    </ul></div>
     <div class="mkgrid" id="fcgrid"></div>
   </div>
 </div><!-- /tab-forecast -->
