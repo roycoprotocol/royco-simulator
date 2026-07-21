@@ -69,6 +69,7 @@ table.ref td.na{color:#A49B90}
 <div class="tabs">
   <button class="tab on" data-t="sim">Simulator</button>
   <button class="tab" data-t="markets">Dawn markets today</button>
+  <button class="tab" data-t="forecast">Forecast</button>
 </div>
 <div id="tab-sim" class="panel">
 <p class="lede">One question: if utilization sits away from its target, how does the Junior's yield share move over the next year? Set the starting share and where utilization actually is, then press Play.</p>
@@ -100,29 +101,36 @@ table.ref td.na{color:#A49B90}
     <p>So a new deposit is exactly one of the events that refreshes utilization and re-reads the share. It is lazy and event-driven, not per-block and not fixed-daily.</p>
   </div>
   <div class="note">
-    <h3>Re-rating speed across markets</h3>
-    <p>The re-rating speed only applies to the <b>self-adjusting</b> curve. Today every launched Royco market uses a <b>fixed</b> curve, so none of them has a live re-rating speed yet. The speed is a design parameter; the only reference values that exist in the code are these:</p>
-    <table class="ref"><thead><tr><th>Reference</th><th>Curve</th><th>Re-rating speed</th></tr></thead><tbody>
-      <tr><td>Code default</td><td>self-adjusting</td><td class="mono">1.0 / yr</td></tr>
-      <tr><td>Engine test scenario</td><td>self-adjusting</td><td class="mono">2.0 / yr</td></tr>
-      <tr><td>Pareto FalconX (example Day market)</td><td>fixed</td><td class="na">not applicable</td></tr>
-      <tr><td>Live Dawn markets</td><td>fixed</td><td class="na">not applicable</td></tr>
-    </tbody></table>
-    <p>The honest answer: there is no per-market re-rating speed to report yet. When a market launches on the self-adjusting curve, its speed will be one per-market setting, most likely near the <b>1.0 / yr</b> default.</p>
+    <h3>How fast the share re-rates</h3>
+    <p>Two things set the pace. First, how far utilization is from the <b>90%</b> target: a bigger gap moves the share faster. Second, a per-market <b>re-rating speed</b>, which is not one universal number, each market can set its own. The code's default is about <b>1.0 per year</b>, which is what the Forecast tab uses.</p>
+    <p>So the pace differs by market. It is early, so expect settings near the <b>1.0 / yr</b> default until a market is tuned otherwise.</p>
   </div>
 </div>
 
 </div><!-- /tab-sim -->
 
 <div id="tab-markets" class="panel" style="display:none">
-  <p class="lede">Real Royco Dawn markets, and how their utilization has moved over the last month. Every Dawn market targets <b>90%</b> utilization; the Junior's yield share follows where utilization actually sits. These use fixed curves, so the share tracks the curve rather than drifting. Live data from the Royco API.</p>
+  <p class="lede">Real Royco Dawn markets, and how their utilization has moved over the last month. Every Dawn market targets <b>90%</b> utilization; the Junior's yield share follows where utilization actually sits. Live data from the Royco API.</p>
   <div class="card">
     <p class="mkSummary" id="mkSummary"></p>
     <div class="mkgrid" id="mkgrid"></div>
   </div>
 </div><!-- /tab-markets -->
 
-<div class="foot">Illustrative model of the self-adjusting part of Royco's Yield Distribution Mechanism (adaptYTarget). When utilization stays away from the target, the target share drifts over time: down when utilization is below target, up when it is above, faster the wider the gap. Not investment advice.</div>
+<div id="tab-forecast" class="panel" style="display:none">
+  <p class="lede">If each market's utilization stayed exactly where it is today, this is how the Junior's yield share would re-rate over the next 12 months. Markets above the <b>90%</b> target drift up; below it, they drift down; right at it, they hold. It is a projection: it holds utilization flat at today's level, but real utilization will keep moving.</p>
+  <div class="card">
+    <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:8px">
+      <label style="font-size:10.5px;text-transform:uppercase;letter-spacing:.14em;color:var(--accent);font-weight:700">Re-rating speed assumption</label>
+      <input type="range" id="fsp" min="0.5" max="4" step="0.5" value="1" style="flex:1;max-width:300px;accent-color:var(--accent);cursor:pointer">
+      <b id="fspv" style="font-family:monospace;font-variant-numeric:tabular-nums">1.0/yr</b>
+    </div>
+    <p class="mkSummary" id="fcSummary"></p>
+    <div class="mkgrid" id="fcgrid"></div>
+  </div>
+</div><!-- /tab-forecast -->
+
+<div class="foot">Illustrative model of how Royco Dawn's Yield Distribution Mechanism re-rates the Junior's share over time (adaptYTarget). When utilization stays away from the 90% target, the share drifts: down when utilization is below target, up when it is above, faster the wider the gap. Not investment advice.</div>
 </div>
 
 <script>
@@ -274,12 +282,44 @@ function renderMarkets(){
       spark(m,col)+
       '<div class="kv">'+kv('Util now',Math.round(m.u*100)+'%')+kv('Junior share',(m.s*100).toFixed(1)+'%')+kv('Coverage',Math.round(m.cov*100)+'%')+'</div></div>';
   }).join(''); }
+/* ---- Forecast tab: hold today's utilization, drift the share with adaptYTarget ---- */
+let FSPEED=1.0;
+function fPath(s0,u,speed){ const a=[s0]; let y=s0;
+  for(let t=1;t<=H;t++) y=adaptYTarget(y,u,DAY,TU,speed,1.0); // never mutates real data
+  // rebuild full path for the sparkline
+  a.length=0; y=s0; a.push(y); for(let t=1;t<=H;t++){ y=adaptYTarget(y,u,DAY,TU,speed,1.0); a.push(y); } return a; }
+function fspark(path,col){ const w=240,h=66,pad={l:6,r:34,t:8,b:16};
+  const mx=Math.max(0.05,Math.max(...path)*1.2), PX=d=>pad.l+d/H*(w-pad.l-pad.r), PY=v=>pad.t+(1-v/mx)*(h-pad.t-pad.b);
+  let s='<svg class="spark" viewBox="0 0 '+w+' '+h+'" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">';
+  s+='<path d="'+path.map((v,i)=>(i?'L':'M')+PX(i).toFixed(1)+' '+PY(v).toFixed(1)).join(' ')+'" fill="none" stroke="'+col+'" stroke-width="2"/>';
+  s+='<circle cx="'+PX(0).toFixed(1)+'" cy="'+PY(path[0]).toFixed(1)+'" r="2.6" fill="#B4A896"/>';
+  s+='<circle cx="'+PX(H).toFixed(1)+'" cy="'+PY(path[H]).toFixed(1)+'" r="2.6" fill="'+col+'"/>';
+  s+='<text x="'+(w-pad.r+3)+'" y="'+(PY(path[H])+3).toFixed(1)+'" fill="'+col+'" font-size="8.5" font-weight="700">'+Math.round(path[H]*100)+'%</text>';
+  ['now','6m','12m'].forEach((lb,i)=>{ const x=pad.l+i/2*(w-pad.l-pad.r); s+='<text x="'+x.toFixed(1)+'" y="'+(h-4)+'" fill="#A49B90" font-size="8" text-anchor="'+(i===0?'start':i===2?'end':'middle')+'">'+lb+'</text>'; });
+  return s+'</svg>'; }
+function renderForecast(){
+  document.getElementById('fspv').textContent=FSPEED.toFixed(1)+'/yr';
+  let up=0,down=0,flat=0;
+  const cards=MKTS.map(m=>{ const path=fPath(m.s,m.u,FSPEED), end=path[H], chg=end-m.s;
+    let dir,col; if(Math.abs(chg)<0.003){dir='Holds';col='#8A8073';flat++;} else if(chg>0){dir='Drifts up';col='#319C61';up++;} else {dir='Drifts down';col='#8F4D42';down++;}
+    const kv=(t,v)=>'<div><div class="t">'+t+'</div><div class="v">'+v+'</div></div>';
+    return '<div class="mk"><div class="top"><div><span class="nm">'+m.n+'</span><span class="ch">'+m.c+'</span></div><span class="tvl">util held '+Math.round(m.u*100)+'%</span></div>'+
+      '<div class="rd" style="color:'+col+'">'+dir+' &middot; share '+(m.s*100).toFixed(1)+'% &rarr; '+(end*100).toFixed(1)+'%</div>'+
+      fspark(path,col)+
+      '<div class="kv">'+kv('Share now',(m.s*100).toFixed(1)+'%')+kv('In 12 months',(end*100).toFixed(1)+'%')+kv('Change',(chg>=0?'+':'')+(chg*100).toFixed(1)+'pp')+'</div></div>';
+  }).join('');
+  document.getElementById('fcSummary').innerHTML='Holding today’s utilization, at a <b>'+FSPEED.toFixed(1)+'/yr</b> re-rating speed: <b>'+up+'</b> markets drift up, <b>'+down+'</b> drift down, <b>'+flat+'</b> hold. Above 90% util the share rises, below it the share falls.';
+  document.getElementById('fcgrid').innerHTML=cards;
+}
+document.getElementById('fsp').addEventListener('input',e=>{ FSPEED=+e.target.value; renderForecast(); });
+
 document.querySelectorAll('.tab').forEach(b=>b.addEventListener('click',()=>{
   document.querySelectorAll('.tab').forEach(x=>x.classList.toggle('on',x===b));
   const t=b.dataset.t;
   document.getElementById('tab-sim').style.display = t==='sim'?'':'none';
   document.getElementById('tab-markets').style.display = t==='markets'?'':'none';
-  if(t==='markets') renderMarkets(); else render();
+  document.getElementById('tab-forecast').style.display = t==='forecast'?'':'none';
+  if(t==='markets') renderMarkets(); else if(t==='forecast') renderForecast(); else render();
 }));
 
 window.addEventListener('resize',render);
