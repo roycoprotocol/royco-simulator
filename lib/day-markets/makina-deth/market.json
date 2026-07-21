@@ -56,7 +56,7 @@
   },
   "customization": {
     "explicitlyAuthorized": true,
-    "authorizationNote": "User explicitly authorized three visible Makina vault pill tabs (DUSD, DETH, and usdSHFmk), removal of DBIT from the tab group, the published 30-day base APY with incentives excluded, restoration of the Backtest using official Machine NAV history, and an ETH return-basis label on 2026-07-21.",
+    "authorizationNote": "User explicitly authorized four visible Makina vault pill tabs (DUSD, DETH, DBIT, and usdSHFmk), the published 30-day base APY with incentives excluded, restoration of the Backtest using official Machine NAV history, and an ETH return-basis label on 2026-07-21.",
     "hiddenSections": [],
     "copyOverrides": {},
     "vaultTabs": {
