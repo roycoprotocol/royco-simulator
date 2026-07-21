@@ -1,0 +1,132 @@
+{
+  "id": "muga",
+  "route": "/muga",
+  "identity": {
+    "marketName": "Muga",
+    "displayAssetName": "Muga Glasgow Cosmic",
+    "underlyingAsset": "Muga Glasgow Cosmic",
+    "seniorName": "Senior Muga",
+    "seniorSymbol": "srMUGA",
+    "juniorName": "Junior Muga",
+    "juniorSymbol": "jrMUGA"
+  },
+  "defaults": {
+    "sourceApy": 0.1709,
+    "coverage": 0.06666666666666667,
+    "minLiquidity": 0.15,
+    "liquidationUtilization": 100,
+    "observationDays": 7,
+    "exitBufferPct": 1,
+    "linkJuniorToFirstLoss": true,
+    "maintainCoverage": false,
+    "riskYDM": {
+      "mode": "static",
+      "y0": 0.014,
+      "yTarget": 0.014,
+      "y100": 0.3
+    },
+    "liqYDM": {
+      "mode": "static",
+      "y0": 0.08,
+      "yTarget": 0.119,
+      "y100": 0.25
+    },
+    "selfLiquidationBonus": 0.01,
+    "stProtocolFee": 0,
+    "jtProtocolFee": 0,
+    "jtYieldShareProtocolFee": 0,
+    "ltYieldShareProtocolFee": 0,
+    "stableYield": 0.035,
+    "swapFeeBps": 10,
+    "poolTurnoverPerYear": 8,
+    "eclpBandWidth": 0.1,
+    "reinvestLiquidityPremium": true,
+    "initialST": 1250000,
+    "initialJT": 99999.99999999999,
+    "initialLT": 208333.3333333333
+  },
+  "targets": {
+    "seniorApyMin": 0.145,
+    "seniorApyMax": 0.155,
+    "juniorApyMin": 0.19,
+    "juniorApyMax": 0.205,
+    "liquidityApyMin": 0.175,
+    "liquidityApyMax": 0.185
+  },
+  "certification": {
+    "intakeConfirmed": true
+  },
+  "customization": {
+    "explicitlyAuthorized": true,
+    "authorizationNote": "The user explicitly authorized a shared finite 120-day forward test with expected and bad outcomes for this reverse market; Muga funds a closed, non-replenishing Junior commitment and seeks Senior funding within the Pareto strategy cap. In browser review, the user authorized hiding the three-role and observation-period panels, retaining the full scenario horizon, and omitting the initial zero-return July anchor from the chart and month-over-month table.",
+    "hiddenSections": [
+      "roles",
+      "observation-period",
+      "junior-funding"
+    ],
+    "copyOverrides": {},
+    "forwardTest": {
+      "termDays": 120,
+      "grossInterestRate": 0.18,
+      "defaultScenario": "expected",
+      "omitInitialZeroReturnPeriod": true,
+      "scenarios": [
+        {
+          "id": "expected",
+          "label": "Expected",
+          "description": "Full principal and contractual interest are paid on Day 120.",
+          "paymentDelayDays": 0,
+          "terminalRecovery": {
+            "kind": "full"
+          }
+        },
+        {
+          "id": "bad",
+          "label": "Bad",
+          "description": "After a 60-day delay, only the $1.4M minimum-distribution receivable is recovered on Day 180; sponsorship and other sources recover zero.",
+          "paymentDelayDays": 60,
+          "terminalRecovery": {
+            "kind": "amount",
+            "amount": 1400000
+          }
+        }
+      ],
+      "tailRiskDisclosure": "Force majeure under the franchise agreement or ETPL default could impair the $1.4M minimum-distribution receivable; this is disclosed as tail risk rather than assumed in the modeled Bad outcome."
+    },
+    "reverseMarket": {
+      "strategyCap": 1500000,
+      "seniorCap": 1400000,
+      "juniorCap": 100000,
+      "issuerName": "Muga",
+      "juniorFunding": "issuer-funded",
+      "juniorDeposits": "closed",
+      "seniorSupportLabel": "Executed ETPL minimum-distribution receivable",
+      "seniorSupportAmount": 1400000
+    }
+  },
+  "provenance": {
+    "source": "Pareto staging Muga Glasgow Cosmic 120-day working-capital vault",
+    "sourceUrl": "https://app-staging.pareto.credit/vault/0xDa7E999327d99d3E2C5396ab8865f9264E0b850F",
+    "sourceProvider": "Pareto Credit and Muga underwriting materials",
+    "seriesPath": "lib/day-markets/muga/series.json",
+    "dataMode": "published-apy-forward",
+    "dataCadence": "none",
+    "priceType": "published-apy",
+    "feesIncluded": true,
+    "observationCount": 0,
+    "firstDate": "not-applicable",
+    "lastDate": "not-applicable",
+    "publishedApy": 0.1709,
+    "retrievedAt": "2026-07-21",
+    "supportingSources": [
+      {
+        "label": "Muga credit-line intake",
+        "url": "https://docs.google.com/document/d/1KACdai5zlJl0kJZojvTDaI93y8R2aaew0IxHBZC-a5M/edit?tab=t.0"
+      },
+      {
+        "label": "Muga underwriting and executed legal documents",
+        "url": "https://drive.google.com/drive/folders/1q1ub2Ef1SxgjCADSxyygtSwQoLxIKGMU"
+      }
+    ]
+  }
+}

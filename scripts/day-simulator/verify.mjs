@@ -402,8 +402,9 @@ for (const forbiddenChartRegression of [
 }
 for (const timeframeContract of [
   '<DayTimeframeBrush',
-  'isFull={isFullRange(viewRange, maxIndex)}',
-  'onChange={setRange}',
+  'view={displayedViewRange}',
+  'isFull={isFullRange(displayedViewRange, displayMaxIndex)}',
+  'onChange={setDisplayedRange}',
 ]) {
   if (!simulator.includes(timeframeContract)) failures.push(`Day simulator missing Dawn unified timeframe contract: ${timeframeContract}`);
 }
@@ -475,8 +476,16 @@ if (marketId) {
     for (const field of ["seniorApyMin", "seniorApyMax", "juniorApyMin", "juniorApyMax"]) {
       if (!Number.isFinite(market.targets?.[field])) failures.push(`Day market targets.${field} must be explicit`);
     }
+    const hasLiquidityTarget = market.targets?.liquidityApyMin !== undefined
+      || market.targets?.liquidityApyMax !== undefined;
+    if (hasLiquidityTarget) {
+      for (const field of ["liquidityApyMin", "liquidityApyMax"]) {
+        if (!Number.isFinite(market.targets?.[field])) failures.push(`Day market targets.${field} must be explicit when LP guardrails are configured`);
+      }
+    }
     if (market.targets?.seniorApyMin > market.targets?.seniorApyMax) failures.push("Senior APY target range is reversed");
     if (market.targets?.juniorApyMin > market.targets?.juniorApyMax) failures.push("Junior APY target range is reversed");
+    if (market.targets?.liquidityApyMin > market.targets?.liquidityApyMax) failures.push("LP APY target range is reversed");
     if (!(market.defaults?.minLiquidity > 0 && market.defaults.minLiquidity < 1)) failures.push("Day market LP ratio must be a fraction between 0 and 1");
     if (!(market.defaults?.coverage > 0 && market.defaults.coverage < 0.9)) failures.push("Day market coverage must be a fraction between 0 and 90%");
     if (!(market.defaults?.sourceApy > -1 && Number.isFinite(market.defaults.sourceApy))) failures.push("Day market sourceApy must be finite and greater than -100%");
@@ -491,7 +500,11 @@ if (marketId) {
     }
     if (typeof market.defaults?.reinvestLiquidityPremium !== "boolean") failures.push("Day market reinvestLiquidityPremium must be explicit");
     if (market.defaults?.linkJuniorToFirstLoss !== true) failures.push("Day market Junior sizing must remain linked to coverage");
-    if (market.defaults?.maintainCoverage !== true) failures.push("Day market must explicitly enable Junior coverage replenishment");
+    const closedIssuerJunior = market.customization?.reverseMarket?.juniorFunding === "issuer-funded"
+      && market.customization?.reverseMarket?.juniorDeposits === "closed";
+    if (market.defaults?.maintainCoverage !== true && !(closedIssuerJunior && market.defaults?.maintainCoverage === false)) {
+      failures.push("Day market must enable Junior replenishment unless an authorized reverse market closes issuer-funded Junior deposits");
+    }
     const expectedJT = (market.defaults?.initialST * market.defaults?.coverage) / (0.9 - market.defaults?.coverage);
     const expectedLT = (market.defaults?.initialST * market.defaults?.minLiquidity) / 0.9;
     if (Math.abs(market.defaults?.initialJT - expectedJT) > 1e-9) failures.push("Day market initial Junior balance must be accountant-sized at 90% utilization");
@@ -510,6 +523,16 @@ if (marketId) {
       if (market.provenance?.[field] === undefined || market.provenance[field] === "") failures.push(`Day market provenance.${field} must be explicit`);
     }
     if (!/^https?:\/\//.test(market.provenance?.sourceUrl ?? "")) failures.push("Day market sourceUrl must be a complete http(s) URL");
+    if (market.provenance?.supportingSources !== undefined) {
+      if (!Array.isArray(market.provenance.supportingSources) || market.provenance.supportingSources.length === 0) {
+        failures.push("Day market provenance.supportingSources must be a non-empty array when supplied");
+      } else {
+        for (const [index, source] of market.provenance.supportingSources.entries()) {
+          if (typeof source?.label !== "string" || !source.label.trim()) failures.push(`Day supporting source ${index + 1} needs a label`);
+          if (!/^https?:\/\//.test(source?.url ?? "")) failures.push(`Day supporting source ${index + 1} needs a complete http(s) URL`);
+        }
+      }
+    }
     const expectedSeriesPath = `lib/day-markets/${marketId}/series.json`;
     if (market.provenance?.seriesPath !== expectedSeriesPath) failures.push(`Day market seriesPath must be ${expectedSeriesPath}`);
     if (market.provenance?.seriesPath) {
@@ -524,6 +547,7 @@ if (marketId) {
         if (market.provenance.priceType !== "published-apy") failures.push("published-apy-forward markets must use priceType published-apy");
         if (market.provenance.observationCount !== 0 || sourceSeries.length !== 0) failures.push("published-apy-forward markets may not claim historical observations");
         if (!Number.isFinite(market.provenance.publishedApy) || Math.abs(market.provenance.publishedApy - market.defaults.sourceApy) > 1e-12) failures.push("published APY must match defaults.sourceApy");
+        if (market.customization?.forwardTest && market.customization?.hiddenSections?.includes("backtest")) failures.push("finite forward tests must remain visible in the shared backtest section");
       } else {
         if (market.provenance.dataMode !== "historical-series" && !historicalWithPublishedApy) failures.push("Day market dataMode must be historical-series, historical-series-with-published-apy, or published-apy-forward");
         if (first?.date !== market.provenance.firstDate || last?.date !== market.provenance.lastDate) failures.push("Day market provenance dates do not match its series");

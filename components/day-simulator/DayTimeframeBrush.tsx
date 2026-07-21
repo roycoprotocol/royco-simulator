@@ -41,6 +41,7 @@ export function DayTimeframeBrush({
   bands,
   view,
   isFull,
+  mode = 'backtest',
   onChange,
 }: {
   dates: string[];
@@ -48,6 +49,7 @@ export function DayTimeframeBrush({
   bands: { a: number; b: number }[];
   view: IndexRange;
   isFull: boolean;
+  mode?: 'backtest' | 'forward';
   onChange: (range: IndexRange) => void;
 }) {
   const trackRef = useRef<HTMLDivElement>(null);
@@ -141,6 +143,14 @@ export function DayTimeframeBrush({
 
   if (!dates.length) return null;
 
+  const isForward = mode === 'forward';
+  const startAriaLabel = isForward
+    ? `Forward test window start, ${dateLabel(dates[view.a])}`
+    : `Backtest window start, ${dateLabel(dates[view.a])}`;
+  const endAriaLabel = isForward
+    ? `Forward test window end, ${dateLabel(dates[view.b])}`
+    : `Backtest window end, ${dateLabel(dates[view.b])}`;
+
   const handleStyle: React.CSSProperties = {
     position: 'absolute',
     top: '50%',
@@ -168,7 +178,7 @@ export function DayTimeframeBrush({
 
   return (
     <div
-      aria-label="Backtest window controls"
+      aria-label={isForward ? 'Forward test window controls' : 'Backtest window controls'}
       style={{
         borderTop: `1px solid ${C.border}`,
         borderBottom: `1px solid ${C.border}`,
@@ -182,9 +192,9 @@ export function DayTimeframeBrush({
         className="flex items-center justify-between gap-3"
         style={{ color: C.kpiLabel, fontSize: 10, fontWeight: 600, letterSpacing: '0.16em', textTransform: 'uppercase' }}
       >
-        <span>Backtest window</span>
+        <span>{isForward ? 'Forward test window' : 'Backtest window'}</span>
         <span style={{ color: C.text, fontFamily: MONO, fontSize: 10.5, fontWeight: 500, letterSpacing: 0, textTransform: 'none' }}>
-          {isFull ? 'Full history' : `${dateLabel(dates[view.a])} → ${dateLabel(dates[view.b])}`}
+          {isFull ? (isForward ? 'Full scenario' : 'Full history') : `${dateLabel(dates[view.a])} → ${dateLabel(dates[view.b])}`}
         </span>
       </div>
 
@@ -210,7 +220,7 @@ export function DayTimeframeBrush({
               viewBox={`0 0 ${BRUSH_VB_W} ${BRUSH_TRACK_H}`}
               preserveAspectRatio="none"
               role="img"
-              aria-label="Full history overview for the backtest window"
+              aria-label={isForward ? 'Full scenario overview for the forward test window' : 'Full history overview for the backtest window'}
               style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', display: 'block' }}
             >
               {preview.bands.map((band, index) => (
@@ -255,7 +265,7 @@ export function DayTimeframeBrush({
             type="button"
             onPointerDown={(event) => begin({ kind: 'handle', side: 'start' }, event)}
             onKeyDown={onHandleKey('start')}
-            aria-label={`Backtest window start, ${dateLabel(dates[view.a])}`}
+            aria-label={startAriaLabel}
             style={{ ...handleStyle, left: `${leftPct}%` }}
           >
             <span style={gripStyle} />
@@ -264,7 +274,7 @@ export function DayTimeframeBrush({
             type="button"
             onPointerDown={(event) => begin({ kind: 'handle', side: 'end' }, event)}
             onKeyDown={onHandleKey('end')}
-            aria-label={`Backtest window end, ${dateLabel(dates[view.b])}`}
+            aria-label={endAriaLabel}
             style={{ ...handleStyle, left: `${rightPct}%` }}
           >
             <span style={gripStyle} />

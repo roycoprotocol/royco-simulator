@@ -43,6 +43,38 @@ export type DayMarketCopy = {
   disclosure: string;
 };
 
+export type DayForwardScenarioId = "expected" | "good" | "normal" | "bad";
+
+export type DayForwardScenario = {
+  id: DayForwardScenarioId;
+  label: string;
+  description: string;
+  paymentDelayDays: number;
+  terminalRecovery:
+    | { kind: "full" }
+    | { kind: "amount"; amount: number };
+};
+
+export type DayForwardTestCustomization = {
+  termDays: number;
+  grossInterestRate: number;
+  defaultScenario: DayForwardScenarioId;
+  scenarios: DayForwardScenario[];
+  omitInitialZeroReturnPeriod?: boolean;
+  tailRiskDisclosure?: string;
+};
+
+export type DayReverseMarketCustomization = {
+  strategyCap: number;
+  seniorCap: number;
+  juniorCap: number;
+  issuerName: string;
+  juniorFunding: "issuer-funded";
+  juniorDeposits: "closed";
+  seniorSupportLabel: string;
+  seniorSupportAmount: number;
+};
+
 export const DAY_PRESENTATION_SECTION_IDS = [
   "senior-summary",
   "roles",
@@ -74,7 +106,12 @@ export type DayMarketCustomization = {
     returnUnit: "USD" | "ETH" | "BTC";
     footnote?: string;
   };
+  forwardTest?: DayForwardTestCustomization;
+  reverseMarket?: DayReverseMarketCustomization;
 };
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  Boolean(value) && typeof value === "object" && !Array.isArray(value);
 
 export function validateDayMarketCustomization(
   customization: DayMarketCustomization | undefined,
@@ -91,6 +128,8 @@ export function validateDayMarketCustomization(
     "copyOverrides",
     "vaultTabs",
     "backtestDisplay",
+    "forwardTest",
+    "reverseMarket",
   ]);
   for (const key of Object.keys(customization)) {
     if (!allowedCustomizationFields.has(key)) issues.push(`unsupported customization field: ${key}`);
@@ -107,6 +146,8 @@ export function validateDayMarketCustomization(
     : {};
   const vaultTabs = customization.vaultTabs;
   const backtestDisplay = customization.backtestDisplay;
+  const forwardTest = customization.forwardTest;
+  const reverseMarket = customization.reverseMarket;
 
   if (!Array.isArray(customization.hiddenSections)) {
     issues.push("customization.hiddenSections must be an array");
@@ -178,10 +219,179 @@ export function validateDayMarketCustomization(
     }
   }
 
+  if (forwardTest !== undefined) {
+    if (!isRecord(forwardTest)) {
+      issues.push("customization.forwardTest must be an object");
+    } else {
+      const allowedForwardFields = new Set([
+        "termDays",
+        "grossInterestRate",
+        "defaultScenario",
+        "scenarios",
+        "omitInitialZeroReturnPeriod",
+        "tailRiskDisclosure",
+      ]);
+      for (const key of Object.keys(forwardTest)) {
+        if (!allowedForwardFields.has(key)) {
+          issues.push(`unsupported customization.forwardTest field: ${key}`);
+        }
+      }
+      if (!Number.isInteger(forwardTest.termDays) || Number(forwardTest.termDays) < 1 || Number(forwardTest.termDays) > 365) {
+        issues.push("customization.forwardTest.termDays must be an integer between 1 and 365");
+      }
+      if (!Number.isFinite(forwardTest.grossInterestRate) || Number(forwardTest.grossInterestRate) <= -1) {
+        issues.push("customization.forwardTest.grossInterestRate must be a finite decimal greater than -1");
+      }
+      const allowedScenarioIds = ["expected", "good", "normal", "bad"];
+      if (!allowedScenarioIds.includes(String(forwardTest.defaultScenario))) {
+        issues.push("customization.forwardTest.defaultScenario must be expected, good, normal, or bad");
+      }
+      const scenarios = Array.isArray(forwardTest.scenarios) ? forwardTest.scenarios : [];
+      if (!Array.isArray(forwardTest.scenarios)) {
+        issues.push("customization.forwardTest.scenarios must be an array");
+      }
+      const scenarioIds = scenarios.map((scenario) => isRecord(scenario) ? scenario.id : undefined);
+      const configuredIds = [...new Set(scenarioIds)].sort().join(",");
+      const hasExpectedBadOutcomes = scenarioIds.length === 2 && configuredIds === "bad,expected";
+      const hasGoodNormalBadOutcomes = scenarioIds.length === 3 && configuredIds === "bad,good,normal";
+      if (!hasExpectedBadOutcomes && !hasGoodNormalBadOutcomes) {
+        issues.push("customization.forwardTest.scenarios must contain either expected and bad, or good, normal, and bad");
+      }
+      for (const [index, scenario] of scenarios.entries()) {
+        if (!isRecord(scenario)) {
+          issues.push(`customization.forwardTest.scenarios[${index}] must be an object`);
+          continue;
+        }
+        const allowedScenarioFields = new Set([
+          "id",
+          "label",
+          "description",
+          "paymentDelayDays",
+          "terminalRecovery",
+        ]);
+        for (const key of Object.keys(scenario)) {
+          if (!allowedScenarioFields.has(key)) {
+            issues.push(`unsupported customization.forwardTest.scenarios[${index}] field: ${key}`);
+          }
+        }
+        if (!allowedScenarioIds.includes(String(scenario.id))) {
+          issues.push(`customization.forwardTest.scenarios[${index}].id must be expected, good, normal, or bad`);
+        }
+        for (const field of ["label", "description"] as const) {
+          if (typeof scenario[field] !== "string" || !scenario[field].trim()) {
+            issues.push(`customization.forwardTest.scenarios[${index}].${field} must be non-empty text`);
+          }
+        }
+        if (
+          !Number.isInteger(scenario.paymentDelayDays)
+          || Number(scenario.paymentDelayDays) < 0
+          || Number(scenario.paymentDelayDays) > 365
+        ) {
+          issues.push(`customization.forwardTest.scenarios[${index}].paymentDelayDays must be an integer between 0 and 365`);
+        }
+        if (!isRecord(scenario.terminalRecovery)) {
+          issues.push(`customization.forwardTest.scenarios[${index}].terminalRecovery must be an object`);
+        } else {
+          const recoveryFields = new Set(["kind", "amount"]);
+          for (const key of Object.keys(scenario.terminalRecovery)) {
+            if (!recoveryFields.has(key)) {
+              issues.push(`unsupported customization.forwardTest.scenarios[${index}].terminalRecovery field: ${key}`);
+            }
+          }
+          if (!['full', 'amount'].includes(String(scenario.terminalRecovery.kind))) {
+            issues.push(`customization.forwardTest.scenarios[${index}].terminalRecovery.kind must be full or amount`);
+          }
+          if (
+            scenario.terminalRecovery.kind === "amount"
+            && !(Number.isFinite(scenario.terminalRecovery.amount) && Number(scenario.terminalRecovery.amount) > 0)
+          ) {
+            issues.push(`customization.forwardTest.scenarios[${index}].terminalRecovery.amount must be positive`);
+          }
+          if (scenario.terminalRecovery.kind === "full" && "amount" in scenario.terminalRecovery) {
+            issues.push(`customization.forwardTest.scenarios[${index}].terminalRecovery.amount is only supported for amount recovery`);
+          }
+        }
+      }
+      if (!scenarioIds.includes(forwardTest.defaultScenario)) {
+        issues.push("customization.forwardTest.defaultScenario must identify a configured scenario");
+      }
+      if (
+        forwardTest.omitInitialZeroReturnPeriod !== undefined
+        && typeof forwardTest.omitInitialZeroReturnPeriod !== "boolean"
+      ) {
+        issues.push("customization.forwardTest.omitInitialZeroReturnPeriod must be boolean");
+      }
+      if (forwardTest.tailRiskDisclosure !== undefined) {
+        if (typeof forwardTest.tailRiskDisclosure !== "string" || !forwardTest.tailRiskDisclosure.trim()) {
+          issues.push("customization.forwardTest.tailRiskDisclosure must be non-empty text");
+        }
+      }
+    }
+  }
+
+  if (reverseMarket !== undefined) {
+    if (!isRecord(reverseMarket)) {
+      issues.push("customization.reverseMarket must be an object");
+    } else {
+      const allowedReverseFields = new Set([
+        "strategyCap",
+        "seniorCap",
+        "juniorCap",
+        "issuerName",
+        "juniorFunding",
+        "juniorDeposits",
+        "seniorSupportLabel",
+        "seniorSupportAmount",
+      ]);
+      for (const key of Object.keys(reverseMarket)) {
+        if (!allowedReverseFields.has(key)) {
+          issues.push(`unsupported customization.reverseMarket field: ${key}`);
+        }
+      }
+      for (const field of ["strategyCap", "seniorCap", "juniorCap", "seniorSupportAmount"] as const) {
+        if (!(Number.isFinite(reverseMarket[field]) && Number(reverseMarket[field]) > 0)) {
+          issues.push(`customization.reverseMarket.${field} must be positive`);
+        }
+      }
+      if (
+        Number.isFinite(reverseMarket.strategyCap)
+        && Number.isFinite(reverseMarket.seniorCap)
+        && Number.isFinite(reverseMarket.juniorCap)
+        && Math.abs(Number(reverseMarket.strategyCap) - Number(reverseMarket.seniorCap) - Number(reverseMarket.juniorCap)) > 1e-6
+      ) {
+        issues.push("customization.reverseMarket.strategyCap must equal seniorCap plus juniorCap");
+      }
+      if (
+        Number.isFinite(reverseMarket.seniorSupportAmount)
+        && Number.isFinite(reverseMarket.seniorCap)
+        && Number(reverseMarket.seniorSupportAmount) > Number(reverseMarket.seniorCap)
+      ) {
+        issues.push("customization.reverseMarket.seniorSupportAmount may not exceed seniorCap");
+      }
+      for (const field of ["issuerName", "seniorSupportLabel"] as const) {
+        if (typeof reverseMarket[field] !== "string" || !reverseMarket[field].trim()) {
+          issues.push(`customization.reverseMarket.${field} must be non-empty text`);
+        }
+      }
+      if (reverseMarket.juniorFunding !== "issuer-funded") {
+        issues.push("customization.reverseMarket.juniorFunding must be issuer-funded");
+      }
+      if (reverseMarket.juniorDeposits !== "closed") {
+        issues.push("customization.reverseMarket.juniorDeposits must be closed");
+      }
+    }
+  }
+
+  if (forwardTest && !reverseMarket) {
+    issues.push("customization.forwardTest requires customization.reverseMarket capacity inputs");
+  }
+
   const hasDeviation = hiddenSections.length > 0
     || Object.keys(copyOverrides).length > 0
     || vaultTabs !== undefined
-    || backtestDisplay !== undefined;
+    || backtestDisplay !== undefined
+    || forwardTest !== undefined
+    || reverseMarket !== undefined;
   if (hasDeviation && customization.explicitlyAuthorized !== true) {
     issues.push("market-specific presentation changes require explicit authorization");
   }
@@ -216,6 +426,20 @@ export function describeDayMarketCustomizations(
         ...(customization.backtestDisplay.footnote ? ["backtest footnote"] : []),
       ]
       : []),
+    ...(customization.forwardTest
+      ? [
+        `finite forward test: ${customization.forwardTest.termDays} days with ${customization.forwardTest.scenarios.map((scenario) => scenario.id).join("/")} scenarios`,
+        ...(customization.forwardTest.omitInitialZeroReturnPeriod
+          ? ["omit initial zero-return period from forward chart and monthly table"]
+          : []),
+      ]
+      : []),
+    ...(customization.reverseMarket
+      ? [
+        `reverse market: ${customization.reverseMarket.issuerName}-funded Junior capped at ${customization.reverseMarket.juniorCap}`,
+        `Senior cap: ${customization.reverseMarket.seniorCap}`,
+      ]
+      : []),
   ];
 }
 
@@ -236,6 +460,8 @@ export type DayMarketManifest = {
     seniorApyMax: number;
     juniorApyMin: number;
     juniorApyMax: number;
+    liquidityApyMin?: number;
+    liquidityApyMax?: number;
   };
   certification: {
     intakeConfirmed: boolean;
@@ -255,6 +481,10 @@ export type DayMarketManifest = {
     lastDate: string;
     publishedApy?: number;
     retrievedAt?: string;
+    supportingSources?: Array<{
+      label: string;
+      url: string;
+    }>;
   };
 };
 
@@ -287,8 +517,11 @@ export function buildDayMarketCopy(manifest: DayMarketManifest): DayMarketCopy {
     : manifest.provenance.feesIncluded === false
       ? "fee-exclusive"
       : "fee-treatment-unknown";
+  const forwardTest = manifest.customization.forwardTest;
   const disclosure = manifest.provenance.dataMode === "published-apy-forward"
-    ? `The forward test uses the published ${publishedPercentage(manifest.provenance.publishedApy ?? manifest.defaults.sourceApy)}% APY supplied by ${manifest.provenance.sourceProvider}; no historical performance series is supplied. Simulator outputs are forward mechanism simulations, not historical backtests, forecasts, or an announced product.`
+    ? forwardTest
+      ? `The forward test models a finite ${forwardTest.termDays}-day facility using the published ${publishedPercentage(manifest.provenance.publishedApy ?? manifest.defaults.sourceApy)}% ${feeTreatment} APY and ${(forwardTest.grossInterestRate * 100).toFixed(2)}% gross interest rate supplied by ${manifest.provenance.sourceProvider}; no historical performance series is supplied. Scenario outputs are user-approved mechanism simulations, not historical backtests or forecasts.`
+      : `The forward test uses the published ${publishedPercentage(manifest.provenance.publishedApy ?? manifest.defaults.sourceApy)}% APY supplied by ${manifest.provenance.sourceProvider}; no historical performance series is supplied. Simulator outputs are forward mechanism simulations, not historical backtests, forecasts, or an announced product.`
     : manifest.provenance.dataMode === "historical-series-with-published-apy"
       ? `The chart preserves the path of ${manifest.provenance.observationCount} ${feeTreatment} ${manifest.provenance.dataCadence} ${priceTypeLabel(manifest.provenance.priceType)} observations supplied by ${manifest.provenance.sourceProvider}, with its trend calibrated to the published ${publishedPercentage(manifest.provenance.publishedApy ?? manifest.defaults.sourceApy)}% APY input. Simulator outputs are mechanism simulations, not historical backtests, forecasts, or an announced product.`
       : `The source APY is derived from ${manifest.provenance.observationCount} ${feeTreatment} ${manifest.provenance.dataCadence} ${priceTypeLabel(manifest.provenance.priceType)} observations supplied by ${manifest.provenance.sourceProvider}. Simulator outputs are mechanism simulations, not historical backtests, forecasts, or an announced product.`;

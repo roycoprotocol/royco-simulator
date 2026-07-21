@@ -1,6 +1,12 @@
 import { Sim, defaultConfig, steadyYear } from "@/lib/day/engine/runner";
 import type { MarketConfig } from "@/lib/day/engine/types";
-import type { DaySeriesPoint, DaySimulatorDefaults } from "@/lib/day-simulator-template/market";
+import type {
+  DayForwardScenarioId,
+  DayForwardTestCustomization,
+  DayReverseMarketCustomization,
+  DaySeriesPoint,
+  DaySimulatorDefaults,
+} from "@/lib/day-simulator-template/market";
 
 export const DAY_TARGET_UTILIZATION = 0.9;
 
@@ -21,6 +27,76 @@ export function buildDayForwardSeries(
       price,
     });
   }
+  return points;
+}
+
+const DAY_MS = 86_400_000;
+
+function dateAfter(anchorTime: number, elapsedDays: number): string {
+  return new Date(anchorTime + elapsedDays * DAY_MS).toISOString().slice(0, 10);
+}
+
+function appendForwardPoint(
+  points: DaySeriesPoint[],
+  anchorTime: number,
+  elapsedDays: number,
+  price: number,
+): void {
+  const point = { date: dateAfter(anchorTime, elapsedDays), price };
+  if (points.at(-1)?.date === point.date) {
+    points[points.length - 1] = point;
+  } else {
+    points.push(point);
+  }
+}
+
+export function buildDayFiniteForwardSeries(
+  sourceApy: number,
+  anchorDate: string,
+  forwardTest: DayForwardTestCustomization,
+  reverseMarket: DayReverseMarketCustomization,
+  scenarioId: DayForwardScenarioId,
+  observationDays: number,
+): DaySeriesPoint[] {
+  const anchorTime = Date.parse(`${anchorDate}T00:00:00Z`);
+  if (!Number.isFinite(anchorTime)) throw new Error(`Invalid forward-series anchor date: ${anchorDate}`);
+  if (!(sourceApy > -1)) throw new Error("Forward-series APY must be greater than -100%");
+
+  const scenario = forwardTest.scenarios.find((candidate) => candidate.id === scenarioId);
+  if (!scenario) throw new Error(`Missing forward scenario: ${scenarioId}`);
+
+  const points: DaySeriesPoint[] = [{ date: anchorDate, price: 1 }];
+  for (let elapsedDays = 30; elapsedDays < forwardTest.termDays; elapsedDays += 30) {
+    appendForwardPoint(
+      points,
+      anchorTime,
+      elapsedDays,
+      Math.pow(1 + sourceApy, elapsedDays / 365),
+    );
+  }
+
+  const termPrice = Math.pow(1 + sourceApy, forwardTest.termDays / 365);
+  appendForwardPoint(points, anchorTime, forwardTest.termDays, termPrice);
+
+  const settlementDays = forwardTest.termDays + scenario.paymentDelayDays;
+  for (let elapsedDays = forwardTest.termDays + 30; elapsedDays < settlementDays; elapsedDays += 30) {
+    appendForwardPoint(points, anchorTime, elapsedDays, termPrice);
+  }
+
+  const settlementPrice = scenario.terminalRecovery.kind === "full"
+    ? termPrice
+    : scenario.terminalRecovery.amount / reverseMarket.strategyCap;
+  appendForwardPoint(points, anchorTime, settlementDays, settlementPrice);
+
+  if (scenario.terminalRecovery.kind === "amount") {
+    appendForwardPoint(
+      points,
+      anchorTime,
+      settlementDays + Math.max(1, observationDays),
+      settlementPrice,
+    );
+  }
+
   return points;
 }
 
