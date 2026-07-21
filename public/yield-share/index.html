@@ -120,7 +120,7 @@ table.ref td.na{color:#A49B90}
     <div class="ctl"><label>Horizon <b id="phzv">90 days</b></label><input type="range" id="phz" min="7" max="365" step="1" value="90"><div class="h">How far ahead to project. The real re-rating is fast, so short windows show it best.</div></div>
   </div>
   <div style="margin-top:8px;font-size:12.5px;color:var(--mut)">Target <b style="color:var(--ink)">90%</b>. Share capped at <b style="color:var(--ink)">100%</b>.<sup>*</sup></div>
-  <div style="font-size:11px;color:#A49B90;margin-top:2px"><sup>*</sup> Both are set per market. Fixed here to keep it simple.</div>
+  <div style="font-size:11px;color:#A49B90;margin-top:2px"><sup>*</sup> Both are market-level settings, fixed here to keep it simple.</div>
   <div class="why" id="why"></div>
 
   <div class="playrow">
@@ -157,7 +157,7 @@ table.ref td.na{color:#A49B90}
     <h3>What this view simplifies</h3>
     <p class="lead">Three simplifications. None change the direction or the pace.</p>
     <ul>
-      <li>This view drifts the <b>yield share at the 90% target</b>. The share actually paid at a given utilization is that same value, adjusted by a fixed step once utilization passes 90%. Deployed markets are flat below target, so <b>below 90% the two match exactly</b>; above 90% the paid share sits a little higher, most at full utilization where it is near its cap anyway. (This is about the share percentage, not the Junior's total return.)</li>
+      <li>This view drifts the <b>yield share at the 90% target</b>. The share actually paid at a given utilization is that same value, plus a premium that grows the further utilization is above 90%. Deployed markets are flat below target, so <b>below 90% the two match exactly</b>; above 90% the paid share sits a little higher, largest at full utilization where it is near its cap anyway. (This is about the share percentage, not the Junior's total return.)</li>
       <li>The Forecast holds each market's utilization flat at today's level. Real utilization keeps moving.</li>
       <li>Re-rating pauses while a market sits in a drawdown recovery (fixed-term) state.</li>
     </ul>
