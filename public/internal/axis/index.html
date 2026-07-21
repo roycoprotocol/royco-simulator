@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Axis Tranche Calculator</title>
+<style>
+
+:root{--sen:#8E7355;--jun:#1B1A17;--ink:#171511;--mut:#6D6860;--line:#E8E2D8;--bg:#FBFAF7;--panel:#FFFDF9;--accent:#967756;--green:#319C61;--red:#8F4D42;
+/* one prose measure for the whole page: every text block in every section obeys it, so no section
+   reads wider or narrower than another. Figures (charts, tables) take the full card. */
+--measure:820px}
+*{box-sizing:border-box}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--ink);
+background-color:var(--bg);background-image:linear-gradient(rgba(150,119,86,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(150,119,86,.05) 1px,transparent 1px);
+background-size:42px 42px;font-size:14px;line-height:1.45;border-top:6px solid #11100E}
+.wrap{max-width:1080px;margin:0 auto;padding:22px 20px 60px}
+.topline{display:flex;align-items:center;gap:9px;color:var(--accent);font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.26em;margin-bottom:8px}
+.topline span{width:7px;height:7px;border-radius:50%;background:var(--green);display:inline-block}
+h1{font-family:Georgia,"Times New Roman",serif;font-weight:400;font-size:clamp(28px,3.4vw,42px);line-height:1.04;letter-spacing:-.02em;margin:0 0 8px}
+.lede{color:var(--mut);font-size:15px;max-width:var(--measure);margin:0 0 6px}
+.stamp{font-size:10px;text-transform:uppercase;letter-spacing:.16em;color:var(--accent);font-weight:700;margin:0 0 14px;display:flex;align-items:center;gap:7px}
+.stamp .dot{width:6px;height:6px;border-radius:50%;background:var(--green);display:inline-block;flex:none}
+.stamp.snap .dot{background:#B4A896}
+h2{font-family:Georgia,"Times New Roman",serif;font-weight:400;font-size:24px;margin:0 0 4px;letter-spacing:-.01em}
+h2 .n{display:block;font-family:-apple-system,sans-serif;font-size:9.5px;font-weight:700;letter-spacing:.22em;text-transform:uppercase;color:var(--accent);margin-bottom:5px}
+.card{background:var(--panel);border:1px solid var(--line);padding:20px;margin-top:12px;box-shadow:0 22px 50px rgba(60,45,28,.05)}
+.sec{margin-top:30px}
+.lead{font-size:13.5px;color:var(--ink);font-weight:600;margin:0 0 4px;max-width:var(--measure)}
+ul{margin:6px 0 0;padding-left:18px;max-width:var(--measure)}
+li{margin:0 0 6px;font-size:13.5px;line-height:1.5;color:var(--mut)}
+li:last-child{margin-bottom:0}
+li b{color:var(--ink)}
+.stat{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0 6px}
+@media(max-width:720px){.stat{grid-template-columns:1fr 1fr}}
+.box{border:1px solid var(--line);background:rgba(255,253,249,.78);padding:10px 12px}
+.box .t{font-size:8.5px;color:#A49B90;text-transform:uppercase;letter-spacing:.12em;font-weight:700}
+.box .v{font-size:21px;font-weight:600;font-variant-numeric:tabular-nums;margin-top:2px;font-family:"SFMono-Regular",Consolas,monospace;letter-spacing:-.04em}
+.box .s{font-size:10.5px;color:var(--mut);margin-top:1px}
+.good{color:var(--green)}.bad{color:var(--red)}
+.chartbox{position:relative;height:300px;width:100%;margin-top:12px}
+.chartbox svg{width:100%;height:100%;display:block;cursor:crosshair}
+.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:11.5px;margin:8px 2px 0;color:var(--mut)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.sw{width:16px;height:3px;display:inline-block;border-radius:2px}
+.sliders{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px 20px;margin-bottom:6px}
+@media(max-width:720px){.sliders{grid-template-columns:1fr 1fr}}
+.ctl label{display:flex;justify-content:space-between;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--mut);font-weight:600;margin-bottom:5px;gap:8px}
+.ctl label b{color:var(--ink);font-variant-numeric:tabular-nums;font-size:13px}
+.ctl input[type=range]{width:100%;accent-color:var(--accent);cursor:pointer}
+.ctl .h{font-size:10.5px;color:var(--mut);line-height:1.35;margin:4px 0 0}
+.seg{display:inline-flex;flex-wrap:wrap;border:1px solid var(--line);background:rgba(255,253,249,.75)}
+.ctlrow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:14px 0 4px}
+.ctlrow .pair{display:flex;align-items:center;gap:10px}
+.ctlrow .pair span{font-size:10.5px;text-transform:uppercase;letter-spacing:.18em;color:var(--accent);font-weight:700}
+.seg button{border:0;border-left:1px solid var(--line);background:transparent;padding:9px 14px;font-weight:500;font-size:11px;color:var(--mut);cursor:pointer;text-transform:uppercase;letter-spacing:.06em}
+.seg button:first-child{border-left:0}
+.seg button.on{background:var(--panel);color:var(--ink);box-shadow:inset 0 -2px 0 var(--accent)}
+.why{background:rgba(150,119,86,.07);border-left:3px solid var(--accent);padding:11px 15px;font-size:14px;color:var(--ink);margin:14px 0 4px}
+.why>*{max-width:var(--measure)}
+.note{font-size:11.5px;color:var(--mut);margin-top:6px;max-width:var(--measure)}
+ul.notes{margin-top:12px}
+ul.notes li{font-size:11.5px;line-height:1.5}
+.note:first-of-type{margin-top:10px}
+.verdict{border:1px solid var(--line);padding:14px 16px;margin:12px 0 10px;font-size:14px}
+.warn{border:1px solid rgba(143,77,66,.35);background:rgba(143,77,66,.06);color:var(--red);padding:10px 13px;margin:10px 0;font-size:12.5px;line-height:1.5}
+table{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:10px}
+th,td{padding:8px 9px;border-bottom:1px solid var(--line);text-align:right;font-variant-numeric:tabular-nums}
+th{font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--accent);font-weight:700;text-align:right}
+th:first-child,td:first-child{text-align:left}
+td.cov{font-weight:600;color:var(--ink)}
+td .sr{color:var(--sen);font-weight:600}
+td .jr{color:var(--jun);font-weight:600;font-size:13px}
+th.grp{text-align:center;padding-bottom:3px;border-left:1px solid var(--line)}
+td.sc{color:var(--sen);font-weight:800;font-size:14px}
+td.jc{color:var(--jun);font-weight:800;font-size:14px}
+td .dec{font-size:.78em;opacity:.7;font-weight:inherit}   /* first decimal, kept quiet so the whole number still reads first */
+/* reading crosshair: hovering a rate bolds its column and its row, so a cushion and a yield
+   can be traced back to the parameters that produced them */
+#tbl .xc{background:rgba(150,119,86,.13)}
+#tbl .xc.sc,#tbl .xc.jc{font-weight:800}
+#tbl th.xc{color:var(--ink)}
+#tbl tr.xr td,#tbl tr.xr th{background:rgba(150,119,86,.09)}
+#tbl tr.xr td.cov,#tbl tr.xr td.meta{font-weight:700;color:var(--ink)}
+#tbl tr.xr .xc{background:rgba(150,119,86,.2)}
+#tbl td[data-c]{cursor:crosshair}
+/* the pair the reader came for, before any table */
+#pair{border:1px solid var(--line);background:rgba(150,119,86,.05);margin:14px 0 4px}
+.pairhead{font-size:10px;text-transform:uppercase;letter-spacing:.18em;color:var(--accent);font-weight:700;padding:11px 15px 0}
+.pairgrid{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line);margin-top:10px}
+.pairgrid .side{background:var(--panel);padding:13px 15px 15px}
+.pairgrid .lab{font-size:9.5px;text-transform:uppercase;letter-spacing:.16em;font-weight:700;display:flex;align-items:center;gap:7px}
+.pairgrid .lab::before{content:'';width:14px;height:3px;border-radius:2px;display:inline-block}
+.pairgrid .s .lab{color:var(--sen)} .pairgrid .s .lab::before{background:var(--sen)}
+.pairgrid .j .lab{color:var(--jun)} .pairgrid .j .lab::before{background:var(--jun)}
+.pairgrid .num{font-family:"SFMono-Regular",Consolas,monospace;font-size:30px;font-weight:700;letter-spacing:-.03em;margin:3px 0 2px}
+.pairgrid .s .num{color:var(--sen)} .pairgrid .j .num{color:var(--jun)}
+.pairgrid .sub{font-size:11.5px;color:var(--mut);line-height:1.4}
+@media(max-width:640px){.pairgrid{grid-template-columns:1fr}}
+th.sc,th.jc{font-weight:700}
+th.sc{color:var(--sen)} th.jc{color:var(--jun)}
+.tblwrap{overflow-x:auto}
+/* the terms table used to force this section to break out of the page width, because it repeated the
+   Senior rate once per cushion. The Senior rate does not depend on the cushion, so it is now one band
+   row and the table fits the same card as everything else. */
+/* Senior and Junior carry the same two colours as the chart legend, so a rate in the table and a line
+   in the chart are visibly the same side of the trade. */
+tr.senband th{text-align:left;color:var(--sen);font-size:9px;letter-spacing:.1em}
+tr.senband td,tr.senband th{background:rgba(150,119,86,.11);border-bottom:2px solid var(--sen)}
+tr.senband th{box-shadow:inset 4px 0 0 var(--sen)}
+tr.grouphead th{text-align:left;color:var(--jun);padding-top:12px;border-bottom:2px solid var(--jun);box-shadow:inset 4px 0 0 var(--jun)}
+tr.senband th::before,tr.grouphead th::before{content:'';display:inline-block;width:14px;height:3px;border-radius:2px;margin-right:7px;vertical-align:middle}
+tr.senband th::before{background:var(--sen)}
+tr.grouphead th::before{background:var(--jun)}
+tr.grouphead td.today{border-bottom:1px solid var(--line)}
+th.yh{text-align:right;border-left:1px solid var(--line)}
+th.yh.today,td.today{background:rgba(150,119,86,.06)}
+td.jy{border-left:1px solid var(--line)}
+td.meta{color:var(--mut);font-weight:400;text-align:right}
+.foot{margin-top:26px;color:var(--mut);font-size:11.5px;border-top:1px solid var(--line);padding-top:12px}
+.foot>p{max-width:var(--measure);margin:0}
+.disc{border:1px solid var(--line);background:rgba(150,119,86,.04);padding:12px 15px;margin-top:14px;font-size:12.5px;line-height:1.55;color:var(--mut)}
+.disc>p{max-width:var(--measure);margin:0}
+.disc b{color:var(--ink)}
+
+/* two scenarios, side by side, sharing one set of controls */
+.duo{display:grid;grid-template-columns:1fr 1fr;gap:20px;margin-top:12px}
+@media(max-width:900px){.duo{grid-template-columns:1fr}}
+.pane{min-width:0}
+.pane .stat{grid-template-columns:1fr 1fr;margin:8px 0 4px}
+.pane .chartbox{height:230px;margin-top:8px}
+.ph{display:flex;align-items:center;gap:8px;padding-bottom:7px;border-bottom:2px solid var(--line)}
+.ph .k{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:.16em;padding:3px 7px;color:#fff;background:var(--jun)}
+.ph.live .k{background:var(--green)}
+.ph .n{font-family:Georgia,serif;font-size:17px;color:var(--ink)}
+.ph .d{font-size:10.5px;color:var(--mut);margin-left:auto;text-align:right}
+.verdict2{font-size:12.5px;line-height:1.5;color:var(--mut);margin-top:9px;border-left:3px solid var(--line);padding-left:11px}
+.verdict2 b{color:var(--ink)}
+.verdict2.hit{border-left-color:var(--red)}
+.verdict2.safe{border-left-color:var(--green)}
+.panectl{margin-top:12px;padding-top:12px;border-top:1px solid var(--line)}
+.panectl label{margin-bottom:6px}
+tr.setrow td{background:rgba(150,119,86,.08)}
+tr.setrow td.cov{box-shadow:inset 3px 0 0 var(--accent)}
+</style></head><body>
+<div class="wrap">
+<div class="topline"><span></span>Royco &times; Axis &middot; Tranche Study</div>
+<h1>Axis Tranche Calculator</h1>
+<p class="lede">What Royco's Senior/Junior split would do on Axis, shown on <b>both</b> records at once: the 2018 to 2024 track record from the dataroom, and the sUSDx feed running onchain today. Built for the Axis team.</p>
+<div class="stamp" id="stamp"><span class="dot"></span><span id="stampTxt"></span></div>
+
+<div class="card" style="margin-top:16px">
+  <p class="lead">What a tranche is, in four lines.</p>
+  <ul>
+    <li><b>One pool, two claims on it.</b> The <b class="sr">Senior</b> takes a protected, predictable rate. The <b style="color:var(--jun)">Junior</b> takes the first losses and is paid more for it.</li>
+    <li><b>The Junior is the buffer.</b> When the pool falls, the Junior absorbs it. The Senior only loses once that buffer is used up.</li>
+    <li><b>Why a protocol wants this:</b> the Senior is a product you can sell to capital that will not take drawdown risk, which is most capital. The Junior is sold to capital that will.</li>
+    <li><b>The only real question</b> is how deep the buffer has to be. That is what this page is for.</li>
+  </ul>
+</div>
+
+<!-- 1 THE TWO RECORDS -->
+<div class="sec">
+<h2><span class="n">1 &middot; The two records</span>A long record with falls, and a short one without</h2>
+<div class="card">
+  <p class="lead">Same strategy, two windows. One contains real falls, the other has not had one yet.</p>
+  <div class="duo">
+    <div class="pane">
+      <div class="ph"><span class="k">Past</span><span class="n">Track record</span><span class="d" id="hdB"></span></div>
+      <div class="stat" id="ovStatB"></div>
+      <div class="chartbox"><svg id="navB" xmlns="http://www.w3.org/2000/svg"></svg></div>
+    </div>
+    <div class="pane">
+      <div class="ph live"><span class="k">Onchain now</span><span class="n">sUSDx feed</span><span class="d" id="hdA"></span></div>
+      <div class="stat" id="ovStatA"></div>
+      <div class="chartbox"><svg id="navA" xmlns="http://www.w3.org/2000/svg"></svg></div>
+    </div>
+  </div>
+  <ul style="margin-top:14px">
+    <li><b>The track record has three losing months in <span id="cNB"></span></b>: May 2022 at <b>-10.3%</b>, then August at -0.2% and December at -2.2%. The fall took one month, the recovery took <b id="cUW"></b>.</li>
+    <li><b>The live feed has never fallen</b>: <span id="cNA"></span> of daily points, <b>zero</b> down steps, maximum drawdown <b>0.00%</b>. That is what a rate provider does, it accrues. It is not evidence that the strategy underneath cannot lose.</li>
+    <li><b>So the risk question can only be answered on the left.</b> A first-loss Junior has nothing to absorb on the right, at any coverage.</li>
+  </ul>
+</div>
+</div>
+
+<!-- 2 SENIOR / JUNIOR ON BOTH -->
+<div class="sec">
+<h2><span class="n">2 &middot; Senior and Junior</span>The same terms, run on both</h2>
+<div class="card">
+  <p class="lead">Royco splits the pool into a protected Senior and a first-loss Junior. One set of terms, applied to both records at once.</p>
+  <ul style="margin-bottom:4px">
+    <li><b>Pick when the market launches.</b> Run from 2018 the Junior spends four years compounding its yield share, so by the time the fall arrives it holds many times the buffer the coverage asked for and the Senior survives even a 3% setting. That measures compounding, not protection.</li>
+    <li><b>So the launch month is a control.</b> It starts at April 2022, the high just before the only large fall on record, which is the case a coverage level is actually chosen for. Move it to see any other starting point.</li>
+  </ul>
+  <div class="sliders" style="margin-top:12px">
+    <div class="ctl"><label>Minimum coverage <b id="covv">20%</b></label><input type="range" id="cov" min="1" max="50" step="1" value="20"><div class="h">The minimum the Junior must be able to cover of Senior losses. The Senior only loses after this is used up.<br><b style="color:var(--accent)">Break point:</b> <span id="hBP"></span></div></div>
+    <div class="ctl"><label>Yield share to Junior <b id="ysv">35%</b></label><input type="range" id="ys" min="0" max="80" step="1" value="35"><div class="h">Slice of the Senior's yield paid to the Junior for taking first losses.<br><b style="color:var(--accent)">Trade off:</b> more share fills the Junior faster and leaves the Senior less.</div></div>
+    <div class="ctl"><label>Observation period <b id="obsv">30d</b></label><input type="range" id="obs" min="1" max="365" step="1" value="30"><div class="h">Grace window for the Junior to recover before a loss is locked in.<br><b style="color:var(--accent)">On this record:</b> <span id="obsNote"></span></div></div>
+  </div>
+  <div class="why" id="headline" style="margin:14px 0 2px"></div>
+  <div class="duo">
+    <div class="pane">
+      <div class="ph"><span class="k">Past</span><span class="n">Track record, <span id="paneFrom"></span></span></div>
+      <div class="stat" id="tsStatB"></div>
+      <div class="chartbox"><svg id="tsB" xmlns="http://www.w3.org/2000/svg"></svg></div>
+      <div class="ctl panectl"><label>Market launches <b id="startv"></b></label><input type="range" id="start" min="0" max="71" step="1" value="45"><div class="h">The month this market opens, with the Junior at its target size. Everything before it is ignored, and only this pane changes.<br><b style="color:var(--accent)">Try:</b> <span id="startHint"></span></div></div>
+      <div class="verdict2" id="whyB"></div>
+    </div>
+    <div class="pane">
+      <div class="ph live"><span class="k">Onchain now</span><span class="n">sUSDx feed</span></div>
+      <div class="stat" id="tsStatA"></div>
+      <div class="chartbox"><svg id="tsA" xmlns="http://www.w3.org/2000/svg"></svg></div>
+      <div class="verdict2" id="whyA"></div>
+    </div>
+  </div>
+  <div class="legend" style="margin-top:10px"><span><span class="sw" style="background:var(--sen)"></span>Senior</span><span><span class="sw" style="background:var(--jun)"></span>Junior</span><span><span class="sw" style="background:#B4A896"></span>Pool (unsplit)</span><span><span class="sw" style="background:#8F4D42"></span>Loss booked</span></div>
+  <div id="obsExplain" class="verdict2" style="margin-top:12px"></div>
+</div>
+</div>
+
+<!-- 3 TERMS -->
+<div class="sec" id="secTerms">
+<h2><span class="n">3 &middot; Terms</span>What each side earns</h2>
+<div class="card">
+  <p class="lead">Pick your terms. The two rates, the shape behind them, and the exact numbers at every coverage. This is the same whichever record you believe, because it splits whatever the pool earns.</p>
+  <div class="ctlrow">
+    <div class="pair"><span>Minimum coverage</span>
+    <div class="seg" id="tblCov"><button data-c="5">5%</button><button data-c="10">10%</button><button data-c="15">15%</button><button data-c="20" class="on">20%</button><button data-c="25">25%</button><button data-c="30">30%</button></div></div>
+    <div class="pair"><span>Yield share</span>
+    <div class="seg" id="tblYs"><button data-y="15">15%</button><button data-y="25">25%</button><button data-y="35" class="on">35%</button><button data-y="45">45%</button></div></div>
+    <div class="pair"><span>Pool yield</span><div class="seg" id="tblY"></div></div>
+  </div>
+  <p class="note" style="margin:8px 0 0">The first two are the same controls as in section 2. Move any of them and everything below follows.</p>
+  <div id="pair"></div>
+  <div class="chartbox" style="height:250px"><svg id="splitChart" xmlns="http://www.w3.org/2000/svg"></svg></div>
+  <div class="legend"><span><span class="sw" style="background:var(--sen)"></span>Senior, flat at every coverage</span><span><span class="sw" style="background:var(--jun)"></span>Junior, falls as the buffer thickens</span></div>
+  <div class="tblwrap"><table id="tbl"></table></div>
+  <ul class="notes">
+    <li><b>Why the Senior rate never moves.</b> Every dollar of Senior capital hands the Junior the same slice of its own yield, whatever the coverage. So the Senior always keeps the rest, and its rate is flat all the way across.</li>
+    <li><b>Why the Junior rate climbs as coverage thins.</b> Fewer Junior dollars share that same slice. At 5% coverage each Junior dollar stands behind <span id="nLev1"></span> of Senior capital; at 50% it stands behind <span id="nLev2"></span>. Same transfer, much smaller base.</li>
+    <li><b>Coverage is a minimum, and the Junior is sized a little above it.</b> Coverage is what the Junior must be able to absorb of Senior losses <i>at all times</i>. Royco's markets hold a slight excess of Junior capital over that minimum, targeting 90% utilization, so Juniors can keep entering and exiting without instantly breaching it. A 20% minimum coverage means a Junior worth 22.2% of the market.</li>
+    <li><b>The formulas.</b> Senior APR = pool yield x (1 minus yield share). Junior APR = pool yield x (1 plus yield share x Senior size / Junior size), with Junior size = coverage / 90% target utilization. Simple annual rates, not compounded.</li>
+    <li><b>The two records annualize differently</b>, so the marked columns differ: <span id="nAnn"></span>. Neither is a forecast.</li>
+  </ul>
+</div>
+</div>
+
+<div class="disc"><p><b>Read this before using any number here.</b> This tool does <b>not</b> set, determine or estimate a minimum coverage, or any other binding market parameter. Any final market terms and the decision to launch are the <b>team's own responsibility, not Royco's</b>. Two limits matter most. First, the track record is <b>monthly</b>: a Junior tranche absorbs losses as they happen, and a month is not a path, so a monthly series cannot show what a coverage level would really have experienced inside May 2022. Second, that single month <b>is</b> the risk history: three losing months in <span id="dN"></span>, one of them deep, is a thin base for sizing first-loss capital. The dataroom does not attribute the 2022 fall to any named event, and neither does this page. The deck also reports the track record as gross while the overview quotes returns net of fees, and no fee schedule is published, so nothing here is net of fees. Nothing here is a recommendation, a promise of returns, or investment advice.</p></div>
+<div class="foot"><p id="foot">Track record transcribed from the Axis dataroom deck "Axis Market Neutral Strategy", February 2026, page 10. Live sUSDx exchange rate from the public Axis API (api.axis.to), contract 0x24891F7852021413D4AcB0641994d045eEaDc9bE. Tranche mechanics follow Royco's Dawn engine. Illustrative model, not investment advice.</p></div>
+</div>
+
+<script>
+const TARGET_UTIL=0.90, LIQ_UTIL=1.0009009, EXIT_BONUS_PCT=0.005;
+const clamp=(v,a,b)=>v<a?a:(v>b?b:v);
+const SB={"start":"2018-06-30","off":[0,31,62,92,123,153,184,215,243,274,304,335,365,396,427,457,488,518,549,580,609,640,670,701,731,762,793,823,854,884,915,946,974,1005,1035,1066,1096,1127,1158,1188,1219,1249,1311,1339,1370,1400,1431,1461,1492,1523,1553,1584,1614,1645,1676,1704,1735,1765,1796,1826,1857,1888,1918,1949,1979,2010,2041,2070,2101,2131,2162,2192,2223,2254,2284,2315,2345,2376],"P":[100.0,116.4,119.4264,131.010761,137.561299,146.365222,147.389779,148.421507,150.054144,151.854793,155.043744,158.919838,161.462555,164.853269,166.172095,168.99702,170.517994,172.052655,172.912919,174.642048,179.357383,184.917462,185.657132,186.956732,188.639342,198.637228,210.158187,230.123215,233.575063,235.677238,240.62646,251.454651,266.54193,276.403982,289.947777,298.356262,303.428319,309.800313,315.376719,321.0535,325.869302,330.757342,333.403401,337.737645,339.426333,341.123465,305.987748,307.211699,307.826122,307.21047,309.360943,312.763914,314.640497,307.718406,310.79559,314.214342,318.613343,322.436703,326.305943,329.569003,334.182969,338.193164,341.236903,345.331746,353.274376,362.812784,369.742508,376.619719,395.488367,402.409413,406.835916,409.927869,413.412256,422.093914,423.571242,425.689099,438.332065,460.687],"labels":["Jun 2018","Jul 2018","Aug 2018","Sep 2018","Oct 2018","Nov 2018","Dec 2018","Jan 2019","Feb 2019","Mar 2019","Apr 2019","May 2019","Jun 2019","Jul 2019","Aug 2019","Sep 2019","Oct 2019","Nov 2019","Dec 2019","Jan 2020","Feb 2020","Mar 2020","Apr 2020","May 2020","Jun 2020","Jul 2020","Aug 2020","Sep 2020","Oct 2020","Nov 2020","Dec 2020","Jan 2021","Feb 2021","Mar 2021","Apr 2021","May 2021","Jun 2021","Jul 2021","Aug 2021","Sep 2021","Oct 2021","Nov 2021","Jan 2022","Feb 2022","Mar 2022","Apr 2022","May 2022","Jun 2022","Jul 2022","Aug 2022","Sep 2022","Oct 2022","Nov 2022","Dec 2022","Jan 2023","Feb 2023","Mar 2023","Apr 2023","May 2023","Jun 2023","Jul 2023","Aug 2023","Sep 2023","Oct 2023","Nov 2023","Dec 2023","Jan 2024","Feb 2024","Mar 2024","Apr 2024","May 2024","Jun 2024","Jul 2024","Aug 2024","Sep 2024","Oct 2024","Nov 2024","Dec 2024"]};   /* the past: monthly track record */
+const SA={"start":"2026-04-18","off":[0,4,8,9,10,12,18,19,20,21,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,66,67,68,69,70,71,72,73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88,89,90,91,92,93,94],"P":[100.0,100.074575,100.182611,100.217155,100.22791,100.303061,100.506174,100.535388,100.576177,100.60235,100.968784,101.047187,101.111167,101.150667,101.190167,101.229666,101.268419,101.305521,101.342576,101.374085,101.388776,101.402729,101.416681,101.430634,101.444587,101.459087,101.473276,101.487597,101.501614,101.515631,101.52968,101.543814,101.557794,101.571486,101.58459,101.597695,101.610799,101.623993,101.637782,101.651572,101.666707,101.684742,101.702777,101.720812,101.738847,101.756882,101.774917,101.796275,101.82445,101.852624,101.880817,101.909768,101.929008,101.967537,101.991383,102.005197,102.019012,102.033036,102.047739,102.062443,102.078106,102.100853,102.134164,102.167204,102.200245,102.233286,102.266327,102.299367,102.329655,102.354435,102.379216,102.403996,102.428777,102.453557,102.478338,102.503956,102.53125,102.558544,102.585838,102.613131]};   /* onchain now: daily sUSDx rate  */
+
+
+function simFT(P,off,coverage,jtYieldShare,dur,noReal,exitBonusPct){
+  exitBonusPct=exitBonusPct||0;
+  const n=P.length, jrShare=coverage/TARGET_UTIL;
+  const S0=(1-jrShare)*100, J0=jrShare*100;
+  let lastSTRaw=S0,lastJTRaw=J0,stEffective=S0,jtEffective=J0,stIL=0,jtIL=0;
+  const Sa=[stEffective],Ja=[jtEffective],Ua=[coverage*(lastSTRaw+lastJTRaw)/Math.max(jtEffective,1e-9)];
+  let state='PERP',obsStart=null,wasLiq=false,exitEvents=0; const ev=[],obs=[],stHit=[];
+  const closeObs=(i,exp)=>{ if(obsStart!=null){obs.push({a:obsStart,b:i,expired:exp});obsStart=null;} };
+  const attrDelta=(d,c,l)=>(d===0||c<=0||l<=0)?0:d*c/l;
+  const forcePerp=(i,type)=>{ if(type==='liquidation') exitEvents++;
+    if(jtIL>1e-9) ev.push({i,type,loss:jtIL/J0*100}); jtIL=0; if(state==='OBS') closeObs(i,true); state='PERP'; };
+  for(let i=1;i<n;i++){
+    const p=P[i], stRaw=S0*p/100, jtRaw=J0*p/100, init=state;
+    const stClaimOnJT=Math.max(stEffective-lastSTRaw,0), jtClaimOnST=Math.max(jtEffective-lastJTRaw,0);
+    const stClaimOnST=Math.max(lastSTRaw-jtClaimOnST,0);
+    const dST=stRaw-lastSTRaw, dJT=jtRaw-lastJTRaw;
+    const dSTonST=lastSTRaw<=0?(stEffective>0?dST:0):attrDelta(dST,stClaimOnST,lastSTRaw);
+    const dSTonJT=attrDelta(dJT,stClaimOnJT,lastJTRaw);
+    const dSTeff=dSTonST+dSTonJT, dJTeff=dST+dJT-dSTeff;
+    if(dJTeff<0){ let loss=-dJTeff, ab=Math.min(loss,jtEffective); jtEffective-=ab; loss-=ab;
+      if(loss>1e-9){ stEffective-=loss; stIL+=loss; stHit.push({i,loss:loss/S0*100}); } }
+    else if(dJTeff>0){ let g=dJTeff, r=Math.min(g,stIL); if(r>0){stIL-=r;stEffective+=r;g-=r;} if(g>0) jtEffective+=g; }
+    if(dSTeff<0){ let loss=-dSTeff, cov=Math.min(loss,jtEffective);
+      if(cov>0){ jtEffective-=cov; jtIL+=cov; loss-=cov; }
+      if(loss>1e-9){ stEffective-=loss; stIL+=loss; stHit.push({i,loss:loss/S0*100}); } }
+    else if(dSTeff>0){ let g=dSTeff, r=Math.min(g,stIL); if(r>0){stIL-=r;stEffective+=r;g-=r;}
+      r=Math.min(g,jtIL); if(r>0){jtIL-=r;jtEffective+=r;g-=r;}
+      if(g>0){ jtEffective+=g*jtYieldShare; stEffective+=g*(1-jtYieldShare); } }
+    const util=coverage*(stRaw+jtRaw)/Math.max(jtEffective,1e-9), liqNow=util>=LIQ_UTIL;
+    if(liqNow) forcePerp(i,'liquidation');
+    else if(!noReal && init==='OBS' && (off[i]-off[obsStart])>=dur) forcePerp(i,'expired');
+    else if(stIL>1e-9) forcePerp(i,'st-il');
+    else if(jtIL>1e-9){ if(init==='PERP') obsStart=i; state='OBS'; }
+    else { if(init==='OBS') closeObs(i,false); state='PERP'; }
+    wasLiq=liqNow; lastSTRaw=stRaw; lastJTRaw=jtRaw;
+    Sa.push(stEffective); Ja.push(Math.max(jtEffective,0)); Ua.push(util);
+  }
+  if(state==='OBS') closeObs(n-1,false);
+  return {sen:Sa.map(x=>x/S0*100), jun:Ja.map(x=>x/J0*100), util:Ua, ev, obs, stHit, jrShare, exitEvents}; }
+const mddOf=a=>{let pk=-1e9,d=0;for(const v of a){pk=Math.max(pk,v);d=Math.min(d,v/pk-1);}return d*100;};
+function tipBox(x,y,w,h,lines){
+  let s='<rect x="'+x.toFixed(1)+'" y="'+y.toFixed(1)+'" width="'+w+'" height="'+h+'" rx="3" fill="#1B1A17" opacity="0.93"/>';
+  lines.forEach((ln,i)=>{ s+='<text x="'+(x+8).toFixed(1)+'" y="'+(y+15+i*13).toFixed(1)+'" fill="#fff" font-size="10.5" font-family="monospace">'+ln+'</text>'; });
+  return s; }
+function axisBox(el){ const b=el.parentElement; return {w:b.clientWidth||760,h:b.clientHeight||300}; }
+function longestUnderwater(P,off){
+  let pk=P[0], startI=0, worst=0;
+  for(let i=0;i<P.length;i++){
+    if(P[i]>=pk){ pk=P[i]; startI=i; }
+    else worst=Math.max(worst,off[i]-off[startI]);
+  }
+  return worst;
+}
+
+const sgn=(v,d)=>(v>=0?'+':'')+v.toFixed(d);
+const dir=v=>v>=0?'good':'bad';
+const capPct=v=>Math.abs(v)>=1000?(v>0?'>1000':'<-1000'):v.toFixed(0);
+const fmtRate=r=>{ const v=r*100;
+  if(Math.abs(v)>=1000) return '<span style="color:#A49B90;font-weight:600">'+(v>0?'&gt;1000%':'&lt;-1000%')+'</span>';
+  const p=v.toFixed(1).split('.'); return p[0]+'<span class="dec">.'+p[1]+'</span>%'; };
+const fmtRateTxt=r=>Math.abs(r*100)>=1000?'&gt;1000':(r*100).toFixed(1);
+const MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+
+/* Each record carries its own geometry, so nothing from one can leak into the other. */
+function mk(S,unit,isLive){
+  const P=S.P, off=S.off, span=off[off.length-1];
+  const rets=[]; for(let i=1;i<P.length;i++) rets.push(P[i]/P[i-1]-1);
+  const yrs=span/365;
+  return {S,P,off,span,yrs,unit,isLive,
+    total:P[P.length-1]-100, ann:(Math.pow(P[P.length-1]/100,1/yrs)-1)*100,
+    mdd:mddOf(P), down:rets.filter(r=>r<0).length, nd:rets.length,
+    worst:Math.min(...rets)*100, uw:longestUnderwater(P,off), hov:null, last:null};
+}
+const B=mk(SB,'month',false), A=mk(SA,'day',true);
+/* The track record is only meaningful for coverage once the market is launched at a chosen moment and
+   the Junior starts at its target size. That moment is the reader's to pick, not ours. */
+const DEFAULT_START=SB.labels.indexOf('Apr 2022');
+let S=null;
+function sliceFrom(i){
+  const P=SB.P.slice(i).map(v=>v/SB.P[i]*100), off=SB.off.slice(i).map(o=>o-SB.off[i]);
+  // offsets are rebased to the launch, so the start date has to move with them or every
+  // tooltip date is wrong by however far the launch sits from the original inception
+  const [y0,m0,d0]=SB.start.split('-').map(Number);
+  const st=new Date(Date.UTC(y0,m0-1,d0)+SB.off[i]*86400000).toISOString().slice(0,10);
+  const r=mk({start:st,off,P,labels:SB.labels.slice(i)},'month',false);
+  r.from=SB.labels[i]; r.to=SB.labels[SB.labels.length-1]; r.i0=i;
+  return r;
+}
+function dateAt(R,i){ const [y,m,d]=R.S.start.split('-').map(Number);
+  const dt=new Date(Date.UTC(y,m-1,d)+R.off[i]*86400000);
+  return R.unit==='month' ? MON[dt.getUTCMonth()]+' '+dt.getUTCFullYear() : dt.toISOString().slice(0,10); }
+const box=(t,v,sub,cls)=>'<div class="box"><div class="t">'+t+'</div><div class="v'+(cls?' '+cls:'')+'">'+v+'</div>'+(sub?'<div class="s">'+sub+'</div>':'')+'</div>';
+
+/* ---------- generic chart, driven by whichever record it is given ---------- */
+function drawSeries(R,svgId,lines,hovKey){
+  const el=document.getElementById(svgId), {w,h}=axisBox(el); el.setAttribute('viewBox','0 0 '+w+' '+h);
+  const pad={l:44,r:40,t:14,b:24};
+  let all=[]; lines.forEach(l=>all=all.concat(l.a));
+  const lo=Math.min(...all)*0.985, hi=Math.max(...all)*1.02;
+  const PX=i=>pad.l+R.off[i]/R.span*(w-pad.l-pad.r), PY=v=>pad.t+(1-(v-lo)/(hi-lo))*(h-pad.t-pad.b);
+  const out=['<rect x="0" y="0" width="'+w+'" height="'+h+'" fill="#FFFDF9"/>'];
+  const sp=hi-lo, base=Math.pow(10,Math.floor(Math.log10(sp/3.5)));
+  const step=base*(sp/3.5>5*base?5:(sp/3.5>2*base?2:1));
+  for(let g=Math.ceil(lo/step)*step;g<=hi;g+=step){ const y=PY(g); if(y<pad.t)continue;
+    out.push('<line x1="'+pad.l+'" y1="'+y.toFixed(1)+'" x2="'+(w-pad.r)+'" y2="'+y.toFixed(1)+'" stroke="#EEE8DE"/>');
+    out.push('<text x="'+(pad.l-5)+'" y="'+(y+3).toFixed(1)+'" fill="#9E968A" font-size="9.5" text-anchor="end">'+(step<1?g.toFixed(1):g.toFixed(0))+'</text>'); }
+  // shade any observation window first, so the lines sit on top of it
+  (R.marks&&R.marks.obs||[]).forEach(o=>{ const x1=PX(o.a), x2=PX(o.b);
+    out.push('<rect x="'+x1.toFixed(1)+'" y="'+pad.t+'" width="'+Math.max(x2-x1,1).toFixed(1)+'" height="'+(h-pad.t-pad.b)+'" fill="#8F4D42" opacity="0.07"/>'); });
+  lines.forEach(l=>{ let d=''; l.a.forEach((v,i)=>{ d+=(i?'L':'M')+PX(i).toFixed(1)+' '+PY(v).toFixed(1); });
+    out.push('<path d="'+d+'" fill="none" stroke="'+l.c+'" stroke-width="'+l.w+'"/>'); });
+  // a dotted vertical every time a loss is booked: from that point the Junior starts again from a lower base
+  (R.marks&&R.marks.ev||[]).forEach(e=>{ const x=PX(e.i);
+    out.push('<line x1="'+x.toFixed(1)+'" y1="'+pad.t+'" x2="'+x.toFixed(1)+'" y2="'+(h-pad.b)+'" stroke="#8F4D42" stroke-width="1.2" stroke-dasharray="3 3" opacity="0.85"/>');
+    out.push('<circle cx="'+x.toFixed(1)+'" cy="'+(pad.t+4)+'" r="2.6" fill="#8F4D42"/>'); });
+  out.push('<text x="'+pad.l+'" y="'+(h-7)+'" fill="#9E968A" font-size="9.5">'+dateAt(R,0)+'</text>');
+  out.push('<text x="'+(w-pad.r)+'" y="'+(h-7)+'" fill="#9E968A" font-size="9.5" text-anchor="end">'+dateAt(R,R.P.length-1)+'</text>');
+  const i=R[hovKey];
+  if(i!=null){ const hx=PX(i);
+    out.push('<line x1="'+hx.toFixed(1)+'" y1="'+pad.t+'" x2="'+hx.toFixed(1)+'" y2="'+(h-pad.b)+'" stroke="#C9BEAE"/>');
+    lines.forEach(l=>out.push('<circle cx="'+hx.toFixed(1)+'" cy="'+PY(l.a[i]).toFixed(1)+'" r="3.2" fill="'+l.c+'" stroke="#fff" stroke-width="1.2"/>'));
+    let tx=hx+9, bw=140, bh=17+lines.length*13; if(tx>w-bw-4) tx=hx-bw-9;
+    out.push(tipBox(tx,pad.t+3,bw,bh,[dateAt(R,i)].concat(lines.map(l=>l.t+' '+l.a[i].toFixed(2))))); }
+  el.innerHTML=out.join('');
+}
+/* getR is a function, not a record: the track record object is rebuilt every time the launch month
+   moves, and a captured reference would write the hover into an orphaned copy. */
+function hoverOn(getR,svgId,key,redraw){
+  const el=document.getElementById(svgId);
+  el.addEventListener('mousemove',e=>{ const R=getR(); if(!R) return;
+    const r=el.getBoundingClientRect(), vb=el.viewBox.baseVal.width||r.width;
+    const mx=(e.clientX-r.left)*(vb/r.width), t=clamp((mx-44)/(vb-84),0,1)*R.span;
+    let bi=0,bd=1e9; for(let i=0;i<R.off.length;i++){ const d=Math.abs(R.off[i]-t); if(d<bd){bd=d;bi=i;} }
+    R[key]=bi; redraw(); });
+  el.addEventListener('mouseleave',()=>{ const R=getR(); if(R) R[key]=null; redraw(); });
+}
+
+/* ---------- section 1 ---------- */
+function renderOv(R,statId,svgId,hdId){
+  R.marks=null;
+  const per=R.unit==='month'?(R.nd+' months'):(R.nd+' days');
+  document.getElementById(statId).innerHTML=
+    box('Total return',sgn(R.total,2)+'%','over '+per,dir(R.total))+
+    box('Annualized',sgn(R.ann,1)+'%','over '+R.yrs.toFixed(1)+' years',dir(R.ann))+
+    box('Max drawdown',R.mdd.toFixed(2)+'%',R.worst<0?('worst '+R.unit+' '+R.worst.toFixed(2)+'%'):'no down '+R.unit+' yet')+
+    box('Losing '+R.unit+'s',R.down+' of '+R.nd,R.down===0?'none, ever':(100*R.down/R.nd).toFixed(0)+'% of the record',R.down===0?'':'bad');
+  document.getElementById(hdId).textContent=dateAt(R,0)+' to '+dateAt(R,R.P.length-1);
+  drawSeries(R,svgId,[{a:R.P,c:'#1B1A17',w:2.2,t:'index'}],'hov');
+}
+/* ---------- section 2 ---------- */
+const cov_=document.getElementById('cov'), ys_=document.getElementById('ys'), obs_=document.getElementById('obs');
+function renderTr(R,statId,svgId,whyId){
+  const cov=+cov_.value/100, ys=+ys_.value/100, obs=+obs_.value;
+  const r=simFT(R.P,R.off,cov,ys,obs,false,EXIT_BONUS_PCT);
+  R.last=r; R.marks={ev:r.ev,obs:r.obs};
+  const se=r.sen[r.sen.length-1], je=r.jun[r.jun.length-1];
+  // stHit can only fire once jtEffective is fully consumed, so a Senior hit IS a Junior wipeout
+  const wiped=Math.min(...r.jun)<1e-9;
+  const an=v=>(Math.pow(v/100,1/R.yrs)-1)*100;
+  document.getElementById(statId).innerHTML=
+    box('Senior, total',sgn(se-100,2)+'%','annualizes to '+capPct(an(se))+'%',dir(se-100))+
+    box('Junior, total',wiped?'wiped out':sgn(je-100,1)+'%',wiped?'and then rebuilt to '+sgn(je-100,1)+'%':'annualizes to '+capPct(an(je))+'%',wiped?'bad':dir(je-100))+
+    box('Senior loss events',r.stHit.length,r.stHit.length===0?'never touched':'Senior was hit',r.stHit.length?'bad':'good')+
+    box('Junior worst drop',mddOf(r.jun).toFixed(2)+'%','pool '+R.mdd.toFixed(2)+'%',dir(mddOf(r.jun)));
+  const md=Math.abs(R.mdd), el=document.getElementById(whyId);
+  el.className='verdict2 '+(r.stHit.length?'hit':'safe');
+  el.innerHTML = R.down===0
+    ? 'Nothing to absorb. The pool never fell, so the Junior never took a loss and the Senior was never at risk. <b>This says nothing about how deep a buffer needs to be.</b>'
+    : (r.stHit.length===0
+      ? 'At '+cov_.value+'% coverage the <b>Senior was never touched</b>: the deepest fall was '+md.toFixed(2)+'% and the Junior absorbed all of it, dropping '+Math.abs(mddOf(r.jun)).toFixed(1)+'% at its worst.'
+      : 'At '+cov_.value+'% coverage the <b>Junior was wiped out</b> and the Senior was hit '+r.stHit.length+' time'+(r.stHit.length>1?'s':'')+': a fall of '+md.toFixed(2)+'% went straight through a buffer only '+cov_.value+'% deep. The line then rebuilds from zero, so the <b>'+sgn(je-100,1)+'%</b> above is what came after the wipeout, not a return for the capital that took it.');
+  drawSeries(R,svgId,[{a:R.P,c:'#B4A896',w:1.5,t:'pool  '},{a:r.sen,c:'#8E7355',w:2.2,t:'senior'},{a:r.jun,c:'#1B1A17',w:2.4,t:'junior'}],'hovT');
+}
+/* ---------- section 3 ---------- */
+let TBL_YS=0.35, TBL_Y=null;
+const COVS=[5,10,15,20,25,30,40,50];
+function renderTable(){
+  /* One variable at a time: the pool yield is a control, not a second axis. The two marked options are
+     what each record actually annualized to, so the reader can price either belief. */
+  const yB=Math.round(B.ann), yA=Math.round(A.ann);
+  const marks={}; marks[yB]='track record'; if(yA!==yB) marks[yA]='sUSDx today';
+  const yields=[5,10,15,20,25,30].filter(y=>!Object.keys(marks).some(m=>Math.abs(y-+m)<=1))
+    .concat(Object.keys(marks).map(Number)).sort((a,b)=>a-b).slice(0,6);
+  if(TBL_Y==null || yields.indexOf(TBL_Y)<0) TBL_Y=yB;
+  document.getElementById('tblY').innerHTML=yields.map(y=>
+    '<button data-py="'+y+'"'+(y===TBL_Y?' class="on"':'')+'>'+y+'%'+(marks[y]?' &middot; '+marks[y]:'')+'</button>').join('');
+  const Y=TBL_Y/100, senR=Y*(1-TBL_YS), setC=+cov_.value;
+  const jrS=(setC/100)/TARGET_UTIL, levS=1+TBL_YS*(1-jrS)/jrS;
+  document.getElementById('pair').innerHTML=
+    '<div class="pairhead">At '+setC+'% minimum coverage, '+Math.round(TBL_YS*100)+'% yield share, a '+TBL_Y+'% pool yield</div>'+
+    '<div class="pairgrid">'+
+      '<div class="side s"><div class="lab">Senior</div><div class="num">'+fmtRate(senR)+'</div><div class="sub">the same at every coverage</div></div>'+
+      '<div class="side j"><div class="lab">Junior</div><div class="num">'+fmtRate(Y*levS)+'</div><div class="sub">'+levS.toFixed(1)+'x the pool yield, and it takes the first losses</div></div>'+
+    '</div>';
+  drawSplit(Y);
+  let html='<thead><tr><th>Minimum coverage</th><th>Junior size<br>at 90% util</th>'+
+    '<th class="sc">Senior earns</th><th class="jc">Junior earns</th><th>Junior vs Senior</th></tr></thead><tbody>';
+  COVS.forEach(c=>{
+    const jr=(c/100)/TARGET_UTIL, lev=1+TBL_YS*(1-jr)/jr, junR=Y*lev;
+    html+='<tr'+(c===setC?' class="setrow"':'')+'><td class="cov">'+c+'%</td>'+
+      '<td class="meta">'+(jr*100).toFixed(1)+'%</td>'+
+      '<td class="sc">'+fmtRate(senR)+'</td><td class="jc">'+fmtRate(junR)+'</td>'+
+      '<td class="meta">'+(junR/senR).toFixed(1)+'x</td></tr>';
+  });
+  document.getElementById('tbl').innerHTML=html+'</tbody>';
+  document.getElementById('nLev1').textContent=((1-(0.05/TARGET_UTIL))/(0.05/TARGET_UTIL)).toFixed(0)+' dollars';
+  document.getElementById('nLev2').textContent=((1-(0.50/TARGET_UTIL))/(0.50/TARGET_UTIL)).toFixed(1)+' dollars';
+  document.getElementById('nAnn').textContent='the track record annualizes to '+B.ann.toFixed(1)+'% over '+B.yrs.toFixed(1)+' years, the live sUSDx feed to '+A.ann.toFixed(1)+'% over '+A.yrs.toFixed(1)+' years';
+}
+let hovSplit=null, SPLIT_Y=null;
+function drawSplit(Y){
+  const el=document.getElementById('splitChart'); if(!el) return;
+  SPLIT_Y=Y;
+  const {w,h}=axisBox(el); el.setAttribute('viewBox','0 0 '+w+' '+h);
+  const pad={l:52,r:16,t:14,b:30}, C0=5, C1=50;
+  const jrOf=c=>(c/100)/TARGET_UTIL;
+  const jun=c=>Y*(1+TBL_YS*(1-jrOf(c))/jrOf(c)), sen=Y*(1-TBL_YS);
+  const hi=Math.max(jun(C0),sen)*1.06;
+  const PX=c=>pad.l+(c-C0)/(C1-C0)*(w-pad.l-pad.r), PY=v=>pad.t+(1-v/hi)*(h-pad.t-pad.b);
+  const P=['<rect x="0" y="0" width="'+w+'" height="'+h+'" fill="#FFFDF9"/>'];
+  const base=Math.pow(10,Math.floor(Math.log10(hi/3.5)));
+  const step=base*(hi/3.5>5*base?5:(hi/3.5>2*base?2:1));
+  for(let g=0;g<=hi;g+=step){ const y=PY(g); if(y<pad.t)continue;
+    P.push('<line x1="'+pad.l+'" y1="'+y.toFixed(1)+'" x2="'+(w-pad.r)+'" y2="'+y.toFixed(1)+'" stroke="#EEE8DE"/>');
+    P.push('<text x="'+(pad.l-6)+'" y="'+(y+3).toFixed(1)+'" fill="#9E968A" font-size="10" text-anchor="end">'+(g*100).toFixed(0)+'%</text>'); }
+  let d='';
+  for(let c=C0;c<=C1;c+=0.5) d+=(c===C0?'M':'L')+PX(c).toFixed(1)+' '+PY(jun(c)).toFixed(1);
+  P.push('<path d="'+d+'" fill="none" stroke="#1B1A17" stroke-width="2.6"/>');
+  P.push('<line x1="'+PX(C0)+'" y1="'+PY(sen).toFixed(1)+'" x2="'+PX(C1)+'" y2="'+PY(sen).toFixed(1)+'" stroke="#8E7355" stroke-width="2.6"/>');
+  const setC=Math.min(Math.max(+cov_.value,C0),C1), mx=PX(setC);
+  P.push('<line x1="'+mx.toFixed(1)+'" y1="'+pad.t+'" x2="'+mx.toFixed(1)+'" y2="'+(h-pad.b)+'" stroke="#967756" stroke-width="1.2" stroke-dasharray="3 3"/>');
+  P.push('<circle cx="'+mx.toFixed(1)+'" cy="'+PY(jun(setC)).toFixed(1)+'" r="4.5" fill="#1B1A17" stroke="#fff" stroke-width="1.6"/>');
+  P.push('<circle cx="'+mx.toFixed(1)+'" cy="'+PY(sen).toFixed(1)+'" r="4.5" fill="#8E7355" stroke="#fff" stroke-width="1.6"/>');
+  for(const c of [5,10,20,30,40,50]) P.push('<text x="'+PX(c).toFixed(1)+'" y="'+(h-9)+'" fill="#9E968A" font-size="10" text-anchor="middle">'+c+'%</text>');
+  if(hovSplit!=null){
+    const hc=hovSplit, hx=PX(hc), js=jun(hc);
+    P.push('<line x1="'+hx.toFixed(1)+'" y1="'+pad.t+'" x2="'+hx.toFixed(1)+'" y2="'+(h-pad.b)+'" stroke="#C9BEAE"/>');
+    P.push('<circle cx="'+hx.toFixed(1)+'" cy="'+PY(js).toFixed(1)+'" r="4" fill="#1B1A17" stroke="#fff" stroke-width="1.5"/>');
+    P.push('<circle cx="'+hx.toFixed(1)+'" cy="'+PY(sen).toFixed(1)+'" r="4" fill="#8E7355" stroke="#fff" stroke-width="1.5"/>');
+    let tx=hx+10; if(tx>w-166) tx=hx-166;
+    P.push(tipBox(tx,pad.t+4,158,61,[hc.toFixed(0)+'% coverage',
+      'senior '+(sen*100).toFixed(1)+'%','junior '+(js*100).toFixed(1)+'%','ratio  '+(js/sen).toFixed(1)+'x']));
+  }
+  P.push('<text x="'+((pad.l+w-pad.r)/2).toFixed(0)+'" y="'+(h-22)+'" fill="#A49B90" font-size="9.5" text-anchor="middle" letter-spacing="1.4">MINIMUM COVERAGE</text>');
+  P.push('<text x="12" y="'+(pad.t+10)+'" fill="#A49B90" font-size="9.5" letter-spacing="1.4">APR</text>');
+  el.innerHTML=P.join('');
+}
+/* ---------- copy that must follow the data ---------- */
+function renderCopy(){
+  document.getElementById('cNB').textContent=B.nd+' months';
+  document.getElementById('cNA').textContent=A.nd+' days';
+  document.getElementById('cUW').textContent=Math.round(B.uw/30.44)+' months';
+  document.getElementById('dN').textContent=B.nd+' months';
+  document.getElementById('stampTxt').textContent='Track record '+dateAt(B,1)+' to '+dateAt(B,B.P.length-1)+' · sUSDx feed '+dateAt(A,0)+' to '+dateAt(A,A.P.length-1);
+}
+/* ---------- wiring ---------- */
+function syncYs(){ TBL_YS=+ys_.value/100;
+  document.querySelectorAll('#tblYs button').forEach(x=>x.classList.toggle('on',+x.dataset.y===+ys_.value));
+  document.querySelectorAll('#tblCov button').forEach(x=>x.classList.toggle('on',+x.dataset.c===+cov_.value)); }
+/* The single most decision relevant number on the page: the coverage at which the Senior stops
+   being hit. Solved from the engine rather than written down, so it can never go stale. */
+function breakeven(){
+  for(let c=1;c<=50;c++){
+    const r=simFT(S.P,S.off,c/100,+ys_.value/100,+obs_.value,false,EXIT_BONUS_PCT);
+    if(r.stHit.length===0) return c;
+  }
+  return null;
+}
+const start_=document.getElementById('start');
+function rebuildStart(){
+  S=sliceFrom(+start_.value);
+  document.getElementById('startv').textContent=S.from;
+  const atPeak=(+start_.value===DEFAULT_START);
+  document.getElementById('startHint').innerHTML=
+    'the deepest fall in this window is <b>'+Math.abs(S.mdd).toFixed(2)+'%</b> over <b>'+S.nd+' months</b>. '+
+    (atPeak ? 'This is the high just before the only large fall on record, so it is the hardest start available.'
+            : 'Slide back to <b>Apr 2022</b> for the hardest start, just before the only large fall on record.');
+}
+function drawAllTr(){
+  renderTr(S,'tsStatB','tsB','whyB'); renderTr(A,'tsStatA','tsA','whyA');
+  document.getElementById('paneFrom').textContent='from '+S.from;
+  const ev=(S.last&&S.last.ev.length)||0, ob=(S.last&&S.last.obs.length)||0;
+  document.getElementById('obsNote').innerHTML = ob>0
+    ? '<b>'+ob+'</b> observation window(s) open at these terms.'
+    : 'no observation window ever opens, so this slider changes nothing here. See the note below.';
+  const be=breakeven();
+  if(be){ const rb=simFT(S.P,S.off,be/100,+ys_.value/100,+obs_.value,false,EXIT_BONUS_PCT);
+    document.getElementById('hBP').innerHTML='<b>'+be+'%</b>. Below it the '+Math.abs(S.mdd).toFixed(2)+'% fall reaches the Senior and the Junior is wiped out. At '+be+'% it does not, but the Junior still loses <b>'+Math.abs(mddOf(rb.jun)).toFixed(0)+'%</b> of itself absorbing it.';
+  } else document.getElementById('hBP').innerHTML='the Senior is hit at every coverage up to 50% on this record.';
+  document.getElementById('headline').innerHTML = be
+    ? 'Launching in <b>'+S.from+'</b>, at <b>'+Math.round(+ys_.value)+'%</b> yield share, the Senior is hit at every coverage below <b>'+be+'%</b> and is never hit at <b>'+be+'%</b> or deeper. The deepest fall was <b>'+Math.abs(S.mdd).toFixed(2)+'%</b>, so the buffer has to be worth more than the fall, not equal to it.'
+    : 'Launching in <b>'+S.from+'</b>, at <b>'+Math.round(+ys_.value)+'%</b> yield share, the Senior is hit at every coverage up to 50%.';
+  document.getElementById('obsExplain').innerHTML = ev===0
+    ? '<b>No loss is booked at these terms.</b> The Junior absorbs every fall and recovers inside its own buffer.'
+    : '<b>The dotted lines mark the '+ev+' points where a loss is booked.</b> At each one the Junior\'s impairment stops being a temporary markdown and becomes permanent, and from that point both tranches start compounding again from the new, lower base.'
+      + (ob===0 ? ' <b>The observation period plays no part in this.</b> On a monthly series the whole fall lands in a single step, which pushes utilization straight past the liquidation threshold, so the loss is booked on the spot with no grace window. A window can only help when a fall arrives gradually, and monthly data cannot show that. This is the clearest example on the page of why the granularity caveat matters.' : '');
+}
+function drawAllOv(){ renderOv(B,'ovStatB','navB','hdB'); renderOv(A,'ovStatA','navA','hdA'); }
+[cov_,ys_,obs_,start_].forEach(el=>el.addEventListener('input',()=>{
+  rebuildStart();
+  document.getElementById('covv').textContent=cov_.value+'%';
+  document.getElementById('ysv').textContent=ys_.value+'%';
+  document.getElementById('obsv').textContent=obs_.value+'d';
+  syncYs(); drawAllTr(); renderTable(); }));
+document.querySelectorAll('#tblYs button').forEach(b=>b.addEventListener('click',()=>{
+  ys_.value=b.dataset.y; ys_.dispatchEvent(new Event('input')); }));
+document.querySelectorAll('#tblCov button').forEach(b=>b.addEventListener('click',()=>{
+  cov_.value=b.dataset.c; cov_.dispatchEvent(new Event('input')); }));
+document.getElementById('tblY').addEventListener('click',e=>{
+  const b=e.target.closest('button'); if(!b) return; TBL_Y=+b.dataset.py; renderTable(); });
+hoverOn(()=>B,'navB','hov',()=>renderOv(B,'ovStatB','navB','hdB'));
+hoverOn(()=>A,'navA','hov',()=>renderOv(A,'ovStatA','navA','hdA'));
+hoverOn(()=>S,'tsB','hovT',()=>renderTr(S,'tsStatB','tsB','whyB'));
+hoverOn(()=>A,'tsA','hovT',()=>renderTr(A,'tsStatA','tsA','whyA'));
+(function(){
+  const wrap=document.getElementById('tbl');
+  const clear=()=>{ wrap.querySelectorAll('.xc').forEach(e=>e.classList.remove('xc'));
+                    wrap.querySelectorAll('tr.xr').forEach(e=>e.classList.remove('xr')); };
+  wrap.addEventListener('mouseover',e=>{
+    const cell=e.target.closest('td,th'); if(!cell||!wrap.contains(cell)) return;
+    clear(); const row=cell.closest('tr'); if(row) row.classList.add('xr');
+    const c=cell.dataset.c;
+    if(c!=null) wrap.querySelectorAll('[data-c="'+c+'"]').forEach(x=>x.classList.add('xc'));
+  });
+  wrap.addEventListener('mouseleave',clear);
+})();
+(function(){
+  const el=document.getElementById('splitChart'), C0=5, C1=50, padL=52, padR=16;
+  el.addEventListener('mousemove',e=>{
+    const r=el.getBoundingClientRect(), vb=el.viewBox.baseVal.width||r.width;
+    const mx=(e.clientX-r.left)*(vb/r.width);
+    hovSplit=C0+clamp((mx-padL)/(vb-padL-padR),0,1)*(C1-C0);
+    if(SPLIT_Y!=null) drawSplit(SPLIT_Y);
+  });
+  el.addEventListener('mouseleave',()=>{ hovSplit=null; if(SPLIT_Y!=null) drawSplit(SPLIT_Y); });
+})();
+window.addEventListener('resize',()=>{ drawAllOv(); drawAllTr(); renderTable(); });
+document.getElementById('obsv').textContent=obs_.value+'d';
+start_.max=SB.P.length-7; start_.value=DEFAULT_START;
+rebuildStart(); syncYs(); renderCopy(); drawAllOv(); drawAllTr(); renderTable();
+</script>
+</body></html>
