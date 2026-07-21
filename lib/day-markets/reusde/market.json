@@ -1,0 +1,77 @@
+{
+  "id": "reusde",
+  "route": "/reusde",
+  "identity": {
+    "marketName": "reUSDe",
+    "displayAssetName": "reUSDe",
+    "underlyingAsset": "reUSDe",
+    "seniorName": "Senior Royco reUSDe",
+    "seniorSymbol": "SrROYreUSDe",
+    "juniorName": "Junior Royco reUSDe",
+    "juniorSymbol": "JrROYreUSDe"
+  },
+  "defaults": {
+    "sourceApy": 0.1409150239834831,
+    "coverage": 0.15,
+    "minLiquidity": 0.2,
+    "liquidationUtilization": 100,
+    "observationDays": 7,
+    "exitBufferPct": 1,
+    "linkJuniorToFirstLoss": true,
+    "maintainCoverage": true,
+    "riskYDM": {
+      "mode": "static",
+      "y0": 0.06,
+      "yTarget": 0.08,
+      "y100": 0.18
+    },
+    "liqYDM": {
+      "mode": "static",
+      "y0": 0.08,
+      "yTarget": 0.18,
+      "y100": 0.2
+    },
+    "selfLiquidationBonus": 0.01,
+    "stProtocolFee": 0,
+    "jtProtocolFee": 0,
+    "jtYieldShareProtocolFee": 0,
+    "ltYieldShareProtocolFee": 0,
+    "stableYield": 0.035,
+    "swapFeeBps": 10,
+    "poolTurnoverPerYear": 8,
+    "eclpBandWidth": 0.1,
+    "reinvestLiquidityPremium": true,
+    "initialST": 1000,
+    "initialJT": 200,
+    "initialLT": 222.22222222222223
+  },
+  "targets": {
+    "seniorApyMin": 0.095,
+    "seniorApyMax": 0.105,
+    "juniorApyMin": 0.2,
+    "juniorApyMax": 0.25
+  },
+  "certification": {
+    "intakeConfirmed": true
+  },
+  "customization": {
+    "explicitlyAuthorized": false,
+    "authorizationNote": "",
+    "hiddenSections": [],
+    "copyOverrides": {}
+  },
+  "provenance": {
+    "source": "Re protocol metrics — reUSDe Price",
+    "sourceUrl": "https://app.re.xyz/metrics",
+    "sourceProvider": "Re",
+    "seriesPath": "lib/day-markets/reusde/series.json",
+    "dataMode": "historical-series",
+    "dataCadence": "daily",
+    "priceType": "price",
+    "feesIncluded": true,
+    "observationCount": 304,
+    "firstDate": "2025-09-19",
+    "lastDate": "2026-07-21",
+    "retrievedAt": "2026-07-21"
+  }
+}
