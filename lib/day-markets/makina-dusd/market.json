@@ -56,28 +56,30 @@
   },
   "customization": {
     "explicitlyAuthorized": true,
-    "authorizationNote": "User explicitly authorized four Makina vault pill tabs and the published 30-day incentive-inclusive APY on 2026-07-20; Backtest is hidden because the $MAK rewards are not represented in a historical total-return series.",
-    "hiddenSections": [
-      "backtest"
-    ],
+    "authorizationNote": "User explicitly authorized four Makina vault pill tabs, the published 30-day incentive-inclusive APY, restoration of the Backtest using contract-validated Machine NAV history, and a two-sentence January 20 chart footnote on 2026-07-20.",
+    "hiddenSections": [],
     "copyOverrides": {},
     "vaultTabs": {
       "group": "makina",
       "label": "DUSD"
+    },
+    "backtestDisplay": {
+      "returnUnit": "USD",
+      "footnote": "January 20 oracle manipulation is excluded: Makina reports that Machine funds were unaffected and the inflated mark was transient. Royco's Makina quoter reads the live Machine share price, so a Royco operation during that intra-block window would require a separate same-block stress scenario."
     }
   },
   "provenance": {
-    "source": "Makina DUSD published 30-day Live APY: 9.42% (4.19% base yield plus 5.22% $MAK reward, displayed values rounded)",
+    "source": "Makina DUSD official Machine share NAV in USDC, with the January 20 transient oracle mark replaced by the end-of-block convertToAssets value, and a 9.42% published 30-day Live APY input (4.19% base yield plus 5.22% $MAK reward, displayed values rounded)",
     "sourceUrl": "https://makina.finance/strategy/dusd",
-    "sourceProvider": "Makina",
+    "sourceProvider": "Makina official API and onchain Machine accounting",
     "seriesPath": "lib/day-markets/makina-dusd/series.json",
-    "dataMode": "published-apy-forward",
-    "dataCadence": "none",
-    "priceType": "published-apy",
+    "dataMode": "historical-series-with-published-apy",
+    "dataCadence": "irregular",
+    "priceType": "nav",
     "feesIncluded": true,
-    "observationCount": 0,
-    "firstDate": "not-applicable",
-    "lastDate": "not-applicable",
+    "observationCount": 40,
+    "firstDate": "2025-10-23",
+    "lastDate": "2026-07-20",
     "publishedApy": 0.0942,
     "retrievedAt": "2026-07-20"
   }

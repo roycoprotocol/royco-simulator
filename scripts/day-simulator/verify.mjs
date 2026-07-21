@@ -518,21 +518,26 @@ if (marketId) {
       const last = sourceSeries.at(-1);
       if (sourceSeries.length !== market.provenance.observationCount) failures.push("Day market observationCount does not match its series");
       const publishedApyForward = market.provenance.dataMode === "published-apy-forward";
+      const historicalWithPublishedApy = market.provenance.dataMode === "historical-series-with-published-apy";
       if (publishedApyForward) {
         if (market.provenance.dataCadence !== "none") failures.push("published-apy-forward markets must use dataCadence none");
         if (market.provenance.priceType !== "published-apy") failures.push("published-apy-forward markets must use priceType published-apy");
         if (market.provenance.observationCount !== 0 || sourceSeries.length !== 0) failures.push("published-apy-forward markets may not claim historical observations");
         if (!Number.isFinite(market.provenance.publishedApy) || Math.abs(market.provenance.publishedApy - market.defaults.sourceApy) > 1e-12) failures.push("published APY must match defaults.sourceApy");
       } else {
-        if (market.provenance.dataMode !== "historical-series") failures.push("Day market dataMode must be historical-series or published-apy-forward");
+        if (market.provenance.dataMode !== "historical-series" && !historicalWithPublishedApy) failures.push("Day market dataMode must be historical-series, historical-series-with-published-apy, or published-apy-forward");
         if (first?.date !== market.provenance.firstDate || last?.date !== market.provenance.lastDate) failures.push("Day market provenance dates do not match its series");
+        if (historicalWithPublishedApy) {
+          if (market.provenance.priceType !== "nav" && market.provenance.priceType !== "total-return-index") failures.push("historical-series-with-published-apy markets must use NAV or total-return observations");
+          if (!Number.isFinite(market.provenance.publishedApy) || Math.abs(market.provenance.publishedApy - market.defaults.sourceApy) > 1e-12) failures.push("published APY must match defaults.sourceApy");
+        }
       }
       for (let index = 0; index < sourceSeries.length; index += 1) {
         const point = sourceSeries[index];
         if (!/^\d{4}-\d{2}-\d{2}$/.test(point?.date ?? "") || !(point?.price > 0)) failures.push(`invalid date/price at series row ${index + 1}`);
         if (index > 0 && point.date <= sourceSeries[index - 1].date) failures.push(`series dates are not strictly increasing at row ${index + 1}`);
       }
-      if (market.provenance.dataMode !== "published-apy-forward") {
+      if (market.provenance.dataMode === "historical-series") {
         const elapsedDays = (Date.parse(last?.date) - Date.parse(first?.date)) / 86_400_000;
         const derivedApy = Math.pow(last?.price / first?.price, 365 / elapsedDays) - 1;
         if (!Number.isFinite(derivedApy) || Math.abs(derivedApy - market.defaults.sourceApy) > 1e-12) failures.push("Day market sourceApy does not match its annualized source series");

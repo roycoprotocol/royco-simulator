@@ -56,28 +56,29 @@
   },
   "customization": {
     "explicitlyAuthorized": true,
-    "authorizationNote": "User explicitly authorized four Makina vault pill tabs and the published 30-day incentive-inclusive APY on 2026-07-20; Backtest is hidden because the $MAK rewards are not represented in a historical total-return series.",
-    "hiddenSections": [
-      "backtest"
-    ],
+    "authorizationNote": "User explicitly authorized four Makina vault pill tabs, the published 30-day incentive-inclusive APY, restoration of the Backtest using official Machine NAV history, and a BTC return-basis label on 2026-07-20.",
+    "hiddenSections": [],
     "copyOverrides": {},
     "vaultTabs": {
       "group": "makina",
       "label": "DBIT"
+    },
+    "backtestDisplay": {
+      "returnUnit": "BTC"
     }
   },
   "provenance": {
-    "source": "Makina DBIT published 30-day Live APY: 3.44% (0.46% base yield plus 2.98% $MAK reward)",
+    "source": "Makina DBIT official Machine share NAV in WBTC, with a 3.44% published 30-day Live APY input (0.46% base yield plus 2.98% $MAK reward)",
     "sourceUrl": "https://makina.finance/strategy/dbit",
-    "sourceProvider": "Makina",
+    "sourceProvider": "Makina official API and onchain Machine accounting",
     "seriesPath": "lib/day-markets/makina-dbit/series.json",
-    "dataMode": "published-apy-forward",
-    "dataCadence": "none",
-    "priceType": "published-apy",
+    "dataMode": "historical-series-with-published-apy",
+    "dataCadence": "irregular",
+    "priceType": "nav",
     "feesIncluded": true,
-    "observationCount": 0,
-    "firstDate": "not-applicable",
-    "lastDate": "not-applicable",
+    "observationCount": 40,
+    "firstDate": "2025-10-23",
+    "lastDate": "2026-07-20",
     "publishedApy": 0.0344,
     "retrievedAt": "2026-07-20"
   }

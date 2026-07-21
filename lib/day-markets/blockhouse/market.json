@@ -56,9 +56,10 @@
   },
   "customization": {
     "explicitlyAuthorized": true,
-    "authorizationNote": "User explicitly authorized hiding Backtest for the Blockhouse market and authorized forward modeling from the supplied 11.4% APY without historical observations.",
+    "authorizationNote": "User explicitly authorized hiding Backtest and Junior funding for the Blockhouse market and authorized forward modeling from the supplied 11.4% APY without historical observations; Junior funding is not displayed because this market has no historical backtest.",
     "hiddenSections": [
-      "backtest"
+      "backtest",
+      "junior-funding"
     ],
     "copyOverrides": {}
   },

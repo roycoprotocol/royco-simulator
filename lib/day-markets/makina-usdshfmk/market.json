@@ -56,10 +56,8 @@
   },
   "customization": {
     "explicitlyAuthorized": true,
-    "authorizationNote": "User explicitly authorized four Makina vault pill tabs and the published 30-day incentive-inclusive APY on 2026-07-20; Backtest is hidden because the $MAK rewards are not represented in a historical total-return series.",
-    "hiddenSections": [
-      "backtest"
-    ],
+    "authorizationNote": "User explicitly authorized four Makina vault pill tabs, the published 30-day incentive-inclusive APY, and restoration of the Backtest using official Machine NAV history on 2026-07-20.",
+    "hiddenSections": [],
     "copyOverrides": {},
     "vaultTabs": {
       "group": "makina",
@@ -67,17 +65,17 @@
     }
   },
   "provenance": {
-    "source": "Makina usdSHFmk published 30-day Live APY: 9.96% (4.74% base yield plus 5.22% $MAK reward)",
+    "source": "Makina usdSHFmk official Machine share NAV in USDC, with a 9.96% published 30-day Live APY input (4.74% base yield plus 5.22% $MAK reward)",
     "sourceUrl": "https://makina.finance/strategy/usdshfmk",
-    "sourceProvider": "Makina",
+    "sourceProvider": "Makina official API and onchain Machine accounting",
     "seriesPath": "lib/day-markets/makina-usdshfmk/series.json",
-    "dataMode": "published-apy-forward",
-    "dataCadence": "none",
-    "priceType": "published-apy",
+    "dataMode": "historical-series-with-published-apy",
+    "dataCadence": "irregular",
+    "priceType": "nav",
     "feesIncluded": true,
-    "observationCount": 0,
-    "firstDate": "not-applicable",
-    "lastDate": "not-applicable",
+    "observationCount": 27,
+    "firstDate": "2026-01-22",
+    "lastDate": "2026-07-20",
     "publishedApy": 0.0996,
     "retrievedAt": "2026-07-20"
   }

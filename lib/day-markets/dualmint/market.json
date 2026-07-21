@@ -56,9 +56,10 @@
   },
   "customization": {
     "explicitlyAuthorized": true,
-    "authorizationNote": "User explicitly authorized a forward-looking DualMint simulation with no historical series and the Backtest section hidden; no historical performance data was provided.",
+    "authorizationNote": "User explicitly authorized a forward-looking DualMint simulation with no historical series and the Backtest and Junior funding sections hidden; no historical performance data was provided, so Junior refill funding is not displayed.",
     "hiddenSections": [
-      "backtest"
+      "backtest",
+      "junior-funding"
     ],
     "copyOverrides": {}
   },

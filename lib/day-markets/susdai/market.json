@@ -11,8 +11,8 @@
     "juniorSymbol": "jrROYSUSDai"
   },
   "defaults": {
-    "sourceApy": 0.08144289218972234,
-    "coverage": 0.07,
+    "sourceApy": 0.08272576052222136,
+    "coverage": 0.09,
     "minLiquidity": 0.15,
     "liquidationUtilization": 100,
     "observationDays": 7,
@@ -42,14 +42,14 @@
     "eclpBandWidth": 0.1,
     "reinvestLiquidityPremium": true,
     "initialST": 1000,
-    "initialJT": 84.33734939759037,
+    "initialJT": 111.11111111111111,
     "initialLT": 166.66666666666666
   },
   "targets": {
-    "seniorApyMin": 0.055,
-    "seniorApyMax": 0.075,
-    "juniorApyMin": 0.15,
-    "juniorApyMax": 0.19
+    "seniorApyMin": 0.06,
+    "seniorApyMax": 0.07,
+    "juniorApyMin": 0.13,
+    "juniorApyMax": 0.16
   },
   "certification": {
     "intakeConfirmed": true
@@ -61,16 +61,16 @@
     "copyOverrides": {}
   },
   "provenance": {
-    "source": "CoinGecko — Staked USDai price history via the linked public market-chart data",
-    "sourceUrl": "https://www.coingecko.com/en/coins/staked-usdai",
-    "sourceProvider": "CoinGecko",
+    "source": "Trading Strategy — onchain Staked USDai vault share price in USDai for the official Arbitrum sUSDai contract; last observed checkpoint per UTC day, with fees internalized",
+    "sourceUrl": "https://tradingstrategy.ai/trading-view/vaults/staked-usdai",
+    "sourceProvider": "Trading Strategy / USD.AI onchain vault data",
     "seriesPath": "lib/day-markets/susdai/series.json",
     "dataMode": "historical-series",
     "dataCadence": "daily",
-    "priceType": "price",
+    "priceType": "nav",
     "feesIncluded": true,
-    "observationCount": 31,
-    "firstDate": "2026-06-20",
+    "observationCount": 350,
+    "firstDate": "2025-05-14",
     "lastDate": "2026-07-20",
     "retrievedAt": "2026-07-20"
   }

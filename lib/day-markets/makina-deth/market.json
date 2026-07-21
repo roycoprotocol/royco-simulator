@@ -56,28 +56,29 @@
   },
   "customization": {
     "explicitlyAuthorized": true,
-    "authorizationNote": "User explicitly authorized four Makina vault pill tabs and the published 30-day incentive-inclusive APY on 2026-07-20; Backtest is hidden because the $MAK rewards are not represented in a historical total-return series.",
-    "hiddenSections": [
-      "backtest"
-    ],
+    "authorizationNote": "User explicitly authorized four Makina vault pill tabs, the published 30-day incentive-inclusive APY, restoration of the Backtest using official Machine NAV history, and an ETH return-basis label on 2026-07-20.",
+    "hiddenSections": [],
     "copyOverrides": {},
     "vaultTabs": {
       "group": "makina",
       "label": "DETH"
+    },
+    "backtestDisplay": {
+      "returnUnit": "ETH"
     }
   },
   "provenance": {
-    "source": "Makina DETH published 30-day Live APY: 7.16% (3.43% base yield plus 3.73% $MAK reward)",
+    "source": "Makina DETH official Machine share NAV in WETH, with a 7.16% published 30-day Live APY input (3.43% base yield plus 3.73% $MAK reward)",
     "sourceUrl": "https://makina.finance/strategy/deth",
-    "sourceProvider": "Makina",
+    "sourceProvider": "Makina official API and onchain Machine accounting",
     "seriesPath": "lib/day-markets/makina-deth/series.json",
-    "dataMode": "published-apy-forward",
-    "dataCadence": "none",
-    "priceType": "published-apy",
+    "dataMode": "historical-series-with-published-apy",
+    "dataCadence": "irregular",
+    "priceType": "nav",
     "feesIncluded": true,
-    "observationCount": 0,
-    "firstDate": "not-applicable",
-    "lastDate": "not-applicable",
+    "observationCount": 40,
+    "firstDate": "2025-10-23",
+    "lastDate": "2026-07-20",
     "publishedApy": 0.0716,
     "retrievedAt": "2026-07-20"
   }

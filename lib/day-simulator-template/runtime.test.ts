@@ -25,12 +25,18 @@ const authorizedCustomization = {
   hiddenSections: ["backtest" as const],
   copyOverrides: { heroTitle: "A market-specific factual headline." },
   vaultTabs: { group: "test-vaults", label: "Test vault" },
+  backtestDisplay: {
+    returnUnit: "ETH" as const,
+    footnote: "The historical path excludes a transient oracle mark. A same-block sync belongs in a separate stress scenario.",
+  },
 };
 assert.deepEqual(validateDayMarketCustomization(authorizedCustomization), []);
 assert.deepEqual(describeDayMarketCustomizations(authorizedCustomization), [
   "hide section: backtest",
   "replace copy: heroTitle",
   "vault tab: Test vault in test-vaults",
+  "backtest return unit: ETH",
+  "backtest footnote",
 ]);
 assert.equal(isDaySectionVisible(authorizedCustomization, "backtest"), false);
 assert.equal(isDaySectionVisible(authorizedCustomization, "roles"), true);
@@ -46,6 +52,17 @@ assert.ok(validateDayMarketCustomization({
   ...authorizedCustomization,
   vaultTabs: { group: "", label: "Test vault" },
 }).some((issue) => issue.includes("vaultTabs.group")));
+assert.ok(validateDayMarketCustomization({
+  ...authorizedCustomization,
+  backtestDisplay: { returnUnit: "EUR" as never },
+}).some((issue) => issue.includes("returnUnit")));
+assert.ok(validateDayMarketCustomization({
+  ...authorizedCustomization,
+  backtestDisplay: {
+    returnUnit: "USD",
+    footnote: "First sentence. Second sentence. Third sentence.",
+  },
+}).some((issue) => issue.includes("two sentences")));
 const terms = {
   coverage: market.defaults.coverage,
   minLiquidity: market.defaults.minLiquidity,
@@ -64,6 +81,23 @@ assert.equal(
 assert.equal(
   copy.disclosure,
   "The source APY is derived from 371 fee-inclusive daily NAV observations supplied by RWA.xyz. Simulator outputs are mechanism simulations, not historical backtests, forecasts, or an announced product.",
+);
+
+const historicalPublishedApyMarket = {
+  ...market,
+  defaults: { ...market.defaults, sourceApy: 0.0996 },
+  provenance: {
+    ...market.provenance,
+    dataMode: "historical-series-with-published-apy" as const,
+    sourceProvider: "Makina onchain Machine accounting",
+    observationCount: 26,
+    dataCadence: "irregular" as const,
+    publishedApy: 0.0996,
+  },
+};
+assert.equal(
+  buildDayMarketCopy(historicalPublishedApyMarket).disclosure,
+  "The chart preserves the path of 26 fee-inclusive irregular NAV observations supplied by Makina onchain Machine accounting, with its trend calibrated to the published 9.96% APY input. Simulator outputs are mechanism simulations, not historical backtests, forecasts, or an announced product.",
 );
 
 const initial = buildDayInitialBalances(market.defaults, terms);

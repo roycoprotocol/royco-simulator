@@ -61,11 +61,15 @@ async function main() {
   const cfg = buildDayMarketConfig(runtimeDefaults, terms);
   const initial = buildDayInitialBalances(runtimeDefaults, terms);
   const sourceApy = market?.defaults.sourceApy ?? 0.12;
-  if (market?.provenance.dataMode === "published-apy-forward") {
+  if (
+    market?.provenance.dataMode === "published-apy-forward"
+    || market?.provenance.dataMode === "historical-series-with-published-apy"
+  ) {
     if (market.provenance.publishedApy !== sourceApy) {
       throw new Error("Published APY provenance must match defaults.sourceApy");
     }
-  } else if (market?.provenance.seriesPath) {
+  }
+  if (market?.provenance.dataMode !== "published-apy-forward" && market?.provenance.seriesPath) {
     const sourceSeries = JSON.parse(
       await readFile(path.join(process.cwd(), market.provenance.seriesPath), "utf8"),
     );

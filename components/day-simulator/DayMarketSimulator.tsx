@@ -35,6 +35,7 @@ import {
 } from '@/lib/day-simulator-template/market';
 import {
   buildDayErasureEvent,
+  formatDayErasureLabel,
   type DayErasureEvent,
 } from '@/lib/day-simulator-template/erasure';
 import { calibrateSeriesApy } from '@/lib/day-simulator-template/series';
@@ -281,13 +282,61 @@ function SeniorLossMark(props: { cx?: number; cy?: number; clipPath?: string }) 
   );
 }
 
-function EndValueTag(props: { cx?: number; cy?: number; text?: string; color?: string }) {
+function distributeEndTagYs(targetYs: number[], minY: number, maxY: number, gap: number): number[] {
+  if (!targetYs.length) return [];
+
+  const order = targetYs.map((target, index) => ({ target, index })).sort((a, b) => a.target - b.target);
+  const placed = new Array<number>(targetYs.length);
+
+  let previous = minY - gap;
+  for (const item of order) {
+    const y = Math.max(item.target, previous + gap);
+    placed[item.index] = y;
+    previous = y;
+  }
+
+  const overflow = placed[order[order.length - 1].index] - maxY;
+  if (overflow > 0) {
+    for (let index = 0; index < placed.length; index += 1) placed[index] -= overflow;
+  }
+
+  const underflow = minY - placed[order[0].index];
+  if (underflow > 0) {
+    for (let index = 0; index < placed.length; index += 1) placed[index] += underflow;
+  }
+
+  return placed;
+}
+
+function EndValueTag(props: {
+  cx?: number;
+  cy?: number;
+  text?: string;
+  color?: string;
+  tagIndex?: number;
+  peerValues?: number[];
+  yMin?: number;
+  yMax?: number;
+}) {
   const plot = usePlotArea();
-  const { cx, cy, text, color } = props;
+  const { cx, cy, text, color, tagIndex = 0, peerValues = [], yMin = 0, yMax = 1 } = props;
   if (!Number.isFinite(cx) || !Number.isFinite(cy) || !text) return null;
-  const x = plot ? Math.min((cx as number) + 4, plot.x + plot.width - 28) : (cx as number) + 4;
+
+  const targetYs = plot && peerValues.length > 0
+    ? peerValues.map((peerValue) => {
+        const boundedValue = Math.max(yMin, Math.min(yMax, peerValue));
+        return plot.y + plot.height * (1 - (boundedValue - yMin) / (yMax - yMin));
+      })
+    : [];
+  const tagYs = plot
+    ? distributeEndTagYs(targetYs, plot.y + 8, plot.y + plot.height - 8, 16)
+    : [];
+  const y = tagYs[tagIndex] ?? (cy as number);
+  // Keep labels in a reserved gutter to the right of the terminal point. The
+  // line ends at the point, so its stroke cannot run through the text.
+  const x = plot ? plot.x + plot.width + 7 : (cx as number) + 7;
   return (
-    <text x={x} y={cy} fill={color} fontSize={11} fontWeight={600} dominantBaseline="middle">
+    <text x={x} y={y} fill={color} fontSize={11} fontWeight={600} dominantBaseline="middle">
       {text}
     </text>
   );
@@ -925,11 +974,14 @@ function GuidedObservationSteps({
         ? `Its duration is market-specific (${days} days here). Direct Senior and Junior deposits/redemptions pause; LP withdrawals pause. Senior can still sell through the LP.`
         : 'Direct Senior and Junior deposits/redemptions pause; LP withdrawals pause. Senior can still sell through the LP.',
       art: (
-        <svg aria-hidden="true" className="mt-3 w-full" viewBox="0 0 210 54">
+        <svg aria-hidden="true" className="mt-3 w-full" viewBox="0 0 210 66">
           <rect x={observationStartX} y="2" width={observationEndX - observationStartX} height="48" fill={C.obsFill} fillOpacity="0.32" />
           <line x1="5" x2="205" y1="15" y2="15" stroke={C.kpiLabel} strokeDasharray="4 4" />
           <polyline points="5,18 48,16 72,15 84,24 111,38 142,30 174,24 205,22" fill="none" stroke={C.juniorLine} strokeWidth="2" />
           <polyline points="5,18 48,16 72,15 142,15 174,13 205,11" fill="none" stroke={C.seniorLine} strokeWidth="2" />
+          <text x={(observationStartX + observationEndX) / 2} y="63" fill={C.eyebrow} fontFamily={MONO} fontSize="9" textAnchor="middle">
+            {days}d
+          </text>
         </svg>
       ),
     },
@@ -1065,6 +1117,9 @@ export default function DayMarketSimulator({
   const heroDescription = activeMarket.customization.copyOverrides.heroDescription
     ?? 'Royco Day gives Senior holders first-loss coverage and a dedicated exit pool. Junior and LP participants earn additional yield for providing those benefits.';
   const defaults = activeMarket.defaults;
+  const backtestDisplay = activeMarket.customization.backtestDisplay;
+  const returnUnit = backtestDisplay?.returnUnit ?? 'USD';
+  const isNativeReturnUnit = returnUnit !== 'USD';
   const simulationSeries = useMemo(
     () => activeMarket.provenance.dataMode === 'published-apy-forward'
       ? buildDayForwardSeries(
@@ -1471,20 +1526,27 @@ export default function DayMarketSimulator({
     }
     return Array.from(new Set(tickIndices)).map((index) => dates[index]);
   }, [chartTickCount, result.chart, yearMarks]);
-  const yMax = useMemo(() => {
-    let maximum = 0;
+  const yMin = useMemo(() => {
+    let minimum = Number.POSITIVE_INFINITY;
+    let maximum = Number.NEGATIVE_INFINITY;
     for (const point of result.chart) {
-      maximum = Math.max(
-        maximum,
-        point.strategy,
-        point.senior,
-        point.junior,
-        point.liquidity,
-      );
+      minimum = Math.min(minimum, point.strategy, point.senior, point.junior, point.liquidity);
+      maximum = Math.max(maximum, point.strategy, point.senior, point.junior, point.liquidity);
+    }
+    const range = Math.max(1, maximum - minimum);
+    const padding = Math.max(2, range * 0.08);
+    return Math.max(0, Math.floor((minimum - padding) / 5) * 5);
+  }, [result.chart]);
+  const chartYMax = useMemo(() => {
+    let maximum = Number.NEGATIVE_INFINITY;
+    for (const point of result.chart) {
+      maximum = Math.max(maximum, point.strategy, point.senior, point.junior, point.liquidity);
     }
     for (const event of result.erasureEvents) maximum = Math.max(maximum, event.top);
-    return Math.max(Math.ceil((maximum * 1.04) / 10) * 10, 110);
-  }, [result.chart, result.erasureEvents]);
+    const range = Math.max(1, maximum - yMin);
+    const padding = Math.max(2, range * 0.08);
+    return Math.ceil((maximum + padding) / 5) * 5;
+  }, [result.chart, result.erasureEvents, yMin]);
   const dateIndex = useMemo(() => {
     const index = new Map<string, number>();
     result.chart.forEach((point, pointIndex) => index.set(point.date, pointIndex));
@@ -1988,12 +2050,17 @@ export default function DayMarketSimulator({
                 <span style={{ width: 18, height: 10, background: C.obsFill, opacity: 0.32, display: 'inline-block' }} />
                 observation period
               </span>
+              {isNativeReturnUnit && (
+                <span style={{ color: C.eyebrow, fontFamily: MONO, fontWeight: 600 }}>
+                  Return basis: {returnUnit}
+                </span>
+              )}
             </div>
             <div ref={chartContainerRef} style={{ width: '100%', minWidth: 0, height: 360, minHeight: 360 }}>
               <ResponsiveContainerNoSSR>
                 <LineChart
                   data={result.chart}
-                  margin={{ top: 8, right: chartTickCount <= 3 ? 36 : 16, bottom: 8, left: 0 }}
+                  margin={{ top: 8, right: 68, bottom: 8, left: 0 }}
                   onMouseMove={(state: { activeLabel?: string | number }) =>
                     setHoverDate(typeof state?.activeLabel === 'string' ? state.activeLabel : null)
                   }
@@ -2041,14 +2108,22 @@ export default function DayMarketSimulator({
                   <YAxis
                     tick={{ fill: C.kpiLabel, fontSize: 11 }}
                     stroke={C.border}
-                    domain={[0, yMax]}
-                    label={{
-                      value: '$ per $100 deposited',
-                      angle: -90,
-                      position: 'insideLeft',
-                      fill: C.kpiLabel,
-                      fontSize: 11,
-                    }}
+                    domain={[yMin, chartYMax]}
+                    label={isNativeReturnUnit
+                      ? {
+                        value: `${returnUnit}-relative index (start = 100)`,
+                        angle: -90,
+                        position: 'insideLeft',
+                        fill: C.kpiLabel,
+                        fontSize: 11,
+                      }
+                      : {
+                        value: '$ per $100 deposited',
+                        angle: -90,
+                        position: 'insideLeft',
+                        fill: C.kpiLabel,
+                        fontSize: 11,
+                      }}
                     width={64}
                   />
                   <Tooltip
@@ -2092,11 +2167,7 @@ export default function DayMarketSimulator({
                       zIndex={600}
                       shape={
                         <ErasureIBeam
-                          beamLabel={
-                            event.forfeitPctOfJuniorNav >= 4
-                              ? `erased −${event.forfeitPctOfJuniorNav.toFixed(0)}%`
-                              : null
-                          }
+                          beamLabel={formatDayErasureLabel(event.forfeitPctOfJuniorNav)}
                         />
                       }
                     />
@@ -2114,21 +2185,48 @@ export default function DayMarketSimulator({
                     <ReferenceDot
                       x={endStep.date}
                       y={endStep.junior}
-                      shape={<EndValueTag text={`Jr ${endStep.junior.toFixed(0)}`} color={C.juniorLine} />}
+                      shape={
+                        <EndValueTag
+                          text={`Jr ${endStep.junior.toFixed(0)}`}
+                          color={C.juniorLine}
+                          tagIndex={0}
+                          peerValues={[endStep.junior, endStep.senior, endStep.liquidity]}
+                          yMin={yMin}
+                          yMax={chartYMax}
+                        />
+                      }
                     />
                   )}
                   {endStep && (
                     <ReferenceDot
                       x={endStep.date}
                       y={endStep.senior}
-                      shape={<EndValueTag text={`Sr ${endStep.senior.toFixed(0)}`} color={C.seniorLine} />}
+                      shape={
+                        <EndValueTag
+                          text={`Sr ${endStep.senior.toFixed(0)}`}
+                          color={C.seniorLine}
+                          tagIndex={1}
+                          peerValues={[endStep.junior, endStep.senior, endStep.liquidity]}
+                          yMin={yMin}
+                          yMax={chartYMax}
+                        />
+                      }
                     />
                   )}
                   {endStep && (
                     <ReferenceDot
                       x={endStep.date}
                       y={endStep.liquidity}
-                      shape={<EndValueTag text={`LP ${endStep.liquidity.toFixed(0)}`} color={C.olive} />}
+                      shape={
+                        <EndValueTag
+                          text={`LP ${endStep.liquidity.toFixed(0)}`}
+                          color={C.olive}
+                          tagIndex={2}
+                          peerValues={[endStep.junior, endStep.senior, endStep.liquidity]}
+                          yMin={yMin}
+                          yMax={chartYMax}
+                        />
+                      }
                     />
                   )}
                   {hoverChip && (
@@ -2144,6 +2242,12 @@ export default function DayMarketSimulator({
                 </LineChart>
               </ResponsiveContainerNoSSR>
             </div>
+
+            {backtestDisplay?.footnote && (
+              <p className="mt-2" style={{ color: C.kpiLabel, fontSize: 10.5, lineHeight: 1.45 }}>
+                {backtestDisplay.footnote}
+              </p>
+            )}
 
             {isGuided && <GuidedObservationSteps days={observationDays} />}
 
@@ -2178,15 +2282,17 @@ export default function DayMarketSimulator({
                       </th>
                     ))}
                     <th className="text-right" style={{ borderBottom: `1px solid ${C.border}`, padding: '6px 7px', whiteSpace: 'nowrap' }}>
-                      end $100 → avg/yr
+                      {isNativeReturnUnit
+                        ? `end index → avg/yr (${returnUnit})`
+                        : 'end $100 → avg/yr'}
                     </th>
                   </tr>
                 </thead>
                 <tbody>
-                  <ReturnRow label="Base strategy" values={result.monthly.map((row) => row.strategyReturn)} end={endStep?.strategy ?? 100} annualized={result.strategyApy} />
-                  <ReturnRow label="Senior return" values={result.monthly.map((row) => row.seniorReturn)} end={endStep?.senior ?? 100} annualized={result.seniorApy} />
-                  <ReturnRow label="Junior return" values={result.monthly.map((row) => row.juniorReturn)} end={endStep?.junior ?? 100} annualized={result.juniorApy} />
-                  <ReturnRow label="LP return" values={result.monthly.map((row) => row.liquidityReturn)} end={endStep?.liquidity ?? 100} annualized={result.liquidityApy} />
+                  <ReturnRow label="Base strategy" values={result.monthly.map((row) => row.strategyReturn)} end={endStep?.strategy ?? 100} annualized={result.strategyApy} showCurrency={!isNativeReturnUnit} />
+                  <ReturnRow label="Senior return" values={result.monthly.map((row) => row.seniorReturn)} end={endStep?.senior ?? 100} annualized={result.seniorApy} showCurrency={!isNativeReturnUnit} />
+                  <ReturnRow label="Junior return" values={result.monthly.map((row) => row.juniorReturn)} end={endStep?.junior ?? 100} annualized={result.juniorApy} showCurrency={!isNativeReturnUnit} />
+                  <ReturnRow label="LP return" values={result.monthly.map((row) => row.liquidityReturn)} end={endStep?.liquidity ?? 100} annualized={result.liquidityApy} showCurrency={!isNativeReturnUnit} />
                 </tbody>
               </table>
             </div>
@@ -2242,11 +2348,13 @@ function ReturnRow({
   values,
   end,
   annualized,
+  showCurrency,
 }: {
   label: string;
   values: number[];
   end: number;
   annualized: number;
+  showCurrency: boolean;
 }) {
   return (
     <tr style={{ borderTop: `1px solid ${C.border}` }}>
@@ -2263,7 +2371,7 @@ function ReturnRow({
         </td>
       ))}
       <td className="text-right" style={{ padding: '6px 7px', borderBottom: `1px solid ${C.border}`, color: C.text, whiteSpace: 'nowrap' }}>
-        <b>${end.toFixed(0)}</b>{' '}
+        <b>{showCurrency ? '$' : ''}{end.toFixed(0)}</b>{' '}
         <span style={{ color: C.kpiLabel, fontSize: 11 }}>
           {pct(annualized)} ann.
         </span>
