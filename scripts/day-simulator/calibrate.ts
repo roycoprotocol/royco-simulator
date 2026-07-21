@@ -12,9 +12,22 @@ async function main() {
 
   const manifestPath = path.join(process.cwd(), "lib", "day-markets", marketId, "market.json");
   const manifest = JSON.parse(await readFile(manifestPath, "utf8")) as DayMarketManifest;
-  const targetValues = Object.values(manifest.targets);
-  if (!targetValues.every(Number.isFinite)) {
+  const requiredTargetValues = [
+    manifest.targets.seniorApyMin,
+    manifest.targets.seniorApyMax,
+    manifest.targets.juniorApyMin,
+    manifest.targets.juniorApyMax,
+  ];
+  if (!requiredTargetValues.every(Number.isFinite)) {
     throw new Error("Fill all four desired Senior/Junior APY target bounds before calibration.");
+  }
+  const hasLiquidityTarget = manifest.targets.liquidityApyMin !== undefined
+    || manifest.targets.liquidityApyMax !== undefined;
+  if (
+    hasLiquidityTarget
+    && ![manifest.targets.liquidityApyMin, manifest.targets.liquidityApyMax].every(Number.isFinite)
+  ) {
+    throw new Error("Fill both LP APY target bounds when using an LP calibration guardrail.");
   }
 
 const distanceToRange = (value: number, min: number, max: number) => {
@@ -39,7 +52,14 @@ const evaluate = (riskYieldShare: number, liquidityYieldShare: number): Candidat
   });
   const targetPenalty =
     distanceToRange(output.seniorApy, manifest.targets.seniorApyMin, manifest.targets.seniorApyMax) ** 2
-    + distanceToRange(output.juniorApy, manifest.targets.juniorApyMin, manifest.targets.juniorApyMax) ** 2;
+    + distanceToRange(output.juniorApy, manifest.targets.juniorApyMin, manifest.targets.juniorApyMax) ** 2
+    + (hasLiquidityTarget
+      ? distanceToRange(
+        output.liquidityApy,
+        manifest.targets.liquidityApyMin!,
+        manifest.targets.liquidityApyMax!,
+      ) ** 2
+      : 0);
   const changePenalty =
     (riskYieldShare - manifest.defaults.riskYDM.yTarget) ** 2
     + (liquidityYieldShare - manifest.defaults.liqYDM.yTarget) ** 2;
@@ -79,6 +99,10 @@ const evaluate = (riskYieldShare: number, liquidityYieldShare: number): Candidat
   liquidityApy: best.liquidityApy,
   withinSeniorTarget: best.seniorApy >= manifest.targets.seniorApyMin && best.seniorApy <= manifest.targets.seniorApyMax,
   withinJuniorTarget: best.juniorApy >= manifest.targets.juniorApyMin && best.juniorApy <= manifest.targets.juniorApyMax,
+  withinLiquidityTarget: hasLiquidityTarget
+    ? best.liquidityApy >= manifest.targets.liquidityApyMin!
+      && best.liquidityApy <= manifest.targets.liquidityApyMax!
+    : null,
   };
   console.log(JSON.stringify(report, null, 2));
 

@@ -12,6 +12,7 @@ import {
   calibrateSeriesApy,
 } from "../../lib/day-simulator-template/series";
 import {
+  buildDayFiniteForwardSeries,
   buildDayInitialBalances,
   buildDayMarketConfig,
   runDayTargetScenario,
@@ -141,8 +142,70 @@ async function main() {
         `Day accountant Junior APY ${(target.juniorApy * 100).toFixed(2)}% is outside the configured target range`,
       );
     }
+    if (
+      market.targets.liquidityApyMin !== undefined
+      && market.targets.liquidityApyMax !== undefined
+      && (
+        target.liquidityApy < market.targets.liquidityApyMin
+        || target.liquidityApy > market.targets.liquidityApyMax
+      )
+    ) {
+      throw new Error(
+        `Day accountant LP APY ${(target.liquidityApy * 100).toFixed(2)}% is outside the configured target range`,
+      );
+    }
+    const forwardTest = market.customization.forwardTest;
+    const reverseMarket = market.customization.reverseMarket;
+    if (forwardTest && reverseMarket) {
+      for (const scenario of forwardTest.scenarios) {
+        const forwardSeries = buildDayFiniteForwardSeries(
+          market.defaults.sourceApy,
+          market.provenance.retrievedAt ?? market.provenance.firstDate,
+          forwardTest,
+          reverseMarket,
+          scenario.id,
+          market.defaults.observationDays,
+        );
+        const forwardSim = new Sim(cfg, initial);
+        for (let index = 1; index < forwardSeries.length; index += 1) {
+          const previous = forwardSeries[index - 1];
+          const current = forwardSeries[index];
+          const elapsedDays = Math.max(
+            1,
+            Math.round((Date.parse(current.date) - Date.parse(previous.date)) / 86_400_000),
+          );
+          const sourceReturn = current.price / previous.price - 1;
+          forwardSim.step({
+            dtSec: elapsedDays * 86_400,
+            stReturn: sourceReturn,
+            jtReturn: sourceReturn,
+          });
+        }
+        const forwardFinal = forwardSim.last();
+        if (
+          ![forwardFinal.stPrice, forwardFinal.jtPrice, forwardFinal.ltPrice].every(Number.isFinite)
+          || Math.abs(forwardFinal.conservationResidual) >= 1e-3
+        ) {
+          throw new Error(`Day ${scenario.id} forward scenario failed accountant conservation`);
+        }
+      }
+      if (market.defaults.initialST > reverseMarket.seniorCap) {
+        throw new Error("Day initial Senior balance exceeds the reverse-market Senior cap");
+      }
+      if (market.defaults.initialJT > reverseMarket.juniorCap) {
+        throw new Error("Day initial Junior balance exceeds the reverse-market Junior cap");
+      }
+      if (market.defaults.initialST + market.defaults.initialJT > reverseMarket.strategyCap) {
+        throw new Error("Day initial strategy balances exceed the reverse-market strategy cap");
+      }
+      console.log(`${market.id} finite ${forwardTest.scenarios.map((scenario) => scenario.id).join("/")} accountant scenarios: PASS`);
+      console.log(`${market.id} reverse-market capacity guardrails: PASS`);
+    }
     console.log(`${market.id} accountant Senior APY: ${(target.seniorApy * 100).toFixed(2)}% PASS`);
     console.log(`${market.id} accountant Junior APY: ${(target.juniorApy * 100).toFixed(2)}% PASS`);
+    if (market.targets.liquidityApyMin !== undefined) {
+      console.log(`${market.id} accountant LP APY: ${(target.liquidityApy * 100).toFixed(2)}% PASS`);
+    }
     const customizations = describeDayMarketCustomizations(market.customization);
     if (customizations.length) {
       console.log(`${market.id} authorized presentation changes: ${customizations.join(", ")} PASS`);

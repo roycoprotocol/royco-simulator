@@ -25,6 +25,7 @@ import {
 } from '@/lib/day-simulator-template/explainer';
 import { isFullRange, normalizeRange, type IndexRange } from '@/lib/hybond/timeframe';
 import type {
+  DayForwardScenarioId,
   DayMarket,
   DayMarketManifest,
   DaySeriesPoint,
@@ -41,6 +42,7 @@ import {
 import { calibrateSeriesApy } from '@/lib/day-simulator-template/series';
 import { shouldRefillJunior } from '@/lib/day-simulator-template/refill';
 import {
+  buildDayFiniteForwardSeries,
   buildDayInitialBalances,
   buildDayMarketConfig,
   buildDayForwardSeries,
@@ -1094,7 +1096,9 @@ function SliderControl({
 }
 
 const annualized = (end: number, start: number, days: number) =>
-  days > 0 && start > 0 && end > 0 ? Math.pow(end / start, 365 / days) - 1 : 0;
+  days > 0 && start > 0 && end >= 0
+    ? end === 0 ? -1 : Math.pow(end / start, 365 / days) - 1
+    : 0;
 const pct = (value: number, digits = 1) =>
   `${value >= 0 ? '+' : ''}${(value * 100).toFixed(digits)}%`;
 const usd0 = (value: number) => `$${Math.round(value).toLocaleString('en-US')}`;
@@ -1118,29 +1122,44 @@ export default function DayMarketSimulator({
     ?? 'Royco Day gives Senior holders first-loss coverage and a dedicated exit pool. Junior and LP participants earn additional yield for providing those benefits.';
   const defaults = activeMarket.defaults;
   const backtestDisplay = activeMarket.customization.backtestDisplay;
+  const forwardTest = activeMarket.customization.forwardTest;
+  const reverseMarket = activeMarket.customization.reverseMarket;
+  const omitInitialZeroReturnPeriod = forwardTest?.omitInitialZeroReturnPeriod === true;
   const returnUnit = backtestDisplay?.returnUnit ?? 'USD';
   const isNativeReturnUnit = returnUnit !== 'USD';
+  const [sourceApyPct, setSourceApyPct] = useState(defaults.sourceApy * 100);
+  const [observationDays, setObservationDays] = useState(defaults.observationDays);
+  const [forwardScenario, setForwardScenario] = useState<DayForwardScenarioId>(
+    forwardTest?.defaultScenario ?? forwardTest?.scenarios[0]?.id ?? 'normal',
+  );
   const simulationSeries = useMemo(
-    () => activeMarket.provenance.dataMode === 'published-apy-forward'
-      ? buildDayForwardSeries(
-        defaults.sourceApy,
-        defaults.stableYield,
+    () => forwardTest && reverseMarket
+      ? buildDayFiniteForwardSeries(
+        sourceApyPct / 100,
         activeMarket.provenance.retrievedAt ?? '2026-01-01',
+        forwardTest,
+        reverseMarket,
+        forwardScenario,
+        observationDays,
       )
-      : activeMarket.series,
-    [activeMarket.provenance.dataMode, activeMarket.provenance.retrievedAt, activeMarket.series, defaults.sourceApy, defaults.stableYield],
+      : activeMarket.provenance.dataMode === 'published-apy-forward'
+        ? buildDayForwardSeries(
+          defaults.sourceApy,
+          defaults.stableYield,
+          activeMarket.provenance.retrievedAt ?? '2026-01-01',
+        )
+        : activeMarket.series,
+    [activeMarket.provenance.dataMode, activeMarket.provenance.retrievedAt, activeMarket.series, defaults.sourceApy, defaults.stableYield, forwardScenario, forwardTest, observationDays, reverseMarket, sourceApyPct],
   );
   const [showInputs, setShowInputs] = useState(false);
   const [showReview, setShowReview] = useState(true);
   const [hoverDate, setHoverDate] = useState<string | null>(null);
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const [chartTickCount, setChartTickCount] = useState(7);
-  const [sourceApyPct, setSourceApyPct] = useState(defaults.sourceApy * 100);
   const [coveragePct, setCoveragePct] = useState(defaults.coverage * 100);
   const [minLiquidityPct, setMinLiquidityPct] = useState(defaults.minLiquidity * 100);
   const [riskSharePct, setRiskSharePct] = useState(defaults.riskYDM.yTarget * 100);
   const [liqSharePct, setLiqSharePct] = useState(defaults.liqYDM.yTarget * 100);
-  const [observationDays, setObservationDays] = useState(defaults.observationDays);
   const [maintainCoverage, setMaintainCoverage] = useState(defaults.maintainCoverage);
   const [range, setRange] = useState<IndexRange>({
     a: 0,
@@ -1167,8 +1186,10 @@ export default function DayMarketSimulator({
     [maxIndex, range],
   );
   const modeledSeries = useMemo(
-    () => calibrateSeriesApy(simulationSeries, sourceApyPct / 100),
-    [simulationSeries, sourceApyPct],
+    () => forwardTest
+      ? simulationSeries
+      : calibrateSeriesApy(simulationSeries, sourceApyPct / 100),
+    [forwardTest, simulationSeries, sourceApyPct],
   );
   const view = useMemo(
     () => modeledSeries.slice(viewRange.a, viewRange.b + 1),
@@ -1367,7 +1388,7 @@ export default function DayMarketSimulator({
     let previousJunior = 100;
     let previousSenior = 100;
     let previousLiquidity = 100;
-    const monthly = Array.from(monthEnds.entries()).map(([month, monthEnd]) => {
+    const monthlyRows = Array.from(monthEnds.entries()).map(([month, monthEnd]) => {
       const strategyReturn = monthEnd.strategy / previousStrategy - 1;
       const juniorReturn = monthEnd.junior / previousJunior - 1;
       const seniorReturn = monthEnd.senior / previousSenior - 1;
@@ -1384,6 +1405,11 @@ export default function DayMarketSimulator({
         liquidityReturn,
       };
     });
+    const monthly = omitInitialZeroReturnPeriod
+      && chart[0]?.date === modeledSeries[0]?.date
+      && monthlyRows.length > 1
+      ? monthlyRows.slice(1)
+      : monthlyRows;
     const final = sim.last();
     return {
       cfg,
@@ -1427,15 +1453,23 @@ export default function DayMarketSimulator({
     modeledSeries,
     minLiquidityPct,
     observationDays,
+    omitInitialZeroReturnPeriod,
     riskSharePct,
     view,
     viewRange,
     maxIndex,
   ]);
 
+  const displaySeriesOffset = omitInitialZeroReturnPeriod && modeledSeries.length > 1 ? 1 : 0;
+  const displayChart = useMemo(
+    () => displaySeriesOffset > 0 && result.chart[0]?.date === modeledSeries[0]?.date
+      ? result.chart.slice(displaySeriesOffset)
+      : result.chart,
+    [displaySeriesOffset, modeledSeries, result.chart],
+  );
   const allDates = useMemo(
-    () => modeledSeries.map((point) => point.date),
-    [modeledSeries],
+    () => modeledSeries.slice(displaySeriesOffset).map((point) => point.date),
+    [displaySeriesOffset, modeledSeries],
   );
   const brushBands = useMemo(() => {
     const indexByDate = new Map(allDates.map((date, index) => [date, index]));
@@ -1453,6 +1487,42 @@ export default function DayMarketSimulator({
     }),
     [fullResult.chart],
   );
+  const displayedBrushSeries = useMemo(
+    () => ({
+      strategy: brushSeries.strategy.slice(displaySeriesOffset),
+      senior: brushSeries.senior.slice(displaySeriesOffset),
+      junior: brushSeries.junior.slice(displaySeriesOffset),
+      liquidity: brushSeries.liquidity.slice(displaySeriesOffset),
+    }),
+    [brushSeries, displaySeriesOffset],
+  );
+  const displayMaxIndex = Math.max(0, allDates.length - 1);
+  const displayedViewRange = useMemo(
+    () => displaySeriesOffset === 0
+      ? viewRange
+      : isFullRange(viewRange, maxIndex)
+        ? { a: 0, b: displayMaxIndex }
+        : normalizeRange(
+          Math.max(0, viewRange.a - displaySeriesOffset),
+          Math.max(0, viewRange.b - displaySeriesOffset),
+          displayMaxIndex,
+        ),
+    [displayMaxIndex, displaySeriesOffset, maxIndex, viewRange],
+  );
+  const setDisplayedRange = useCallback((next: IndexRange) => {
+    if (displaySeriesOffset === 0) {
+      setRange(next);
+      return;
+    }
+    if (isFullRange(next, displayMaxIndex)) {
+      setRange({ a: 0, b: maxIndex });
+      return;
+    }
+    setRange({
+      a: next.a + displaySeriesOffset,
+      b: next.b + displaySeriesOffset,
+    });
+  }, [displayMaxIndex, displaySeriesOffset, maxIndex]);
 
   const bandDates = useCallback(
     (period: DayObservationPeriod): { x1: string; x2: string } | null => {
@@ -1473,7 +1543,7 @@ export default function DayMarketSimulator({
   const yearMarks = useMemo(() => {
     const marks: Array<{ date: string; year: string }> = [];
     let previousYear = '';
-    for (const point of result.chart) {
+    for (const point of displayChart) {
       const year = point.date.slice(0, 4);
       if (year !== previousYear) {
         if (previousYear !== '') marks.push({ date: point.date, year });
@@ -1481,9 +1551,9 @@ export default function DayMarketSimulator({
       }
     }
     return marks;
-  }, [result.chart]);
+  }, [displayChart]);
   const xTicks = useMemo(() => {
-    const dates = result.chart.map((point) => point.date);
+    const dates = displayChart.map((point) => point.date);
     if (dates.length <= 1) return dates;
     const yearMarkIndices = yearMarks
       .map((mark) => dates.indexOf(mark.date))
@@ -1525,7 +1595,7 @@ export default function DayMarketSimulator({
       }
     }
     return Array.from(new Set(tickIndices)).map((index) => dates[index]);
-  }, [chartTickCount, result.chart, yearMarks]);
+  }, [chartTickCount, displayChart, yearMarks]);
   const yMin = useMemo(() => {
     let minimum = Number.POSITIVE_INFINITY;
     let maximum = Number.NEGATIVE_INFINITY;
@@ -1578,6 +1648,9 @@ export default function DayMarketSimulator({
   const endStep = result.chart[result.chart.length - 1];
   const startDate = view[0]?.date ?? '—';
   const endDate = view[view.length - 1]?.date ?? '—';
+  const selectedForwardScenario = forwardTest?.scenarios.find(
+    (scenario) => scenario.id === forwardScenario,
+  );
 
   return (
     <div className="flex flex-col" style={{ gap: 10 }}>
@@ -1999,12 +2072,16 @@ export default function DayMarketSimulator({
       {showSection('backtest') && <section style={cardStyle}>
         <div className="flex items-start justify-between gap-4">
           <div>
-            <Eyebrow>Backtest</Eyebrow>
+            {forwardTest ? <Eyebrow>Forward test</Eyebrow> : <Eyebrow>Backtest</Eyebrow>}
             <h2 className="mt-2" style={{ color: C.text, fontFamily: SERIF, fontSize: 22, fontWeight: 400, lineHeight: 1.08 }}>
-              {isExecutive ? 'See it in the market history.' : isGuided ? 'See the rules play out over time.' : LOCKED_COPY.reviewTitle}
+              {forwardTest
+                ? `Test the ${forwardTest.termDays}-day facility under ${forwardTest.scenarios.length} payment outcomes.`
+                : isExecutive ? 'See it in the market history.' : isGuided ? 'See the rules play out over time.' : LOCKED_COPY.reviewTitle}
             </h2>
             <p className="mt-1" style={{ color: C.muted, fontSize: 12.5, lineHeight: 1.38 }}>
-              {isExecutive
+              {forwardTest
+                ? 'The shared accountant applies each forward path to Senior, Junior, and LP. Select an outcome to compare timing and loss absorption.'
+                : isExecutive
                 ? 'This accountant-backed chart shows each position, every observation period, and any loss that becomes permanent.'
                 : isGuided
                 ? 'Use the chart to see when Junior coverage is active, when a loss can still recover, and when it becomes permanent.'
@@ -2034,6 +2111,60 @@ export default function DayMarketSimulator({
 
         {showReview && (
           <div className="mt-4">
+            {forwardTest && reverseMarket && (
+              <div style={{ borderBottom: `1px solid ${C.border}`, marginBottom: 14, paddingBottom: 14 }}>
+                <div
+                  aria-label="Forward scenario"
+                  className={`grid grid-cols-1 ${forwardTest.scenarios.length === 2 ? 'sm:grid-cols-2' : 'sm:grid-cols-3'}`}
+                  role="tablist"
+                  style={{ gap: 8 }}
+                >
+                  {forwardTest.scenarios.map((scenario) => {
+                    const active = scenario.id === forwardScenario;
+                    return (
+                      <button
+                        aria-selected={active}
+                        key={scenario.id}
+                        onClick={() => {
+                          setForwardScenario(scenario.id);
+                          setRange({ a: 0, b: Number.MAX_SAFE_INTEGER });
+                        }}
+                        role="tab"
+                        type="button"
+                        style={{
+                          background: active ? `${C.eyebrow}12` : C.cardBg,
+                          border: `1px solid ${active ? C.eyebrow : C.border}`,
+                          color: active ? C.text : C.muted,
+                          cursor: 'pointer',
+                          padding: '10px 12px',
+                          textAlign: 'left',
+                        }}
+                      >
+                        <span style={{ display: 'block', fontFamily: MONO, fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase' }}>
+                          {scenario.label}
+                        </span>
+                        <span style={{ display: 'block', fontSize: 11, lineHeight: 1.4, marginTop: 5 }}>
+                          {scenario.description}
+                        </span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <div className="mt-3 grid grid-cols-1 md:grid-cols-3" style={{ gap: 8 }}>
+                  <ExecutiveMetric label="Total strategy cap" value={usd0(reverseMarket.strategyCap)} valueColor={C.text} />
+                  <ExecutiveMetric label="Senior cap" value={usd0(reverseMarket.seniorCap)} valueColor={C.accent} />
+                  <ExecutiveMetric label={`${reverseMarket.issuerName} Junior commitment`} value={usd0(reverseMarket.juniorCap)} valueColor={C.juniorLine} />
+                </div>
+                <p className="mt-2" style={{ color: C.muted, fontSize: 11, lineHeight: 1.45 }}>
+                  {reverseMarket.seniorSupportLabel}: {usd0(reverseMarket.seniorSupportAmount)}. Junior deposits are closed and issuer-funded. LP uses the shared 10% Senior / 90% stable composition.
+                </p>
+                {selectedForwardScenario && (
+                  <p className="mt-1" style={{ color: C.kpiLabel, fontSize: 10.5, lineHeight: 1.45 }}>
+                    Selected outcome: {selectedForwardScenario.description}
+                  </p>
+                )}
+              </div>
+            )}
             {isGuided && <GuidedChartGuide />}
             <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 mb-3" style={{ fontSize: 11.5, color: C.muted }}>
               <LegendSwatch color={C.seniorLine}>Senior share price</LegendSwatch>
@@ -2059,7 +2190,7 @@ export default function DayMarketSimulator({
             <div ref={chartContainerRef} style={{ width: '100%', minWidth: 0, height: 360, minHeight: 360 }}>
               <ResponsiveContainerNoSSR>
                 <LineChart
-                  data={result.chart}
+                  data={displayChart}
                   margin={{ top: 8, right: 68, bottom: 8, left: 0 }}
                   onMouseMove={(state: { activeLabel?: string | number }) =>
                     setHoverDate(typeof state?.activeLabel === 'string' ? state.activeLabel : null)
@@ -2249,15 +2380,22 @@ export default function DayMarketSimulator({
               </p>
             )}
 
+            {forwardTest?.tailRiskDisclosure && (
+              <p className="mt-2" style={{ color: C.danger, fontSize: 10.5, lineHeight: 1.45 }}>
+                Tail risk: {forwardTest.tailRiskDisclosure}
+              </p>
+            )}
+
             {isGuided && <GuidedObservationSteps days={observationDays} />}
 
             <DayTimeframeBrush
               dates={allDates}
-              series={brushSeries}
+              series={displayedBrushSeries}
               bands={brushBands}
-              view={viewRange}
-              isFull={isFullRange(viewRange, maxIndex)}
-              onChange={setRange}
+              view={displayedViewRange}
+              isFull={isFullRange(displayedViewRange, displayMaxIndex)}
+              mode={forwardTest ? 'forward' : 'backtest'}
+              onChange={setDisplayedRange}
             />
 
             <div className="mt-4 overflow-x-auto">
@@ -2336,8 +2474,18 @@ export default function DayMarketSimulator({
         <p className="mt-1">{activeMarket.copy.disclosure}</p>
         <p className="mt-1">
           Source:{' '}
-          {activeMarket.provenance.sourceUrl}
+          <a href={activeMarket.provenance.sourceUrl} rel="noreferrer" style={{ color: C.eyebrow, overflowWrap: 'anywhere' }} target="_blank">
+            {activeMarket.provenance.sourceUrl}
+          </a>
         </p>
+        {activeMarket.provenance.supportingSources?.map((source) => (
+          <p className="mt-1" key={source.url}>
+            Supporting source:{' '}
+            <a href={source.url} rel="noreferrer" style={{ color: C.eyebrow, overflowWrap: 'anywhere' }} target="_blank">
+              {source.label}
+            </a>
+          </p>
+        ))}
       </footer>}
     </div>
   );
