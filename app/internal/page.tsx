@@ -159,6 +159,69 @@ export default function InternalPage() {
               Partner-facing intake form — curve, coverage &amp; recovery terms, exported as a pool config.
             </p>
           </a>
+
+          {/* RiseX XLP Tranche Calculator card — route handler, not a page, so a plain anchor */}
+          <a
+            href="/internal/risex"
+            className="group block bg-[#0a0c10] border border-[#1f242c] rounded-lg p-6 hover:border-[#5CC8A0] transition-colors"
+          >
+            <div className="flex items-start justify-between mb-3">
+              <span className="text-[10px] tracking-widest uppercase text-[#5CC8A0]">
+                risex
+              </span>
+              <span className="text-[#5CC8A0] text-sm opacity-0 group-hover:opacity-100 transition-opacity">
+                →
+              </span>
+            </div>
+            <h2 className="text-base font-medium text-[#e5e7eb] mb-1">
+              RiseX XLP Tranche Calculator
+            </h2>
+            <p className="text-xs text-[#6b7280]">
+              Senior/Junior on the RiseX XLP perps vault — live share history, coverage terms &amp; what each side earns.
+            </p>
+          </a>
+
+          {/* Axis Tranche Calculator card — route handler, not a page, so a plain anchor */}
+          <a
+            href="/internal/axis"
+            className="group block bg-[#0a0c10] border border-[#1f242c] rounded-lg p-6 hover:border-[#C8873E] transition-colors"
+          >
+            <div className="flex items-start justify-between mb-3">
+              <span className="text-[10px] tracking-widest uppercase text-[#C8873E]">
+                axis
+              </span>
+              <span className="text-[#C8873E] text-sm opacity-0 group-hover:opacity-100 transition-opacity">
+                →
+              </span>
+            </div>
+            <h2 className="text-base font-medium text-[#e5e7eb] mb-1">
+              Axis Tranche Calculator
+            </h2>
+            <p className="text-xs text-[#6b7280]">
+              Axis track record 2018&ndash;2024 and the live sUSDx feed side by side — with a selectable launch month.
+            </p>
+          </a>
+
+          {/* Yield Share over Time card — route handler, not a page, so a plain anchor */}
+          <a
+            href="/internal/yield-share"
+            className="group block bg-[#0a0c10] border border-[#1f242c] rounded-lg p-6 hover:border-[#9B8AFB] transition-colors"
+          >
+            <div className="flex items-start justify-between mb-3">
+              <span className="text-[10px] tracking-widest uppercase text-[#9B8AFB]">
+                ydm
+              </span>
+              <span className="text-[#9B8AFB] text-sm opacity-0 group-hover:opacity-100 transition-opacity">
+                →
+              </span>
+            </div>
+            <h2 className="text-base font-medium text-[#e5e7eb] mb-1">
+              Yield Share over Time
+            </h2>
+            <p className="text-xs text-[#6b7280]">
+              How the Junior&apos;s yield share re-rates as utilization moves — on the deployed AdaptiveCurve_V2.
+            </p>
+          </a>
         </div>
       </main>
     </div>

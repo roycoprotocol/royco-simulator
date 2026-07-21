@@ -1,0 +1,628 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>RiseX XLP Tranche Calculator</title>
+<style>
+:root{--sen:#8E7355;--jun:#1B1A17;--ink:#171511;--mut:#6D6860;--line:#E8E2D8;--bg:#FBFAF7;--panel:#FFFDF9;--accent:#967756;--green:#319C61;--red:#8F4D42;
+/* one prose measure for the whole page: every text block in every section obeys it, so no section
+   reads wider or narrower than another. Figures (charts, tables) take the full card. */
+--measure:820px}
+*{box-sizing:border-box}
+body{margin:0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;color:var(--ink);
+background-color:var(--bg);background-image:linear-gradient(rgba(150,119,86,.05) 1px,transparent 1px),linear-gradient(90deg,rgba(150,119,86,.05) 1px,transparent 1px);
+background-size:42px 42px;font-size:14px;line-height:1.45;border-top:6px solid #11100E}
+.wrap{max-width:1080px;margin:0 auto;padding:22px 20px 60px}
+.topline{display:flex;align-items:center;gap:9px;color:var(--accent);font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.26em;margin-bottom:8px}
+.topline span{width:7px;height:7px;border-radius:50%;background:var(--green);display:inline-block}
+h1{font-family:Georgia,"Times New Roman",serif;font-weight:400;font-size:clamp(28px,3.4vw,42px);line-height:1.04;letter-spacing:-.02em;margin:0 0 8px}
+.lede{color:var(--mut);font-size:15px;max-width:var(--measure);margin:0 0 6px}
+.stamp{font-size:10px;text-transform:uppercase;letter-spacing:.16em;color:var(--accent);font-weight:700;margin:0 0 14px;display:flex;align-items:center;gap:7px}
+.stamp .dot{width:6px;height:6px;border-radius:50%;background:var(--green);display:inline-block;flex:none}
+.stamp.snap .dot{background:#B4A896}
+h2{font-family:Georgia,"Times New Roman",serif;font-weight:400;font-size:24px;margin:0 0 4px;letter-spacing:-.01em}
+h2 .n{display:block;font-family:-apple-system,sans-serif;font-size:9.5px;font-weight:700;letter-spacing:.22em;text-transform:uppercase;color:var(--accent);margin-bottom:5px}
+.card{background:var(--panel);border:1px solid var(--line);padding:20px;margin-top:12px;box-shadow:0 22px 50px rgba(60,45,28,.05)}
+.sec{margin-top:30px}
+.lead{font-size:13.5px;color:var(--ink);font-weight:600;margin:0 0 4px;max-width:var(--measure)}
+ul{margin:6px 0 0;padding-left:18px;max-width:var(--measure)}
+li{margin:0 0 6px;font-size:13.5px;line-height:1.5;color:var(--mut)}
+li:last-child{margin-bottom:0}
+li b{color:var(--ink)}
+.stat{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:12px 0 6px}
+@media(max-width:720px){.stat{grid-template-columns:1fr 1fr}}
+.box{border:1px solid var(--line);background:rgba(255,253,249,.78);padding:10px 12px}
+.box .t{font-size:8.5px;color:#A49B90;text-transform:uppercase;letter-spacing:.12em;font-weight:700}
+.box .v{font-size:21px;font-weight:600;font-variant-numeric:tabular-nums;margin-top:2px;font-family:"SFMono-Regular",Consolas,monospace;letter-spacing:-.04em}
+.box .s{font-size:10.5px;color:var(--mut);margin-top:1px}
+.good{color:var(--green)}.bad{color:var(--red)}
+.chartbox{position:relative;height:300px;width:100%;margin-top:12px}
+.chartbox svg{width:100%;height:100%;display:block;cursor:crosshair}
+.legend{display:flex;flex-wrap:wrap;gap:14px;font-size:11.5px;margin:8px 2px 0;color:var(--mut)}
+.legend span{display:inline-flex;align-items:center;gap:6px}
+.sw{width:16px;height:3px;display:inline-block;border-radius:2px}
+.sliders{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px 20px;margin-bottom:6px}
+@media(max-width:720px){.sliders{grid-template-columns:1fr 1fr}}
+.ctl label{display:flex;justify-content:space-between;font-size:11px;text-transform:uppercase;letter-spacing:.05em;color:var(--mut);font-weight:600;margin-bottom:5px;gap:8px}
+.ctl label b{color:var(--ink);font-variant-numeric:tabular-nums;font-size:13px}
+.ctl input[type=range]{width:100%;accent-color:var(--accent);cursor:pointer}
+.ctl .h{font-size:10.5px;color:var(--mut);line-height:1.35;margin:4px 0 0}
+.seg{display:inline-flex;flex-wrap:wrap;border:1px solid var(--line);background:rgba(255,253,249,.75)}
+.ctlrow{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:14px 0 4px}
+.ctlrow .pair{display:flex;align-items:center;gap:10px}
+.ctlrow .pair span{font-size:10.5px;text-transform:uppercase;letter-spacing:.18em;color:var(--accent);font-weight:700}
+.seg button{border:0;border-left:1px solid var(--line);background:transparent;padding:9px 14px;font-weight:500;font-size:11px;color:var(--mut);cursor:pointer;text-transform:uppercase;letter-spacing:.06em}
+.seg button:first-child{border-left:0}
+.seg button.on{background:var(--panel);color:var(--ink);box-shadow:inset 0 -2px 0 var(--accent)}
+.why{background:rgba(150,119,86,.07);border-left:3px solid var(--accent);padding:11px 15px;font-size:14px;color:var(--ink);margin:14px 0 4px}
+.why>*{max-width:var(--measure)}
+.note{font-size:11.5px;color:var(--mut);margin-top:6px;max-width:var(--measure)}
+ul.notes{margin-top:12px}
+ul.notes li{font-size:11.5px;line-height:1.5}
+.note:first-of-type{margin-top:10px}
+.verdict{border:1px solid var(--line);padding:14px 16px;margin:12px 0 10px;font-size:14px}
+.warn{border:1px solid rgba(143,77,66,.35);background:rgba(143,77,66,.06);color:var(--red);padding:10px 13px;margin:10px 0;font-size:12.5px;line-height:1.5}
+table{width:100%;border-collapse:collapse;font-size:12.5px;margin-top:10px}
+th,td{padding:8px 9px;border-bottom:1px solid var(--line);text-align:right;font-variant-numeric:tabular-nums}
+th{font-size:9px;text-transform:uppercase;letter-spacing:.1em;color:var(--accent);font-weight:700;text-align:right}
+th:first-child,td:first-child{text-align:left}
+td.cov{font-weight:600;color:var(--ink)}
+td .sr{color:var(--sen);font-weight:600}
+td .jr{color:var(--jun);font-weight:600;font-size:13px}
+th.grp{text-align:center;padding-bottom:3px;border-left:1px solid var(--line)}
+td.sc{color:var(--sen);font-weight:800;font-size:14px}
+td.jc{color:var(--jun);font-weight:800;font-size:14px}
+td .dec{font-size:.78em;opacity:.7;font-weight:inherit}   /* first decimal, kept quiet so the whole number still reads first */
+/* reading crosshair: hovering a rate bolds its column and its row, so a cushion and a yield
+   can be traced back to the parameters that produced them */
+#tbl .xc{background:rgba(150,119,86,.13)}
+#tbl .xc.sc,#tbl .xc.jc{font-weight:800}
+#tbl th.xc{color:var(--ink)}
+#tbl tr.xr td,#tbl tr.xr th{background:rgba(150,119,86,.09)}
+#tbl tr.xr td.cov,#tbl tr.xr td.meta{font-weight:700;color:var(--ink)}
+#tbl tr.xr .xc{background:rgba(150,119,86,.2)}
+#tbl td[data-c]{cursor:crosshair}
+/* the pair the reader came for, before any table */
+#pair{border:1px solid var(--line);background:rgba(150,119,86,.05);margin:14px 0 4px}
+.pairhead{font-size:10px;text-transform:uppercase;letter-spacing:.18em;color:var(--accent);font-weight:700;padding:11px 15px 0}
+.pairgrid{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line);margin-top:10px}
+.pairgrid .side{background:var(--panel);padding:13px 15px 15px}
+.pairgrid .lab{font-size:9.5px;text-transform:uppercase;letter-spacing:.16em;font-weight:700;display:flex;align-items:center;gap:7px}
+.pairgrid .lab::before{content:'';width:14px;height:3px;border-radius:2px;display:inline-block}
+.pairgrid .s .lab{color:var(--sen)} .pairgrid .s .lab::before{background:var(--sen)}
+.pairgrid .j .lab{color:var(--jun)} .pairgrid .j .lab::before{background:var(--jun)}
+.pairgrid .num{font-family:"SFMono-Regular",Consolas,monospace;font-size:30px;font-weight:700;letter-spacing:-.03em;margin:3px 0 2px}
+.pairgrid .s .num{color:var(--sen)} .pairgrid .j .num{color:var(--jun)}
+.pairgrid .sub{font-size:11.5px;color:var(--mut);line-height:1.4}
+@media(max-width:640px){.pairgrid{grid-template-columns:1fr}}
+th.sc,th.jc{font-weight:700}
+th.sc{color:var(--sen)} th.jc{color:var(--jun)}
+.tblwrap{overflow-x:auto}
+/* the terms table used to force this section to break out of the page width, because it repeated the
+   Senior rate once per cushion. The Senior rate does not depend on the cushion, so it is now one band
+   row and the table fits the same card as everything else. */
+/* Senior and Junior carry the same two colours as the chart legend, so a rate in the table and a line
+   in the chart are visibly the same side of the trade. */
+tr.senband th{text-align:left;color:var(--sen);font-size:9px;letter-spacing:.1em}
+tr.senband td,tr.senband th{background:rgba(150,119,86,.11);border-bottom:2px solid var(--sen)}
+tr.senband th{box-shadow:inset 4px 0 0 var(--sen)}
+tr.grouphead th{text-align:left;color:var(--jun);padding-top:12px;border-bottom:2px solid var(--jun);box-shadow:inset 4px 0 0 var(--jun)}
+tr.senband th::before,tr.grouphead th::before{content:'';display:inline-block;width:14px;height:3px;border-radius:2px;margin-right:7px;vertical-align:middle}
+tr.senband th::before{background:var(--sen)}
+tr.grouphead th::before{background:var(--jun)}
+tr.grouphead td.today{border-bottom:1px solid var(--line)}
+th.yh{text-align:right;border-left:1px solid var(--line)}
+th.yh.today,td.today{background:rgba(150,119,86,.06)}
+td.jy{border-left:1px solid var(--line)}
+td.meta{color:var(--mut);font-weight:400;text-align:right}
+.foot{margin-top:26px;color:var(--mut);font-size:11.5px;border-top:1px solid var(--line);padding-top:12px}
+.foot>p{max-width:var(--measure);margin:0}
+.disc{border:1px solid var(--line);background:rgba(150,119,86,.04);padding:12px 15px;margin-top:14px;font-size:12.5px;line-height:1.55;color:var(--mut)}
+.disc>p{max-width:var(--measure);margin:0}
+.disc b{color:var(--ink)}
+</style></head><body>
+<div class="wrap">
+<div class="topline"><span></span>Royco × RiseX · Tranche Study</div>
+<h1>RiseX XLP Tranche Calculator</h1>
+<p class="lede">What Royco's Senior/Junior split would look like on the RiseX <b>XLP</b> vault, using its real share history. Built for the RiseX team.</p>
+<div class="stamp" id="stamp"><span class="dot"></span><span id="stampTxt">Loading live vault data</span></div>
+
+<div class="card" style="margin-top:16px">
+  <p class="lead">What a tranche is, in four lines.</p>
+  <ul>
+    <li><b>One vault, two claims on it.</b> The <b class="sr">Senior</b> takes a protected, predictable rate. The <b style="color:var(--jun)">Junior</b> takes the first losses and is paid more for it.</li>
+    <li><b>The Junior is the buffer.</b> When the vault falls, the Junior absorbs it. The Senior only loses once that buffer is used up.</li>
+    <li><b>Why a protocol wants this:</b> the Senior is a product you can sell to capital that will not take drawdown risk, which is most capital. The Junior is sold to capital that will.</li>
+    <li><b>The only real question</b> is how deep the buffer has to be. That is what this page is for.</li>
+  </ul>
+</div>
+
+<!-- 1 OVERVIEW -->
+<div class="sec">
+<h2><span class="n">1 · Overview</span>How the vault share has moved</h2>
+<div class="card">
+  <p class="lead">XLP provides market making and liquidation services to RiseX. Its share price is the raw material for any tranche.</p>
+  <div class="stat" id="ovStat"></div>
+  <div class="chartbox"><svg id="navChart" xmlns="http://www.w3.org/2000/svg"></svg></div>
+  <div class="legend"><span><span class="sw" style="background:var(--jun)"></span>NAV per share</span><span><span class="sw" style="background:var(--accent);opacity:.5"></span>TVL</span></div>
+  <ul style="margin-top:12px">
+    <li id="ovB1"></li>
+    <li id="ovB2"></li>
+    <li>A market making plus liquidation book on a perps venue carries <b>tail risk</b> that a short record will not show.</li>
+  </ul>
+</div>
+</div>
+
+<!-- 2 SENIOR / JUNIOR -->
+<div class="sec">
+<h2><span class="n">2 · Senior and Junior</span>What each side would have earned</h2>
+<div class="card">
+  <p class="lead">Royco splits the vault into a protected Senior and a first-loss Junior. Drag the terms; the lines are the real XLP history.</p>
+  <div class="sliders" style="margin-top:12px">
+    <div class="ctl"><label>First-loss coverage <b id="covv">20%</b></label><input type="range" id="cov" min="1" max="50" step="1" value="20"><div class="h">The minimum the Junior must be able to cover of Senior losses. The Senior only loses after this is used up.<br><b style="color:var(--accent)">Record so far:</b> the deepest fall was <b id="hMdd"></b>. That is the historical floor, not a recommendation.</div></div>
+    <div class="ctl"><label>Yield share to Junior <b id="ysv">35%</b></label><input type="range" id="ys" min="0" max="80" step="1" value="35"><div class="h">Slice of the Senior's yield paid to the Junior for taking first losses.<br><b style="color:var(--accent)">Trade off:</b> more share makes the Junior easier to fill and leaves the Senior less.</div></div>
+    <div class="ctl"><label>Observation period <b id="obsv">14d</b></label><input type="range" id="obs" min="1" max="60" step="1" value="14"><div class="h">Grace window for the Junior to recover before a loss is locked in.<br><b style="color:var(--accent)">Record so far:</b> <span id="hRec"></span>.</div></div>
+  </div>
+  <div class="why" id="headline" style="margin:14px 0 2px"></div>
+  <div class="stat" id="tsStat"></div>
+  <div class="chartbox"><svg id="tsChart" xmlns="http://www.w3.org/2000/svg"></svg></div>
+  <div class="legend"><span><span class="sw" style="background:var(--sen)"></span>Senior</span><span><span class="sw" style="background:var(--jun)"></span>Junior</span><span><span class="sw" style="background:#B4A896"></span>Vault (unsplit)</span></div>
+  <div class="why" id="tsWhy"></div>
+</div>
+</div>
+
+<!-- 3 TERMS TABLE -->
+<div class="sec" id="secTerms">
+<h2><span class="n">3 · Terms</span>What each side earns</h2>
+<div class="card">
+  <p class="lead">Pick your terms. The two rates, the shape behind them, and the exact numbers at every coverage.</p>
+  <div class="ctlrow">
+    <div class="pair"><span>Minimum coverage</span>
+    <div class="seg" id="tblCov"><button data-c="5">5%</button><button data-c="10">10%</button><button data-c="15">15%</button><button data-c="20" class="on">20%</button><button data-c="25">25%</button><button data-c="30">30%</button></div></div>
+    <div class="pair"><span>Yield share</span>
+    <div class="seg" id="tblYs"><button data-y="15">15%</button><button data-y="25">25%</button><button data-y="35" class="on">35%</button><button data-y="45">45%</button></div></div>
+    <div class="pair"><span>Vault yield</span><div class="seg" id="tblY"></div></div>
+  </div>
+  <p class="note" style="margin:8px 0 0">The first two are the same controls as in section 2. Move any of them and everything below follows.</p>
+  <div id="pair"></div>
+  <div class="chartbox" style="height:250px"><svg id="splitChart" xmlns="http://www.w3.org/2000/svg"></svg></div>
+  <div class="legend"><span><span class="sw" style="background:var(--sen)"></span>Senior, flat at every coverage</span><span><span class="sw" style="background:var(--jun)"></span>Junior, falls as the buffer thickens</span></div>
+  <div class="tblwrap"><table id="tbl"></table></div>
+  <ul class="notes">
+    <li><b>Why the Senior rate never moves.</b> Every dollar of Senior capital hands the Junior the same slice of its own yield, whatever the cushion. So the Senior always keeps the rest, and its rate is flat all the way across.</li>
+    <li><b>Why the Junior rate climbs as the cushion thins.</b> Fewer Junior dollars share that same slice. At a 5% cushion each Junior dollar stands behind <span id="nLev1"></span> of Senior capital; at 50% it stands behind <span id="nLev2"></span>. Same transfer, much smaller base.</li>
+    <li><b>The cushion is the minimum coverage, and the Junior is sized a little above it.</b> Coverage is what the Junior must be able to absorb of Senior losses <i>at all times</i>. Royco's markets hold a slight excess of Junior capital over that minimum, targeting 90% utilization, so Juniors can keep entering and exiting without instantly breaching it. A 20% minimum coverage means a Junior worth 22.2% of the market.</li>
+    <li><b>The formulas.</b> Senior APR = vault yield x (1 minus yield share). Junior APR = vault yield x (1 plus yield share x Senior size / Junior size), with Junior size = cushion / 90% target utilization. Simple annual rates, not compounded.</li>
+    <li><span id="nApr"></span></li>
+    <li><span id="nCeil"></span></li>
+    <li><b>What these are not.</b> Contractual splits of whatever the vault earns, not returns anyone expects it to deliver. Section 2 shows what the split did on the real record.</li>
+  </ul>
+</div>
+</div>
+
+<div class="disc">
+<p><b>Read this before using any number here.</b> This tool does <b>not</b> set, determine or estimate a minimum coverage, or any other binding market parameter. It produces a <b>data-driven estimate</b> from a short price history that can be wrong, and from assumptions you choose. Any final market terms and the decision to launch are the <b>team's own responsibility, not Royco's</b>. The XLP record used here is <b id="dRec"></b> long<span id="dReg"></span>; a market making and liquidation vault on a perps venue carries tail risks (adverse selection, liquidation cascades, oracle or latency failures) that such a sample cannot reveal. Nothing here is a recommendation, a promise of returns, or investment advice.</p>
+</div>
+
+<div class="foot"><p id="foot">Vault data from the public RiseX API (api.rise.trade/rlp), snapshot 21 Jul 2026. XLP vault 0xBCf7A882B6A95827B4996055a5018FdC3B95D40c on RISE Chain. Tranche mechanics follow Royco's Dawn engine. Illustrative model, not investment advice.</p></div>
+</div>
+
+<script>
+const SNAPSHOT={start:'2026-04-02',off:[0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19,20,21,22,23,24,25,26,27,28,29,30,31,32,33,34,35,36,37,38,39,40,41,42,43,44,45,46,47,48,49,50,51,52,53,54,55,56,57,58,59,60,61,62,63,64,65,66,67,68,69,70,71,72,73,74,75,76,77,78,79,80,81,82,83,84,85,86,87,88,89,90,91,92,93,94,95,96,97,98,99,100,101,102,103,104,105,106,107,108,109,109],P:[100,100,100,100,100.003,100.018,100.065,100.085,100.085,100.126,100.104,100.1,100.104,100.11,100.115,100.117,100.064,100.068,100.077,100.1,100.118,100.151,100.161,100.227,100.304,100.382,100.535,100.599,100.687,100.822,101.007,101.423,101.757,104.326,106.954,107.24,107.579,107.833,108.253,108.658,109.111,109.527,109.716,109.355,109.164,108.664,108.801,109.08,109.491,109.495,109.592,109.858,110.145,110.427,110.651,110.759,110.871,110.924,110.952,111.001,111.1,111.225,111.189,111.205,111.287,111.487,111.826,112.237,112.622,112.998,113.378,113.76,114.126,114.487,114.823,115.119,115.394,115.647,115.87,116.082,116.267,116.438,116.595,116.741,117.572,117.577,117.591,117.611,117.632,117.655,117.678,117.707,117.746,117.791,117.85,117.919,117.998,118.054,118.112,118.177,118.248,118.323,118.403,118.486,118.574,118.664,118.754,118.846,118.939,119.032,119.076],tvl:[0,200,30776,30776,30577,30593,30601,30601,40604,90668,90620,90619,200667,200628,480642,480652,480398,480433,480529,480601,480733,480861,480861,481320,481669,481921,482962,483062,483692,484428,485917,487657,491505,514403,617134,1511496,1767606,1874635,1934365,2037122,2050593,2052604,2051289,2043722,2040151,2531439,2802068,2718819,2735329,2735490,2770149,2788177,2786573,2980346,2993007,3096158,3102776,3193354,3167823,3177851,3188687,3386316,3371197,3293122,3314836,3352504,3380238,3416269,3908320,4039786,4079829,4108471,4123235,4125947,4220910,4236018,4334835,4382586,4384403,4392774,4398368,4402770,4462298,4458761,4458715,4517259,4522665,4499239,4500243,4837709,5321370,5277477,5950899,5996319,6008478,6015687,6009460,8005358,7990053,8006070,8012511,8006504,8010171,8012361,8019226,8013524,8012675,8019873,8024771,8027821,8029606]};
+/* ---------- engine (Royco Dawn, ported from the Dawn simulator) ---------- */
+const TARGET_UTIL=0.90, LIQ_UTIL=1.0009009, EXIT_BONUS_PCT=0.5;
+const clamp=(x,a,b)=>Math.max(a,Math.min(b,x));
+function simFT(P,off,coverage,jtYieldShare,dur,noReal,exitBonusPct){
+  exitBonusPct=exitBonusPct||0;
+  const n=P.length, jrShare=coverage/TARGET_UTIL;
+  const S0=(1-jrShare)*100, J0=jrShare*100;
+  let lastSTRaw=S0,lastJTRaw=J0,stEffective=S0,jtEffective=J0,stIL=0,jtIL=0;
+  const Sa=[stEffective],Ja=[jtEffective],Ua=[coverage*(lastSTRaw+lastJTRaw)/Math.max(jtEffective,1e-9)];
+  let state='PERP',obsStart=null,wasLiq=false,exitEvents=0; const ev=[],obs=[],stHit=[];
+  const closeObs=(i,exp)=>{ if(obsStart!=null){obs.push({a:obsStart,b:i,expired:exp});obsStart=null;} };
+  const attrDelta=(d,c,l)=>(d===0||c<=0||l<=0)?0:d*c/l;
+  const forcePerp=(i,type)=>{ if(type==='liquidation') exitEvents++;
+    if(jtIL>1e-9) ev.push({i,type,loss:jtIL/J0*100}); jtIL=0; if(state==='OBS') closeObs(i,true); state='PERP'; };
+  for(let i=1;i<n;i++){
+    const p=P[i], stRaw=S0*p/100, jtRaw=J0*p/100, init=state;
+    const stClaimOnJT=Math.max(stEffective-lastSTRaw,0), jtClaimOnST=Math.max(jtEffective-lastJTRaw,0);
+    const stClaimOnST=Math.max(lastSTRaw-jtClaimOnST,0);
+    const dST=stRaw-lastSTRaw, dJT=jtRaw-lastJTRaw;
+    const dSTonST=lastSTRaw<=0?(stEffective>0?dST:0):attrDelta(dST,stClaimOnST,lastSTRaw);
+    const dSTonJT=attrDelta(dJT,stClaimOnJT,lastJTRaw);
+    const dSTeff=dSTonST+dSTonJT, dJTeff=dST+dJT-dSTeff;
+    if(dJTeff<0){ let loss=-dJTeff, ab=Math.min(loss,jtEffective); jtEffective-=ab; loss-=ab;
+      if(loss>1e-9){ stEffective-=loss; stIL+=loss; stHit.push({i,loss:loss/S0*100}); } }
+    else if(dJTeff>0){ let g=dJTeff, r=Math.min(g,stIL); if(r>0){stIL-=r;stEffective+=r;g-=r;} if(g>0) jtEffective+=g; }
+    if(dSTeff<0){ let loss=-dSTeff, cov=Math.min(loss,jtEffective);
+      if(cov>0){ jtEffective-=cov; jtIL+=cov; loss-=cov; }
+      if(loss>1e-9){ stEffective-=loss; stIL+=loss; stHit.push({i,loss:loss/S0*100}); } }
+    else if(dSTeff>0){ let g=dSTeff, r=Math.min(g,stIL); if(r>0){stIL-=r;stEffective+=r;g-=r;}
+      r=Math.min(g,jtIL); if(r>0){jtIL-=r;jtEffective+=r;g-=r;}
+      if(g>0){ jtEffective+=g*jtYieldShare; stEffective+=g*(1-jtYieldShare); } }
+    const util=coverage*(stRaw+jtRaw)/Math.max(jtEffective,1e-9), liqNow=util>=LIQ_UTIL;
+    if(liqNow) forcePerp(i,'liquidation');
+    else if(!noReal && init==='OBS' && (off[i]-off[obsStart])>=dur) forcePerp(i,'expired');
+    else if(stIL>1e-9) forcePerp(i,'st-il');
+    else if(jtIL>1e-9){ if(init==='PERP') obsStart=i; state='OBS'; }
+    else { if(init==='OBS') closeObs(i,false); state='PERP'; }
+    wasLiq=liqNow; lastSTRaw=stRaw; lastJTRaw=jtRaw;
+    Sa.push(stEffective); Ja.push(Math.max(jtEffective,0)); Ua.push(util);
+  }
+  if(state==='OBS') closeObs(n-1,false);
+  return {sen:Sa.map(x=>x/S0*100), jun:Ja.map(x=>x/J0*100), util:Ua, ev, obs, stHit, jrShare, exitEvents}; }
+const annu=(navEnd,days)=>(Math.pow(navEnd/100,365/days)-1)*100;
+/* a return can be negative, so the sign and the colour have to follow the number, never be assumed */
+const sgn=(v,d)=>(v>=0?'+':'')+v.toFixed(d);
+const dir=v=>v>=0?'good':'bad';
+const capPct=v=>Math.abs(v)>=1000?(v>0?'>1000':'<-1000'):v.toFixed(0);
+const mddOf=a=>{let pk=-1e9,d=0;for(const v of a){pk=Math.max(pk,v);d=Math.min(d,v/pk-1);}return d*100;};
+
+/* ---------- overview ---------- */
+/* ---------- live data ----------
+   The page ships with SNAPSHOT embedded so it always renders, then replaces it with whatever the
+   public RiseX API returns. Everything below derives from XLP, so a swap is a re-render, not a rewrite. */
+const SNAP_DATE='21 Jul 2026';
+let CAP_USD=8e6;                            // overwritten by /deposit-cap, which does expose it
+let XLP={start:SNAPSHOT.start,off:SNAPSHOT.off.slice(),P:SNAPSHOT.P.slice(),tvl:SNAPSHOT.tvl.slice(),ts:null};
+let NAV=XLP.P;
+let DAYS=XLP.off[XLP.off.length-1];          // geometry: last x position
+let SPAN_DAYS=DAYS;                          // elapsed time, used for annualizing
+let VAULT_APR=0.6518;                        // metrics.apr, the rate RiseX reports
+let APR_LIVE=false;                          // true only when this run actually read metrics.apr
+let CAP_LIVE=false;
+// the table's today column is an integer, so prose must quote the same integer or the two disagree
+const shownY=()=>Math.round(VAULT_APR*100)/100;
+const aprSrc=()=>APR_LIVE?'the APR the API reports today':'the last APR read from the API';
+const aprNote=()=>'extrapolated, '+(APR_LIVE?'API APR ':'last known APR ')+(shownY()*100).toFixed(0)+'%';
+let DATA_MODE='snapshot', DATA_AS_OF=null, LOADED_AT=null;
+
+const MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const p2=n=>String(n).padStart(2,'0');
+function stampUTC(ms){ const d=new Date(ms);
+  return d.getUTCDate()+' '+MON[d.getUTCMonth()]+' '+d.getUTCFullYear()+', '+p2(d.getUTCHours())+':'+p2(d.getUTCMinutes())+' UTC'; }
+
+/* longest stretch the share price spent below a previous high, in days */
+function longestUnderwater(P,off){
+  let pk=P[0], startI=0, worst=0;
+  for(let i=0;i<P.length;i++){
+    if(P[i]>=pk){ pk=P[i]; startI=i; }
+    else worst=Math.max(worst,off[i]-off[startI]);
+  }
+  return worst;
+}
+function applyData(d,mode){
+  const keep={XLP,NAV,DAYS,SPAN_DAYS,DATA_MODE};
+  try{
+    XLP=d; NAV=d.P;
+    DAYS=d.off[d.off.length-1];
+    SPAN_DAYS=d.ts ? (d.ts[d.ts.length-1]-d.ts[0])/86400 : DAYS;
+    DATA_MODE=mode; hovNav=null; hovTs=null;
+    renderOverview(); renderTranche(); renderTable();
+  }catch(e){
+    Object.assign(window,{});
+    XLP=keep.XLP; NAV=keep.NAV; DAYS=keep.DAYS; SPAN_DAYS=keep.SPAN_DAYS; DATA_MODE=keep.DATA_MODE;
+    renderOverview(); renderTranche(); renderTable();   // back to the data we know renders
+  }
+  renderStamp();
+}
+function renderStamp(){
+  const el=document.getElementById('stamp'), t=document.getElementById('stampTxt');
+  const foot=document.getElementById('foot');
+  if(DATA_MODE==='live'){
+    const ageH=(LOADED_AT/1000-DATA_AS_OF)/3600;
+    el.classList.remove('snap');
+    t.textContent='Live · vault data as of '+stampUTC(DATA_AS_OF*1000)+(ageH>36?', feed is '+Math.round(ageH/24)+' days behind':'');
+    foot.innerHTML='Live data from the public RiseX API (api.rise.trade/rlp) · vault data as of '+stampUTC(DATA_AS_OF*1000)+' · loaded '+stampUTC(LOADED_AT)+'. XLP vault 0xBCf7A882B6A95827B4996055a5018FdC3B95D40c on RISE Chain. Tranche mechanics follow Royco\'s Dawn engine. Illustrative model, not investment advice.';
+  } else {
+    el.classList.add('snap');
+    t.textContent='Embedded snapshot of '+SNAP_DATE+' · live feed not reachable';
+    foot.innerHTML='Embedded snapshot of '+SNAP_DATE+', the live RiseX API was not reachable'+(LOADED_AT?' at '+stampUTC(LOADED_AT):'')+'. XLP vault 0xBCf7A882B6A95827B4996055a5018FdC3B95D40c on RISE Chain. Tranche mechanics follow Royco\'s Dawn engine. Illustrative model, not investment advice.';
+  }
+}
+const API='https://api.rise.trade/rlp/v1/vault';
+async function loadLive(){
+  const ctl=new AbortController(), timer=setTimeout(()=>ctl.abort(),8000);
+  try{
+    const grab=u=>fetch(u,{signal:ctl.signal}).then(r=>{ if(!r.ok) throw new Error(r.status); return r.json(); });
+    const [ch,me,dc]=await Promise.all([
+      grab(API+'/charts?period=D365&resolution=D1'),
+      grab(API+'/metrics').catch(()=>null),
+      grab(API+'/deposit-cap').catch(()=>null)
+    ]);
+    if(!ch||!Array.isArray(ch.navPerShare)||!ch.navPerShare.length) throw new Error('shape');
+    // clean, sort, then keep one row per UTC day so a same day double sample cannot duplicate an x position
+    const byDay=new Map();
+    ch.navPerShare.forEach(r=>{ const t=+r.timestamp, v=+r.value;
+      if(Number.isFinite(t)&&t>0&&Number.isFinite(v)&&v>0) byDay.set(Math.floor(t/86400),{t,v}); });
+    const rows=[...byDay.values()].sort((a,b)=>a.t-b.t);
+    if(rows.length<30) throw new Error('too short');
+    const span=(rows[rows.length-1].t-rows[0].t)/86400;
+    if(span<30) throw new Error('too short');
+    const tvlBy=new Map();
+    (ch.tvl||[]).forEach(r=>{ const t=+r.timestamp, v=+r.value; if(Number.isFinite(t)&&Number.isFinite(v)) tvlBy.set(Math.floor(t/86400),v); });
+    const t0=rows[0].t, v0=rows[0].v, day0=Math.floor(t0/86400);
+    const d={ start:new Date(t0*1000).toISOString().slice(0,10),
+      ts:rows.map(r=>r.t),
+      off:rows.map(r=>Math.floor(r.t/86400)-day0),
+      P:rows.map(r=>r.v/v0*100),
+      tvl:(()=>{ let last=0; return rows.map(r=>{ const v=tvlBy.get(Math.floor(r.t/86400)); if(Number.isFinite(v)) last=v; return last; }); })() };
+    for(let i=1;i<d.off.length;i++) if(d.off[i]<=d.off[i-1]) throw new Error('not monotonic');
+    const apr=me&&+me.apr;
+    // guard the unit too: a backend that switched to fractions would send 0.65, not 65
+    if(Number.isFinite(apr)&&apr>=1&&apr<=500){ VAULT_APR=apr/100; APR_LIVE=true; }
+    const cap=dc&&+dc.cap;
+    if(Number.isFinite(cap)&&cap>0&&!(dc.unlimited===true)){ CAP_USD=cap; CAP_LIVE=true; }
+    LOADED_AT=Date.now(); DATA_AS_OF=rows[rows.length-1].t;
+    applyData(d,'live');
+  }catch(e){
+    LOADED_AT=Date.now();
+    renderStamp();                             // keep the snapshot already on screen, just label it honestly
+  }finally{ clearTimeout(timer); }
+}
+function fmtUsd(v){ if(v>=1e6) return '$'+(v/1e6).toFixed(1)+'M'; if(v>=1e3) return '$'+Math.round(v/1e3)+'k'; return '$'+Math.round(v); }
+function ovStats(){
+  const rets=[]; for(let i=1;i<NAV.length;i++) rets.push(NAV[i]/NAV[i-1]-1);
+  const mean=rets.reduce((a,b)=>a+b,0)/rets.length;
+  const sd=Math.sqrt(rets.reduce((a,b)=>a+(b-mean)*(b-mean),0)/rets.length);
+  return { total:NAV[NAV.length-1]-100, ann:annu(NAV[NAV.length-1],SPAN_DAYS), mdd:mddOf(NAV),
+    vol:sd*Math.sqrt(365)*100, down:rets.filter(r=>r<0).length, nd:rets.length,
+    worst:Math.min(...rets)*100, tvl:XLP.tvl[XLP.tvl.length-1] }; }
+function renderOverview(){
+  const s=ovStats(), box=(t,v,sub,cls)=>'<div class="box"><div class="t">'+t+'</div><div class="v'+(cls?' '+cls:'')+'">'+v+'</div>'+(sub?'<div class="s">'+sub+'</div>':'')+'</div>';
+  const days=Math.round(SPAN_DAYS), months=(SPAN_DAYS/30.44).toFixed(1);
+  const fill=s.tvl/CAP_USD;
+  document.getElementById('ovStat').innerHTML=
+    box('Total return',sgn(s.total,2)+'%','over '+days+' days',dir(s.total))+
+    box('Annualized',sgn(s.ann,0)+'%',aprNote())+
+    box('Max drawdown',s.mdd.toFixed(2)+'%',s.worst<0?'worst day '+s.worst.toFixed(2)+'%':'no down day yet')+
+    box('TVL',fmtUsd(s.tvl),fill>=0.98?'cap '+fmtUsd(CAP_USD)+', full':(fill*100).toFixed(0)+'% of the '+fmtUsd(CAP_USD)+' cap');
+  // every claim below is a function of the series on screen, so it can never contradict the chart
+  const calm=Math.abs(s.mdd)<3;
+  document.getElementById('ovB1').innerHTML=calm
+    ? 'Up and to the right, with <b>almost no drawdown</b>: the deepest fall was '+Math.abs(s.mdd).toFixed(2)+'%. That is unusual and it is the whole story here.'
+    : 'The share price has fallen as much as <b>'+Math.abs(s.mdd).toFixed(2)+'%</b> from a high. That depth is what any cushion has to cover.';
+  document.getElementById('ovB2').innerHTML='But the record is <b>short</b>: about '+months+' months, and '+s.down+' down days out of '+s.nd+'.'+(calm?' No stress event has happened yet.':'');
+  document.getElementById('hMdd').textContent=Math.abs(s.mdd).toFixed(2)+'%';
+  const uw=longestUnderwater(NAV,XLP.off);
+  document.getElementById('hRec').innerHTML=uw>0
+    ? 'the longest stretch below a previous high was <b>'+uw+' days</b>, so a window under that would have expired mid dip'
+    : 'the share price has never yet closed below a previous high, so this record cannot tell you how long a window needs to be';
+  document.getElementById('dRec').textContent='about '+months+' months';
+  document.getElementById('dReg').textContent=calm?', in a calm regime, with no stress event in it':', and its deepest fall so far is '+Math.abs(s.mdd).toFixed(2)+'%';
+  document.getElementById('nApr').innerHTML='<b>The vault yield itself is not one number.</b> The API reports a '+(shownY()*100).toFixed(0)+'% APR, while the realised NAV over '+days+' days annualizes to '+s.ann.toFixed(0)+'%. The lower figure is the one used here.';
+  document.getElementById('nCeil').innerHTML='<b>Why the table stops at '+(shownY()*100).toFixed(0)+'%.</b> That is '+aprSrc()+', and it is the ceiling on purpose: market making and liquidation yields compress as the book grows, so the columns run down rather than up.';
+  document.getElementById('nLev1').textContent=((1-(0.05/TARGET_UTIL))/(0.05/TARGET_UTIL)).toFixed(0)+' dollars';
+  document.getElementById('nLev2').textContent=((1-(0.50/TARGET_UTIL))/(0.50/TARGET_UTIL)).toFixed(1)+' dollars';
+  drawNav();
+}
+/* ---------- charts ---------- */
+function axisBox(el){ const b=el.parentElement; return {w:b.clientWidth||760,h:b.clientHeight||300}; }
+let hovNav=null, hovTs=null;
+function dateAt(i){ const [y,m,d]=XLP.start.split('-').map(Number);
+  return new Date(Date.UTC(y,m-1,d)+XLP.off[i]*86400000).toISOString().slice(0,10); }
+function nearestIdx(frac){ const target=frac*DAYS; let best=0,bd=1e9;
+  for(let i=0;i<XLP.off.length;i++){ const d=Math.abs(XLP.off[i]-target); if(d<bd){bd=d;best=i;} } return best; }
+function tipBox(x,y,w,h,lines){
+  let s='<rect x="'+x.toFixed(1)+'" y="'+y.toFixed(1)+'" width="'+w+'" height="'+h+'" rx="3" fill="#1B1A17" opacity="0.93"/>';
+  lines.forEach((ln,i)=>{ s+='<text x="'+(x+8).toFixed(1)+'" y="'+(y+15+i*13).toFixed(1)+'" fill="#fff" font-size="10.5" font-family="monospace">'+ln+'</text>'; });
+  return s; }
+function wireHover(el,setter,redraw,padL,padR){
+  el.addEventListener('mousemove',e=>{ const r=el.getBoundingClientRect(), vb=el.viewBox.baseVal.width||r.width;
+    const mx=(e.clientX-r.left)*(vb/r.width);
+    setter(nearestIdx(clamp((mx-padL)/(vb-padL-padR),0,1))); redraw(); });
+  el.addEventListener('mouseleave',()=>{ setter(null); redraw(); }); }
+function drawNav(){
+  const el=document.getElementById('navChart'), {w,h}=axisBox(el); el.setAttribute('viewBox','0 0 '+w+' '+h);
+  const pad={l:46,r:54,t:16,b:28}, lo=Math.min(99.5,Math.min(...NAV)*0.995), hi=Math.max(...NAV)*1.005;
+  const PX=i=>pad.l+XLP.off[i]/DAYS*(w-pad.l-pad.r), PY=v=>pad.t+(1-(v-lo)/(hi-lo))*(h-pad.t-pad.b);
+  const tmax=Math.max(...XLP.tvl), hasTvl=tmax>0, TY=v=>pad.t+(1-v/(tmax||1))*(h-pad.t-pad.b);
+  const P=['<rect x="0" y="0" width="'+w+'" height="'+h+'" fill="#FFFDF9"/>'];
+  for(let g=Math.floor(lo/5)*5;g<=hi;g+=5){ const y=PY(g); if(y<pad.t)continue;
+    P.push('<line x1="'+pad.l+'" y1="'+y.toFixed(1)+'" x2="'+(w-pad.r)+'" y2="'+y.toFixed(1)+'" stroke="#EEE8DE"/>');
+    P.push('<text x="'+(pad.l-6)+'" y="'+(y+3).toFixed(1)+'" fill="#9E968A" font-size="10" text-anchor="end">'+(g/100).toFixed(2)+'</text>'); }
+  let td='M'+pad.l+' '+(h-pad.b); XLP.tvl.forEach((v,i)=>{ td+='L'+PX(i).toFixed(1)+' '+TY(v).toFixed(1); });
+  td+='L'+PX(NAV.length-1).toFixed(1)+' '+(h-pad.b)+'Z';
+  if(hasTvl) P.push('<path d="'+td+'" fill="#967756" opacity=".13"/>');
+  let d=''; NAV.forEach((v,i)=>{ d+=(i?'L':'M')+PX(i).toFixed(1)+' '+PY(v).toFixed(1); });
+  P.push('<path d="'+d+'" fill="none" stroke="#1B1A17" stroke-width="2.4"/>');
+  P.push('<text x="'+(w-pad.r+4)+'" y="'+(PY(NAV[NAV.length-1])+3).toFixed(1)+'" fill="#1B1A17" font-size="11" font-weight="700" font-family="monospace">'+(NAV[NAV.length-1]/100).toFixed(3)+'</text>');
+  P.push('<text x="'+pad.l+'" y="'+(h-8)+'" fill="#9E968A" font-size="10">'+XLP.start+'</text>');
+  P.push('<text x="'+(w-pad.r)+'" y="'+(h-8)+'" fill="#9E968A" font-size="10" text-anchor="end">today</text>');
+  if(hovNav!=null){ const i=hovNav, hx=PX(i), hy=PY(NAV[i]);
+    P.push('<line x1="'+hx.toFixed(1)+'" y1="'+pad.t+'" x2="'+hx.toFixed(1)+'" y2="'+(h-pad.b)+'" stroke="#C9BEAE"/>');
+    P.push('<circle cx="'+hx.toFixed(1)+'" cy="'+hy.toFixed(1)+'" r="4" fill="#1B1A17" stroke="#fff" stroke-width="1.5"/>');
+    let tx=hx+10; if(tx>w-150) tx=hx-150;
+    P.push(tipBox(tx,pad.t+4,142,48,[dateAt(i),'nav  '+(NAV[i]/100).toFixed(4),'tvl  '+fmtUsd(XLP.tvl[i])])); }
+  el.innerHTML=P.join('');
+}
+/* ---------- tranche sim ---------- */
+const cov_=document.getElementById('cov'), ys_=document.getElementById('ys'), obs_=document.getElementById('obs');
+/* Solve for the coverage at which the Senior stops being hit, rather than asserting one. On a record
+   this calm the answer is "every coverage", and saying so plainly is the honest result. */
+function breakeven(){
+  const ys=+ys_.value/100, obs=+obs_.value;
+  for(let c=1;c<=50;c++) if(simFT(NAV,XLP.off,c/100,ys,obs,false,EXIT_BONUS_PCT).stHit.length===0) return c;
+  return null;
+}
+function renderTranche(){
+  const cov=+cov_.value/100, ys=+ys_.value/100, obs=+obs_.value;
+  document.getElementById('covv').textContent=cov_.value+'%';
+  document.getElementById('ysv').textContent=ys_.value+'%';
+  document.getElementById('obsv').textContent=obs_.value+'d';
+  const r=simFT(NAV,XLP.off,cov,ys,obs,false,EXIT_BONUS_PCT);
+  const senEnd=r.sen[r.sen.length-1], junEnd=r.jun[r.jun.length-1];
+  const wiped=Math.min(...r.jun)<1e-9;   // a Senior hit and a Junior wipeout are the same event
+  const box=(t,v,sub,cls)=>'<div class="box"><div class="t">'+t+'</div><div class="v'+(cls?' '+cls:'')+'">'+v+'</div>'+(sub?'<div class="s">'+sub+'</div>':'')+'</div>';
+  document.getElementById('tsStat').innerHTML=
+    box('Senior, '+Math.round(SPAN_DAYS)+' days',sgn(senEnd-100,2)+'%','annualizes to '+capPct(annu(senEnd,SPAN_DAYS))+'%',dir(senEnd-100))+
+    box('Junior, '+Math.round(SPAN_DAYS)+' days',wiped?'wiped out':sgn(junEnd-100,1)+'%',wiped?'and then rebuilt to '+sgn(junEnd-100,1)+'%':'annualizes to '+capPct(annu(junEnd,SPAN_DAYS))+'%',wiped?'bad':dir(junEnd-100))+
+    box('Senior loss events',r.stHit.length, r.stHit.length===0?'never touched':'Senior was hit', r.stHit.length?'bad':'good')+
+    box('Junior worst drop',mddOf(r.jun).toFixed(2)+'%','vault '+mddOf(NAV).toFixed(2)+'%',dir(mddOf(r.jun)));
+  const why=r.stHit.length===0
+    ? 'At '+cov_.value+'% coverage the <b>Senior was never touched</b>: the vault never fell more than <b>'+Math.abs(mddOf(NAV)).toFixed(2)+'%</b>. Over these '+Math.round(SPAN_DAYS)+' days the Junior made <b>'+sgn(junEnd-100,1)+'%</b> against the vault\'s '+sgn(NAV[NAV.length-1]-100,2)+'%. Two cautions: annualizing a '+Math.round(SPAN_DAYS)+' day window overstates a real year, and nothing '+(Math.abs(mddOf(NAV))<3?'stressful happened in it':'as deep as a real stress event happened in it')+'.'
+    : 'At '+cov_.value+'% coverage the Senior took <b>'+r.stHit.length+'</b> hit(s) on this history.';
+  document.getElementById('tsWhy').innerHTML=why;
+  const be=breakeven(), md=Math.abs(mddOf(NAV));
+  document.getElementById('headline').innerHTML = be===1
+    ? '<b>On this record the Senior is never hit, at any coverage down to 1%.</b> The deepest fall was '+md.toFixed(2)+'%, so even the thinnest buffer swallows it whole. That is a statement about a '+(SPAN_DAYS/30.44).toFixed(1)+' month calm window, not about how deep a buffer needs to be. A record with a real drawdown is what would set that number.'
+    : (be ? '<b>On this record the Senior is hit below '+be+'% coverage and never at '+be+'% or deeper.</b> The deepest fall was '+md.toFixed(2)+'%, so the buffer has to be worth more than the fall, not equal to it.'
+          : '<b>On this record the Senior is hit at every coverage up to 50%.</b>');
+  LASTR=r; drawTranche(r);
+}
+let LASTR=null;
+function drawTranche(r){
+  const el=document.getElementById('tsChart'), {w,h}=axisBox(el); el.setAttribute('viewBox','0 0 '+w+' '+h);
+  const pad={l:46,r:54,t:16,b:28};
+  const all=r.sen.concat(r.jun).concat(NAV), lo=Math.min(95,Math.min(...all)*0.99), hi=Math.max(...all)*1.02;
+  const PX=i=>pad.l+XLP.off[i]/DAYS*(w-pad.l-pad.r), PY=v=>pad.t+(1-(v-lo)/(hi-lo))*(h-pad.t-pad.b);
+  const P=['<rect x="0" y="0" width="'+w+'" height="'+h+'" fill="#FFFDF9"/>'];
+  const step=Math.max(10,Math.round((hi-lo)/5/10)*10);
+  for(let g=Math.ceil(lo/step)*step;g<=hi;g+=step){ const y=PY(g);
+    P.push('<line x1="'+pad.l+'" y1="'+y.toFixed(1)+'" x2="'+(w-pad.r)+'" y2="'+y.toFixed(1)+'" stroke="#EEE8DE"/>');
+    P.push('<text x="'+(pad.l-6)+'" y="'+(y+3).toFixed(1)+'" fill="#9E968A" font-size="10" text-anchor="end">'+g+'</text>'); }
+  const line=(a,col,wd)=>{ let d=''; a.forEach((v,i)=>{ d+=(i?'L':'M')+PX(i).toFixed(1)+' '+PY(v).toFixed(1); });
+    return '<path d="'+d+'" fill="none" stroke="'+col+'" stroke-width="'+wd+'"/>'; };
+  P.push(line(NAV,'#B4A896',1.6), line(r.sen,'#8E7355',2.4), line(r.jun,'#1B1A17',2.6));
+  const lab=(a,col)=>'<text x="'+(w-pad.r+4)+'" y="'+(PY(a[a.length-1])+3).toFixed(1)+'" fill="'+col+'" font-size="10.5" font-weight="700" font-family="monospace">'+a[a.length-1].toFixed(0)+'</text>';
+  P.push(lab(r.jun,'#1B1A17'),lab(r.sen,'#8E7355'));
+  if(hovTs!=null){ const i=hovTs, hx=PX(i);
+    P.push('<line x1="'+hx.toFixed(1)+'" y1="'+pad.t+'" x2="'+hx.toFixed(1)+'" y2="'+(h-pad.b)+'" stroke="#C9BEAE"/>');
+    [[r.jun,'#1B1A17'],[r.sen,'#8E7355'],[NAV,'#B4A896']].forEach(([a,c])=>{
+      P.push('<circle cx="'+hx.toFixed(1)+'" cy="'+PY(a[i]).toFixed(1)+'" r="3.5" fill="'+c+'" stroke="#fff" stroke-width="1.2"/>'); });
+    let tx=hx+10; if(tx>w-158) tx=hx-158;
+    P.push(tipBox(tx,pad.t+4,150,61,[dateAt(i),'junior '+r.jun[i].toFixed(1),'senior '+r.sen[i].toFixed(1),'vault  '+NAV[i].toFixed(1)])); }
+  el.innerHTML=P.join('');
+}
+/* ---------- terms table ---------- */
+let TBL_YS=0.35, TBL_Y=null;
+const COVS=[5,10,15,20,25,30,40,50];
+// Above 1000% daily compounding stops being a meaningful number, so it is shown as a
+// bound rather than a precise figure nobody should quote.
+const fmtRate=r=>{
+  const v=r*100;
+  if(v>=1000) return '<span style="color:#A49B90;font-weight:600">&gt;1000%</span>';
+  const p=v.toFixed(1).split('.');
+  return p[0]+'<span class="dec">.'+p[1]+'</span>%';
+};
+const fmtRateTxt=r=>(r*100)>=1000?'&gt;1000':(r*100).toFixed(1);   // same number, no markup, for prose
+function renderTable(){
+  /* One variable at a time. The vault yield is a control, not a second axis, so the reader answers
+     "what does each side earn at my terms" by reading one row instead of intersecting a matrix. */
+  const base=[10,20,30,40,50], today=Math.round(shownY()*100);
+  const yields=(today>0&&today<=500 ? base.filter(y=>Math.abs(y-today)>2).concat([today]) : base.slice()).sort((a,b)=>a-b);
+  if(TBL_Y==null || yields.indexOf(TBL_Y)<0) TBL_Y = yields.indexOf(today)>=0 ? today : yields[yields.length-1];
+  document.getElementById('tblY').innerHTML = yields.map(y=>
+    '<button data-py="'+y+'"'+(y===TBL_Y?' class="on"':'')+'>'+y+'%'+(y===today?' &middot; today':'')+'</button>').join('');
+  const Y=TBL_Y/100, senR=Y*(1-TBL_YS), setC=+cov_.value;
+
+  // headline pair: the two numbers the reader actually came for
+  const jrS=(setC/100)/TARGET_UTIL, levS=1+TBL_YS*(1-jrS)/jrS;
+  document.getElementById('pair').innerHTML=
+    '<div class="pairhead">At '+setC+'% minimum coverage, '+Math.round(TBL_YS*100)+'% yield share, a '+TBL_Y+'% vault yield</div>'+
+    '<div class="pairgrid">'+
+      '<div class="side s"><div class="lab">Senior</div><div class="num">'+fmtRate(senR)+'</div><div class="sub">the same at every coverage</div></div>'+
+      '<div class="side j"><div class="lab">Junior</div><div class="num">'+fmtRate(Y*levS)+'</div><div class="sub">'+levS.toFixed(1)+'x the vault yield, and it takes the first losses</div></div>'+
+    '</div>';
+
+  // the shape: Senior flat, Junior decaying as the buffer thickens
+  drawSplit(Y);
+
+  // and the exact numbers, one row per coverage, at the selected yield only
+  let html='<thead><tr><th>Minimum coverage</th><th>Junior size<br>at 90% util</th>'+
+    '<th class="sc">Senior earns</th><th class="jc">Junior earns</th><th>Junior vs Senior</th></tr></thead><tbody>';
+  COVS.forEach(c=>{
+    const jr=(c/100)/TARGET_UTIL, lev=1+TBL_YS*(1-jr)/jr, junR=Y*lev;
+    html+='<tr'+(c===setC?' class="setrow"':'')+'><td class="cov">'+c+'%</td>'+
+      '<td class="meta">'+(jr*100).toFixed(1)+'%</td>'+
+      '<td class="sc">'+fmtRate(senR)+'</td><td class="jc">'+fmtRate(junR)+'</td>'+
+      '<td class="meta">'+(junR/senR).toFixed(1)+'x</td></tr>';
+  });
+  document.getElementById('tbl').innerHTML=html+'</tbody>';
+  document.getElementById('nLev1').textContent=((1-(0.05/TARGET_UTIL))/(0.05/TARGET_UTIL)).toFixed(0)+' dollars';
+  document.getElementById('nLev2').textContent=((1-(0.50/TARGET_UTIL))/(0.50/TARGET_UTIL)).toFixed(1)+' dollars';
+}
+let hovSplit=null, SPLIT_Y=null;
+function drawSplit(Y){
+  const el=document.getElementById('splitChart'); if(!el) return;
+  SPLIT_Y=Y;
+  const {w,h}=axisBox(el); el.setAttribute('viewBox','0 0 '+w+' '+h);
+  const pad={l:52,r:16,t:14,b:30}, C0=5, C1=50;
+  const jrOf=c=>(c/100)/TARGET_UTIL;
+  const jun=c=>Y*(1+TBL_YS*(1-jrOf(c))/jrOf(c)), sen=Y*(1-TBL_YS);
+  const hi=Math.max(jun(C0),sen)*1.06;
+  const PX=c=>pad.l+(c-C0)/(C1-C0)*(w-pad.l-pad.r), PY=v=>pad.t+(1-v/hi)*(h-pad.t-pad.b);
+  const P=['<rect x="0" y="0" width="'+w+'" height="'+h+'" fill="#FFFDF9"/>'];
+  const base=Math.pow(10,Math.floor(Math.log10(hi/3.5)));
+  const step=base*(hi/3.5>5*base?5:(hi/3.5>2*base?2:1));
+  for(let g=0;g<=hi;g+=step){ const y=PY(g); if(y<pad.t)continue;
+    P.push('<line x1="'+pad.l+'" y1="'+y.toFixed(1)+'" x2="'+(w-pad.r)+'" y2="'+y.toFixed(1)+'" stroke="#EEE8DE"/>');
+    P.push('<text x="'+(pad.l-6)+'" y="'+(y+3).toFixed(1)+'" fill="#9E968A" font-size="10" text-anchor="end">'+(g*100).toFixed(0)+'%</text>'); }
+  let d='';
+  for(let c=C0;c<=C1;c+=0.5) d+=(c===C0?'M':'L')+PX(c).toFixed(1)+' '+PY(jun(c)).toFixed(1);
+  P.push('<path d="'+d+'" fill="none" stroke="#1B1A17" stroke-width="2.6"/>');
+  P.push('<line x1="'+PX(C0)+'" y1="'+PY(sen).toFixed(1)+'" x2="'+PX(C1)+'" y2="'+PY(sen).toFixed(1)+'" stroke="#8E7355" stroke-width="2.6"/>');
+  const setC=Math.min(Math.max(+cov_.value,C0),C1), mx=PX(setC);
+  P.push('<line x1="'+mx.toFixed(1)+'" y1="'+pad.t+'" x2="'+mx.toFixed(1)+'" y2="'+(h-pad.b)+'" stroke="#967756" stroke-width="1.2" stroke-dasharray="3 3"/>');
+  P.push('<circle cx="'+mx.toFixed(1)+'" cy="'+PY(jun(setC)).toFixed(1)+'" r="4.5" fill="#1B1A17" stroke="#fff" stroke-width="1.6"/>');
+  P.push('<circle cx="'+mx.toFixed(1)+'" cy="'+PY(sen).toFixed(1)+'" r="4.5" fill="#8E7355" stroke="#fff" stroke-width="1.6"/>');
+  for(const c of [5,10,20,30,40,50]) P.push('<text x="'+PX(c).toFixed(1)+'" y="'+(h-9)+'" fill="#9E968A" font-size="10" text-anchor="middle">'+c+'%</text>');
+  if(hovSplit!=null){
+    const hc=hovSplit, hx=PX(hc), js=jun(hc);
+    P.push('<line x1="'+hx.toFixed(1)+'" y1="'+pad.t+'" x2="'+hx.toFixed(1)+'" y2="'+(h-pad.b)+'" stroke="#C9BEAE"/>');
+    P.push('<circle cx="'+hx.toFixed(1)+'" cy="'+PY(js).toFixed(1)+'" r="4" fill="#1B1A17" stroke="#fff" stroke-width="1.5"/>');
+    P.push('<circle cx="'+hx.toFixed(1)+'" cy="'+PY(sen).toFixed(1)+'" r="4" fill="#8E7355" stroke="#fff" stroke-width="1.5"/>');
+    let tx=hx+10; if(tx>w-166) tx=hx-166;
+    P.push(tipBox(tx,pad.t+4,158,61,[hc.toFixed(0)+'% coverage',
+      'senior '+(sen*100).toFixed(1)+'%','junior '+(js*100).toFixed(1)+'%','ratio  '+(js/sen).toFixed(1)+'x']));
+  }
+  P.push('<text x="'+((pad.l+w-pad.r)/2).toFixed(0)+'" y="'+(h-22)+'" fill="#A49B90" font-size="9.5" text-anchor="middle" letter-spacing="1.4">MINIMUM COVERAGE</text>');
+  P.push('<text x="12" y="'+(pad.t+10)+'" fill="#A49B90" font-size="9.5" letter-spacing="1.4">APR</text>');
+  el.innerHTML=P.join('');
+}
+
+/* ---------- wiring ---------- */
+// The yield share appeared twice on the page under the same name. It is now one value: the slider owns
+// it, the chips are a shortcut into the slider, and the chip lights up only when it matches.
+function syncYs(){
+  TBL_YS=+ys_.value/100;
+  document.querySelectorAll('#tblYs button').forEach(x=>x.classList.toggle('on',+x.dataset.y===+ys_.value));
+  document.querySelectorAll('#tblCov button').forEach(x=>x.classList.toggle('on',+x.dataset.c===+cov_.value));
+}
+[cov_,ys_,obs_].forEach(el=>el.addEventListener('input',()=>{ syncYs(); renderTranche(); renderTable(); }));
+document.querySelectorAll('#tblYs button').forEach(b=>b.addEventListener('click',()=>{
+  ys_.value=b.dataset.y; ys_.dispatchEvent(new Event('input')); }));
+/* The coverage chips drive the section 2 slider, so there is still one source of truth. The vault yield
+   is local to this section: it is a what if, not a term of the market. */
+document.querySelectorAll('#tblCov button').forEach(b=>b.addEventListener('click',()=>{
+  cov_.value=b.dataset.c; cov_.dispatchEvent(new Event('input')); }));
+document.getElementById('tblY').addEventListener('click',e=>{
+  const t=e.target.closest('button'); if(!t) return; TBL_Y=+t.dataset.py; renderTable(); });
+(function(){
+  const el=document.getElementById('splitChart'), C0=5, C1=50, padL=52, padR=16;
+  el.addEventListener('mousemove',e=>{
+    const r=el.getBoundingClientRect(), vb=el.viewBox.baseVal.width||r.width;
+    const mx=(e.clientX-r.left)*(vb/r.width);
+    hovSplit=C0+clamp((mx-padL)/(vb-padL-padR),0,1)*(C1-C0);
+    if(SPLIT_Y!=null) drawSplit(SPLIT_Y);
+  });
+  el.addEventListener('mouseleave',()=>{ hovSplit=null; if(SPLIT_Y!=null) drawSplit(SPLIT_Y); });
+})();
+window.addEventListener('resize',()=>{ renderOverview(); renderTranche(); renderTable(); });
+syncYs(); renderOverview(); renderTranche(); renderTable();
+/* One delegated listener on the container, so it survives every re-render of the table. */
+(function(){
+  const wrap=document.getElementById('tbl');
+  const clear=()=>{ wrap.querySelectorAll('.xc').forEach(e=>e.classList.remove('xc'));
+                    wrap.querySelectorAll('tr.xr').forEach(e=>e.classList.remove('xr')); };
+  wrap.addEventListener('mouseover',e=>{
+    const cell=e.target.closest('td,th'); if(!cell||!wrap.contains(cell)) return;
+    clear();
+    const row=cell.closest('tr'); if(row) row.classList.add('xr');
+    const c=cell.dataset.c;
+    if(c!=null) wrap.querySelectorAll('[data-c="'+c+'"]').forEach(x=>x.classList.add('xc'));
+  });
+  wrap.addEventListener('mouseleave',clear);
+})();
+loadLive();   // draw the embedded snapshot first, then swap in whatever RiseX reports right now
+wireHover(document.getElementById('navChart'),v=>{hovNav=v;},drawNav,46,54);
+wireHover(document.getElementById('tsChart'),v=>{hovTs=v;},()=>{ if(LASTR) drawTranche(LASTR); },46,54);
+</script></body></html>
