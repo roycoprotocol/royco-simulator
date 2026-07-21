@@ -21,13 +21,19 @@ h1{font-family:Georgia,"Times New Roman",serif;font-weight:400;font-size:clamp(2
 .explain p:last-child{margin-bottom:0}
 .explain b{font-weight:600}
 .explain .nums{color:var(--mut)}
+.explain ul{margin:8px 0 0;padding-left:18px}
+.explain li{margin:0 0 6px;font-size:13.5px;line-height:1.5}
+.explain li:last-child{margin-bottom:0}
+.foot .fn{font-size:11px;color:#A49B90;margin-top:6px}
 .mkSummary{font-size:13px;color:var(--mut);margin:0 0 4px}
 .mkSummary b{color:var(--ink)}
 .howto{font-size:12px;color:var(--mut);line-height:1.5;margin:6px 0 2px;max-width:740px;border-top:1px solid var(--line);padding-top:10px}
 .howto b{color:var(--ink)}
 .mkgrid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px;margin-top:14px}
 @media(max-width:680px){.mkgrid{grid-template-columns:1fr}}
-.mk{border:1px solid var(--line);background:rgba(255,253,249,.82);padding:14px}
+.mk{position:relative;border:1px solid var(--line);background:rgba(255,253,249,.82);padding:14px}
+.mk svg.spark{cursor:crosshair}
+.sparktip{position:absolute;pointer-events:none;background:#1B1A17;color:#fff;font-size:11px;font-family:"SFMono-Regular",Consolas,monospace;padding:3px 7px;border-radius:3px;transform:translate(-50%,-112%);white-space:nowrap;z-index:6;display:none}
 .mk .top{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
 .mk .nm{font-weight:600;font-size:14.5px;color:var(--ink)}
 .mk .ch{font-size:9.5px;text-transform:uppercase;letter-spacing:.07em;color:var(--accent);border:1px solid var(--line);padding:1px 6px;border-radius:2px;margin-left:6px;vertical-align:middle;white-space:nowrap}
@@ -38,7 +44,7 @@ h1{font-family:Georgia,"Times New Roman",serif;font-weight:400;font-size:clamp(2
 .mk .kv .t{font-size:8.5px;text-transform:uppercase;letter-spacing:.07em;color:#A49B90;font-weight:700}
 .mk .kv .v{font-size:15px;font-weight:600;font-variant-numeric:tabular-nums;font-family:"SFMono-Regular",Consolas,monospace}
 .card{background:var(--panel);border:1px solid var(--line);padding:20px;margin-top:8px;box-shadow:0 22px 50px rgba(60,45,28,.05)}
-.sliders{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px 20px;margin-bottom:6px}
+.sliders{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px 20px;margin-bottom:6px}
 @media(max-width:720px){.sliders{grid-template-columns:1fr 1fr}}
 @media(max-width:420px){.sliders{grid-template-columns:1fr}}
 .ctl label{display:flex;justify-content:space-between;font-size:11.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--mut);font-weight:600;margin-bottom:6px;gap:8px}
@@ -80,22 +86,25 @@ table.ref td.na{color:#A49B90}
   <button class="tab" data-t="forecast">Forecast</button>
 </div>
 <div id="tab-sim" class="panel">
-<p class="lede">One question: if utilization sits away from its 90% target, how does the Junior's yield share re-rate over the coming days? Set the starting share and where utilization actually is, then press Play.</p>
+<p class="lede">Set the values, press Play, and watch the Junior's yield share re-rate day by day.</p>
 <div class="explain">
   <div class="eb">How it works</div>
-  <p>Royco Dawn splits an asset into a protected <b>Senior</b> and a first-loss <b>Junior</b>. The Junior earns a <b>share of the Senior's yield</b> for absorbing losses first. That share is not fixed: it <b>re-rates over time</b> to keep utilization near its target, the same way Morpho's adaptive interest rate keeps a lending market near its target, only here it tunes the yield split.</p>
-  <p>When the Junior side is stretched (utilization above 90%), the share climbs to pull in more Junior capital. When it is slack (below 90%), the share falls. <span class="nums">The further from 90%, the faster it moves. Target 90%, bounded between 0.01% and 100%.</span></p>
-  <p class="nums">For example, a live Dawn market (sNUSD) starts the Junior at an <b>11%</b> share up to the 90% target and rises toward <b>31%</b> at full utilization, then re-rates from there.</p>
+  <p>Royco Dawn splits an asset into a protected <b>Senior</b> and a first-loss <b>Junior</b>. The Junior earns a share of the Senior's yield for taking the first losses.</p>
+  <ul>
+    <li>That share is <b>not fixed</b>. It re-rates over time, like Morpho's adaptive rate, but tuning the yield split instead of a borrow rate.</li>
+    <li>Utilization <b>above 90%</b>: the share climbs to attract Junior capital. <b>Below 90%</b>: it falls.</li>
+    <li>The further from 90%, the <b>faster</b> it moves. Bounded 0.01% to 100%.</li>
+  </ul>
 </div>
 
 <div class="card">
   <div class="sliders">
     <div class="ctl"><label>Starting yield share <b id="ps0v">35%</b></label><input type="range" id="ps0" min="1" max="80" step="1" value="35"><div class="h">Where the Junior's share begins today.</div></div>
     <div class="ctl"><label>Utilization now <b id="puv">85%</b></label><input type="range" id="pu" min="0" max="100" step="1" value="85"><div class="h">Where utilization actually is, held there. Above 90% the share rises; below 90% it falls.</div></div>
-    <div class="ctl"><label>Horizon <b id="phzv">90 days</b></label><input type="range" id="phz" min="7" max="365" step="1" value="90"><div class="h">How far ahead to project. Royco's real re-rating is fast, so short windows show it best.</div></div>
-    <div class="ctl"><label>Max share (cap) <b id="pcapv">100%</b></label><input type="range" id="pcap" min="20" max="100" step="5" value="100"><div class="h">The Royco upper bound on the share at target. Real markets use 100%; lower it to explore a tighter cap.</div></div>
+    <div class="ctl"><label>Horizon <b id="phzv">90 days</b></label><input type="range" id="phz" min="7" max="365" step="1" value="90"><div class="h">How far ahead to project. The real re-rating is fast, so short windows show it best.</div></div>
   </div>
-  <div style="margin-top:4px;font-size:12.5px;color:var(--mut)">Target utilization is fixed at <b style="color:var(--ink)">90%</b>. Whenever utilization sits away from it, the share re-rates toward the market-clearing level, and it moves fast: the further from 90%, the faster.</div>
+  <div style="margin-top:8px;font-size:12.5px;color:var(--mut)">Target <b style="color:var(--ink)">90%</b>. Share capped at <b style="color:var(--ink)">100%</b>.<sup>*</sup></div>
+  <div style="font-size:11px;color:#A49B90;margin-top:2px"><sup>*</sup> Both are set per market. Fixed here to keep it simple.</div>
   <div class="why" id="why"></div>
 
   <div class="playrow">
@@ -138,7 +147,7 @@ table.ref td.na{color:#A49B90}
 </div><!-- /tab-markets -->
 
 <div id="tab-forecast" class="panel" style="display:none">
-  <p class="lede">If each market's utilization stayed exactly where it is today, this is how the Junior's yield share would re-rate over the <b>next 30 days</b>, at Royco's real re-rating speed. Markets above the <b>90%</b> target drift up; below it, they drift down; right at it, they hold. It is a projection: it holds utilization flat, but in reality utilization responds and keeps moving.</p>
+  <p class="lede">How each market's Junior share would re-rate over the <b>next 30 days</b> if utilization held at today's level, at Royco's real speed. Above 90% it drifts up, below 90% it drifts down. A projection: real utilization keeps moving.</p>
   <div class="card">
     <p class="mkSummary" id="fcSummary"></p>
     <p class="howto">How to read each card: the line is the Junior's <b>yield share</b> drifting over the next 30 days if utilization stayed at today's level. <b style="color:#319C61">Green</b> rises, <b style="color:#8F4D42">red</b> falls. The tiles show the share now, in 30 days, and the change in percentage points.</p>
@@ -238,7 +247,6 @@ function bind(id,valId,set){ const s=document.getElementById(id), v=document.get
   s.addEventListener('input',()=>{ set(+s.value); v.textContent=(+s.value)+'%'; render(); }); }
 bind('ps0','ps0v',x=>S.s0=x/100);
 bind('pu','puv',x=>S.u=x/100);
-bind('pcap','pcapv',x=>S.cap=x/100);
 const monEl=document.getElementById('mon'), monLabel=document.getElementById('monLabel');
 const phzEl=document.getElementById('phz'), phzV=document.getElementById('phzv');
 phzEl.addEventListener('input',()=>{ HZN=+phzEl.value; phzV.textContent=HZN+' days'; monEl.max=HZN; if(S.day>HZN) S.day=HZN; setMon(S.day); render(); });
@@ -280,49 +288,75 @@ function reading(m){ const d=m.u-m.u30;
   if(d<-0.05) return ['Cooling off','#8F4D42'];
   if(m.u<0.35) return ['Quiet, well below target','#8A8073'];
   return ['Steady','#8A8073']; }
-function spark(m,col){ const w=240,h=66,pad={l:6,r:30,t:8,b:16}, xs=[pad.l,(w-pad.r+pad.l)/2,w-pad.r];
+const SPKOPEN='<svg class="spark" preserveAspectRatio="none" viewBox="0 0 240 66" xmlns="http://www.w3.org/2000/svg"';
+function sparkInner(m,col,hi){ const w=240,h=66,pad={l:6,r:30,t:8,b:16}, xs=[pad.l,(w-pad.r+pad.l)/2,w-pad.r];
   const PY=v=>pad.t+(1-v)*(h-pad.t-pad.b), pts=[m.u30,m.u7,m.u].map((v,i)=>[xs[i],PY(v)]);
-  let s='<svg class="spark" viewBox="0 0 '+w+' '+h+'" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">';
-  s+='<line x1="'+pad.l+'" y1="'+PY(TU).toFixed(1)+'" x2="'+(w-pad.r)+'" y2="'+PY(TU).toFixed(1)+'" stroke="#E0C9A8" stroke-dasharray="2 3"/>';
+  let s='<line x1="'+pad.l+'" y1="'+PY(TU).toFixed(1)+'" x2="'+(w-pad.r)+'" y2="'+PY(TU).toFixed(1)+'" stroke="#E0C9A8" stroke-dasharray="2 3"/>';
   s+='<text x="'+(w-pad.r+3)+'" y="'+(PY(TU)+3).toFixed(1)+'" fill="#C9A87E" font-size="8">90%</text>';
   s+='<path d="'+pts.map((p,i)=>(i?'L':'M')+p[0].toFixed(1)+' '+p[1].toFixed(1)).join(' ')+'" fill="none" stroke="'+col+'" stroke-width="2"/>';
-  pts.forEach(p=>{ s+='<circle cx="'+p[0].toFixed(1)+'" cy="'+p[1].toFixed(1)+'" r="2.6" fill="'+col+'"/>'; });
+  if(hi!=null) s+='<line x1="'+pts[hi][0].toFixed(1)+'" y1="'+pad.t+'" x2="'+pts[hi][0].toFixed(1)+'" y2="'+(h-pad.b)+'" stroke="#C9BEAE" stroke-width="0.8"/>';
+  pts.forEach((p,i)=>{ const on=hi===i; s+='<circle cx="'+p[0].toFixed(1)+'" cy="'+p[1].toFixed(1)+'" r="'+(on?4.2:2.6)+'" fill="'+col+'"'+(on?' stroke="#fff" stroke-width="1.2"':'')+'/>'; });
   ['30d','7d','now'].forEach((lb,i)=>{ s+='<text x="'+xs[i].toFixed(1)+'" y="'+(h-4)+'" fill="#A49B90" font-size="8" text-anchor="'+(i===0?'start':i===2?'end':'middle')+'">'+lb+'</text>'; });
-  return s+'</svg>'; }
+  return s; }
 function renderMarkets(){
   document.getElementById('mkSummary').innerHTML='<b>19</b> Dawn markets live, about <b>$20.9M</b> total. Showing the <b>10</b> above $100k. Snapshot '+SNAP+'. Utilization shown as 30-day average, 7-day average, and now.';
-  document.getElementById('mkgrid').innerHTML=MKTS.map(m=>{ const [rd,col]=reading(m);
+  document.getElementById('mkgrid').innerHTML=MKTS.map((m,i)=>{ const [rd,col]=reading(m);
     const kv=(t,v)=>'<div><div class="t">'+t+'</div><div class="v">'+v+'</div></div>';
-    return '<div class="mk"><div class="top"><div><span class="nm">'+m.n+'</span><span class="ch">'+m.c+'</span></div><span class="tvl">'+fmtUsd(m.tvl)+'</span></div>'+
+    return '<div class="mk"><div class="sparktip"></div><div class="top"><div><span class="nm">'+m.n+'</span><span class="ch">'+m.c+'</span></div><span class="tvl">'+fmtUsd(m.tvl)+'</span></div>'+
       '<div class="rd" style="color:'+col+'">'+rd+' &middot; util '+Math.round(m.u30*100)+'% &rarr; '+Math.round(m.u*100)+'%</div>'+
-      spark(m,col)+
+      SPKOPEN+' data-mk="'+i+'">'+sparkInner(m,col,null)+'</svg>'+
       '<div class="kv">'+kv('Util now',Math.round(m.u*100)+'%')+kv('Junior share',(m.s*100).toFixed(1)+'%')+kv('Coverage',Math.round(m.cov*100)+'%')+'</div></div>';
-  }).join(''); }
+  }).join('');
+  wireSpark('mkgrid','mk'); }
 /* ---- Forecast tab: hold today's utilization, drift the share with the real curve over 30 days ---- */
-const FHZN=30; // days
+const FHZN=30, FCP=[], FCC=[]; // days, per-market forecast paths + colors
 function fPath(s0,u){ const a=[s0]; let y=s0;
   for(let t=1;t<=FHZN;t++){ y=adaptYTarget(y,u,DAY,TU,RSPEED,1.0); a.push(y); } return a; }
-function fspark(path,col){ const w=240,h=66,pad={l:6,r:34,t:8,b:16};
+function fsparkInner(path,col,hi){ const w=240,h=66,pad={l:6,r:34,t:8,b:16};
   const mx=Math.max(0.05,Math.max(...path)*1.2), PX=d=>pad.l+d/FHZN*(w-pad.l-pad.r), PY=v=>pad.t+(1-v/mx)*(h-pad.t-pad.b);
-  let s='<svg class="spark" viewBox="0 0 '+w+' '+h+'" preserveAspectRatio="none" xmlns="http://www.w3.org/2000/svg">';
-  s+='<path d="'+path.map((v,i)=>(i?'L':'M')+PX(i).toFixed(1)+' '+PY(v).toFixed(1)).join(' ')+'" fill="none" stroke="'+col+'" stroke-width="2"/>';
+  let s='<path d="'+path.map((v,i)=>(i?'L':'M')+PX(i).toFixed(1)+' '+PY(v).toFixed(1)).join(' ')+'" fill="none" stroke="'+col+'" stroke-width="2"/>';
   s+='<circle cx="'+PX(0).toFixed(1)+'" cy="'+PY(path[0]).toFixed(1)+'" r="2.6" fill="#B4A896"/>';
   s+='<circle cx="'+PX(FHZN).toFixed(1)+'" cy="'+PY(path[FHZN]).toFixed(1)+'" r="2.6" fill="'+col+'"/>';
   s+='<text x="'+(w-pad.r+3)+'" y="'+(PY(path[FHZN])+3).toFixed(1)+'" fill="'+col+'" font-size="8.5" font-weight="700">'+Math.round(path[FHZN]*100)+'%</text>';
+  if(hi!=null){ s+='<line x1="'+PX(hi).toFixed(1)+'" y1="'+pad.t+'" x2="'+PX(hi).toFixed(1)+'" y2="'+(h-pad.b)+'" stroke="#C9BEAE" stroke-width="0.8"/>';
+    s+='<circle cx="'+PX(hi).toFixed(1)+'" cy="'+PY(path[hi]).toFixed(1)+'" r="4" fill="'+col+'" stroke="#fff" stroke-width="1.2"/>'; }
   ['now','15d','30d'].forEach((lb,i)=>{ const x=pad.l+i/2*(w-pad.l-pad.r); s+='<text x="'+x.toFixed(1)+'" y="'+(h-4)+'" fill="#A49B90" font-size="8" text-anchor="'+(i===0?'start':i===2?'end':'middle')+'">'+lb+'</text>'; });
-  return s+'</svg>'; }
+  return s; }
 function renderForecast(){
-  let up=0,down=0,flat=0;
-  const cards=MKTS.map(m=>{ const path=fPath(m.s,m.u), end=path[FHZN], chg=end-m.s;
+  let up=0,down=0,flat=0; FCP.length=0; FCC.length=0;
+  const cards=MKTS.map((m,i)=>{ const path=fPath(m.s,m.u), end=path[FHZN], chg=end-m.s;
     let dir,col; if(Math.abs(chg)<0.003){dir='Holds';col='#8A8073';flat++;} else if(chg>0){dir='Drifts up';col='#319C61';up++;} else {dir='Drifts down';col='#8F4D42';down++;}
+    FCP[i]=path; FCC[i]=col;
     const kv=(t,v)=>'<div><div class="t">'+t+'</div><div class="v">'+v+'</div></div>';
-    return '<div class="mk"><div class="top"><div><span class="nm">'+m.n+'</span><span class="ch">'+m.c+'</span></div><span class="tvl">util held '+Math.round(m.u*100)+'%</span></div>'+
+    return '<div class="mk"><div class="sparktip"></div><div class="top"><div><span class="nm">'+m.n+'</span><span class="ch">'+m.c+'</span></div><span class="tvl">util held '+Math.round(m.u*100)+'%</span></div>'+
       '<div class="rd" style="color:'+col+'">'+dir+' &middot; share '+(m.s*100).toFixed(1)+'% &rarr; '+(end*100).toFixed(1)+'%</div>'+
-      fspark(path,col)+
+      SPKOPEN+' data-fc="'+i+'">'+fsparkInner(path,col,null)+'</svg>'+
       '<div class="kv">'+kv('Share now',(m.s*100).toFixed(1)+'%')+kv('In 30 days',(end*100).toFixed(1)+'%')+kv('Change',(chg>=0?'+':'')+(chg*100).toFixed(1)+'pp')+'</div></div>';
   }).join('');
   document.getElementById('fcSummary').innerHTML='Holding today’s utilization at the real re-rating speed: <b>'+up+'</b> markets drift up, <b>'+down+'</b> drift down, <b>'+flat+'</b> hold. Above 90% util the share rises, below it it falls, and it moves fast the further from target.';
   document.getElementById('fcgrid').innerHTML=cards;
+  wireSpark('fcgrid','fc'); }
+/* hover on the small sparklines: crosshair in the svg + a tooltip that follows the mouse */
+function wireSpark(gridId,kind){
+  document.querySelectorAll('#'+gridId+' svg.spark').forEach(svg=>{
+    const card=svg.closest('.mk'), tip=card.querySelector('.sparktip');
+    svg.addEventListener('mousemove',e=>{
+      const r=svg.getBoundingClientRect(), cr=card.getBoundingClientRect(), fx=clamp((e.clientX-r.left)/r.width,0,1);
+      let px,txt;
+      if(kind==='mk'){ const m=MKTS[+svg.dataset.mk], xf=[6/240,108/240,210/240];
+        let idx=0; for(let i=1;i<3;i++){ if(Math.abs(fx-xf[i])<Math.abs(fx-xf[idx])) idx=i; }
+        svg.innerHTML=sparkInner(m,reading(m)[1],idx);
+        px=xf[idx]*r.width; txt=['30d avg','7d avg','now'][idx]+' '+Math.round([m.u30,m.u7,m.u][idx]*100)+'%';
+      } else { const i=+svg.dataset.fc, path=FCP[i], day=Math.round(fx*FHZN);
+        svg.innerHTML=fsparkInner(path,FCC[i],day);
+        px=(6+day/FHZN*(240-40))/240*r.width; txt='day '+day+' &middot; '+(path[day]*100).toFixed(1)+'%';
+      }
+      tip.innerHTML=txt; tip.style.left=((r.left-cr.left)+px)+'px'; tip.style.top=(r.top-cr.top)+'px'; tip.style.display='block';
+    });
+    svg.addEventListener('mouseleave',()=>{ tip.style.display='none';
+      if(kind==='mk'){ const m=MKTS[+svg.dataset.mk]; svg.innerHTML=sparkInner(m,reading(m)[1],null); }
+      else { const i=+svg.dataset.fc; svg.innerHTML=fsparkInner(FCP[i],FCC[i],null); } });
+  });
 }
 
 document.querySelectorAll('.tab').forEach(b=>b.addEventListener('click',()=>{
