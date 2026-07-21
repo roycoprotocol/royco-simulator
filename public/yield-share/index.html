@@ -13,8 +13,9 @@ background-size:42px 42px;font-size:14px;line-height:1.45;border-top:6px solid #
 h1{font-family:Georgia,"Times New Roman",serif;font-weight:400;font-size:clamp(28px,3.4vw,40px);line-height:1.04;letter-spacing:-.02em;margin:0 0 8px}
 .lede{color:var(--mut);font-size:15px;max-width:660px;margin:0 0 14px}
 .card{background:var(--panel);border:1px solid var(--line);padding:20px;margin-top:8px;box-shadow:0 22px 50px rgba(60,45,28,.05)}
-.sliders{display:grid;grid-template-columns:repeat(3,1fr);gap:16px 22px;margin-bottom:6px}
-@media(max-width:620px){.sliders{grid-template-columns:1fr}}
+.sliders{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px 20px;margin-bottom:6px}
+@media(max-width:720px){.sliders{grid-template-columns:1fr 1fr}}
+@media(max-width:420px){.sliders{grid-template-columns:1fr}}
 .ctl label{display:flex;justify-content:space-between;font-size:11.5px;text-transform:uppercase;letter-spacing:.05em;color:var(--mut);font-weight:600;margin-bottom:6px;gap:8px}
 .ctl label b{color:var(--ink);font-variant-numeric:tabular-nums;font-size:13px}
 .ctl input[type=range]{width:100%;accent-color:var(--accent);cursor:pointer}
@@ -35,17 +36,27 @@ h1{font-family:Georgia,"Times New Roman",serif;font-weight:400;font-size:clamp(2
 .chartbox{position:relative;height:340px;width:100%;margin-top:14px}
 .chartbox svg{width:100%;height:100%;display:block}
 .foot{margin-top:22px;color:var(--mut);font-size:11.5px;border-top:1px solid var(--line);padding-top:12px;max-width:660px}
+.note h3{font-family:Georgia,"Times New Roman",serif;font-weight:400;font-size:20px;margin:0 0 6px;letter-spacing:-.01em}
+.note p{color:var(--mut);font-size:13.5px;line-height:1.5;margin:0 0 10px;max-width:680px}
+.note p b{color:var(--ink)}
+.note+.note{margin-top:22px;border-top:1px solid var(--line);padding-top:18px}
+table.ref{width:100%;border-collapse:collapse;font-size:13px;margin:8px 0 10px}
+table.ref th,table.ref td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line)}
+table.ref th{font-size:9.5px;text-transform:uppercase;letter-spacing:.12em;color:var(--accent);font-weight:700}
+table.ref td.mono{font-family:"SFMono-Regular",Consolas,monospace;font-variant-numeric:tabular-nums;white-space:nowrap}
+table.ref td.na{color:#A49B90}
 </style></head><body>
 <div class="wrap">
 <div class="topline"><span></span>Royco · Dawn Market Design</div>
 <h1>Yield Share over Time</h1>
-<p class="lede">One question: if utilization sits away from its target, how does the Junior's yield share move over the next year? Set the starting share, the target, and where utilization actually is. Then press Play.</p>
+<p class="lede">One question: if utilization sits away from its target, how does the Junior's yield share move over the next year? Set the starting share and where utilization actually is, then press Play.</p>
 
 <div class="card">
   <div class="sliders">
     <div class="ctl"><label>Starting yield share <b id="ps0v">35%</b></label><input type="range" id="ps0" min="1" max="80" step="1" value="35"><div class="h">Where the Junior's share begins today.</div></div>
     <div class="ctl"><label>Utilization now <b id="puv">95%</b></label><input type="range" id="pu" min="0" max="100" step="1" value="95"><div class="h">Where utilization actually is, held there for the year. Above 90% the share rises; below 90% it falls.</div></div>
     <div class="ctl"><label>Re-rating speed <b id="pspv">1.0/yr</b></label><input type="range" id="psp" min="0.5" max="4" step="0.5" value="1"><div class="h">How fast this market re-rates toward target. A per-market setting, so not every market moves at the same pace.</div></div>
+    <div class="ctl"><label>Max share (ceiling) <b id="pcapv">100%</b></label><input type="range" id="pcap" min="40" max="100" step="5" value="100"><div class="h">The highest share this market will ever pay the Junior. A per-market cap, not a universal number (the code default is 100%).</div></div>
   </div>
   <div style="margin-top:4px;font-size:12.5px;color:var(--mut)">Target utilization is fixed at <b style="color:var(--ink)">90%</b>. The share drifts toward it over time whenever utilization sits away from it.</div>
   <div class="why" id="why"></div>
@@ -60,25 +71,44 @@ h1{font-family:Georgia,"Times New Roman",serif;font-weight:400;font-size:clamp(2
   <div class="chartbox"><svg id="chart" xmlns="http://www.w3.org/2000/svg"></svg></div>
 </div>
 
+<div class="card notes">
+  <div class="note">
+    <h3>How these numbers update</h3>
+    <p>They are not on a clock. Royco recomputes the Junior's yield share whenever the market is <b>synced</b>, and a sync happens on any interaction with the market: a Senior or Junior <b>deposit</b>, a <b>redemption</b>, or a yield accrual. Between two interactions the share is held as a <b>time-weighted average</b> of what it was, so it only moves when something actually happens.</p>
+    <p>So a new deposit is exactly one of the events that refreshes utilization and re-reads the share. It is lazy and event-driven, not per-block and not fixed-daily.</p>
+  </div>
+  <div class="note">
+    <h3>Re-rating speed across markets</h3>
+    <p>The re-rating speed only applies to the <b>self-adjusting</b> curve. Today every launched Royco market uses a <b>fixed</b> curve, so none of them has a live re-rating speed yet. The speed is a design parameter; the only reference values that exist in the code are these:</p>
+    <table class="ref"><thead><tr><th>Reference</th><th>Curve</th><th>Re-rating speed</th></tr></thead><tbody>
+      <tr><td>Code default</td><td>self-adjusting</td><td class="mono">1.0 / yr</td></tr>
+      <tr><td>Engine test scenario</td><td>self-adjusting</td><td class="mono">2.0 / yr</td></tr>
+      <tr><td>Pareto FalconX (example Day market)</td><td>fixed</td><td class="na">not applicable</td></tr>
+      <tr><td>Live Dawn markets</td><td>fixed</td><td class="na">not applicable</td></tr>
+    </tbody></table>
+    <p>The honest answer: there is no per-market re-rating speed to report yet. When a market launches on the self-adjusting curve, its speed will be one per-market setting, most likely near the <b>1.0 / yr</b> default.</p>
+  </div>
+</div>
+
 <div class="foot">Illustrative model of the self-adjusting part of Royco's Yield Distribution Mechanism (adaptYTarget). When utilization stays away from the target, the target share drifts over time: down when utilization is below target, up when it is above, faster the wider the gap. Not investment advice.</div>
 </div>
 
 <script>
 /* Real Royco YDM drift (ported from lib/day/engine/ydm.ts, adaptYTarget) */
-const YEAR_SEC=365*24*60*60, DAY=86400, H=365, CAP=0.90;
+const YEAR_SEC=365*24*60*60, DAY=86400, H=365;
 const clamp=(x,lo,hi)=>Math.max(lo,Math.min(hi,x));
-function adaptYTarget(yTarget,U,dtSec,targetUtil,speedPerYear){
+function adaptYTarget(yTarget,U,dtSec,targetUtil,speedPerYear,cap){
   const u=U>1?1:U;
   let delta = u>=targetUtil ? (u-targetUtil)/(1-targetUtil) : (u-targetUtil)/targetUtil;
   delta=clamp(delta,-1,1);
   const speed=speedPerYear/YEAR_SEC;
-  return clamp(yTarget*Math.exp(speed*delta*dtSec), 0.01, CAP);
+  return clamp(yTarget*Math.exp(speed*delta*dtSec), 1e-4, cap); // floor = real minYTarget default
 }
 
-const S={ s0:0.35, tu:0.90, u:0.95, speed:1, day:0, hover:null };
+const S={ s0:0.35, tu:0.90, u:0.95, speed:1, cap:1.0, day:0, hover:null };
 let PATH=null;
 function build(){ const a=[]; let y=S.s0; a.push(y);
-  for(let t=1;t<=H;t++){ y=adaptYTarget(y,S.u,DAY,S.tu,S.speed); a.push(y); } return a; }
+  for(let t=1;t<=H;t++){ y=adaptYTarget(y,S.u,DAY,S.tu,S.speed,S.cap); a.push(y); } return a; }
 
 const num=x=>Math.round(x*100)/100;
 const pct=x=>Math.round(x*100)+'%';
@@ -97,9 +127,9 @@ function draw(){
   }
   for(let m=0;m<=12;m+=3){ const x=PX(m/12*H); P.push('<text x="'+num(x)+'" y="'+(h-12)+'" fill="#9E968A" font-size="10" text-anchor="middle">'+m+'m</text>'); }
   P.push('<text x="'+((pad.l+(w-pad.r))/2)+'" y="'+(h-1)+'" fill="#9E968A" font-size="10" text-anchor="middle">Months from today</text>');
-  // ceiling line at cap
-  P.push('<line x1="'+pad.l+'" y1="'+num(PY(CAP))+'" x2="'+(w-pad.r)+'" y2="'+num(PY(CAP))+'" stroke="#E0C9A8" stroke-dasharray="2 5"/>');
-  P.push('<text x="'+(w-pad.r-2)+'" y="'+num(PY(CAP)-4)+'" fill="#C9A87E" font-size="9" text-anchor="end">ceiling '+pct(CAP)+'</text>');
+  // ceiling line at cap (only when below 100%)
+  if(S.cap<0.999){ P.push('<line x1="'+pad.l+'" y1="'+num(PY(S.cap))+'" x2="'+(w-pad.r)+'" y2="'+num(PY(S.cap))+'" stroke="#E0C9A8" stroke-dasharray="2 5"/>');
+    P.push('<text x="'+(w-pad.r-2)+'" y="'+num(PY(S.cap)-4)+'" fill="#C9A87E" font-size="9" text-anchor="end">ceiling '+pct(S.cap)+'</text>'); }
   // reference line at starting share
   P.push('<line x1="'+pad.l+'" y1="'+num(PY(PATH[0]))+'" x2="'+(w-pad.r)+'" y2="'+num(PY(PATH[0]))+'" stroke="#D9CFC0" stroke-dasharray="1 4"/>');
   const pts=PATH.map((s,d)=>[PX(d),PY(s)]);
@@ -111,7 +141,7 @@ function draw(){
   P.push('<path d="'+pts.slice(0,S.day+1).map((p,i)=>(i?'L':'M')+num(p[0])+' '+num(p[1])).join(' ')+'" fill="none" stroke="'+col+'" stroke-width="3.4"/>');
   // start marker + label
   P.push('<circle cx="'+num(PX(0))+'" cy="'+num(PY(PATH[0]))+'" r="4.5" fill="#fff" stroke="#B4A896" stroke-width="2"/>');
-  P.push('<text x="'+(pad.l)+'" y="'+num(PY(PATH[0])-9)+'" fill="#8A8073" font-size="10" font-family="monospace">start '+pct(PATH[0])+'</text>');
+  P.push('<text x="'+(pad.l+8)+'" y="'+num(PY(PATH[0])+16)+'" fill="#8A8073" font-size="10" font-family="monospace">start '+pct(PATH[0])+'</text>');
   // end label at right edge
   P.push('<text x="'+(w-pad.r+5)+'" y="'+num(PY(PATH[H])+3)+'" fill="'+col+'" font-size="11" font-weight="700" font-family="monospace">'+pct(PATH[H])+'</text>');
   // hover
@@ -143,7 +173,7 @@ function render(){
   let why;
   if(Math.abs(gap)<0.02) why='Utilization is right at the <b>'+pct(S.tu)+'</b> target, so the share barely moves. It holds near <b>'+pct(S.s0)+'</b>.';
   else if(gap<0) why='Utilization (<b>'+pct(S.u)+'</b>) is below the <b>'+pct(S.tu)+'</b> target, so the share <b>falls</b> over the year, from <b>'+pct(S.s0)+'</b> toward <b>'+pct(end)+'</b>. It falls faster when the gap is bigger or the re-rating speed is higher.';
-  else why='Utilization (<b>'+pct(S.u)+'</b>) is above the <b>'+pct(S.tu)+'</b> target, so the share <b>rises</b> over the year, from <b>'+pct(S.s0)+'</b> toward <b>'+pct(end)+'</b>, up to its <b>'+pct(CAP)+'</b> ceiling. It rises faster when the gap is bigger or the re-rating speed is higher.';
+  else why='Utilization (<b>'+pct(S.u)+'</b>) is above the <b>'+pct(S.tu)+'</b> target, so the share <b>rises</b> over the year, from <b>'+pct(S.s0)+'</b> toward <b>'+pct(end)+'</b>'+(S.cap<0.999?', up to its <b>'+pct(S.cap)+'</b> ceiling':'')+'. It rises faster when the gap is bigger or the re-rating speed is higher.';
   document.getElementById('why').innerHTML=why;
   draw();
 }
@@ -154,6 +184,7 @@ bind('ps0','ps0v',x=>S.s0=x/100);
 bind('pu','puv',x=>S.u=x/100);
 const spEl=document.getElementById('psp'), spV=document.getElementById('pspv');
 spEl.addEventListener('input',()=>{ S.speed=+spEl.value; spV.textContent=(+spEl.value).toFixed(1)+'/yr'; render(); });
+bind('pcap','pcapv',x=>S.cap=x/100);
 
 const monEl=document.getElementById('mon'), monLabel=document.getElementById('monLabel');
 function setMon(d){ S.day=clamp(Math.round(d),0,H); monEl.value=S.day; monLabel.textContent='month '+monOf(S.day).toFixed(1); }
