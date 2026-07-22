@@ -39,7 +39,7 @@ import {
   formatDayErasureLabel,
   type DayErasureEvent,
 } from '@/lib/day-simulator-template/erasure';
-import { calibrateSeriesApy } from '@/lib/day-simulator-template/series';
+import { calibrateSeriesApy, hasObservedDrawdown } from '@/lib/day-simulator-template/series';
 import { shouldRefillJunior } from '@/lib/day-simulator-template/refill';
 import {
   buildDayFiniteForwardSeries,
@@ -1119,7 +1119,7 @@ export default function DayMarketSimulator({
   const heroTitle = activeMarket.customization.copyOverrides.heroTitle
     ?? 'Make illiquid yield easier to own.';
   const heroDescription = activeMarket.customization.copyOverrides.heroDescription
-    ?? 'Royco Day gives Senior holders first-loss coverage and a dedicated exit pool. Junior and LP participants earn additional yield for providing those benefits.';
+    ?? 'Royco Day turns one yield opportunity into three choices. Senior does not take losses until Junior\'s buffer is used. Junior earns more for taking losses first, and the liquidity provider (LP) earns more for supplying assets Senior holders can sell into.';
   const defaults = activeMarket.defaults;
   const backtestDisplay = activeMarket.customization.backtestDisplay;
   const forwardTest = activeMarket.customization.forwardTest;
@@ -1150,6 +1150,10 @@ export default function DayMarketSimulator({
         )
         : activeMarket.series,
     [activeMarket.provenance.dataMode, activeMarket.provenance.retrievedAt, activeMarket.series, defaults.sourceApy, defaults.stableYield, forwardScenario, forwardTest, observationDays, reverseMarket, sourceApyPct],
+  );
+  const sourceHasObservedDrawdown = useMemo(
+    () => hasObservedDrawdown(activeMarket.series),
+    [activeMarket.series],
   );
   const [showInputs, setShowInputs] = useState(false);
   const [showReview, setShowReview] = useState(true);
@@ -1692,25 +1696,14 @@ export default function DayMarketSimulator({
         </p>
       </section>
 
-      {isExecutive && showSection('senior-summary') && (
-        <section style={{ ...cardStyle, padding: 16 }}>
-          <Eyebrow>What Senior receives</Eyebrow>
-          <div className="mt-3 grid grid-cols-1 md:grid-cols-3" style={{ gap: 8 }}>
-            <ExecutiveMetric label="Senior average yield" value={`${pct(result.seniorApy)}/yr`} valueColor={C.accent} />
-            <ExecutiveMetric label="Contract-enforced coverage" value={`${coveragePct.toFixed(0)}% minimum`} valueColor={C.juniorLine} />
-            <ExecutiveMetric label="Dedicated liquidity" value={`${minLiquidityPct.toFixed(0)}% minimum`} valueColor={C.olive} />
-          </div>
-        </section>
-      )}
-
       {isExecutive && showSection('roles') && (
         <section style={{ ...cardStyle, padding: 16 }}>
-          <Eyebrow>One opportunity · three roles</Eyebrow>
+          <Eyebrow>One investment · three choices</Eyebrow>
           <h2 className="mt-2" style={{ color: C.text, fontFamily: SERIF, fontSize: 24, fontWeight: 400, lineHeight: 1.12 }}>
-            One investment opportunity becomes three specialized positions.
+            Choose how you want to earn from the same underlying opportunity.
           </h2>
           <p className="mt-2" style={{ color: C.muted, fontSize: 12.5, lineHeight: 1.45 }}>
-            Each position earns yield for doing a different job. Senior pays premiums for coverage and liquidity, and Junior and LP earn those premiums for providing them.
+            Senior, Junior, and LP all use the same investment. They earn different returns because each takes a different role.
           </p>
           <div className="mt-4 grid grid-cols-1 md:grid-cols-3" style={{ gap: 8 }}>
             <div style={{ background: C.pageBg, border: `1px solid ${C.seniorLine}`, minHeight: 178, padding: 14 }}>
@@ -1718,9 +1711,9 @@ export default function DayMarketSimulator({
               <p className="mt-3" style={{ color: C.accent, fontFamily: MONO, fontSize: 26, fontWeight: 700 }}>
                 {pct(result.seniorApy)}/yr
               </p>
-              <p className="mt-2" style={{ color: C.text, fontFamily: SERIF, fontSize: 18 }}>Senior takes losses only after Junior.</p>
+              <p className="mt-2" style={{ color: C.text, fontFamily: SERIF, fontSize: 18 }}>Can sell before the underlying asset matures.</p>
               <p className="mt-2" style={{ color: C.muted, fontSize: 11.5, lineHeight: 1.45 }}>
-                Senior keeps the remaining strategy yield and can exit through the dedicated LP before the underlying asset matures.
+                LP supplies assets for Senior sales, while Junior takes investment losses before Senior does.
               </p>
             </div>
             <div style={{ background: C.pageBg, border: `1px solid ${C.juniorLine}`, minHeight: 178, padding: 14 }}>
@@ -1728,19 +1721,19 @@ export default function DayMarketSimulator({
               <p className="mt-3" style={{ color: C.juniorLine, fontFamily: MONO, fontSize: 26, fontWeight: 700 }}>
                 {pct(result.juniorApy)}/yr
               </p>
-              <p className="mt-2" style={{ color: C.text, fontFamily: SERIF, fontSize: 18 }}>Gets paid to take losses first.</p>
+              <p className="mt-2" style={{ color: C.text, fontFamily: SERIF, fontSize: 18 }}>Earns more by taking losses first.</p>
               <p className="mt-2" style={{ color: C.muted, fontSize: 11.5, lineHeight: 1.45 }}>
-                Earns a risk premium because Junior takes investment losses before Senior does.
+                Junior receives part of the yield because it takes investment losses before Senior does.
               </p>
             </div>
             <div style={{ background: C.pageBg, border: `1px solid ${C.olive}`, minHeight: 178, padding: 14 }}>
-              <Eyebrow>LP · dedicated liquidity</Eyebrow>
+              <Eyebrow>LP · supplies assets for Senior sales</Eyebrow>
               <p className="mt-3" style={{ color: C.olive, fontFamily: MONO, fontSize: 26, fontWeight: 700 }}>
                 {pct(result.liquidityApy)}/yr
               </p>
-              <p className="mt-2" style={{ color: C.text, fontFamily: SERIF, fontSize: 18 }}>Gets paid to fund exits.</p>
+              <p className="mt-2" style={{ color: C.text, fontFamily: SERIF, fontSize: 18 }}>Earns more by funding Senior sales.</p>
               <p className="mt-2" style={{ color: C.muted, fontSize: 11.5, lineHeight: 1.45 }}>
-                Earns a liquidity premium by providing the assets Senior holders can sell into.
+                LP receives part of the yield for providing the assets Senior holders can sell into.
               </p>
             </div>
           </div>
@@ -1752,14 +1745,25 @@ export default function DayMarketSimulator({
             <div className="hidden items-center justify-center md:flex" aria-hidden="true" style={{ color: C.faint, fontFamily: MONO, fontSize: 20 }}>→</div>
             <div className="grid grid-cols-1 sm:grid-cols-2" style={{ gap: 8 }}>
               <div style={{ borderLeft: `3px solid ${C.eyebrow}`, padding: '7px 10px' }}>
-                <p style={{ color: C.eyebrow, fontFamily: MONO, fontSize: 9.5, fontWeight: 700, textTransform: 'uppercase' }}>Risk premium → Junior</p>
-                <p className="mt-1" style={{ color: C.muted, fontSize: 11 }}>Pays for first-loss coverage.</p>
+                <p style={{ color: C.eyebrow, fontFamily: MONO, fontSize: 9.5, fontWeight: 700, textTransform: 'uppercase' }}>Senior pays Junior</p>
+                <p className="mt-1" style={{ color: C.muted, fontSize: 11 }}>Junior takes losses first.</p>
               </div>
               <div style={{ borderLeft: `3px solid ${C.olive}`, padding: '7px 10px' }}>
-                <p style={{ color: C.olive, fontFamily: MONO, fontSize: 9.5, fontWeight: 700, textTransform: 'uppercase' }}>Liquidity premium → LP</p>
-                <p className="mt-1" style={{ color: C.muted, fontSize: 11 }}>Pays for dedicated liquidity.</p>
+                <p style={{ color: C.olive, fontFamily: MONO, fontSize: 9.5, fontWeight: 700, textTransform: 'uppercase' }}>Senior pays LP</p>
+                <p className="mt-1" style={{ color: C.muted, fontSize: 11 }}>LP supplies assets for Senior sales.</p>
               </div>
             </div>
+          </div>
+        </section>
+      )}
+
+      {isExecutive && showSection('senior-summary') && (
+        <section style={{ ...cardStyle, padding: 16 }}>
+          <Eyebrow>What Senior gets</Eyebrow>
+          <div className="mt-3 grid grid-cols-1 md:grid-cols-3" style={{ gap: 8 }}>
+            <ExecutiveMetric label="Senior average yield" value={`${pct(result.seniorApy)}/yr`} valueColor={C.accent} />
+            <ExecutiveMetric label="First-loss coverage for Senior" value={`${coveragePct.toFixed(0)}% minimum`} valueColor={C.juniorLine} />
+            <ExecutiveMetric label="Minimum liquidity" value={`${minLiquidityPct.toFixed(0)}% minimum`} valueColor={C.olive} />
           </div>
         </section>
       )}
@@ -2039,10 +2043,10 @@ export default function DayMarketSimulator({
           {isExecutive && (
             <>
               <h2 className="mt-2" style={{ color: C.text, fontFamily: SERIF, fontSize: 22, fontWeight: 400, lineHeight: 1.12 }}>
-                Junior absorbs loss first.
+                Senior is shielded from the first losses.
               </h2>
               <p className="mt-2" style={{ color: C.muted, fontSize: 11.5, lineHeight: 1.45 }}>
-                Contracts require a minimum Junior buffer behind Senior, providing first-loss coverage.
+                Junior capital takes losses before Senior. Senior starts losing value only after that Junior buffer is used.
               </p>
             </>
           )}
@@ -2056,7 +2060,7 @@ export default function DayMarketSimulator({
         </div>
       </section>}
 
-      {isExecutive && showSection('observation-period') && (
+      {isExecutive && showSection('observation-period') && sourceHasObservedDrawdown && (
         <section style={{ ...cardStyle, padding: 16 }}>
           <Eyebrow>What is an observation period?</Eyebrow>
           <h2 className="mt-2" style={{ color: C.text, fontFamily: SERIF, fontSize: 24, fontWeight: 400, lineHeight: 1.12 }}>
@@ -2430,7 +2434,7 @@ export default function DayMarketSimulator({
                   <ReturnRow label="Base strategy" values={result.monthly.map((row) => row.strategyReturn)} end={endStep?.strategy ?? 100} annualized={result.strategyApy} showCurrency={!isNativeReturnUnit} />
                   <ReturnRow label="Senior return" values={result.monthly.map((row) => row.seniorReturn)} end={endStep?.senior ?? 100} annualized={result.seniorApy} showCurrency={!isNativeReturnUnit} />
                   <ReturnRow label="Junior return" values={result.monthly.map((row) => row.juniorReturn)} end={endStep?.junior ?? 100} annualized={result.juniorApy} showCurrency={!isNativeReturnUnit} />
-                  <ReturnRow label="LP return" values={result.monthly.map((row) => row.liquidityReturn)} end={endStep?.liquidity ?? 100} annualized={result.liquidityApy} showCurrency={!isNativeReturnUnit} />
+                  <ReturnRow label="LPT return" values={result.monthly.map((row) => row.liquidityReturn)} end={endStep?.liquidity ?? 100} annualized={result.liquidityApy} showCurrency={!isNativeReturnUnit} />
                 </tbody>
               </table>
             </div>

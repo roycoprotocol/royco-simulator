@@ -12,6 +12,10 @@ export function annualizedSeriesApy(series: DaySeriesPoint[]): number {
     : 0;
 }
 
+export function hasObservedDrawdown(series: DaySeriesPoint[]): boolean {
+  return series.some((point, index) => index > 0 && point.price < series[index - 1].price);
+}
+
 export function calibrateSeriesApy(
   series: DaySeriesPoint[],
   targetApy: number,
