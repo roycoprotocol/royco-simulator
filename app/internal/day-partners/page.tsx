@@ -33,6 +33,16 @@ const PARTNERS = [
     href: "/susdai",
   },
   {
+    name: "Re",
+    asset: "reUSDe",
+    href: "/reusde",
+  },
+  {
+    name: "Muga",
+    asset: "Muga Glasgow Cosmic",
+    href: "/muga",
+  },
+  {
     name: "Apollo Diversified Credit",
     asset: "ACRED",
     href: "/internal/acred",

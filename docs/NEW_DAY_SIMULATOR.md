@@ -19,6 +19,7 @@ Do not start until all fields below are answered. Never infer an unanswered fiel
 - **Are fees already included?**
 - **Desired Senior yield** (a range, as decimals in the manifest)
 - **Desired Junior yield** (a range, as decimals in the manifest)
+- **Desired LP yield** (optional guardrail range; both bounds are required when used)
 - **Desired minimum coverage**
 - **Anything that must differ from the standard template**
 
@@ -40,7 +41,7 @@ An explicitly authorized forward-only market with no historical series may use t
 npm run day-sim:new -- <market-id> <source-url> <route> --published-apy <decimal>
 ```
 
-This mode records zero historical observations, derives the forward input from the supplied APY, and uses the shared accountant-backed forward-series adapter for runtime outputs. It must hide `backtest` through the authorized customization manifest and must disclose that no historical performance series is supplied.
+This mode records zero historical observations, derives the forward input from the supplied APY, and uses the shared accountant-backed forward-series adapter for runtime outputs. It must hide `backtest` through the authorized customization manifest unless the user has explicitly authorized the shared finite-facility forward test described below. Every forward-only market must disclose that no historical performance series is supplied.
 
 The factory creates exactly four artifacts:
 
@@ -81,6 +82,8 @@ For an explicitly authorized presentation difference, use only supported manifes
 
 Supported hidden sections are `senior-summary`, `roles`, `market-inputs`, `liquidity-and-coverage`, `observation-period`, `backtest`, `junior-funding`, and `disclosure`. Supported copy overrides are `heroTitle` and `heroDescription`. Unsupported keys fail verification.
 
+An explicitly authorized reverse market may configure `customization.forwardTest` together with `customization.reverseMarket`. A forward test may use either the standard three-outcome set (`good`, `normal`, and `bad`) or a fixed-return two-outcome set (`expected` and `bad`) when the lender has no contractual participation in borrower upside. It requires a finite facility term, a payment delay, and either full recovery or an explicit terminal recovery amount. Capacity, issuer-funded/closed Junior status, and Senior support are declared under `reverseMarket`. The shared runtime accrues the configured published APY through maturity, holds value flat during a payment delay, and routes terminal recovery through the existing accountant and observation logic. When the generated anchor produces a zero-return calendar period, an authorized market may set `omitInitialZeroReturnPeriod` to omit only that anchor from the chart, brush, and monthly table while preserving it for accountant accrual and return calculations. The market manifest may contain only these assumptions—not derived prices, tranche formulas, waterfall math, or UI logic. In this mode the shared `backtest` section remains visible and is labeled Forward test.
+
 Hidden defaults are still accountant inputs. Keep them explicit. Never guess a fee, curve endpoint, liquidity assumption, observation duration, refill rule, notional, or protocol parameter. Ask the user when a required value is missing.
 
 ### 3. Calibrate through the accountant
@@ -89,7 +92,7 @@ Hidden defaults are still accountant inputs. Keep them explicit. Never guess a f
 npm run day-sim:calibrate -- <market-id>
 ```
 
-This searches the Junior and LP yield-share settings by repeatedly running `lib/day/engine`. It does not use an approximate yield formula. Review the report. If both target ranges pass, write the result with:
+This searches the Junior and LP yield-share settings by repeatedly running `lib/day/engine`. It does not use an approximate yield formula. Review the report. If every configured Senior, Junior, and optional LP target range passes, write the result with:
 
 ```bash
 npm run day-sim:calibrate -- <market-id> --write
@@ -151,7 +154,7 @@ LP stable yield, trading-fee income, turnover, and execution-liquidity economics
 
 ## Locked presentation contract
 
-The strict shell renders the approved executive page by default. It includes the same section order, text, mechanism diagrams, expandable market-input bar, six sliders, three APY cards, auto-scaled liquidity curve with dynamic exit-percentage outputs, fixed-scale coverage loss waterfall, observation-period explainer, full accountant-backed history chart, ISO-date hover behavior, observation/erasure/loss annotations, unified two-handle backtest scrubber, month-over-month table, refill control, and source disclosure as Pareto FalconX v3.
+The strict shell renders the approved executive page by default. It includes the same section order, text, mechanism diagrams, expandable market-input bar, six sliders, three APY cards, auto-scaled liquidity curve with dynamic exit-percentage outputs, fixed-scale coverage loss waterfall, observation-period explainer, full accountant-backed history chart, ISO-date hover behavior, observation/erasure/loss annotations, unified two-handle backtest scrubber, month-over-month table, refill control, and source disclosure as Pareto FalconX v3. An authorized finite forward test reuses that same chart and scrubber, adding only shared scenario and capacity controls driven by the manifest.
 
 Fonts, palette, borders, radii, shadows, card dimensions, spacing, breakpoints, chart geometry, label placement, and mobile/high-zoom behavior are shared code. A market route cannot pass a variant, class, or style override. Market folders cannot contain React or CSS. Supported market customizations flow through the manifest and shared component, so disabling a section does not alter or duplicate its accounting.
 
