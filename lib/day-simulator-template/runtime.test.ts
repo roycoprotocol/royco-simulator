@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import manifest from "../day-markets/pareto-falconx/market.json";
+import falconXSeries from "../day-markets/pareto-falconx/series.json";
 import {
   buildDayMarketCopy,
   describeDayMarketCustomizations,
@@ -14,7 +15,7 @@ import {
   buildDayMarketConfig,
   runDayTargetScenario,
 } from "./runtime";
-import { annualizedSeriesApy } from "./series";
+import { annualizedSeriesApy, hasObservedDrawdown } from "./series";
 
 const market = manifest as DayMarketManifest;
 assert.deepEqual(validateDayMarketCustomization(market.customization), []);
@@ -178,8 +179,20 @@ assert.equal(
 );
 assert.equal(
   copy.disclosure,
-  "The source APY is derived from 371 fee-inclusive daily NAV observations supplied by RWA.xyz. Simulator outputs are mechanism simulations, not historical backtests, forecasts, or an announced product.",
+  "The source APY is derived from 11 fee-inclusive irregular price observations supplied by Pareto Credit. Simulator outputs are mechanism simulations, not historical backtests, forecasts, or an announced product.",
 );
+
+assert.equal(hasObservedDrawdown([
+  { date: "2026-01-01", price: 1 },
+  { date: "2026-02-01", price: 1.01 },
+  { date: "2026-03-01", price: 1.02 },
+]), false);
+assert.equal(hasObservedDrawdown([
+  { date: "2026-01-01", price: 1 },
+  { date: "2026-02-01", price: 0.99 },
+]), true);
+assert.equal(hasObservedDrawdown([]), false);
+assert.equal(hasObservedDrawdown(falconXSeries), false);
 
 const historicalPublishedApyMarket = {
   ...market,
@@ -190,6 +203,7 @@ const historicalPublishedApyMarket = {
     sourceProvider: "Makina onchain Machine accounting",
     observationCount: 26,
     dataCadence: "irregular" as const,
+    priceType: "nav" as const,
     publishedApy: 0.0996,
   },
 };
@@ -213,9 +227,9 @@ assert.equal(config.ltYieldShareProtocolFee, market.defaults.ltYieldShareProtoco
 assert.equal(config.reinvestLiquidityPremium, true);
 
 const yields = runDayTargetScenario(market.defaults);
-assert.ok(Math.abs(yields.seniorApy - 0.07094948110446264) < 1e-12);
-assert.ok(Math.abs(yields.juniorApy - 0.26029190861047224) < 1e-12);
-assert.ok(Math.abs(yields.liquidityApy - 0.14334071663933146) < 1e-12);
+assert.ok(Math.abs(yields.seniorApy - 0.07249497552408601) < 1e-12);
+assert.ok(Math.abs(yields.juniorApy - 0.2675612623571568) < 1e-12);
+assert.ok(Math.abs(yields.liquidityApy - 0.17409854245399936) < 1e-12);
 
 const forwardSeries = buildDayForwardSeries(0.114, market.defaults.stableYield, "2026-07-20");
 assert.equal(forwardSeries.length, 13);

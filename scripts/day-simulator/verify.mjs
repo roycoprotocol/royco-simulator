@@ -227,7 +227,7 @@ for (const output of [
   'label="Base strategy"',
   'label="Senior return"',
   'label="Junior return"',
-  'label="LP return"',
+  'label="LPT return"',
   'result.monthly',
   'function ReturnRow',
   '<Eyebrow>Junior funding</Eyebrow>',
@@ -299,13 +299,14 @@ for (const invariant of [
 for (const strictExecutiveContract of [
   "variant === 'executive'",
   "'Make illiquid yield easier to own.'",
-  "'Royco Day gives Senior holders first-loss coverage and a dedicated exit pool. Junior and LP participants earn additional yield for providing those benefits.'",
-  '<Eyebrow>What Senior receives</Eyebrow>',
-  '<Eyebrow>One opportunity · three roles</Eyebrow>',
+  "'Royco Day turns one yield opportunity into three choices. Senior does not take losses until Junior\\'s buffer is used. Junior earns more for taking losses first, and the liquidity provider (LP) earns more for supplying assets Senior holders can sell into.'",
+  '<Eyebrow>What Senior gets</Eyebrow>',
+  '<Eyebrow>One investment · three choices</Eyebrow>',
   '<Eyebrow>Senior · yield and liquidity</Eyebrow>',
   '<Eyebrow>Junior · first-loss capital</Eyebrow>',
-  '<Eyebrow>LP · dedicated liquidity</Eyebrow>',
+  '<Eyebrow>LP · supplies assets for Senior sales</Eyebrow>',
   '<Eyebrow>Loss waterfall</Eyebrow>',
+  'sourceHasObservedDrawdown && (',
   "'This accountant-backed chart shows each position, every observation period, and any loss that becomes permanent.'",
   'generalizeObservation',
 ]) {
@@ -331,6 +332,7 @@ for (const explainerContract of [
 for (const calibrationContract of [
   'export function annualizedSeriesApy',
   'export function calibrateSeriesApy',
+  'export function hasObservedDrawdown',
   'pathResidual + targetLogGrowth * progress',
 ]) {
   if (!seriesCalibration.includes(calibrationContract)) {
@@ -589,8 +591,9 @@ if (marketId) {
     if (marketId === "pareto-falconx" && (
       market.route !== "/falconx-v3" ||
       market.defaults.coverage !== 0.03 || market.defaults.minLiquidity !== 0.15 ||
-      market.defaults.riskYDM?.yTarget !== 0.06 || market.defaults.liqYDM?.yTarget !== 0.17 ||
+      market.defaults.riskYDM?.yTarget !== 0.056 || market.defaults.liqYDM?.yTarget !== 0.211 ||
       market.defaults.observationDays !== 7 || market.defaults.riskYDM?.y100 !== 0.18 ||
+      market.defaults.liqYDM?.y100 !== 0.25 ||
       market.defaults.exitBufferPct !== 1 || market.defaults.selfLiquidationBonus !== 0.01
     )) failures.push("Pareto FalconX must retain the approved strict-template reference configuration");
   }
