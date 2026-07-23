@@ -11,7 +11,7 @@
     "juniorSymbol": "Jr_ACRED"
   },
   "defaults": {
-    "sourceApy": 0.09646623216209371,
+    "sourceApy": 0.07319568277604449,
     "coverage": 0.18,
     "minLiquidity": 0.2,
     "liquidationUtilization": 100,
@@ -46,9 +46,9 @@
     "initialLT": 222.22222222222223
   },
   "targets": {
-    "seniorApyMin": 0.065,
+    "seniorApyMin": 0.049,
     "seniorApyMax": 0.075,
-    "juniorApyMin": 0.16,
+    "juniorApyMin": 0.121,
     "juniorApyMax": 0.18
   },
   "certification": {
@@ -61,17 +61,23 @@
     "copyOverrides": {}
   },
   "provenance": {
-    "source": "CoinGecko — Apollo Diversified Credit Securitize Fund (ACRED) USD price history",
-    "sourceUrl": "https://www.coingecko.com/en/coins/apollo-diversified-credit-securitize-fund?chart=type%3Dprice%26mode%3Dline%26timeframe%3Dmax",
-    "sourceProvider": "CoinGecko",
+    "source": "RedStone ACRED_FUNDAMENTAL official NAV feed, sampled with latestRoundData() at Ethereum UTC daily closing blocks",
+    "sourceUrl": "https://github.com/redstone-finance/redstone-oracles-monorepo/blob/370c597bbaafb24ada3ac6bca31c92154cbf0d17/packages/relayer-remote-config/main/relayer-manifests-multi-feed/ethereumMultiFeed.json",
+    "sourceProvider": "RedStone / Securitize",
     "seriesPath": "lib/day-markets/acred/series.json",
     "dataMode": "historical-series",
     "dataCadence": "daily",
-    "priceType": "price",
+    "priceType": "nav",
     "feesIncluded": true,
-    "observationCount": 292,
-    "firstDate": "2025-03-14",
-    "lastDate": "2025-12-30",
-    "retrievedAt": "2026-07-20"
+    "observationCount": 517,
+    "firstDate": "2025-02-20",
+    "lastDate": "2026-07-21",
+    "retrievedAt": "2026-07-22",
+    "supportingSources": [
+      {
+        "label": "ACRED primary market page",
+        "url": "https://securitize.io/primary-market/apollo-diversified-credit-securitize-fund"
+      }
+    ]
   }
 }
