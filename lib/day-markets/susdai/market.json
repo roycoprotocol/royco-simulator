@@ -11,7 +11,7 @@
     "juniorSymbol": "jrROYSUSDai"
   },
   "defaults": {
-    "sourceApy": 0.08272576052222136,
+    "sourceApy": 0.082779919594975,
     "coverage": 0.09,
     "minLiquidity": 0.15,
     "liquidationUtilization": 100,
@@ -61,17 +61,23 @@
     "copyOverrides": {}
   },
   "provenance": {
-    "source": "Trading Strategy — onchain Staked USDai vault share price in USDai for the official Arbitrum sUSDai contract; last observed checkpoint per UTC day, with fees internalized",
-    "sourceUrl": "https://tradingstrategy.ai/trading-view/vaults/staked-usdai",
-    "sourceProvider": "Trading Strategy / USD.AI onchain vault data",
+    "source": "Official sUSDai ERC-4626 optimistic deposit NAV, sampled with convertToAssets(1e18) at Arbitrum UTC daily closing blocks",
+    "sourceUrl": "https://github.com/usdai-foundation/usdai-contracts/blob/main/src/StakedUSDai.sol",
+    "sourceProvider": "USD.AI onchain sUSDai contract",
     "seriesPath": "lib/day-markets/susdai/series.json",
     "dataMode": "historical-series",
     "dataCadence": "daily",
     "priceType": "nav",
     "feesIncluded": true,
-    "observationCount": 350,
+    "observationCount": 434,
     "firstDate": "2025-05-14",
-    "lastDate": "2026-07-20",
-    "retrievedAt": "2026-07-20"
+    "lastDate": "2026-07-21",
+    "retrievedAt": "2026-07-22",
+    "supportingSources": [
+      {
+        "label": "Arbitrum sUSDai contract",
+        "url": "https://arbiscan.io/address/0x0B2b2B2076d95dda7817e785989fE353fe955ef9"
+      }
+    ]
   }
 }

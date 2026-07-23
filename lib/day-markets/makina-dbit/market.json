@@ -68,18 +68,24 @@
     }
   },
   "provenance": {
-    "source": "Makina DBIT official Machine share NAV in WBTC, with a 0.46% published 30-day base APY input with incentives excluded",
-    "sourceUrl": "https://makina.finance/strategy/dbit",
-    "sourceProvider": "Makina official API and onchain Machine accounting",
+    "source": "Official Makina DBIT Machine share NAV in WBTC, sampled with convertToAssets(1e28) at Ethereum UTC daily closing blocks; the 0.46% published 30-day base APY input excludes incentives",
+    "sourceUrl": "https://docs.makina.finance/strategies/deployments",
+    "sourceProvider": "Makina onchain Machine accounting",
     "seriesPath": "lib/day-markets/makina-dbit/series.json",
     "dataMode": "historical-series-with-published-apy",
-    "dataCadence": "irregular",
+    "dataCadence": "daily",
     "priceType": "nav",
     "feesIncluded": true,
-    "observationCount": 40,
-    "firstDate": "2025-10-23",
-    "lastDate": "2026-07-20",
+    "observationCount": 270,
+    "firstDate": "2025-10-25",
+    "lastDate": "2026-07-21",
     "publishedApy": 0.0046,
-    "retrievedAt": "2026-07-20"
+    "retrievedAt": "2026-07-22",
+    "supportingSources": [
+      {
+        "label": "Makina DBIT strategy",
+        "url": "https://makina.finance/strategy/dbit"
+      }
+    ]
   }
 }

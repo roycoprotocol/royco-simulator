@@ -1,0 +1,3638 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-07-22T22:02:38.271Z",
+  "source": "RedStone ACRED_FUNDAMENTAL daily NAV feed",
+  "sourceUrl": "https://github.com/redstone-finance/redstone-oracles-monorepo/blob/370c597bbaafb24ada3ac6bca31c92154cbf0d17/packages/relayer-remote-config/main/relayer-manifests-multi-feed/ethereumMultiFeed.json",
+  "chain": "ethereum",
+  "chainId": 1,
+  "contract": "0xD6BcbbC87bFb6c8964dDc73DC3EaE6d08865d51C",
+  "rpcMethod": "latestRoundData() at daily closing blocks",
+  "verification": {
+    "decimals": 8
+  },
+  "observationCount": 517,
+  "firstDate": "2025-02-20",
+  "lastDate": "2026-07-21",
+  "seriesSha256": "fc0ab8d23078ca102e3a9461a687b4b4f090ba6cf568a30efa107e127e1e6e84",
+  "observations": [
+    {
+      "date": "2025-02-20",
+      "blockNumber": 21890993,
+      "rawValue": "100030671100",
+      "oracleUpdatedAt": "2025-02-20T16:53:23.000Z",
+      "price": 1000.306711
+    },
+    {
+      "date": "2025-02-21",
+      "blockNumber": 21898155,
+      "rawValue": "100030671100",
+      "oracleUpdatedAt": "2025-02-21T19:49:11.000Z",
+      "price": 1000.306711
+    },
+    {
+      "date": "2025-02-22",
+      "blockNumber": 21905310,
+      "rawValue": "100030671100",
+      "oracleUpdatedAt": "2025-02-22T20:39:35.000Z",
+      "price": 1000.306711
+    },
+    {
+      "date": "2025-02-23",
+      "blockNumber": 21912465,
+      "rawValue": "100030671100",
+      "oracleUpdatedAt": "2025-02-23T02:08:11.000Z",
+      "price": 1000.306711
+    },
+    {
+      "date": "2025-02-24",
+      "blockNumber": 21919621,
+      "rawValue": "100030671100",
+      "oracleUpdatedAt": "2025-02-24T23:02:59.000Z",
+      "price": 1000.306711
+    },
+    {
+      "date": "2025-02-25",
+      "blockNumber": 21926782,
+      "rawValue": "100030671100",
+      "oracleUpdatedAt": "2025-02-25T19:54:35.000Z",
+      "price": 1000.306711
+    },
+    {
+      "date": "2025-02-26",
+      "blockNumber": 21933948,
+      "rawValue": "100684323500",
+      "oracleUpdatedAt": "2025-02-26T22:08:35.000Z",
+      "price": 1006.843235
+    },
+    {
+      "date": "2025-02-27",
+      "blockNumber": 21941120,
+      "rawValue": "100684323500",
+      "oracleUpdatedAt": "2025-02-27T14:56:11.000Z",
+      "price": 1006.843235
+    },
+    {
+      "date": "2025-02-28",
+      "blockNumber": 21948291,
+      "rawValue": "100795708300",
+      "oracleUpdatedAt": "2025-02-28T19:16:11.000Z",
+      "price": 1007.957083
+    },
+    {
+      "date": "2025-03-01",
+      "blockNumber": 21955462,
+      "rawValue": "100816817400",
+      "oracleUpdatedAt": "2025-03-01T11:10:23.000Z",
+      "price": 1008.168174
+    },
+    {
+      "date": "2025-03-02",
+      "blockNumber": 21962635,
+      "rawValue": "100816817400",
+      "oracleUpdatedAt": "2025-03-02T11:10:35.000Z",
+      "price": 1008.168174
+    },
+    {
+      "date": "2025-03-03",
+      "blockNumber": 21969800,
+      "rawValue": "100925044300",
+      "oracleUpdatedAt": "2025-03-03T23:31:59.000Z",
+      "price": 1009.250443
+    },
+    {
+      "date": "2025-03-04",
+      "blockNumber": 21976966,
+      "rawValue": "101053564200",
+      "oracleUpdatedAt": "2025-03-04T23:42:47.000Z",
+      "price": 1010.535642
+    },
+    {
+      "date": "2025-03-05",
+      "blockNumber": 21984128,
+      "rawValue": "101053564200",
+      "oracleUpdatedAt": "2025-03-05T19:53:47.000Z",
+      "price": 1010.535642
+    },
+    {
+      "date": "2025-03-06",
+      "blockNumber": 21991286,
+      "rawValue": "100924024900",
+      "oracleUpdatedAt": "2025-03-06T22:09:47.000Z",
+      "price": 1009.240249
+    },
+    {
+      "date": "2025-03-07",
+      "blockNumber": 21998438,
+      "rawValue": "100924024900",
+      "oracleUpdatedAt": "2025-03-07T19:51:47.000Z",
+      "price": 1009.240249
+    },
+    {
+      "date": "2025-03-08",
+      "blockNumber": 22005590,
+      "rawValue": "100902076500",
+      "oracleUpdatedAt": "2025-03-08T13:53:23.000Z",
+      "price": 1009.020765
+    },
+    {
+      "date": "2025-03-09",
+      "blockNumber": 22012750,
+      "rawValue": "100902076500",
+      "oracleUpdatedAt": "2025-03-09T18:23:35.000Z",
+      "price": 1009.020765
+    },
+    {
+      "date": "2025-03-10",
+      "blockNumber": 22019907,
+      "rawValue": "100902076500",
+      "oracleUpdatedAt": "2025-03-10T16:31:11.000Z",
+      "price": 1009.020765
+    },
+    {
+      "date": "2025-03-11",
+      "blockNumber": 22027064,
+      "rawValue": "101075760200",
+      "oracleUpdatedAt": "2025-03-11T21:08:23.000Z",
+      "price": 1010.757602
+    },
+    {
+      "date": "2025-03-12",
+      "blockNumber": 22034224,
+      "rawValue": "101075760200",
+      "oracleUpdatedAt": "2025-03-12T18:55:23.000Z",
+      "price": 1010.757602
+    },
+    {
+      "date": "2025-03-13",
+      "blockNumber": 22041393,
+      "rawValue": "100876003500",
+      "oracleUpdatedAt": "2025-03-13T21:15:23.000Z",
+      "price": 1008.760035
+    },
+    {
+      "date": "2025-03-14",
+      "blockNumber": 22048553,
+      "rawValue": "100876003500",
+      "oracleUpdatedAt": "2025-03-14T12:27:23.000Z",
+      "price": 1008.760035
+    },
+    {
+      "date": "2025-03-15",
+      "blockNumber": 22055722,
+      "rawValue": "100876003500",
+      "oracleUpdatedAt": "2025-03-15T16:34:11.000Z",
+      "price": 1008.760035
+    },
+    {
+      "date": "2025-03-16",
+      "blockNumber": 22062883,
+      "rawValue": "100876003500",
+      "oracleUpdatedAt": "2025-03-16T13:51:11.000Z",
+      "price": 1008.760035
+    },
+    {
+      "date": "2025-03-17",
+      "blockNumber": 22070044,
+      "rawValue": "100876003500",
+      "oracleUpdatedAt": "2025-03-17T13:51:23.000Z",
+      "price": 1008.760035
+    },
+    {
+      "date": "2025-03-18",
+      "blockNumber": 22077198,
+      "rawValue": "100872249600",
+      "oracleUpdatedAt": "2025-03-18T18:57:59.000Z",
+      "price": 1008.722496
+    },
+    {
+      "date": "2025-03-19",
+      "blockNumber": 22084356,
+      "rawValue": "100866765900",
+      "oracleUpdatedAt": "2025-03-19T22:49:35.000Z",
+      "price": 1008.667659
+    },
+    {
+      "date": "2025-03-20",
+      "blockNumber": 22091518,
+      "rawValue": "100960869800",
+      "oracleUpdatedAt": "2025-03-20T22:01:35.000Z",
+      "price": 1009.608698
+    },
+    {
+      "date": "2025-03-21",
+      "blockNumber": 22098694,
+      "rawValue": "100960869800",
+      "oracleUpdatedAt": "2025-03-21T15:38:59.000Z",
+      "price": 1009.608698
+    },
+    {
+      "date": "2025-03-22",
+      "blockNumber": 22105862,
+      "rawValue": "101028980900",
+      "oracleUpdatedAt": "2025-03-22T05:20:35.000Z",
+      "price": 1010.289809
+    },
+    {
+      "date": "2025-03-23",
+      "blockNumber": 22113034,
+      "rawValue": "101028980900",
+      "oracleUpdatedAt": "2025-03-23T05:20:47.000Z",
+      "price": 1010.289809
+    },
+    {
+      "date": "2025-03-24",
+      "blockNumber": 22120200,
+      "rawValue": "101028980900",
+      "oracleUpdatedAt": "2025-03-24T05:20:59.000Z",
+      "price": 1010.289809
+    },
+    {
+      "date": "2025-03-25",
+      "blockNumber": 22127350,
+      "rawValue": "101089927900",
+      "oracleUpdatedAt": "2025-03-25T05:21:11.000Z",
+      "price": 1010.899279
+    },
+    {
+      "date": "2025-03-26",
+      "blockNumber": 22134526,
+      "rawValue": "101020996400",
+      "oracleUpdatedAt": "2025-03-26T13:31:35.000Z",
+      "price": 1010.209964
+    },
+    {
+      "date": "2025-03-27",
+      "blockNumber": 22141688,
+      "rawValue": "101012122100",
+      "oracleUpdatedAt": "2025-03-27T21:08:11.000Z",
+      "price": 1010.121221
+    },
+    {
+      "date": "2025-03-28",
+      "blockNumber": 22148848,
+      "rawValue": "101012122100",
+      "oracleUpdatedAt": "2025-03-28T15:10:11.000Z",
+      "price": 1010.121221
+    },
+    {
+      "date": "2025-03-29",
+      "blockNumber": 22156001,
+      "rawValue": "101032033800",
+      "oracleUpdatedAt": "2025-03-29T03:31:11.000Z",
+      "price": 1010.320338
+    },
+    {
+      "date": "2025-03-30",
+      "blockNumber": 22163172,
+      "rawValue": "101032033800",
+      "oracleUpdatedAt": "2025-03-30T22:43:35.000Z",
+      "price": 1010.320338
+    },
+    {
+      "date": "2025-03-31",
+      "blockNumber": 22170334,
+      "rawValue": "101139700300",
+      "oracleUpdatedAt": "2025-03-31T19:12:23.000Z",
+      "price": 1011.397003
+    },
+    {
+      "date": "2025-04-01",
+      "blockNumber": 22177499,
+      "rawValue": "101139700300",
+      "oracleUpdatedAt": "2025-04-01T15:24:47.000Z",
+      "price": 1011.397003
+    },
+    {
+      "date": "2025-04-02",
+      "blockNumber": 22184669,
+      "rawValue": "101215954800",
+      "oracleUpdatedAt": "2025-04-02T23:41:35.000Z",
+      "price": 1012.159548
+    },
+    {
+      "date": "2025-04-03",
+      "blockNumber": 22191826,
+      "rawValue": "101215954800",
+      "oracleUpdatedAt": "2025-04-03T13:09:11.000Z",
+      "price": 1012.159548
+    },
+    {
+      "date": "2025-04-04",
+      "blockNumber": 22198999,
+      "rawValue": "101188848700",
+      "oracleUpdatedAt": "2025-04-04T12:48:35.000Z",
+      "price": 1011.888487
+    },
+    {
+      "date": "2025-04-05",
+      "blockNumber": 22206150,
+      "rawValue": "101253568100",
+      "oracleUpdatedAt": "2025-04-05T12:48:47.000Z",
+      "price": 1012.535681
+    },
+    {
+      "date": "2025-04-06",
+      "blockNumber": 22213305,
+      "rawValue": "101253568100",
+      "oracleUpdatedAt": "2025-04-06T17:52:47.000Z",
+      "price": 1012.535681
+    },
+    {
+      "date": "2025-04-07",
+      "blockNumber": 22220455,
+      "rawValue": "101171412000",
+      "oracleUpdatedAt": "2025-04-07T19:56:11.000Z",
+      "price": 1011.71412
+    },
+    {
+      "date": "2025-04-08",
+      "blockNumber": 22227624,
+      "rawValue": "100791400700",
+      "oracleUpdatedAt": "2025-04-08T20:29:47.000Z",
+      "price": 1007.914007
+    },
+    {
+      "date": "2025-04-09",
+      "blockNumber": 22234793,
+      "rawValue": "101080155300",
+      "oracleUpdatedAt": "2025-04-09T20:18:23.000Z",
+      "price": 1010.801553
+    },
+    {
+      "date": "2025-04-10",
+      "blockNumber": 22241970,
+      "rawValue": "101080155300",
+      "oracleUpdatedAt": "2025-04-10T11:03:59.000Z",
+      "price": 1010.801553
+    },
+    {
+      "date": "2025-04-11",
+      "blockNumber": 22249146,
+      "rawValue": "100935995100",
+      "oracleUpdatedAt": "2025-04-11T20:05:23.000Z",
+      "price": 1009.359951
+    },
+    {
+      "date": "2025-04-12",
+      "blockNumber": 22256323,
+      "rawValue": "100935995100",
+      "oracleUpdatedAt": "2025-04-12T11:04:23.000Z",
+      "price": 1009.359951
+    },
+    {
+      "date": "2025-04-13",
+      "blockNumber": 22263499,
+      "rawValue": "100935995100",
+      "oracleUpdatedAt": "2025-04-13T11:04:35.000Z",
+      "price": 1009.359951
+    },
+    {
+      "date": "2025-04-14",
+      "blockNumber": 22270667,
+      "rawValue": "100935995100",
+      "oracleUpdatedAt": "2025-04-14T11:04:47.000Z",
+      "price": 1009.359951
+    },
+    {
+      "date": "2025-04-15",
+      "blockNumber": 22277825,
+      "rawValue": "101192572800",
+      "oracleUpdatedAt": "2025-04-15T18:32:47.000Z",
+      "price": 1011.925728
+    },
+    {
+      "date": "2025-04-16",
+      "blockNumber": 22284996,
+      "rawValue": "101192572800",
+      "oracleUpdatedAt": "2025-04-16T11:05:11.000Z",
+      "price": 1011.925728
+    },
+    {
+      "date": "2025-04-17",
+      "blockNumber": 22292157,
+      "rawValue": "101417629200",
+      "oracleUpdatedAt": "2025-04-17T20:48:23.000Z",
+      "price": 1014.176292
+    },
+    {
+      "date": "2025-04-18",
+      "blockNumber": 22299326,
+      "rawValue": "101417629200",
+      "oracleUpdatedAt": "2025-04-18T09:46:59.000Z",
+      "price": 1014.176292
+    },
+    {
+      "date": "2025-04-19",
+      "blockNumber": 22306493,
+      "rawValue": "101417629200",
+      "oracleUpdatedAt": "2025-04-19T09:47:11.000Z",
+      "price": 1014.176292
+    },
+    {
+      "date": "2025-04-20",
+      "blockNumber": 22313650,
+      "rawValue": "101417629200",
+      "oracleUpdatedAt": "2025-04-20T09:47:47.000Z",
+      "price": 1014.176292
+    },
+    {
+      "date": "2025-04-21",
+      "blockNumber": 22320818,
+      "rawValue": "101490064300",
+      "oracleUpdatedAt": "2025-04-21T20:40:47.000Z",
+      "price": 1014.900643
+    },
+    {
+      "date": "2025-04-22",
+      "blockNumber": 22327989,
+      "rawValue": "101490064300",
+      "oracleUpdatedAt": "2025-04-22T09:48:11.000Z",
+      "price": 1014.900643
+    },
+    {
+      "date": "2025-04-23",
+      "blockNumber": 22335153,
+      "rawValue": "101462611100",
+      "oracleUpdatedAt": "2025-04-23T08:23:23.000Z",
+      "price": 1014.626111
+    },
+    {
+      "date": "2025-04-24",
+      "blockNumber": 22342307,
+      "rawValue": "101682272700",
+      "oracleUpdatedAt": "2025-04-24T20:03:23.000Z",
+      "price": 1016.822727
+    },
+    {
+      "date": "2025-04-25",
+      "blockNumber": 22349480,
+      "rawValue": "101838248000",
+      "oracleUpdatedAt": "2025-04-25T21:07:23.000Z",
+      "price": 1018.38248
+    },
+    {
+      "date": "2025-04-26",
+      "blockNumber": 22356658,
+      "rawValue": "101838248000",
+      "oracleUpdatedAt": "2025-04-26T08:23:59.000Z",
+      "price": 1018.38248
+    },
+    {
+      "date": "2025-04-27",
+      "blockNumber": 22363838,
+      "rawValue": "101838248000",
+      "oracleUpdatedAt": "2025-04-27T08:24:11.000Z",
+      "price": 1018.38248
+    },
+    {
+      "date": "2025-04-28",
+      "blockNumber": 22370998,
+      "rawValue": "101983255100",
+      "oracleUpdatedAt": "2025-04-28T20:08:23.000Z",
+      "price": 1019.832551
+    },
+    {
+      "date": "2025-04-29",
+      "blockNumber": 22378150,
+      "rawValue": "102133844500",
+      "oracleUpdatedAt": "2025-04-29T19:54:23.000Z",
+      "price": 1021.338445
+    },
+    {
+      "date": "2025-04-30",
+      "blockNumber": 22385293,
+      "rawValue": "102230230400",
+      "oracleUpdatedAt": "2025-04-30T19:48:47.000Z",
+      "price": 1022.302304
+    },
+    {
+      "date": "2025-05-01",
+      "blockNumber": 22392426,
+      "rawValue": "102230230400",
+      "oracleUpdatedAt": "2025-05-01T09:53:11.000Z",
+      "price": 1022.302304
+    },
+    {
+      "date": "2025-05-02",
+      "blockNumber": 22399543,
+      "rawValue": "102246988800",
+      "oracleUpdatedAt": "2025-05-02T09:53:23.000Z",
+      "price": 1022.469888
+    },
+    {
+      "date": "2025-05-03",
+      "blockNumber": 22406692,
+      "rawValue": "102220967300",
+      "oracleUpdatedAt": "2025-05-03T09:53:35.000Z",
+      "price": 1022.209673
+    },
+    {
+      "date": "2025-05-04",
+      "blockNumber": 22413825,
+      "rawValue": "102220967300",
+      "oracleUpdatedAt": "2025-05-04T09:53:47.000Z",
+      "price": 1022.209673
+    },
+    {
+      "date": "2025-05-05",
+      "blockNumber": 22420967,
+      "rawValue": "102141969600",
+      "oracleUpdatedAt": "2025-05-05T20:30:35.000Z",
+      "price": 1021.419696
+    },
+    {
+      "date": "2025-05-06",
+      "blockNumber": 22428091,
+      "rawValue": "102141969600",
+      "oracleUpdatedAt": "2025-05-06T09:54:11.000Z",
+      "price": 1021.419696
+    },
+    {
+      "date": "2025-05-07",
+      "blockNumber": 22435129,
+      "rawValue": "102160000300",
+      "oracleUpdatedAt": "2025-05-07T09:54:23.000Z",
+      "price": 1021.600003
+    },
+    {
+      "date": "2025-05-08",
+      "blockNumber": 22442219,
+      "rawValue": "102123512500",
+      "oracleUpdatedAt": "2025-05-08T09:54:47.000Z",
+      "price": 1021.235125
+    },
+    {
+      "date": "2025-05-09",
+      "blockNumber": 22449297,
+      "rawValue": "102143495400",
+      "oracleUpdatedAt": "2025-05-09T09:54:59.000Z",
+      "price": 1021.434954
+    },
+    {
+      "date": "2025-05-10",
+      "blockNumber": 22456400,
+      "rawValue": "102072660800",
+      "oracleUpdatedAt": "2025-05-10T09:55:11.000Z",
+      "price": 1020.726608
+    },
+    {
+      "date": "2025-05-11",
+      "blockNumber": 22463509,
+      "rawValue": "102072660800",
+      "oracleUpdatedAt": "2025-05-11T09:55:23.000Z",
+      "price": 1020.726608
+    },
+    {
+      "date": "2025-05-12",
+      "blockNumber": 22470610,
+      "rawValue": "102072660800",
+      "oracleUpdatedAt": "2025-05-12T09:55:35.000Z",
+      "price": 1020.726608
+    },
+    {
+      "date": "2025-05-13",
+      "blockNumber": 22477719,
+      "rawValue": "102059683900",
+      "oracleUpdatedAt": "2025-05-13T20:59:23.000Z",
+      "price": 1020.596839
+    },
+    {
+      "date": "2025-05-14",
+      "blockNumber": 22484823,
+      "rawValue": "102059683900",
+      "oracleUpdatedAt": "2025-05-14T12:45:23.000Z",
+      "price": 1020.596839
+    },
+    {
+      "date": "2025-05-15",
+      "blockNumber": 22491938,
+      "rawValue": "102124314800",
+      "oracleUpdatedAt": "2025-05-15T13:54:59.000Z",
+      "price": 1021.243148
+    },
+    {
+      "date": "2025-05-16",
+      "blockNumber": 22499048,
+      "rawValue": "102254385200",
+      "oracleUpdatedAt": "2025-05-16T20:09:47.000Z",
+      "price": 1022.543852
+    },
+    {
+      "date": "2025-05-17",
+      "blockNumber": 22506180,
+      "rawValue": "102254385200",
+      "oracleUpdatedAt": "2025-05-17T12:45:47.000Z",
+      "price": 1022.543852
+    },
+    {
+      "date": "2025-05-18",
+      "blockNumber": 22513304,
+      "rawValue": "102254385200",
+      "oracleUpdatedAt": "2025-05-18T12:45:59.000Z",
+      "price": 1022.543852
+    },
+    {
+      "date": "2025-05-19",
+      "blockNumber": 22520426,
+      "rawValue": "102254385200",
+      "oracleUpdatedAt": "2025-05-19T12:46:11.000Z",
+      "price": 1022.543852
+    },
+    {
+      "date": "2025-05-20",
+      "blockNumber": 22527557,
+      "rawValue": "102265699800",
+      "oracleUpdatedAt": "2025-05-20T12:46:23.000Z",
+      "price": 1022.656998
+    },
+    {
+      "date": "2025-05-21",
+      "blockNumber": 22534697,
+      "rawValue": "102291233600",
+      "oracleUpdatedAt": "2025-05-21T12:46:35.000Z",
+      "price": 1022.912336
+    },
+    {
+      "date": "2025-05-22",
+      "blockNumber": 22541848,
+      "rawValue": "102193269100",
+      "oracleUpdatedAt": "2025-05-22T19:07:23.000Z",
+      "price": 1021.932691
+    },
+    {
+      "date": "2025-05-23",
+      "blockNumber": 22548995,
+      "rawValue": "102193269100",
+      "oracleUpdatedAt": "2025-05-23T10:46:59.000Z",
+      "price": 1021.932691
+    },
+    {
+      "date": "2025-05-24",
+      "blockNumber": 22556132,
+      "rawValue": "102211309900",
+      "oracleUpdatedAt": "2025-05-24T10:47:11.000Z",
+      "price": 1022.113099
+    },
+    {
+      "date": "2025-05-25",
+      "blockNumber": 22563268,
+      "rawValue": "102211309900",
+      "oracleUpdatedAt": "2025-05-25T10:47:35.000Z",
+      "price": 1022.113099
+    },
+    {
+      "date": "2025-05-26",
+      "blockNumber": 22570404,
+      "rawValue": "102211309900",
+      "oracleUpdatedAt": "2025-05-26T10:47:47.000Z",
+      "price": 1022.113099
+    },
+    {
+      "date": "2025-05-27",
+      "blockNumber": 22577561,
+      "rawValue": "102286388600",
+      "oracleUpdatedAt": "2025-05-27T20:10:47.000Z",
+      "price": 1022.863886
+    },
+    {
+      "date": "2025-05-28",
+      "blockNumber": 22584692,
+      "rawValue": "102441945200",
+      "oracleUpdatedAt": "2025-05-28T20:28:23.000Z",
+      "price": 1024.419452
+    },
+    {
+      "date": "2025-05-29",
+      "blockNumber": 22591834,
+      "rawValue": "102441945200",
+      "oracleUpdatedAt": "2025-05-29T10:48:23.000Z",
+      "price": 1024.419452
+    },
+    {
+      "date": "2025-05-30",
+      "blockNumber": 22598988,
+      "rawValue": "102416774200",
+      "oracleUpdatedAt": "2025-05-30T06:43:23.000Z",
+      "price": 1024.167742
+    },
+    {
+      "date": "2025-05-31",
+      "blockNumber": 22606142,
+      "rawValue": "102480901800",
+      "oracleUpdatedAt": "2025-05-31T06:43:35.000Z",
+      "price": 1024.809018
+    },
+    {
+      "date": "2025-06-01",
+      "blockNumber": 22613285,
+      "rawValue": "102480901800",
+      "oracleUpdatedAt": "2025-06-01T06:43:47.000Z",
+      "price": 1024.809018
+    },
+    {
+      "date": "2025-06-02",
+      "blockNumber": 22620414,
+      "rawValue": "102560878500",
+      "oracleUpdatedAt": "2025-06-02T21:27:23.000Z",
+      "price": 1025.608785
+    },
+    {
+      "date": "2025-06-03",
+      "blockNumber": 22627564,
+      "rawValue": "102560878500",
+      "oracleUpdatedAt": "2025-06-03T06:44:11.000Z",
+      "price": 1025.608785
+    },
+    {
+      "date": "2025-06-04",
+      "blockNumber": 22634703,
+      "rawValue": "102599901800",
+      "oracleUpdatedAt": "2025-06-04T06:44:23.000Z",
+      "price": 1025.999018
+    },
+    {
+      "date": "2025-06-05",
+      "blockNumber": 22641841,
+      "rawValue": "102681241800",
+      "oracleUpdatedAt": "2025-06-05T20:28:35.000Z",
+      "price": 1026.812418
+    },
+    {
+      "date": "2025-06-06",
+      "blockNumber": 22648987,
+      "rawValue": "102681241800",
+      "oracleUpdatedAt": "2025-06-06T06:44:47.000Z",
+      "price": 1026.812418
+    },
+    {
+      "date": "2025-06-07",
+      "blockNumber": 22656150,
+      "rawValue": "102655455600",
+      "oracleUpdatedAt": "2025-06-07T06:44:59.000Z",
+      "price": 1026.554556
+    },
+    {
+      "date": "2025-06-08",
+      "blockNumber": 22663305,
+      "rawValue": "102655455600",
+      "oracleUpdatedAt": "2025-06-08T06:45:11.000Z",
+      "price": 1026.554556
+    },
+    {
+      "date": "2025-06-09",
+      "blockNumber": 22670450,
+      "rawValue": "102574389900",
+      "oracleUpdatedAt": "2025-06-09T20:00:35.000Z",
+      "price": 1025.743899
+    },
+    {
+      "date": "2025-06-10",
+      "blockNumber": 22677606,
+      "rawValue": "102686346600",
+      "oracleUpdatedAt": "2025-06-10T21:43:23.000Z",
+      "price": 1026.863466
+    },
+    {
+      "date": "2025-06-11",
+      "blockNumber": 22684757,
+      "rawValue": "102686346600",
+      "oracleUpdatedAt": "2025-06-11T06:45:47.000Z",
+      "price": 1026.863466
+    },
+    {
+      "date": "2025-06-12",
+      "blockNumber": 22691920,
+      "rawValue": "102813705100",
+      "oracleUpdatedAt": "2025-06-12T20:50:35.000Z",
+      "price": 1028.137051
+    },
+    {
+      "date": "2025-06-13",
+      "blockNumber": 22699074,
+      "rawValue": "102813705100",
+      "oracleUpdatedAt": "2025-06-13T06:46:11.000Z",
+      "price": 1028.137051
+    },
+    {
+      "date": "2025-06-14",
+      "blockNumber": 22706233,
+      "rawValue": "102832064100",
+      "oracleUpdatedAt": "2025-06-14T06:46:23.000Z",
+      "price": 1028.320641
+    },
+    {
+      "date": "2025-06-15",
+      "blockNumber": 22713369,
+      "rawValue": "102832064100",
+      "oracleUpdatedAt": "2025-06-15T06:46:35.000Z",
+      "price": 1028.320641
+    },
+    {
+      "date": "2025-06-16",
+      "blockNumber": 22720514,
+      "rawValue": "102832064100",
+      "oracleUpdatedAt": "2025-06-16T06:46:47.000Z",
+      "price": 1028.320641
+    },
+    {
+      "date": "2025-06-17",
+      "blockNumber": 22727653,
+      "rawValue": "102886909800",
+      "oracleUpdatedAt": "2025-06-17T06:46:59.000Z",
+      "price": 1028.869098
+    },
+    {
+      "date": "2025-06-18",
+      "blockNumber": 22734806,
+      "rawValue": "102861981400",
+      "oracleUpdatedAt": "2025-06-18T11:34:23.000Z",
+      "price": 1028.619814
+    },
+    {
+      "date": "2025-06-19",
+      "blockNumber": 22741966,
+      "rawValue": "102876847200",
+      "oracleUpdatedAt": "2025-06-19T08:14:59.000Z",
+      "price": 1028.768472
+    },
+    {
+      "date": "2025-06-20",
+      "blockNumber": 22749115,
+      "rawValue": "102876847200",
+      "oracleUpdatedAt": "2025-06-20T08:15:11.000Z",
+      "price": 1028.768472
+    },
+    {
+      "date": "2025-06-21",
+      "blockNumber": 22756269,
+      "rawValue": "102940240500",
+      "oracleUpdatedAt": "2025-06-21T08:15:23.000Z",
+      "price": 1029.402405
+    },
+    {
+      "date": "2025-06-22",
+      "blockNumber": 22763413,
+      "rawValue": "102940240500",
+      "oracleUpdatedAt": "2025-06-22T08:15:23.000Z",
+      "price": 1029.402405
+    },
+    {
+      "date": "2025-06-23",
+      "blockNumber": 22770563,
+      "rawValue": "102940240500",
+      "oracleUpdatedAt": "2025-06-23T08:15:23.000Z",
+      "price": 1029.402405
+    },
+    {
+      "date": "2025-06-24",
+      "blockNumber": 22777731,
+      "rawValue": "103102038300",
+      "oracleUpdatedAt": "2025-06-24T20:54:23.000Z",
+      "price": 1031.020383
+    },
+    {
+      "date": "2025-06-25",
+      "blockNumber": 22784894,
+      "rawValue": "103218113000",
+      "oracleUpdatedAt": "2025-06-25T22:12:23.000Z",
+      "price": 1032.18113
+    },
+    {
+      "date": "2025-06-26",
+      "blockNumber": 22792055,
+      "rawValue": "103218113000",
+      "oracleUpdatedAt": "2025-06-26T08:16:11.000Z",
+      "price": 1032.18113
+    },
+    {
+      "date": "2025-06-27",
+      "blockNumber": 22799210,
+      "rawValue": "103385270700",
+      "oracleUpdatedAt": "2025-06-27T21:17:23.000Z",
+      "price": 1033.852707
+    },
+    {
+      "date": "2025-06-28",
+      "blockNumber": 22806371,
+      "rawValue": "103385270700",
+      "oracleUpdatedAt": "2025-06-28T08:16:35.000Z",
+      "price": 1033.852707
+    },
+    {
+      "date": "2025-06-29",
+      "blockNumber": 22813511,
+      "rawValue": "103385270700",
+      "oracleUpdatedAt": "2025-06-29T08:16:47.000Z",
+      "price": 1033.852707
+    },
+    {
+      "date": "2025-06-30",
+      "blockNumber": 22820673,
+      "rawValue": "103385270700",
+      "oracleUpdatedAt": "2025-06-30T08:16:59.000Z",
+      "price": 1033.852707
+    },
+    {
+      "date": "2025-07-01",
+      "blockNumber": 22827823,
+      "rawValue": "103506532700",
+      "oracleUpdatedAt": "2025-07-01T20:57:23.000Z",
+      "price": 1035.065327
+    },
+    {
+      "date": "2025-07-02",
+      "blockNumber": 22834979,
+      "rawValue": "103506532700",
+      "oracleUpdatedAt": "2025-07-02T14:21:47.000Z",
+      "price": 1035.065327
+    },
+    {
+      "date": "2025-07-03",
+      "blockNumber": 22842131,
+      "rawValue": "103525799600",
+      "oracleUpdatedAt": "2025-07-03T11:22:11.000Z",
+      "price": 1035.257996
+    },
+    {
+      "date": "2025-07-04",
+      "blockNumber": 22849297,
+      "rawValue": "103592331300",
+      "oracleUpdatedAt": "2025-07-04T11:22:23.000Z",
+      "price": 1035.923313
+    },
+    {
+      "date": "2025-07-05",
+      "blockNumber": 22856444,
+      "rawValue": "103592331300",
+      "oracleUpdatedAt": "2025-07-05T11:22:35.000Z",
+      "price": 1035.923313
+    },
+    {
+      "date": "2025-07-06",
+      "blockNumber": 22863596,
+      "rawValue": "103592331300",
+      "oracleUpdatedAt": "2025-07-06T11:22:47.000Z",
+      "price": 1035.923313
+    },
+    {
+      "date": "2025-07-07",
+      "blockNumber": 22870753,
+      "rawValue": "103592331300",
+      "oracleUpdatedAt": "2025-07-07T11:22:59.000Z",
+      "price": 1035.923313
+    },
+    {
+      "date": "2025-07-08",
+      "blockNumber": 22877912,
+      "rawValue": "103576765500",
+      "oracleUpdatedAt": "2025-07-08T11:23:11.000Z",
+      "price": 1035.767655
+    },
+    {
+      "date": "2025-07-09",
+      "blockNumber": 22885056,
+      "rawValue": "103552975200",
+      "oracleUpdatedAt": "2025-07-09T11:23:23.000Z",
+      "price": 1035.529752
+    },
+    {
+      "date": "2025-07-10",
+      "blockNumber": 22892221,
+      "rawValue": "103574036800",
+      "oracleUpdatedAt": "2025-07-10T11:23:35.000Z",
+      "price": 1035.740368
+    },
+    {
+      "date": "2025-07-11",
+      "blockNumber": 22899370,
+      "rawValue": "103594759200",
+      "oracleUpdatedAt": "2025-07-11T14:56:35.000Z",
+      "price": 1035.947592
+    },
+    {
+      "date": "2025-07-12",
+      "blockNumber": 22906533,
+      "rawValue": "103658960400",
+      "oracleUpdatedAt": "2025-07-12T14:56:47.000Z",
+      "price": 1036.589604
+    },
+    {
+      "date": "2025-07-13",
+      "blockNumber": 22913694,
+      "rawValue": "103658960400",
+      "oracleUpdatedAt": "2025-07-13T14:56:59.000Z",
+      "price": 1036.589604
+    },
+    {
+      "date": "2025-07-14",
+      "blockNumber": 22920858,
+      "rawValue": "103658960400",
+      "oracleUpdatedAt": "2025-07-14T15:42:11.000Z",
+      "price": 1036.589604
+    },
+    {
+      "date": "2025-07-15",
+      "blockNumber": 22928027,
+      "rawValue": "103670116400",
+      "oracleUpdatedAt": "2025-07-15T15:42:23.000Z",
+      "price": 1036.701164
+    },
+    {
+      "date": "2025-07-16",
+      "blockNumber": 22935192,
+      "rawValue": "103736860400",
+      "oracleUpdatedAt": "2025-07-16T15:42:35.000Z",
+      "price": 1037.368604
+    },
+    {
+      "date": "2025-07-17",
+      "blockNumber": 22942366,
+      "rawValue": "103792831500",
+      "oracleUpdatedAt": "2025-07-17T18:16:47.000Z",
+      "price": 1037.928315
+    },
+    {
+      "date": "2025-07-18",
+      "blockNumber": 22949536,
+      "rawValue": "103792831500",
+      "oracleUpdatedAt": "2025-07-18T15:42:59.000Z",
+      "price": 1037.928315
+    },
+    {
+      "date": "2025-07-19",
+      "blockNumber": 22956684,
+      "rawValue": "103812057600",
+      "oracleUpdatedAt": "2025-07-19T15:43:11.000Z",
+      "price": 1038.120576
+    },
+    {
+      "date": "2025-07-20",
+      "blockNumber": 22963843,
+      "rawValue": "103812057600",
+      "oracleUpdatedAt": "2025-07-20T15:43:23.000Z",
+      "price": 1038.120576
+    },
+    {
+      "date": "2025-07-21",
+      "blockNumber": 22971002,
+      "rawValue": "103962370000",
+      "oracleUpdatedAt": "2025-07-21T20:41:23.000Z",
+      "price": 1039.6237
+    },
+    {
+      "date": "2025-07-22",
+      "blockNumber": 22978149,
+      "rawValue": "103962370000",
+      "oracleUpdatedAt": "2025-07-22T15:43:47.000Z",
+      "price": 1039.6237
+    },
+    {
+      "date": "2025-07-23",
+      "blockNumber": 22985302,
+      "rawValue": "104028865700",
+      "oracleUpdatedAt": "2025-07-23T17:20:23.000Z",
+      "price": 1040.288657
+    },
+    {
+      "date": "2025-07-24",
+      "blockNumber": 22992450,
+      "rawValue": "104092775800",
+      "oracleUpdatedAt": "2025-07-24T07:58:59.000Z",
+      "price": 1040.927758
+    },
+    {
+      "date": "2025-07-25",
+      "blockNumber": 22999594,
+      "rawValue": "104110959100",
+      "oracleUpdatedAt": "2025-07-25T07:59:11.000Z",
+      "price": 1041.109591
+    },
+    {
+      "date": "2025-07-26",
+      "blockNumber": 23006757,
+      "rawValue": "104084662400",
+      "oracleUpdatedAt": "2025-07-26T07:59:23.000Z",
+      "price": 1040.846624
+    },
+    {
+      "date": "2025-07-27",
+      "blockNumber": 23013926,
+      "rawValue": "104084662400",
+      "oracleUpdatedAt": "2025-07-27T07:59:35.000Z",
+      "price": 1040.846624
+    },
+    {
+      "date": "2025-07-28",
+      "blockNumber": 23021075,
+      "rawValue": "104084662400",
+      "oracleUpdatedAt": "2025-07-28T07:59:47.000Z",
+      "price": 1040.846624
+    },
+    {
+      "date": "2025-07-29",
+      "blockNumber": 23028226,
+      "rawValue": "104168401700",
+      "oracleUpdatedAt": "2025-07-29T22:57:59.000Z",
+      "price": 1041.684017
+    },
+    {
+      "date": "2025-07-30",
+      "blockNumber": 23035372,
+      "rawValue": "104232143100",
+      "oracleUpdatedAt": "2025-07-30T22:58:11.000Z",
+      "price": 1042.321431
+    },
+    {
+      "date": "2025-07-31",
+      "blockNumber": 23042513,
+      "rawValue": "104159171500",
+      "oracleUpdatedAt": "2025-07-31T22:58:23.000Z",
+      "price": 1041.591715
+    },
+    {
+      "date": "2025-08-01",
+      "blockNumber": 23049661,
+      "rawValue": "104173547500",
+      "oracleUpdatedAt": "2025-08-01T22:58:35.000Z",
+      "price": 1041.735475
+    },
+    {
+      "date": "2025-08-02",
+      "blockNumber": 23056812,
+      "rawValue": "104173547500",
+      "oracleUpdatedAt": "2025-08-02T22:58:35.000Z",
+      "price": 1041.735475
+    },
+    {
+      "date": "2025-08-03",
+      "blockNumber": 23063980,
+      "rawValue": "104173547500",
+      "oracleUpdatedAt": "2025-08-03T22:58:47.000Z",
+      "price": 1041.735475
+    },
+    {
+      "date": "2025-08-04",
+      "blockNumber": 23071145,
+      "rawValue": "104417944000",
+      "oracleUpdatedAt": "2025-08-04T22:58:59.000Z",
+      "price": 1044.17944
+    },
+    {
+      "date": "2025-08-05",
+      "blockNumber": 23078306,
+      "rawValue": "104530839500",
+      "oracleUpdatedAt": "2025-08-05T22:59:11.000Z",
+      "price": 1045.308395
+    },
+    {
+      "date": "2025-08-06",
+      "blockNumber": 23085465,
+      "rawValue": "104530839500",
+      "oracleUpdatedAt": "2025-08-06T15:53:47.000Z",
+      "price": 1045.308395
+    },
+    {
+      "date": "2025-08-07",
+      "blockNumber": 23092619,
+      "rawValue": "104674143100",
+      "oracleUpdatedAt": "2025-08-07T20:24:35.000Z",
+      "price": 1046.741431
+    },
+    {
+      "date": "2025-08-08",
+      "blockNumber": 23099777,
+      "rawValue": "104605004800",
+      "oracleUpdatedAt": "2025-08-08T22:12:35.000Z",
+      "price": 1046.050048
+    },
+    {
+      "date": "2025-08-09",
+      "blockNumber": 23106939,
+      "rawValue": "104605004800",
+      "oracleUpdatedAt": "2025-08-09T22:12:35.000Z",
+      "price": 1046.050048
+    },
+    {
+      "date": "2025-08-10",
+      "blockNumber": 23114096,
+      "rawValue": "104605004800",
+      "oracleUpdatedAt": "2025-08-10T22:12:35.000Z",
+      "price": 1046.050048
+    },
+    {
+      "date": "2025-08-11",
+      "blockNumber": 23121240,
+      "rawValue": "104621554100",
+      "oracleUpdatedAt": "2025-08-11T22:12:47.000Z",
+      "price": 1046.215541
+    },
+    {
+      "date": "2025-08-12",
+      "blockNumber": 23128405,
+      "rawValue": "104621554100",
+      "oracleUpdatedAt": "2025-08-12T11:27:11.000Z",
+      "price": 1046.215541
+    },
+    {
+      "date": "2025-08-13",
+      "blockNumber": 23135570,
+      "rawValue": "104715614700",
+      "oracleUpdatedAt": "2025-08-13T20:22:23.000Z",
+      "price": 1047.156147
+    },
+    {
+      "date": "2025-08-14",
+      "blockNumber": 23142716,
+      "rawValue": "104880746300",
+      "oracleUpdatedAt": "2025-08-14T20:51:23.000Z",
+      "price": 1048.807463
+    },
+    {
+      "date": "2025-08-15",
+      "blockNumber": 23149883,
+      "rawValue": "104764911200",
+      "oracleUpdatedAt": "2025-08-15T19:30:23.000Z",
+      "price": 1047.649112
+    },
+    {
+      "date": "2025-08-16",
+      "blockNumber": 23157046,
+      "rawValue": "104764911200",
+      "oracleUpdatedAt": "2025-08-16T16:58:35.000Z",
+      "price": 1047.649112
+    },
+    {
+      "date": "2025-08-17",
+      "blockNumber": 23164221,
+      "rawValue": "104764911200",
+      "oracleUpdatedAt": "2025-08-17T16:58:35.000Z",
+      "price": 1047.649112
+    },
+    {
+      "date": "2025-08-18",
+      "blockNumber": 23171390,
+      "rawValue": "104764911200",
+      "oracleUpdatedAt": "2025-08-18T13:01:59.000Z",
+      "price": 1047.649112
+    },
+    {
+      "date": "2025-08-19",
+      "blockNumber": 23178566,
+      "rawValue": "104780945700",
+      "oracleUpdatedAt": "2025-08-19T13:02:23.000Z",
+      "price": 1047.809457
+    },
+    {
+      "date": "2025-08-20",
+      "blockNumber": 23185735,
+      "rawValue": "104799569400",
+      "oracleUpdatedAt": "2025-08-20T13:02:35.000Z",
+      "price": 1047.995694
+    },
+    {
+      "date": "2025-08-21",
+      "blockNumber": 23192892,
+      "rawValue": "104886175600",
+      "oracleUpdatedAt": "2025-08-21T19:20:35.000Z",
+      "price": 1048.861756
+    },
+    {
+      "date": "2025-08-22",
+      "blockNumber": 23200063,
+      "rawValue": "104886175600",
+      "oracleUpdatedAt": "2025-08-22T13:02:59.000Z",
+      "price": 1048.861756
+    },
+    {
+      "date": "2025-08-23",
+      "blockNumber": 23207221,
+      "rawValue": "104814724600",
+      "oracleUpdatedAt": "2025-08-23T13:03:11.000Z",
+      "price": 1048.147246
+    },
+    {
+      "date": "2025-08-24",
+      "blockNumber": 23214395,
+      "rawValue": "104814724600",
+      "oracleUpdatedAt": "2025-08-24T13:03:23.000Z",
+      "price": 1048.147246
+    },
+    {
+      "date": "2025-08-25",
+      "blockNumber": 23221563,
+      "rawValue": "105107799500",
+      "oracleUpdatedAt": "2025-08-25T19:22:23.000Z",
+      "price": 1051.077995
+    },
+    {
+      "date": "2025-08-26",
+      "blockNumber": 23228730,
+      "rawValue": "104988284600",
+      "oracleUpdatedAt": "2025-08-26T20:05:23.000Z",
+      "price": 1049.882846
+    },
+    {
+      "date": "2025-08-27",
+      "blockNumber": 23235895,
+      "rawValue": "105336207100",
+      "oracleUpdatedAt": "2025-08-27T18:54:23.000Z",
+      "price": 1053.362071
+    },
+    {
+      "date": "2025-08-28",
+      "blockNumber": 23243055,
+      "rawValue": "105336207100",
+      "oracleUpdatedAt": "2025-08-28T12:35:47.000Z",
+      "price": 1053.362071
+    },
+    {
+      "date": "2025-08-29",
+      "blockNumber": 23250225,
+      "rawValue": "105446471100",
+      "oracleUpdatedAt": "2025-08-29T17:36:23.000Z",
+      "price": 1054.464711
+    },
+    {
+      "date": "2025-08-30",
+      "blockNumber": 23257401,
+      "rawValue": "105420588400",
+      "oracleUpdatedAt": "2025-08-30T12:36:11.000Z",
+      "price": 1054.205884
+    },
+    {
+      "date": "2025-08-31",
+      "blockNumber": 23264565,
+      "rawValue": "105420588400",
+      "oracleUpdatedAt": "2025-08-31T12:36:23.000Z",
+      "price": 1054.205884
+    },
+    {
+      "date": "2025-09-01",
+      "blockNumber": 23271730,
+      "rawValue": "105420588400",
+      "oracleUpdatedAt": "2025-09-01T12:36:35.000Z",
+      "price": 1054.205884
+    },
+    {
+      "date": "2025-09-02",
+      "blockNumber": 23278858,
+      "rawValue": "105529342800",
+      "oracleUpdatedAt": "2025-09-02T20:17:23.000Z",
+      "price": 1055.293428
+    },
+    {
+      "date": "2025-09-03",
+      "blockNumber": 23286025,
+      "rawValue": "105529342800",
+      "oracleUpdatedAt": "2025-09-03T13:39:47.000Z",
+      "price": 1055.293428
+    },
+    {
+      "date": "2025-09-04",
+      "blockNumber": 23293184,
+      "rawValue": "105572604500",
+      "oracleUpdatedAt": "2025-09-04T09:26:47.000Z",
+      "price": 1055.726045
+    },
+    {
+      "date": "2025-09-05",
+      "blockNumber": 23300346,
+      "rawValue": "105641541900",
+      "oracleUpdatedAt": "2025-09-05T09:26:59.000Z",
+      "price": 1056.415419
+    },
+    {
+      "date": "2025-09-06",
+      "blockNumber": 23307492,
+      "rawValue": "105706644200",
+      "oracleUpdatedAt": "2025-09-06T09:27:11.000Z",
+      "price": 1057.066442
+    },
+    {
+      "date": "2025-09-07",
+      "blockNumber": 23314653,
+      "rawValue": "105706644200",
+      "oracleUpdatedAt": "2025-09-07T09:27:35.000Z",
+      "price": 1057.066442
+    },
+    {
+      "date": "2025-09-08",
+      "blockNumber": 23321812,
+      "rawValue": "105957525200",
+      "oracleUpdatedAt": "2025-09-08T19:41:35.000Z",
+      "price": 1059.575252
+    },
+    {
+      "date": "2025-09-09",
+      "blockNumber": 23328981,
+      "rawValue": "106211738300",
+      "oracleUpdatedAt": "2025-09-09T19:31:23.000Z",
+      "price": 1062.117383
+    },
+    {
+      "date": "2025-09-10",
+      "blockNumber": 23336103,
+      "rawValue": "106211738300",
+      "oracleUpdatedAt": "2025-09-10T09:28:23.000Z",
+      "price": 1062.117383
+    },
+    {
+      "date": "2025-09-11",
+      "blockNumber": 23343259,
+      "rawValue": "106185365900",
+      "oracleUpdatedAt": "2025-09-11T09:28:35.000Z",
+      "price": 1061.853659
+    },
+    {
+      "date": "2025-09-12",
+      "blockNumber": 23350424,
+      "rawValue": "106162480500",
+      "oracleUpdatedAt": "2025-09-12T09:28:47.000Z",
+      "price": 1061.624805
+    },
+    {
+      "date": "2025-09-13",
+      "blockNumber": 23357591,
+      "rawValue": "106230730800",
+      "oracleUpdatedAt": "2025-09-13T09:28:59.000Z",
+      "price": 1062.307308
+    },
+    {
+      "date": "2025-09-14",
+      "blockNumber": 23364762,
+      "rawValue": "106230730800",
+      "oracleUpdatedAt": "2025-09-14T09:29:11.000Z",
+      "price": 1062.307308
+    },
+    {
+      "date": "2025-09-15",
+      "blockNumber": 23371915,
+      "rawValue": "106230730800",
+      "oracleUpdatedAt": "2025-09-15T09:29:23.000Z",
+      "price": 1062.307308
+    },
+    {
+      "date": "2025-09-16",
+      "blockNumber": 23379075,
+      "rawValue": "106240509300",
+      "oracleUpdatedAt": "2025-09-16T09:29:23.000Z",
+      "price": 1062.405093
+    },
+    {
+      "date": "2025-09-17",
+      "blockNumber": 23386240,
+      "rawValue": "106171401500",
+      "oracleUpdatedAt": "2025-09-17T09:29:35.000Z",
+      "price": 1061.714015
+    },
+    {
+      "date": "2025-09-18",
+      "blockNumber": 23393399,
+      "rawValue": "106187588000",
+      "oracleUpdatedAt": "2025-09-18T09:29:47.000Z",
+      "price": 1061.87588
+    },
+    {
+      "date": "2025-09-19",
+      "blockNumber": 23400558,
+      "rawValue": "106253030300",
+      "oracleUpdatedAt": "2025-09-19T09:29:59.000Z",
+      "price": 1062.530303
+    },
+    {
+      "date": "2025-09-20",
+      "blockNumber": 23407710,
+      "rawValue": "106267308300",
+      "oracleUpdatedAt": "2025-09-20T09:30:11.000Z",
+      "price": 1062.673083
+    },
+    {
+      "date": "2025-09-21",
+      "blockNumber": 23414856,
+      "rawValue": "106267308300",
+      "oracleUpdatedAt": "2025-09-21T09:30:23.000Z",
+      "price": 1062.673083
+    },
+    {
+      "date": "2025-09-22",
+      "blockNumber": 23422005,
+      "rawValue": "106407711700",
+      "oracleUpdatedAt": "2025-09-22T20:27:23.000Z",
+      "price": 1064.077117
+    },
+    {
+      "date": "2025-09-23",
+      "blockNumber": 23429173,
+      "rawValue": "106407711700",
+      "oracleUpdatedAt": "2025-09-23T09:30:47.000Z",
+      "price": 1064.077117
+    },
+    {
+      "date": "2025-09-24",
+      "blockNumber": 23436334,
+      "rawValue": "106383907900",
+      "oracleUpdatedAt": "2025-09-24T17:40:11.000Z",
+      "price": 1063.839079
+    },
+    {
+      "date": "2025-09-25",
+      "blockNumber": 23443482,
+      "rawValue": "106439251200",
+      "oracleUpdatedAt": "2025-09-25T17:40:23.000Z",
+      "price": 1064.392512
+    },
+    {
+      "date": "2025-09-26",
+      "blockNumber": 23450625,
+      "rawValue": "106249499900",
+      "oracleUpdatedAt": "2025-09-26T19:46:23.000Z",
+      "price": 1062.494999
+    },
+    {
+      "date": "2025-09-27",
+      "blockNumber": 23457779,
+      "rawValue": "106249499900",
+      "oracleUpdatedAt": "2025-09-27T17:40:47.000Z",
+      "price": 1062.494999
+    },
+    {
+      "date": "2025-09-28",
+      "blockNumber": 23464929,
+      "rawValue": "106249499900",
+      "oracleUpdatedAt": "2025-09-28T17:40:59.000Z",
+      "price": 1062.494999
+    },
+    {
+      "date": "2025-09-29",
+      "blockNumber": 23472088,
+      "rawValue": "106249499900",
+      "oracleUpdatedAt": "2025-09-29T17:41:11.000Z",
+      "price": 1062.494999
+    },
+    {
+      "date": "2025-09-30",
+      "blockNumber": 23479243,
+      "rawValue": "106263440300",
+      "oracleUpdatedAt": "2025-09-30T17:41:23.000Z",
+      "price": 1062.634403
+    },
+    {
+      "date": "2025-10-01",
+      "blockNumber": 23486383,
+      "rawValue": "106440035600",
+      "oracleUpdatedAt": "2025-10-01T21:51:23.000Z",
+      "price": 1064.400356
+    },
+    {
+      "date": "2025-10-02",
+      "blockNumber": 23493531,
+      "rawValue": "106604639700",
+      "oracleUpdatedAt": "2025-10-02T21:14:23.000Z",
+      "price": 1066.046397
+    },
+    {
+      "date": "2025-10-03",
+      "blockNumber": 23500695,
+      "rawValue": "106717568100",
+      "oracleUpdatedAt": "2025-10-03T20:50:35.000Z",
+      "price": 1067.175681
+    },
+    {
+      "date": "2025-10-04",
+      "blockNumber": 23507848,
+      "rawValue": "106717568100",
+      "oracleUpdatedAt": "2025-10-04T13:18:35.000Z",
+      "price": 1067.175681
+    },
+    {
+      "date": "2025-10-05",
+      "blockNumber": 23515011,
+      "rawValue": "106717568100",
+      "oracleUpdatedAt": "2025-10-05T13:18:47.000Z",
+      "price": 1067.175681
+    },
+    {
+      "date": "2025-10-06",
+      "blockNumber": 23522162,
+      "rawValue": "106717568100",
+      "oracleUpdatedAt": "2025-10-06T13:18:59.000Z",
+      "price": 1067.175681
+    },
+    {
+      "date": "2025-10-07",
+      "blockNumber": 23529320,
+      "rawValue": "106602538600",
+      "oracleUpdatedAt": "2025-10-07T20:28:35.000Z",
+      "price": 1066.025386
+    },
+    {
+      "date": "2025-10-08",
+      "blockNumber": 23536460,
+      "rawValue": "106602538600",
+      "oracleUpdatedAt": "2025-10-08T11:13:11.000Z",
+      "price": 1066.025386
+    },
+    {
+      "date": "2025-10-09",
+      "blockNumber": 23543615,
+      "rawValue": "106619944200",
+      "oracleUpdatedAt": "2025-10-09T11:13:23.000Z",
+      "price": 1066.199442
+    },
+    {
+      "date": "2025-10-10",
+      "blockNumber": 23550763,
+      "rawValue": "106591778600",
+      "oracleUpdatedAt": "2025-10-10T11:13:23.000Z",
+      "price": 1065.917786
+    },
+    {
+      "date": "2025-10-11",
+      "blockNumber": 23557920,
+      "rawValue": "106559667300",
+      "oracleUpdatedAt": "2025-10-11T11:13:35.000Z",
+      "price": 1065.596673
+    },
+    {
+      "date": "2025-10-12",
+      "blockNumber": 23565080,
+      "rawValue": "106559667300",
+      "oracleUpdatedAt": "2025-10-12T11:13:47.000Z",
+      "price": 1065.596673
+    },
+    {
+      "date": "2025-10-13",
+      "blockNumber": 23572225,
+      "rawValue": "106379627800",
+      "oracleUpdatedAt": "2025-10-13T20:37:23.000Z",
+      "price": 1063.796278
+    },
+    {
+      "date": "2025-10-14",
+      "blockNumber": 23579375,
+      "rawValue": "106379627800",
+      "oracleUpdatedAt": "2025-10-14T11:14:11.000Z",
+      "price": 1063.796278
+    },
+    {
+      "date": "2025-10-15",
+      "blockNumber": 23586523,
+      "rawValue": "106561000000",
+      "oracleUpdatedAt": "2025-10-15T23:24:11.000Z",
+      "price": 1065.61
+    },
+    {
+      "date": "2025-10-16",
+      "blockNumber": 23593662,
+      "rawValue": "106629222800",
+      "oracleUpdatedAt": "2025-10-16T23:24:23.000Z",
+      "price": 1066.292228
+    },
+    {
+      "date": "2025-10-17",
+      "blockNumber": 23600817,
+      "rawValue": "106649571000",
+      "oracleUpdatedAt": "2025-10-17T23:24:35.000Z",
+      "price": 1066.49571
+    },
+    {
+      "date": "2025-10-18",
+      "blockNumber": 23607963,
+      "rawValue": "106649571000",
+      "oracleUpdatedAt": "2025-10-18T10:31:23.000Z",
+      "price": 1066.49571
+    },
+    {
+      "date": "2025-10-19",
+      "blockNumber": 23615116,
+      "rawValue": "106649571000",
+      "oracleUpdatedAt": "2025-10-19T10:31:35.000Z",
+      "price": 1066.49571
+    },
+    {
+      "date": "2025-10-20",
+      "blockNumber": 23622239,
+      "rawValue": "106649571000",
+      "oracleUpdatedAt": "2025-10-20T10:31:47.000Z",
+      "price": 1066.49571
+    },
+    {
+      "date": "2025-10-21",
+      "blockNumber": 23629361,
+      "rawValue": "106775770600",
+      "oracleUpdatedAt": "2025-10-21T21:21:23.000Z",
+      "price": 1067.757706
+    },
+    {
+      "date": "2025-10-22",
+      "blockNumber": 23636490,
+      "rawValue": "106775770600",
+      "oracleUpdatedAt": "2025-10-22T19:21:11.000Z",
+      "price": 1067.757706
+    },
+    {
+      "date": "2025-10-23",
+      "blockNumber": 23643619,
+      "rawValue": "106669863800",
+      "oracleUpdatedAt": "2025-10-23T21:09:23.000Z",
+      "price": 1066.698638
+    },
+    {
+      "date": "2025-10-24",
+      "blockNumber": 23650757,
+      "rawValue": "106669863800",
+      "oracleUpdatedAt": "2025-10-24T19:21:35.000Z",
+      "price": 1066.698638
+    },
+    {
+      "date": "2025-10-25",
+      "blockNumber": 23657910,
+      "rawValue": "106690694800",
+      "oracleUpdatedAt": "2025-10-25T19:21:47.000Z",
+      "price": 1066.906948
+    },
+    {
+      "date": "2025-10-26",
+      "blockNumber": 23665071,
+      "rawValue": "106690694800",
+      "oracleUpdatedAt": "2025-10-26T19:21:59.000Z",
+      "price": 1066.906948
+    },
+    {
+      "date": "2025-10-27",
+      "blockNumber": 23672211,
+      "rawValue": "106833160600",
+      "oracleUpdatedAt": "2025-10-27T19:22:11.000Z",
+      "price": 1068.331606
+    },
+    {
+      "date": "2025-10-28",
+      "blockNumber": 23679339,
+      "rawValue": "106833160600",
+      "oracleUpdatedAt": "2025-10-28T19:22:23.000Z",
+      "price": 1068.331606
+    },
+    {
+      "date": "2025-10-29",
+      "blockNumber": 23686487,
+      "rawValue": "106963010500",
+      "oracleUpdatedAt": "2025-10-29T20:24:23.000Z",
+      "price": 1069.630105
+    },
+    {
+      "date": "2025-10-30",
+      "blockNumber": 23693628,
+      "rawValue": "106839017700",
+      "oracleUpdatedAt": "2025-10-30T20:41:23.000Z",
+      "price": 1068.390177
+    },
+    {
+      "date": "2025-10-31",
+      "blockNumber": 23700766,
+      "rawValue": "106839017700",
+      "oracleUpdatedAt": "2025-10-31T21:53:59.000Z",
+      "price": 1068.390177
+    },
+    {
+      "date": "2025-11-01",
+      "blockNumber": 23707919,
+      "rawValue": "106839017700",
+      "oracleUpdatedAt": "2025-11-01T21:54:11.000Z",
+      "price": 1068.390177
+    },
+    {
+      "date": "2025-11-02",
+      "blockNumber": 23715078,
+      "rawValue": "106839017700",
+      "oracleUpdatedAt": "2025-11-02T21:54:23.000Z",
+      "price": 1068.390177
+    },
+    {
+      "date": "2025-11-03",
+      "blockNumber": 23722235,
+      "rawValue": "106839017700",
+      "oracleUpdatedAt": "2025-11-03T16:45:11.000Z",
+      "price": 1068.390177
+    },
+    {
+      "date": "2025-11-04",
+      "blockNumber": 23729387,
+      "rawValue": "106791899600",
+      "oracleUpdatedAt": "2025-11-04T20:34:23.000Z",
+      "price": 1067.918996
+    },
+    {
+      "date": "2025-11-05",
+      "blockNumber": 23736527,
+      "rawValue": "106618554900",
+      "oracleUpdatedAt": "2025-11-05T20:56:35.000Z",
+      "price": 1066.185549
+    },
+    {
+      "date": "2025-11-06",
+      "blockNumber": 23743678,
+      "rawValue": "106618554900",
+      "oracleUpdatedAt": "2025-11-06T17:14:59.000Z",
+      "price": 1066.185549
+    },
+    {
+      "date": "2025-11-07",
+      "blockNumber": 23750827,
+      "rawValue": "106618554900",
+      "oracleUpdatedAt": "2025-11-07T17:15:11.000Z",
+      "price": 1066.185549
+    },
+    {
+      "date": "2025-11-08",
+      "blockNumber": 23757981,
+      "rawValue": "106659310700",
+      "oracleUpdatedAt": "2025-11-08T17:15:23.000Z",
+      "price": 1066.593107
+    },
+    {
+      "date": "2025-11-09",
+      "blockNumber": 23765143,
+      "rawValue": "106659310700",
+      "oracleUpdatedAt": "2025-11-09T17:15:35.000Z",
+      "price": 1066.593107
+    },
+    {
+      "date": "2025-11-10",
+      "blockNumber": 23772288,
+      "rawValue": "106659310700",
+      "oracleUpdatedAt": "2025-11-10T17:15:47.000Z",
+      "price": 1066.593107
+    },
+    {
+      "date": "2025-11-11",
+      "blockNumber": 23779425,
+      "rawValue": "106720120500",
+      "oracleUpdatedAt": "2025-11-11T17:15:59.000Z",
+      "price": 1067.201205
+    },
+    {
+      "date": "2025-11-12",
+      "blockNumber": 23786576,
+      "rawValue": "106693763400",
+      "oracleUpdatedAt": "2025-11-12T17:16:11.000Z",
+      "price": 1066.937634
+    },
+    {
+      "date": "2025-11-13",
+      "blockNumber": 23793714,
+      "rawValue": "106502785800",
+      "oracleUpdatedAt": "2025-11-13T20:38:23.000Z",
+      "price": 1065.027858
+    },
+    {
+      "date": "2025-11-14",
+      "blockNumber": 23800870,
+      "rawValue": "106502785800",
+      "oracleUpdatedAt": "2025-11-14T17:16:47.000Z",
+      "price": 1065.027858
+    },
+    {
+      "date": "2025-11-15",
+      "blockNumber": 23808023,
+      "rawValue": "106502785800",
+      "oracleUpdatedAt": "2025-11-15T16:37:23.000Z",
+      "price": 1065.027858
+    },
+    {
+      "date": "2025-11-16",
+      "blockNumber": 23815179,
+      "rawValue": "106502785800",
+      "oracleUpdatedAt": "2025-11-16T16:37:35.000Z",
+      "price": 1065.027858
+    },
+    {
+      "date": "2025-11-17",
+      "blockNumber": 23822302,
+      "rawValue": "106252336600",
+      "oracleUpdatedAt": "2025-11-17T21:10:35.000Z",
+      "price": 1062.523366
+    },
+    {
+      "date": "2025-11-18",
+      "blockNumber": 23829427,
+      "rawValue": "106252336600",
+      "oracleUpdatedAt": "2025-11-18T16:37:59.000Z",
+      "price": 1062.523366
+    },
+    {
+      "date": "2025-11-19",
+      "blockNumber": 23836544,
+      "rawValue": "106223491200",
+      "oracleUpdatedAt": "2025-11-19T12:34:23.000Z",
+      "price": 1062.234912
+    },
+    {
+      "date": "2025-11-20",
+      "blockNumber": 23843673,
+      "rawValue": "106229547700",
+      "oracleUpdatedAt": "2025-11-20T12:34:35.000Z",
+      "price": 1062.295477
+    },
+    {
+      "date": "2025-11-21",
+      "blockNumber": 23850795,
+      "rawValue": "106296092500",
+      "oracleUpdatedAt": "2025-11-21T12:34:59.000Z",
+      "price": 1062.960925
+    },
+    {
+      "date": "2025-11-22",
+      "blockNumber": 23857896,
+      "rawValue": "106311093000",
+      "oracleUpdatedAt": "2025-11-22T12:35:11.000Z",
+      "price": 1063.11093
+    },
+    {
+      "date": "2025-11-23",
+      "blockNumber": 23865016,
+      "rawValue": "106311093000",
+      "oracleUpdatedAt": "2025-11-23T12:35:23.000Z",
+      "price": 1063.11093
+    },
+    {
+      "date": "2025-11-24",
+      "blockNumber": 23872121,
+      "rawValue": "106411577000",
+      "oracleUpdatedAt": "2025-11-24T20:46:23.000Z",
+      "price": 1064.11577
+    },
+    {
+      "date": "2025-11-25",
+      "blockNumber": 23879219,
+      "rawValue": "106571906900",
+      "oracleUpdatedAt": "2025-11-25T21:06:23.000Z",
+      "price": 1065.719069
+    },
+    {
+      "date": "2025-11-26",
+      "blockNumber": 23886341,
+      "rawValue": "106688720300",
+      "oracleUpdatedAt": "2025-11-26T20:18:23.000Z",
+      "price": 1066.887203
+    },
+    {
+      "date": "2025-11-27",
+      "blockNumber": 23893472,
+      "rawValue": "106688720300",
+      "oracleUpdatedAt": "2025-11-27T13:18:47.000Z",
+      "price": 1066.887203
+    },
+    {
+      "date": "2025-11-28",
+      "blockNumber": 23900602,
+      "rawValue": "106688720300",
+      "oracleUpdatedAt": "2025-11-28T13:18:59.000Z",
+      "price": 1066.887203
+    },
+    {
+      "date": "2025-11-29",
+      "blockNumber": 23907761,
+      "rawValue": "106722964500",
+      "oracleUpdatedAt": "2025-11-29T13:19:11.000Z",
+      "price": 1067.229645
+    },
+    {
+      "date": "2025-11-30",
+      "blockNumber": 23914920,
+      "rawValue": "106722964500",
+      "oracleUpdatedAt": "2025-11-30T13:19:23.000Z",
+      "price": 1067.229645
+    },
+    {
+      "date": "2025-12-01",
+      "blockNumber": 23922066,
+      "rawValue": "106973982700",
+      "oracleUpdatedAt": "2025-12-01T22:05:23.000Z",
+      "price": 1069.739827
+    },
+    {
+      "date": "2025-12-02",
+      "blockNumber": 23929210,
+      "rawValue": "106855986700",
+      "oracleUpdatedAt": "2025-12-02T21:39:23.000Z",
+      "price": 1068.559867
+    },
+    {
+      "date": "2025-12-03",
+      "blockNumber": 23936303,
+      "rawValue": "106855986700",
+      "oracleUpdatedAt": "2025-12-03T13:19:59.000Z",
+      "price": 1068.559867
+    },
+    {
+      "date": "2025-12-04",
+      "blockNumber": 23943068,
+      "rawValue": "107078542400",
+      "oracleUpdatedAt": "2025-12-04T21:36:23.000Z",
+      "price": 1070.785424
+    },
+    {
+      "date": "2025-12-05",
+      "blockNumber": 23950139,
+      "rawValue": "107078542400",
+      "oracleUpdatedAt": "2025-12-05T19:32:47.000Z",
+      "price": 1070.785424
+    },
+    {
+      "date": "2025-12-06",
+      "blockNumber": 23957250,
+      "rawValue": "107103534700",
+      "oracleUpdatedAt": "2025-12-06T19:32:59.000Z",
+      "price": 1071.035347
+    },
+    {
+      "date": "2025-12-07",
+      "blockNumber": 23964385,
+      "rawValue": "107103534700",
+      "oracleUpdatedAt": "2025-12-07T19:33:11.000Z",
+      "price": 1071.035347
+    },
+    {
+      "date": "2025-12-08",
+      "blockNumber": 23971510,
+      "rawValue": "107408554200",
+      "oracleUpdatedAt": "2025-12-08T20:25:23.000Z",
+      "price": 1074.085542
+    },
+    {
+      "date": "2025-12-09",
+      "blockNumber": 23978632,
+      "rawValue": "107521911400",
+      "oracleUpdatedAt": "2025-12-09T21:24:23.000Z",
+      "price": 1075.219114
+    },
+    {
+      "date": "2025-12-10",
+      "blockNumber": 23985730,
+      "rawValue": "107776651900",
+      "oracleUpdatedAt": "2025-12-10T21:20:35.000Z",
+      "price": 1077.766519
+    },
+    {
+      "date": "2025-12-11",
+      "blockNumber": 23992864,
+      "rawValue": "108120426700",
+      "oracleUpdatedAt": "2025-12-11T21:26:23.000Z",
+      "price": 1081.204267
+    },
+    {
+      "date": "2025-12-12",
+      "blockNumber": 23999969,
+      "rawValue": "108199616800",
+      "oracleUpdatedAt": "2025-12-12T20:41:11.000Z",
+      "price": 1081.996168
+    },
+    {
+      "date": "2025-12-13",
+      "blockNumber": 24007119,
+      "rawValue": "108199616800",
+      "oracleUpdatedAt": "2025-12-13T13:59:11.000Z",
+      "price": 1081.996168
+    },
+    {
+      "date": "2025-12-14",
+      "blockNumber": 24014285,
+      "rawValue": "108199616800",
+      "oracleUpdatedAt": "2025-12-14T13:59:23.000Z",
+      "price": 1081.996168
+    },
+    {
+      "date": "2025-12-15",
+      "blockNumber": 24021445,
+      "rawValue": "108305546800",
+      "oracleUpdatedAt": "2025-12-15T21:18:35.000Z",
+      "price": 1083.055468
+    },
+    {
+      "date": "2025-12-16",
+      "blockNumber": 24028609,
+      "rawValue": "108305546800",
+      "oracleUpdatedAt": "2025-12-16T12:10:11.000Z",
+      "price": 1083.055468
+    },
+    {
+      "date": "2025-12-17",
+      "blockNumber": 24035770,
+      "rawValue": "108277267600",
+      "oracleUpdatedAt": "2025-12-17T13:07:23.000Z",
+      "price": 1082.772676
+    },
+    {
+      "date": "2025-12-18",
+      "blockNumber": 24042925,
+      "rawValue": "108134231100",
+      "oracleUpdatedAt": "2025-12-18T21:56:35.000Z",
+      "price": 1081.342311
+    },
+    {
+      "date": "2025-12-19",
+      "blockNumber": 24050082,
+      "rawValue": "108195683700",
+      "oracleUpdatedAt": "2025-12-19T22:07:23.000Z",
+      "price": 1081.956837
+    },
+    {
+      "date": "2025-12-20",
+      "blockNumber": 24057253,
+      "rawValue": "108195683700",
+      "oracleUpdatedAt": "2025-12-20T13:34:35.000Z",
+      "price": 1081.956837
+    },
+    {
+      "date": "2025-12-21",
+      "blockNumber": 24064431,
+      "rawValue": "108195683700",
+      "oracleUpdatedAt": "2025-12-21T13:34:47.000Z",
+      "price": 1081.956837
+    },
+    {
+      "date": "2025-12-22",
+      "blockNumber": 24071592,
+      "rawValue": "108163370000",
+      "oracleUpdatedAt": "2025-12-22T21:40:23.000Z",
+      "price": 1081.6337
+    },
+    {
+      "date": "2025-12-23",
+      "blockNumber": 24078750,
+      "rawValue": "108326788900",
+      "oracleUpdatedAt": "2025-12-23T21:13:23.000Z",
+      "price": 1083.267889
+    },
+    {
+      "date": "2025-12-24",
+      "blockNumber": 24085922,
+      "rawValue": "108300462600",
+      "oracleUpdatedAt": "2025-12-24T19:42:35.000Z",
+      "price": 1083.004626
+    },
+    {
+      "date": "2025-12-25",
+      "blockNumber": 24093082,
+      "rawValue": "108300462600",
+      "oracleUpdatedAt": "2025-12-25T13:54:47.000Z",
+      "price": 1083.004626
+    },
+    {
+      "date": "2025-12-26",
+      "blockNumber": 24100245,
+      "rawValue": "108389740600",
+      "oracleUpdatedAt": "2025-12-26T20:43:23.000Z",
+      "price": 1083.897406
+    },
+    {
+      "date": "2025-12-27",
+      "blockNumber": 24107406,
+      "rawValue": "108389740600",
+      "oracleUpdatedAt": "2025-12-27T13:55:23.000Z",
+      "price": 1083.897406
+    },
+    {
+      "date": "2025-12-28",
+      "blockNumber": 24114577,
+      "rawValue": "108389740600",
+      "oracleUpdatedAt": "2025-12-28T13:55:35.000Z",
+      "price": 1083.897406
+    },
+    {
+      "date": "2025-12-29",
+      "blockNumber": 24121738,
+      "rawValue": "108401335200",
+      "oracleUpdatedAt": "2025-12-29T22:33:23.000Z",
+      "price": 1084.013352
+    },
+    {
+      "date": "2025-12-30",
+      "blockNumber": 24128884,
+      "rawValue": "108563646700",
+      "oracleUpdatedAt": "2025-12-30T21:57:23.000Z",
+      "price": 1085.636467
+    },
+    {
+      "date": "2025-12-31",
+      "blockNumber": 24136052,
+      "rawValue": "108628475300",
+      "oracleUpdatedAt": "2025-12-31T20:29:23.000Z",
+      "price": 1086.284753
+    },
+    {
+      "date": "2026-01-01",
+      "blockNumber": 24143222,
+      "rawValue": "108628475300",
+      "oracleUpdatedAt": "2026-01-01T13:56:35.000Z",
+      "price": 1086.284753
+    },
+    {
+      "date": "2026-01-02",
+      "blockNumber": 24150396,
+      "rawValue": "108613757600",
+      "oracleUpdatedAt": "2026-01-02T22:10:23.000Z",
+      "price": 1086.137576
+    },
+    {
+      "date": "2026-01-03",
+      "blockNumber": 24157566,
+      "rawValue": "108613757600",
+      "oracleUpdatedAt": "2026-01-03T13:56:59.000Z",
+      "price": 1086.137576
+    },
+    {
+      "date": "2026-01-04",
+      "blockNumber": 24164738,
+      "rawValue": "108613757600",
+      "oracleUpdatedAt": "2026-01-04T13:57:23.000Z",
+      "price": 1086.137576
+    },
+    {
+      "date": "2026-01-05",
+      "blockNumber": 24171901,
+      "rawValue": "108747151300",
+      "oracleUpdatedAt": "2026-01-05T21:59:23.000Z",
+      "price": 1087.471513
+    },
+    {
+      "date": "2026-01-06",
+      "blockNumber": 24179079,
+      "rawValue": "108811208700",
+      "oracleUpdatedAt": "2026-01-06T22:47:23.000Z",
+      "price": 1088.112087
+    },
+    {
+      "date": "2026-01-07",
+      "blockNumber": 24186241,
+      "rawValue": "109070548800",
+      "oracleUpdatedAt": "2026-01-07T22:04:23.000Z",
+      "price": 1090.705488
+    },
+    {
+      "date": "2026-01-08",
+      "blockNumber": 24193397,
+      "rawValue": "108898059600",
+      "oracleUpdatedAt": "2026-01-08T21:46:23.000Z",
+      "price": 1088.980596
+    },
+    {
+      "date": "2026-01-09",
+      "blockNumber": 24200571,
+      "rawValue": "109161227200",
+      "oracleUpdatedAt": "2026-01-09T21:56:23.000Z",
+      "price": 1091.612272
+    },
+    {
+      "date": "2026-01-10",
+      "blockNumber": 24207742,
+      "rawValue": "109161227200",
+      "oracleUpdatedAt": "2026-01-10T13:58:47.000Z",
+      "price": 1091.612272
+    },
+    {
+      "date": "2026-01-11",
+      "blockNumber": 24214912,
+      "rawValue": "109161227200",
+      "oracleUpdatedAt": "2026-01-11T13:58:59.000Z",
+      "price": 1091.612272
+    },
+    {
+      "date": "2026-01-12",
+      "blockNumber": 24222074,
+      "rawValue": "109264059500",
+      "oracleUpdatedAt": "2026-01-12T22:20:23.000Z",
+      "price": 1092.640595
+    },
+    {
+      "date": "2026-01-13",
+      "blockNumber": 24229220,
+      "rawValue": "109473311000",
+      "oracleUpdatedAt": "2026-01-13T22:19:59.000Z",
+      "price": 1094.73311
+    },
+    {
+      "date": "2026-01-14",
+      "blockNumber": 24236386,
+      "rawValue": "109399994400",
+      "oracleUpdatedAt": "2026-01-14T21:57:23.000Z",
+      "price": 1093.999944
+    },
+    {
+      "date": "2026-01-15",
+      "blockNumber": 24243557,
+      "rawValue": "109516135200",
+      "oracleUpdatedAt": "2026-01-15T20:30:23.000Z",
+      "price": 1095.161352
+    },
+    {
+      "date": "2026-01-16",
+      "blockNumber": 24250737,
+      "rawValue": "109389100500",
+      "oracleUpdatedAt": "2026-01-16T22:13:23.000Z",
+      "price": 1093.891005
+    },
+    {
+      "date": "2026-01-17",
+      "blockNumber": 24257909,
+      "rawValue": "109389100500",
+      "oracleUpdatedAt": "2026-01-17T15:45:59.000Z",
+      "price": 1093.891005
+    },
+    {
+      "date": "2026-01-18",
+      "blockNumber": 24265091,
+      "rawValue": "109389100500",
+      "oracleUpdatedAt": "2026-01-18T15:46:11.000Z",
+      "price": 1093.891005
+    },
+    {
+      "date": "2026-01-19",
+      "blockNumber": 24272265,
+      "rawValue": "109389100500",
+      "oracleUpdatedAt": "2026-01-19T15:46:23.000Z",
+      "price": 1093.891005
+    },
+    {
+      "date": "2026-01-20",
+      "blockNumber": 24279434,
+      "rawValue": "109512565200",
+      "oracleUpdatedAt": "2026-01-20T21:21:23.000Z",
+      "price": 1095.125652
+    },
+    {
+      "date": "2026-01-21",
+      "blockNumber": 24286607,
+      "rawValue": "109442181900",
+      "oracleUpdatedAt": "2026-01-21T21:09:23.000Z",
+      "price": 1094.421819
+    },
+    {
+      "date": "2026-01-22",
+      "blockNumber": 24293765,
+      "rawValue": "109510647500",
+      "oracleUpdatedAt": "2026-01-22T23:05:23.000Z",
+      "price": 1095.106475
+    },
+    {
+      "date": "2026-01-23",
+      "blockNumber": 24300927,
+      "rawValue": "109529487300",
+      "oracleUpdatedAt": "2026-01-23T21:38:23.000Z",
+      "price": 1095.294873
+    },
+    {
+      "date": "2026-01-24",
+      "blockNumber": 24308099,
+      "rawValue": "109529487300",
+      "oracleUpdatedAt": "2026-01-24T09:48:47.000Z",
+      "price": 1095.294873
+    },
+    {
+      "date": "2026-01-25",
+      "blockNumber": 24315273,
+      "rawValue": "109529487300",
+      "oracleUpdatedAt": "2026-01-25T09:48:59.000Z",
+      "price": 1095.294873
+    },
+    {
+      "date": "2026-01-26",
+      "blockNumber": 24322443,
+      "rawValue": "109591949600",
+      "oracleUpdatedAt": "2026-01-26T20:42:23.000Z",
+      "price": 1095.919496
+    },
+    {
+      "date": "2026-01-27",
+      "blockNumber": 24329613,
+      "rawValue": "109562052100",
+      "oracleUpdatedAt": "2026-01-27T22:06:23.000Z",
+      "price": 1095.620521
+    },
+    {
+      "date": "2026-01-28",
+      "blockNumber": 24336785,
+      "rawValue": "109622865100",
+      "oracleUpdatedAt": "2026-01-28T21:29:23.000Z",
+      "price": 1096.228651
+    },
+    {
+      "date": "2026-01-29",
+      "blockNumber": 24343955,
+      "rawValue": "109558140900",
+      "oracleUpdatedAt": "2026-01-29T21:30:23.000Z",
+      "price": 1095.581409
+    },
+    {
+      "date": "2026-01-30",
+      "blockNumber": 24351127,
+      "rawValue": "109485147200",
+      "oracleUpdatedAt": "2026-01-30T21:34:23.000Z",
+      "price": 1094.851472
+    },
+    {
+      "date": "2026-01-31",
+      "blockNumber": 24358292,
+      "rawValue": "109485147200",
+      "oracleUpdatedAt": "2026-01-31T13:07:11.000Z",
+      "price": 1094.851472
+    },
+    {
+      "date": "2026-02-01",
+      "blockNumber": 24365453,
+      "rawValue": "109485147200",
+      "oracleUpdatedAt": "2026-02-01T13:07:23.000Z",
+      "price": 1094.851472
+    },
+    {
+      "date": "2026-02-02",
+      "blockNumber": 24372613,
+      "rawValue": "109485147200",
+      "oracleUpdatedAt": "2026-02-02T12:31:35.000Z",
+      "price": 1094.851472
+    },
+    {
+      "date": "2026-02-03",
+      "blockNumber": 24379762,
+      "rawValue": "109612370700",
+      "oracleUpdatedAt": "2026-02-03T22:01:47.000Z",
+      "price": 1096.123707
+    },
+    {
+      "date": "2026-02-04",
+      "blockNumber": 24386914,
+      "rawValue": "109579226200",
+      "oracleUpdatedAt": "2026-02-04T21:44:47.000Z",
+      "price": 1095.792262
+    },
+    {
+      "date": "2026-02-05",
+      "blockNumber": 24394064,
+      "rawValue": "109547729000",
+      "oracleUpdatedAt": "2026-02-05T20:46:23.000Z",
+      "price": 1095.47729
+    },
+    {
+      "date": "2026-02-06",
+      "blockNumber": 24401222,
+      "rawValue": "109567408100",
+      "oracleUpdatedAt": "2026-02-06T21:33:23.000Z",
+      "price": 1095.674081
+    },
+    {
+      "date": "2026-02-07",
+      "blockNumber": 24408384,
+      "rawValue": "109567408100",
+      "oracleUpdatedAt": "2026-02-07T13:26:47.000Z",
+      "price": 1095.674081
+    },
+    {
+      "date": "2026-02-08",
+      "blockNumber": 24415493,
+      "rawValue": "109567408100",
+      "oracleUpdatedAt": "2026-02-08T13:26:59.000Z",
+      "price": 1095.674081
+    },
+    {
+      "date": "2026-02-09",
+      "blockNumber": 24422653,
+      "rawValue": "109629693700",
+      "oracleUpdatedAt": "2026-02-09T20:48:23.000Z",
+      "price": 1096.296937
+    },
+    {
+      "date": "2026-02-10",
+      "blockNumber": 24429809,
+      "rawValue": "109629693700",
+      "oracleUpdatedAt": "2026-02-10T13:27:23.000Z",
+      "price": 1096.296937
+    },
+    {
+      "date": "2026-02-11",
+      "blockNumber": 24436971,
+      "rawValue": "109670967100",
+      "oracleUpdatedAt": "2026-02-11T20:39:23.000Z",
+      "price": 1096.709671
+    },
+    {
+      "date": "2026-02-12",
+      "blockNumber": 24444138,
+      "rawValue": "109597488400",
+      "oracleUpdatedAt": "2026-02-12T21:06:35.000Z",
+      "price": 1095.974884
+    },
+    {
+      "date": "2026-02-13",
+      "blockNumber": 24451302,
+      "rawValue": "109597488400",
+      "oracleUpdatedAt": "2026-02-13T10:37:35.000Z",
+      "price": 1095.974884
+    },
+    {
+      "date": "2026-02-14",
+      "blockNumber": 24458475,
+      "rawValue": "109713972400",
+      "oracleUpdatedAt": "2026-02-14T14:44:23.000Z",
+      "price": 1097.139724
+    },
+    {
+      "date": "2026-02-15",
+      "blockNumber": 24465653,
+      "rawValue": "109713972400",
+      "oracleUpdatedAt": "2026-02-15T10:37:59.000Z",
+      "price": 1097.139724
+    },
+    {
+      "date": "2026-02-16",
+      "blockNumber": 24472825,
+      "rawValue": "109713972400",
+      "oracleUpdatedAt": "2026-02-16T13:53:11.000Z",
+      "price": 1097.139724
+    },
+    {
+      "date": "2026-02-17",
+      "blockNumber": 24479994,
+      "rawValue": "109797197400",
+      "oracleUpdatedAt": "2026-02-17T20:36:23.000Z",
+      "price": 1097.971974
+    },
+    {
+      "date": "2026-02-18",
+      "blockNumber": 24487167,
+      "rawValue": "109721916300",
+      "oracleUpdatedAt": "2026-02-18T19:45:23.000Z",
+      "price": 1097.219163
+    },
+    {
+      "date": "2026-02-19",
+      "blockNumber": 24494335,
+      "rawValue": "109741345100",
+      "oracleUpdatedAt": "2026-02-19T21:04:23.000Z",
+      "price": 1097.413451
+    },
+    {
+      "date": "2026-02-20",
+      "blockNumber": 24501511,
+      "rawValue": "109713469800",
+      "oracleUpdatedAt": "2026-02-20T20:24:23.000Z",
+      "price": 1097.134698
+    },
+    {
+      "date": "2026-02-21",
+      "blockNumber": 24508681,
+      "rawValue": "109713469800",
+      "oracleUpdatedAt": "2026-02-21T09:49:35.000Z",
+      "price": 1097.134698
+    },
+    {
+      "date": "2026-02-22",
+      "blockNumber": 24515859,
+      "rawValue": "109713469800",
+      "oracleUpdatedAt": "2026-02-22T09:49:47.000Z",
+      "price": 1097.134698
+    },
+    {
+      "date": "2026-02-23",
+      "blockNumber": 24523029,
+      "rawValue": "109767271300",
+      "oracleUpdatedAt": "2026-02-23T22:21:23.000Z",
+      "price": 1097.672713
+    },
+    {
+      "date": "2026-02-24",
+      "blockNumber": 24530203,
+      "rawValue": "109767271300",
+      "oracleUpdatedAt": "2026-02-24T09:50:11.000Z",
+      "price": 1097.672713
+    },
+    {
+      "date": "2026-02-25",
+      "blockNumber": 24537365,
+      "rawValue": "109663749600",
+      "oracleUpdatedAt": "2026-02-25T20:27:23.000Z",
+      "price": 1096.637496
+    },
+    {
+      "date": "2026-02-26",
+      "blockNumber": 24544538,
+      "rawValue": "109663749600",
+      "oracleUpdatedAt": "2026-02-26T09:50:35.000Z",
+      "price": 1096.637496
+    },
+    {
+      "date": "2026-02-27",
+      "blockNumber": 24551711,
+      "rawValue": "109656661900",
+      "oracleUpdatedAt": "2026-02-27T20:51:23.000Z",
+      "price": 1096.566619
+    },
+    {
+      "date": "2026-02-28",
+      "blockNumber": 24558867,
+      "rawValue": "109656661900",
+      "oracleUpdatedAt": "2026-02-28T09:50:59.000Z",
+      "price": 1096.566619
+    },
+    {
+      "date": "2026-03-01",
+      "blockNumber": 24566043,
+      "rawValue": "109656661900",
+      "oracleUpdatedAt": "2026-03-01T09:51:11.000Z",
+      "price": 1096.566619
+    },
+    {
+      "date": "2026-03-02",
+      "blockNumber": 24573203,
+      "rawValue": "109639124100",
+      "oracleUpdatedAt": "2026-03-02T20:34:23.000Z",
+      "price": 1096.391241
+    },
+    {
+      "date": "2026-03-03",
+      "blockNumber": 24580372,
+      "rawValue": "109488294100",
+      "oracleUpdatedAt": "2026-03-03T21:13:23.000Z",
+      "price": 1094.882941
+    },
+    {
+      "date": "2026-03-04",
+      "blockNumber": 24587537,
+      "rawValue": "109415571700",
+      "oracleUpdatedAt": "2026-03-04T20:38:23.000Z",
+      "price": 1094.155717
+    },
+    {
+      "date": "2026-03-05",
+      "blockNumber": 24594708,
+      "rawValue": "109533355100",
+      "oracleUpdatedAt": "2026-03-05T22:36:23.000Z",
+      "price": 1095.333551
+    },
+    {
+      "date": "2026-03-06",
+      "blockNumber": 24601856,
+      "rawValue": "109553793700",
+      "oracleUpdatedAt": "2026-03-06T20:43:23.000Z",
+      "price": 1095.537937
+    },
+    {
+      "date": "2026-03-07",
+      "blockNumber": 24609015,
+      "rawValue": "109553793700",
+      "oracleUpdatedAt": "2026-03-07T13:46:35.000Z",
+      "price": 1095.537937
+    },
+    {
+      "date": "2026-03-08",
+      "blockNumber": 24616187,
+      "rawValue": "109553793700",
+      "oracleUpdatedAt": "2026-03-08T13:46:47.000Z",
+      "price": 1095.537937
+    },
+    {
+      "date": "2026-03-09",
+      "blockNumber": 24623352,
+      "rawValue": "109566069700",
+      "oracleUpdatedAt": "2026-03-09T20:24:23.000Z",
+      "price": 1095.660697
+    },
+    {
+      "date": "2026-03-10",
+      "blockNumber": 24630504,
+      "rawValue": "109541100000",
+      "oracleUpdatedAt": "2026-03-10T19:54:23.000Z",
+      "price": 1095.411
+    },
+    {
+      "date": "2026-03-11",
+      "blockNumber": 24637660,
+      "rawValue": "109608980100",
+      "oracleUpdatedAt": "2026-03-11T19:22:23.000Z",
+      "price": 1096.089801
+    },
+    {
+      "date": "2026-03-12",
+      "blockNumber": 24644820,
+      "rawValue": "109307095200",
+      "oracleUpdatedAt": "2026-03-12T21:15:23.000Z",
+      "price": 1093.070952
+    },
+    {
+      "date": "2026-03-13",
+      "blockNumber": 24651992,
+      "rawValue": "109183953200",
+      "oracleUpdatedAt": "2026-03-13T21:14:23.000Z",
+      "price": 1091.839532
+    },
+    {
+      "date": "2026-03-14",
+      "blockNumber": 24659163,
+      "rawValue": "109183953200",
+      "oracleUpdatedAt": "2026-03-14T14:57:23.000Z",
+      "price": 1091.839532
+    },
+    {
+      "date": "2026-03-15",
+      "blockNumber": 24666338,
+      "rawValue": "109183953200",
+      "oracleUpdatedAt": "2026-03-15T14:57:23.000Z",
+      "price": 1091.839532
+    },
+    {
+      "date": "2026-03-16",
+      "blockNumber": 24673496,
+      "rawValue": "109183953200",
+      "oracleUpdatedAt": "2026-03-16T14:57:23.000Z",
+      "price": 1091.839532
+    },
+    {
+      "date": "2026-03-17",
+      "blockNumber": 24680644,
+      "rawValue": "109145696400",
+      "oracleUpdatedAt": "2026-03-17T17:46:47.000Z",
+      "price": 1091.456964
+    },
+    {
+      "date": "2026-03-18",
+      "blockNumber": 24687807,
+      "rawValue": "109276980100",
+      "oracleUpdatedAt": "2026-03-18T19:51:23.000Z",
+      "price": 1092.769801
+    },
+    {
+      "date": "2026-03-19",
+      "blockNumber": 24694981,
+      "rawValue": "109203171700",
+      "oracleUpdatedAt": "2026-03-19T19:45:23.000Z",
+      "price": 1092.031717
+    },
+    {
+      "date": "2026-03-20",
+      "blockNumber": 24702156,
+      "rawValue": "109076894700",
+      "oracleUpdatedAt": "2026-03-20T20:03:23.000Z",
+      "price": 1090.768947
+    },
+    {
+      "date": "2026-03-21",
+      "blockNumber": 24709326,
+      "rawValue": "109076894700",
+      "oracleUpdatedAt": "2026-03-21T15:22:59.000Z",
+      "price": 1090.768947
+    },
+    {
+      "date": "2026-03-22",
+      "blockNumber": 24716493,
+      "rawValue": "109076894700",
+      "oracleUpdatedAt": "2026-03-22T15:23:11.000Z",
+      "price": 1090.768947
+    },
+    {
+      "date": "2026-03-23",
+      "blockNumber": 24723659,
+      "rawValue": "108895337700",
+      "oracleUpdatedAt": "2026-03-23T20:22:23.000Z",
+      "price": 1088.953377
+    },
+    {
+      "date": "2026-03-24",
+      "blockNumber": 24730839,
+      "rawValue": "109056279200",
+      "oracleUpdatedAt": "2026-03-24T23:06:47.000Z",
+      "price": 1090.562792
+    },
+    {
+      "date": "2026-03-25",
+      "blockNumber": 24738009,
+      "rawValue": "109056279200",
+      "oracleUpdatedAt": "2026-03-25T15:29:47.000Z",
+      "price": 1090.562792
+    },
+    {
+      "date": "2026-03-26",
+      "blockNumber": 24745175,
+      "rawValue": "109056279200",
+      "oracleUpdatedAt": "2026-03-26T15:29:59.000Z",
+      "price": 1090.562792
+    },
+    {
+      "date": "2026-03-27",
+      "blockNumber": 24752336,
+      "rawValue": "108971705500",
+      "oracleUpdatedAt": "2026-03-27T23:37:23.000Z",
+      "price": 1089.717055
+    },
+    {
+      "date": "2026-03-28",
+      "blockNumber": 24759518,
+      "rawValue": "108971705500",
+      "oracleUpdatedAt": "2026-03-28T15:30:23.000Z",
+      "price": 1089.717055
+    },
+    {
+      "date": "2026-03-29",
+      "blockNumber": 24766691,
+      "rawValue": "108971705500",
+      "oracleUpdatedAt": "2026-03-29T15:30:23.000Z",
+      "price": 1089.717055
+    },
+    {
+      "date": "2026-03-30",
+      "blockNumber": 24773860,
+      "rawValue": "109079370300",
+      "oracleUpdatedAt": "2026-03-30T20:03:35.000Z",
+      "price": 1090.793703
+    },
+    {
+      "date": "2026-03-31",
+      "blockNumber": 24781026,
+      "rawValue": "109145269100",
+      "oracleUpdatedAt": "2026-03-31T21:03:35.000Z",
+      "price": 1091.452691
+    },
+    {
+      "date": "2026-04-01",
+      "blockNumber": 24788192,
+      "rawValue": "109345642400",
+      "oracleUpdatedAt": "2026-04-01T21:59:47.000Z",
+      "price": 1093.456424
+    },
+    {
+      "date": "2026-04-02",
+      "blockNumber": 24795370,
+      "rawValue": "109461707600",
+      "oracleUpdatedAt": "2026-04-02T20:08:23.000Z",
+      "price": 1094.617076
+    },
+    {
+      "date": "2026-04-03",
+      "blockNumber": 24802549,
+      "rawValue": "109461707600",
+      "oracleUpdatedAt": "2026-04-03T08:53:11.000Z",
+      "price": 1094.617076
+    },
+    {
+      "date": "2026-04-04",
+      "blockNumber": 24809731,
+      "rawValue": "109461707600",
+      "oracleUpdatedAt": "2026-04-04T08:53:23.000Z",
+      "price": 1094.617076
+    },
+    {
+      "date": "2026-04-05",
+      "blockNumber": 24816907,
+      "rawValue": "109461707600",
+      "oracleUpdatedAt": "2026-04-05T08:53:35.000Z",
+      "price": 1094.617076
+    },
+    {
+      "date": "2026-04-06",
+      "blockNumber": 24824077,
+      "rawValue": "109489868800",
+      "oracleUpdatedAt": "2026-04-06T22:52:59.000Z",
+      "price": 1094.898688
+    },
+    {
+      "date": "2026-04-07",
+      "blockNumber": 24831255,
+      "rawValue": "109489868800",
+      "oracleUpdatedAt": "2026-04-07T22:53:11.000Z",
+      "price": 1094.898688
+    },
+    {
+      "date": "2026-04-08",
+      "blockNumber": 24838434,
+      "rawValue": "109489868800",
+      "oracleUpdatedAt": "2026-04-08T22:53:23.000Z",
+      "price": 1094.898688
+    },
+    {
+      "date": "2026-04-09",
+      "blockNumber": 24845605,
+      "rawValue": "109842799500",
+      "oracleUpdatedAt": "2026-04-09T22:26:35.000Z",
+      "price": 1098.427995
+    },
+    {
+      "date": "2026-04-10",
+      "blockNumber": 24852769,
+      "rawValue": "109327552800",
+      "oracleUpdatedAt": "2026-04-10T20:09:23.000Z",
+      "price": 1093.275528
+    },
+    {
+      "date": "2026-04-11",
+      "blockNumber": 24859941,
+      "rawValue": "109327552800",
+      "oracleUpdatedAt": "2026-04-11T20:09:23.000Z",
+      "price": 1093.275528
+    },
+    {
+      "date": "2026-04-12",
+      "blockNumber": 24867119,
+      "rawValue": "109327552800",
+      "oracleUpdatedAt": "2026-04-12T20:09:35.000Z",
+      "price": 1093.275528
+    },
+    {
+      "date": "2026-04-13",
+      "blockNumber": 24874300,
+      "rawValue": "109337978700",
+      "oracleUpdatedAt": "2026-04-13T19:27:23.000Z",
+      "price": 1093.379787
+    },
+    {
+      "date": "2026-04-14",
+      "blockNumber": 24881482,
+      "rawValue": "109307820500",
+      "oracleUpdatedAt": "2026-04-14T21:41:23.000Z",
+      "price": 1093.078205
+    },
+    {
+      "date": "2026-04-15",
+      "blockNumber": 24888661,
+      "rawValue": "109473957800",
+      "oracleUpdatedAt": "2026-04-15T20:08:23.000Z",
+      "price": 1094.739578
+    },
+    {
+      "date": "2026-04-16",
+      "blockNumber": 24895841,
+      "rawValue": "109493523000",
+      "oracleUpdatedAt": "2026-04-16T19:40:23.000Z",
+      "price": 1094.93523
+    },
+    {
+      "date": "2026-04-17",
+      "blockNumber": 24903024,
+      "rawValue": "109510062000",
+      "oracleUpdatedAt": "2026-04-17T19:53:23.000Z",
+      "price": 1095.10062
+    },
+    {
+      "date": "2026-04-18",
+      "blockNumber": 24910201,
+      "rawValue": "109510062000",
+      "oracleUpdatedAt": "2026-04-18T19:53:35.000Z",
+      "price": 1095.10062
+    },
+    {
+      "date": "2026-04-19",
+      "blockNumber": 24917376,
+      "rawValue": "109510062000",
+      "oracleUpdatedAt": "2026-04-19T23:03:11.000Z",
+      "price": 1095.10062
+    },
+    {
+      "date": "2026-04-20",
+      "blockNumber": 24924560,
+      "rawValue": "109761950700",
+      "oracleUpdatedAt": "2026-04-20T20:10:23.000Z",
+      "price": 1097.619507
+    },
+    {
+      "date": "2026-04-21",
+      "blockNumber": 24931742,
+      "rawValue": "109773472900",
+      "oracleUpdatedAt": "2026-04-21T22:45:23.000Z",
+      "price": 1097.734729
+    },
+    {
+      "date": "2026-04-22",
+      "blockNumber": 24938910,
+      "rawValue": "109703177400",
+      "oracleUpdatedAt": "2026-04-22T22:21:23.000Z",
+      "price": 1097.031774
+    },
+    {
+      "date": "2026-04-23",
+      "blockNumber": 24946093,
+      "rawValue": "109675164300",
+      "oracleUpdatedAt": "2026-04-23T20:13:23.000Z",
+      "price": 1096.751643
+    },
+    {
+      "date": "2026-04-24",
+      "blockNumber": 24953276,
+      "rawValue": "109644970400",
+      "oracleUpdatedAt": "2026-04-24T20:20:23.000Z",
+      "price": 1096.449704
+    },
+    {
+      "date": "2026-04-25",
+      "blockNumber": 24960463,
+      "rawValue": "109644970400",
+      "oracleUpdatedAt": "2026-04-25T20:20:35.000Z",
+      "price": 1096.449704
+    },
+    {
+      "date": "2026-04-26",
+      "blockNumber": 24967646,
+      "rawValue": "109644970400",
+      "oracleUpdatedAt": "2026-04-26T20:20:47.000Z",
+      "price": 1096.449704
+    },
+    {
+      "date": "2026-04-27",
+      "blockNumber": 24974829,
+      "rawValue": "109753326100",
+      "oracleUpdatedAt": "2026-04-27T20:39:23.000Z",
+      "price": 1097.533261
+    },
+    {
+      "date": "2026-04-28",
+      "blockNumber": 24982011,
+      "rawValue": "109723571000",
+      "oracleUpdatedAt": "2026-04-28T20:28:23.000Z",
+      "price": 1097.23571
+    },
+    {
+      "date": "2026-04-29",
+      "blockNumber": 24989191,
+      "rawValue": "109696368000",
+      "oracleUpdatedAt": "2026-04-29T20:10:23.000Z",
+      "price": 1096.96368
+    },
+    {
+      "date": "2026-04-30",
+      "blockNumber": 24996367,
+      "rawValue": "109520435000",
+      "oracleUpdatedAt": "2026-04-30T22:32:23.000Z",
+      "price": 1095.20435
+    },
+    {
+      "date": "2026-05-01",
+      "blockNumber": 25003545,
+      "rawValue": "109586316000",
+      "oracleUpdatedAt": "2026-05-01T22:48:35.000Z",
+      "price": 1095.86316
+    },
+    {
+      "date": "2026-05-02",
+      "blockNumber": 25010735,
+      "rawValue": "109586316000",
+      "oracleUpdatedAt": "2026-05-02T22:48:47.000Z",
+      "price": 1095.86316
+    },
+    {
+      "date": "2026-05-03",
+      "blockNumber": 25017913,
+      "rawValue": "109586316000",
+      "oracleUpdatedAt": "2026-05-03T22:49:11.000Z",
+      "price": 1095.86316
+    },
+    {
+      "date": "2026-05-04",
+      "blockNumber": 25025077,
+      "rawValue": "109693202000",
+      "oracleUpdatedAt": "2026-05-04T20:08:23.000Z",
+      "price": 1096.93202
+    },
+    {
+      "date": "2026-05-05",
+      "blockNumber": 25032255,
+      "rawValue": "109554226000",
+      "oracleUpdatedAt": "2026-05-05T23:13:23.000Z",
+      "price": 1095.54226
+    },
+    {
+      "date": "2026-05-06",
+      "blockNumber": 25039432,
+      "rawValue": "109583720000",
+      "oracleUpdatedAt": "2026-05-06T22:05:23.000Z",
+      "price": 1095.8372
+    },
+    {
+      "date": "2026-05-07",
+      "blockNumber": 25046605,
+      "rawValue": "109825274000",
+      "oracleUpdatedAt": "2026-05-07T20:26:23.000Z",
+      "price": 1098.25274
+    },
+    {
+      "date": "2026-05-08",
+      "blockNumber": 25053792,
+      "rawValue": "109766738000",
+      "oracleUpdatedAt": "2026-05-08T21:46:23.000Z",
+      "price": 1097.66738
+    },
+    {
+      "date": "2026-05-09",
+      "blockNumber": 25060964,
+      "rawValue": "109766738000",
+      "oracleUpdatedAt": "2026-05-09T21:46:35.000Z",
+      "price": 1097.66738
+    },
+    {
+      "date": "2026-05-10",
+      "blockNumber": 25068138,
+      "rawValue": "109766738000",
+      "oracleUpdatedAt": "2026-05-10T21:46:47.000Z",
+      "price": 1097.66738
+    },
+    {
+      "date": "2026-05-11",
+      "blockNumber": 25075305,
+      "rawValue": "109833340000",
+      "oracleUpdatedAt": "2026-05-11T22:14:23.000Z",
+      "price": 1098.3334
+    },
+    {
+      "date": "2026-05-12",
+      "blockNumber": 25082485,
+      "rawValue": "109707577000",
+      "oracleUpdatedAt": "2026-05-12T21:28:23.000Z",
+      "price": 1097.07577
+    },
+    {
+      "date": "2026-05-13",
+      "blockNumber": 25089644,
+      "rawValue": "109622659000",
+      "oracleUpdatedAt": "2026-05-13T22:01:23.000Z",
+      "price": 1096.22659
+    },
+    {
+      "date": "2026-05-14",
+      "blockNumber": 25096819,
+      "rawValue": "109738158000",
+      "oracleUpdatedAt": "2026-05-14T20:35:47.000Z",
+      "price": 1097.38158
+    },
+    {
+      "date": "2026-05-15",
+      "blockNumber": 25103999,
+      "rawValue": "109760875000",
+      "oracleUpdatedAt": "2026-05-15T20:34:23.000Z",
+      "price": 1097.60875
+    },
+    {
+      "date": "2026-05-16",
+      "blockNumber": 25111182,
+      "rawValue": "109760875000",
+      "oracleUpdatedAt": "2026-05-16T20:34:35.000Z",
+      "price": 1097.60875
+    },
+    {
+      "date": "2026-05-17",
+      "blockNumber": 25118358,
+      "rawValue": "109760875000",
+      "oracleUpdatedAt": "2026-05-17T20:34:59.000Z",
+      "price": 1097.60875
+    },
+    {
+      "date": "2026-05-18",
+      "blockNumber": 25125536,
+      "rawValue": "109627050000",
+      "oracleUpdatedAt": "2026-05-18T21:32:23.000Z",
+      "price": 1096.2705
+    },
+    {
+      "date": "2026-05-19",
+      "blockNumber": 25132717,
+      "rawValue": "109552418000",
+      "oracleUpdatedAt": "2026-05-19T21:56:23.000Z",
+      "price": 1095.52418
+    },
+    {
+      "date": "2026-05-20",
+      "blockNumber": 25139893,
+      "rawValue": "109471963000",
+      "oracleUpdatedAt": "2026-05-20T21:23:23.000Z",
+      "price": 1094.71963
+    },
+    {
+      "date": "2026-05-21",
+      "blockNumber": 25147071,
+      "rawValue": "109638804000",
+      "oracleUpdatedAt": "2026-05-21T20:27:35.000Z",
+      "price": 1096.38804
+    },
+    {
+      "date": "2026-05-22",
+      "blockNumber": 25154243,
+      "rawValue": "109609948000",
+      "oracleUpdatedAt": "2026-05-22T21:37:35.000Z",
+      "price": 1096.09948
+    },
+    {
+      "date": "2026-05-23",
+      "blockNumber": 25161418,
+      "rawValue": "109609948000",
+      "oracleUpdatedAt": "2026-05-23T21:37:47.000Z",
+      "price": 1096.09948
+    },
+    {
+      "date": "2026-05-24",
+      "blockNumber": 25168596,
+      "rawValue": "109609948000",
+      "oracleUpdatedAt": "2026-05-24T21:37:59.000Z",
+      "price": 1096.09948
+    },
+    {
+      "date": "2026-05-25",
+      "blockNumber": 25175762,
+      "rawValue": "109609948000",
+      "oracleUpdatedAt": "2026-05-25T21:38:11.000Z",
+      "price": 1096.09948
+    },
+    {
+      "date": "2026-05-26",
+      "blockNumber": 25182942,
+      "rawValue": "109680838000",
+      "oracleUpdatedAt": "2026-05-26T23:24:35.000Z",
+      "price": 1096.80838
+    },
+    {
+      "date": "2026-05-27",
+      "blockNumber": 25190113,
+      "rawValue": "109753647000",
+      "oracleUpdatedAt": "2026-05-27T23:16:11.000Z",
+      "price": 1097.53647
+    },
+    {
+      "date": "2026-05-28",
+      "blockNumber": 25197290,
+      "rawValue": "109725875000",
+      "oracleUpdatedAt": "2026-05-28T20:10:11.000Z",
+      "price": 1097.25875
+    },
+    {
+      "date": "2026-05-29",
+      "blockNumber": 25204464,
+      "rawValue": "109796093000",
+      "oracleUpdatedAt": "2026-05-29T20:58:47.000Z",
+      "price": 1097.96093
+    },
+    {
+      "date": "2026-05-30",
+      "blockNumber": 25211628,
+      "rawValue": "109796093000",
+      "oracleUpdatedAt": "2026-05-30T20:58:59.000Z",
+      "price": 1097.96093
+    },
+    {
+      "date": "2026-05-31",
+      "blockNumber": 25218797,
+      "rawValue": "109796093000",
+      "oracleUpdatedAt": "2026-05-31T20:59:11.000Z",
+      "price": 1097.96093
+    },
+    {
+      "date": "2026-06-01",
+      "blockNumber": 25225970,
+      "rawValue": "109796093000",
+      "oracleUpdatedAt": "2026-06-01T20:59:23.000Z",
+      "price": 1097.96093
+    },
+    {
+      "date": "2026-06-02",
+      "blockNumber": 25233136,
+      "rawValue": "109796093000",
+      "oracleUpdatedAt": "2026-06-02T20:59:35.000Z",
+      "price": 1097.96093
+    },
+    {
+      "date": "2026-06-03",
+      "blockNumber": 25240302,
+      "rawValue": "109742333000",
+      "oracleUpdatedAt": "2026-06-03T23:29:11.000Z",
+      "price": 1097.42333
+    },
+    {
+      "date": "2026-06-04",
+      "blockNumber": 25247461,
+      "rawValue": "109710633000",
+      "oracleUpdatedAt": "2026-06-04T20:12:47.000Z",
+      "price": 1097.10633
+    },
+    {
+      "date": "2026-06-05",
+      "blockNumber": 25254619,
+      "rawValue": "109837492000",
+      "oracleUpdatedAt": "2026-06-05T23:21:23.000Z",
+      "price": 1098.37492
+    },
+    {
+      "date": "2026-06-06",
+      "blockNumber": 25261799,
+      "rawValue": "109837492000",
+      "oracleUpdatedAt": "2026-06-06T23:21:35.000Z",
+      "price": 1098.37492
+    },
+    {
+      "date": "2026-06-07",
+      "blockNumber": 25268963,
+      "rawValue": "109837492000",
+      "oracleUpdatedAt": "2026-06-07T23:21:47.000Z",
+      "price": 1098.37492
+    },
+    {
+      "date": "2026-06-08",
+      "blockNumber": 25276141,
+      "rawValue": "109650175000",
+      "oracleUpdatedAt": "2026-06-08T19:43:47.000Z",
+      "price": 1096.50175
+    },
+    {
+      "date": "2026-06-09",
+      "blockNumber": 25283318,
+      "rawValue": "109650175000",
+      "oracleUpdatedAt": "2026-06-09T22:05:23.000Z",
+      "price": 1096.50175
+    },
+    {
+      "date": "2026-06-10",
+      "blockNumber": 25290492,
+      "rawValue": "109736579000",
+      "oracleUpdatedAt": "2026-06-10T20:01:23.000Z",
+      "price": 1097.36579
+    },
+    {
+      "date": "2026-06-11",
+      "blockNumber": 25297657,
+      "rawValue": "109755105000",
+      "oracleUpdatedAt": "2026-06-11T20:15:47.000Z",
+      "price": 1097.55105
+    },
+    {
+      "date": "2026-06-12",
+      "blockNumber": 25304829,
+      "rawValue": "109921376000",
+      "oracleUpdatedAt": "2026-06-12T19:33:35.000Z",
+      "price": 1099.21376
+    },
+    {
+      "date": "2026-06-13",
+      "blockNumber": 25312002,
+      "rawValue": "109921376000",
+      "oracleUpdatedAt": "2026-06-13T19:33:59.000Z",
+      "price": 1099.21376
+    },
+    {
+      "date": "2026-06-14",
+      "blockNumber": 25319172,
+      "rawValue": "109921376000",
+      "oracleUpdatedAt": "2026-06-14T19:34:11.000Z",
+      "price": 1099.21376
+    },
+    {
+      "date": "2026-06-15",
+      "blockNumber": 25326350,
+      "rawValue": "109981245000",
+      "oracleUpdatedAt": "2026-06-15T20:09:35.000Z",
+      "price": 1099.81245
+    },
+    {
+      "date": "2026-06-16",
+      "blockNumber": 25333536,
+      "rawValue": "110050506000",
+      "oracleUpdatedAt": "2026-06-16T21:57:23.000Z",
+      "price": 1100.50506
+    },
+    {
+      "date": "2026-06-17",
+      "blockNumber": 25340718,
+      "rawValue": "110117831000",
+      "oracleUpdatedAt": "2026-06-17T20:03:59.000Z",
+      "price": 1101.17831
+    },
+    {
+      "date": "2026-06-18",
+      "blockNumber": 25347893,
+      "rawValue": "109891057000",
+      "oracleUpdatedAt": "2026-06-18T20:18:35.000Z",
+      "price": 1098.91057
+    },
+    {
+      "date": "2026-06-19",
+      "blockNumber": 25355071,
+      "rawValue": "109891057000",
+      "oracleUpdatedAt": "2026-06-19T20:18:47.000Z",
+      "price": 1098.91057
+    },
+    {
+      "date": "2026-06-20",
+      "blockNumber": 25362242,
+      "rawValue": "109891057000",
+      "oracleUpdatedAt": "2026-06-20T20:18:59.000Z",
+      "price": 1098.91057
+    },
+    {
+      "date": "2026-06-21",
+      "blockNumber": 25369413,
+      "rawValue": "109891057000",
+      "oracleUpdatedAt": "2026-06-21T20:19:11.000Z",
+      "price": 1098.91057
+    },
+    {
+      "date": "2026-06-22",
+      "blockNumber": 25376588,
+      "rawValue": "110019499000",
+      "oracleUpdatedAt": "2026-06-22T21:29:11.000Z",
+      "price": 1100.19499
+    },
+    {
+      "date": "2026-06-23",
+      "blockNumber": 25383756,
+      "rawValue": "110038230000",
+      "oracleUpdatedAt": "2026-06-23T23:57:23.000Z",
+      "price": 1100.3823
+    },
+    {
+      "date": "2026-06-24",
+      "blockNumber": 25390910,
+      "rawValue": "110008481000",
+      "oracleUpdatedAt": "2026-06-24T21:34:35.000Z",
+      "price": 1100.08481
+    },
+    {
+      "date": "2026-06-25",
+      "blockNumber": 25398082,
+      "rawValue": "110077745000",
+      "oracleUpdatedAt": "2026-06-25T21:10:11.000Z",
+      "price": 1100.77745
+    },
+    {
+      "date": "2026-06-26",
+      "blockNumber": 25405251,
+      "rawValue": "110099276000",
+      "oracleUpdatedAt": "2026-06-26T21:24:23.000Z",
+      "price": 1100.99276
+    },
+    {
+      "date": "2026-06-27",
+      "blockNumber": 25412424,
+      "rawValue": "110099276000",
+      "oracleUpdatedAt": "2026-06-27T21:24:35.000Z",
+      "price": 1100.99276
+    },
+    {
+      "date": "2026-06-28",
+      "blockNumber": 25419597,
+      "rawValue": "110099276000",
+      "oracleUpdatedAt": "2026-06-28T21:24:47.000Z",
+      "price": 1100.99276
+    },
+    {
+      "date": "2026-06-29",
+      "blockNumber": 25426766,
+      "rawValue": "110106832000",
+      "oracleUpdatedAt": "2026-06-29T21:24:59.000Z",
+      "price": 1101.06832
+    },
+    {
+      "date": "2026-06-30",
+      "blockNumber": 25433938,
+      "rawValue": "110171660000",
+      "oracleUpdatedAt": "2026-06-30T21:10:23.000Z",
+      "price": 1101.7166
+    },
+    {
+      "date": "2026-07-01",
+      "blockNumber": 25441105,
+      "rawValue": "110121220000",
+      "oracleUpdatedAt": "2026-07-01T22:30:11.000Z",
+      "price": 1101.2122
+    },
+    {
+      "date": "2026-07-02",
+      "blockNumber": 25448270,
+      "rawValue": "110188250000",
+      "oracleUpdatedAt": "2026-07-02T20:45:35.000Z",
+      "price": 1101.8825
+    },
+    {
+      "date": "2026-07-03",
+      "blockNumber": 25455433,
+      "rawValue": "110188250000",
+      "oracleUpdatedAt": "2026-07-03T11:52:23.000Z",
+      "price": 1101.8825
+    },
+    {
+      "date": "2026-07-04",
+      "blockNumber": 25462598,
+      "rawValue": "110188250000",
+      "oracleUpdatedAt": "2026-07-04T11:52:47.000Z",
+      "price": 1101.8825
+    },
+    {
+      "date": "2026-07-05",
+      "blockNumber": 25469763,
+      "rawValue": "110188250000",
+      "oracleUpdatedAt": "2026-07-05T11:52:59.000Z",
+      "price": 1101.8825
+    },
+    {
+      "date": "2026-07-06",
+      "blockNumber": 25476942,
+      "rawValue": "110310926000",
+      "oracleUpdatedAt": "2026-07-06T20:50:47.000Z",
+      "price": 1103.10926
+    },
+    {
+      "date": "2026-07-07",
+      "blockNumber": 25484120,
+      "rawValue": "110328721000",
+      "oracleUpdatedAt": "2026-07-07T21:33:35.000Z",
+      "price": 1103.28721
+    },
+    {
+      "date": "2026-07-08",
+      "blockNumber": 25491296,
+      "rawValue": "110345256000",
+      "oracleUpdatedAt": "2026-07-08T20:30:47.000Z",
+      "price": 1103.45256
+    },
+    {
+      "date": "2026-07-09",
+      "blockNumber": 25498467,
+      "rawValue": "110305845000",
+      "oracleUpdatedAt": "2026-07-09T20:48:59.000Z",
+      "price": 1103.05845
+    },
+    {
+      "date": "2026-07-10",
+      "blockNumber": 25505640,
+      "rawValue": "110305845000",
+      "oracleUpdatedAt": "2026-07-10T09:07:47.000Z",
+      "price": 1103.05845
+    },
+    {
+      "date": "2026-07-11",
+      "blockNumber": 25512815,
+      "rawValue": "110305845000",
+      "oracleUpdatedAt": "2026-07-11T09:07:59.000Z",
+      "price": 1103.05845
+    },
+    {
+      "date": "2026-07-12",
+      "blockNumber": 25519987,
+      "rawValue": "110305845000",
+      "oracleUpdatedAt": "2026-07-12T09:08:11.000Z",
+      "price": 1103.05845
+    },
+    {
+      "date": "2026-07-13",
+      "blockNumber": 25527154,
+      "rawValue": "110305845000",
+      "oracleUpdatedAt": "2026-07-13T09:08:23.000Z",
+      "price": 1103.05845
+    },
+    {
+      "date": "2026-07-14",
+      "blockNumber": 25534324,
+      "rawValue": "110352304000",
+      "oracleUpdatedAt": "2026-07-14T20:58:23.000Z",
+      "price": 1103.52304
+    },
+    {
+      "date": "2026-07-15",
+      "blockNumber": 25541499,
+      "rawValue": "110371423000",
+      "oracleUpdatedAt": "2026-07-15T22:23:23.000Z",
+      "price": 1103.71423
+    },
+    {
+      "date": "2026-07-16",
+      "blockNumber": 25548675,
+      "rawValue": "110490117000",
+      "oracleUpdatedAt": "2026-07-16T19:48:23.000Z",
+      "price": 1104.90117
+    },
+    {
+      "date": "2026-07-17",
+      "blockNumber": 25555858,
+      "rawValue": "110509732000",
+      "oracleUpdatedAt": "2026-07-17T20:47:23.000Z",
+      "price": 1105.09732
+    },
+    {
+      "date": "2026-07-18",
+      "blockNumber": 25563031,
+      "rawValue": "110509732000",
+      "oracleUpdatedAt": "2026-07-18T20:47:23.000Z",
+      "price": 1105.09732
+    },
+    {
+      "date": "2026-07-19",
+      "blockNumber": 25570200,
+      "rawValue": "110509732000",
+      "oracleUpdatedAt": "2026-07-19T20:47:35.000Z",
+      "price": 1105.09732
+    },
+    {
+      "date": "2026-07-20",
+      "blockNumber": 25577369,
+      "rawValue": "110518013000",
+      "oracleUpdatedAt": "2026-07-20T22:27:23.000Z",
+      "price": 1105.18013
+    },
+    {
+      "date": "2026-07-21",
+      "blockNumber": 25584545,
+      "rawValue": "110536046000",
+      "oracleUpdatedAt": "2026-07-21T22:01:23.000Z",
+      "price": 1105.36046
+    }
+  ]
+}
