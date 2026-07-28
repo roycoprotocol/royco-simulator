@@ -27,6 +27,13 @@ const GROUPS: Group[] = [
     defaultOpen: true,
     items: [
       {
+        name: 'Pool Creator',
+        desc: 'Public self-serve wizard: configure and deploy a Day pool against your own strategy.',
+        href: '/create',
+        build: 'pool-creator',
+        accent: '#967756',
+      },
+      {
         name: 'Day Simulator',
         desc: 'Full day-cycle engine with intraday event sequencing and runner output.',
         href: '/internal/day',
