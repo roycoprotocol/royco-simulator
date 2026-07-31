@@ -19,7 +19,7 @@ async function main() {
     manifest.targets.juniorApyMax,
   ];
   if (!requiredTargetValues.every(Number.isFinite)) {
-    throw new Error("Fill all four desired Senior/Junior APY target bounds before calibration.");
+    throw new Error("Fill all four desired ST/JT APY target bounds before calibration.");
   }
   const hasLiquidityTarget = manifest.targets.liquidityApyMin !== undefined
     || manifest.targets.liquidityApyMax !== undefined;
@@ -27,7 +27,7 @@ async function main() {
     hasLiquidityTarget
     && ![manifest.targets.liquidityApyMin, manifest.targets.liquidityApyMax].every(Number.isFinite)
   ) {
-    throw new Error("Fill both LP APY target bounds when using an LP calibration guardrail.");
+    throw new Error("Fill both SLP APY target bounds when using an SLP calibration guardrail.");
   }
 
 const distanceToRange = (value: number, min: number, max: number) => {

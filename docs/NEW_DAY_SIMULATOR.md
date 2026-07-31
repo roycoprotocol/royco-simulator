@@ -4,6 +4,16 @@ The public Day simulator is a grounded factory, not a page-building task. The ap
 
 Agents operate the factory. They do not recreate it.
 
+## Explorer and published-market boundary
+
+`/day-sim` is the canonical educational Day Explorer. It uses the shared Royco Explore product system—neutral foundation, white rounded surfaces, compact Inter typography, subtle borders, restrained shadows, and semantic tranche colors—and the same shared accountant runtime. It can load any registered certified market or an unverified user-supplied history from CSV, TSV, JSON, a public Google Sheet, or a public HTML date/value table.
+
+Explorer imports are drafts. They must keep unknown price type and fee treatment visible until the user answers them, may not claim certification, and may not create or overwrite a public market route. The Explorer is allowed to derive source APY from the supplied normalized series, but all tranche accounting still flows through `lib/day-simulator-template/runtime.ts` and `lib/day/engine`.
+
+The Explorer renders a compact guided variant. The source selector is followed by one unified market snapshot, not a stack of disconnected cards. Its default view contains a four-value setup summary, a secondary line for premium split/recovery/refill assumptions, one comparison table for the source, ST, JT, and SLP, proportional liquidity and loss-protection gauges, optional history, and the required disclosure. The comparison table must state each position's job, modeled end value, annualized return, and worst peak-to-trough drop. The two gauges use accountant-derived outputs: near-par and maximum atomic ST capacity for liquidity, and the source-loss breakpoint before ST declines for protection. Import controls, editable sliders, full liquidity and loss curves, the detailed history, and the monthly table are available on demand. The shared E-CLP downside-band input keeps its plain-language range and tradeoff when the setup editor is open; changing it must flow through `buildDayMarketConfig` and the existing executable quote path. The optional secondary-liquidity curve defaults to an illustrative 0–100% arbitrage-assisted sequence and provides a focused atomic-sale view through the current pool boundary. The sequence may only repeat the existing accountant-derived quote curve under a disclosed full-recentering assumption; it may not imply guaranteed arbitrage timing, total fill, or realized price. Every opened data chart—the liquidity views, coverage waterfall, detailed history, and timeframe overview—must expose its values on hover and must provide equivalent tap, focus, and arrow-key inspection where the chart is custom-rendered. These are presentation rules only; the guided variant may not calculate or restate accountant math.
+
+Registered market manifests populate the Explorer source selector. Individual market routes remain compatibility and review surfaces until the Explorer supports every authorized customization and those routes are deliberately migrated. A future migration may redirect them to `/day-sim?market=<market-id>`; do not remove generated routes as part of ordinary market creation.
+
 ## Required intake
 
 Do not start until all fields below are answered. Never infer an unanswered field.
@@ -12,14 +22,14 @@ Do not start until all fields below are answered. Never infer an unanswered fiel
 - **Route**
 - **Underlying asset**
 - **Display asset name** (the short label used in “___ base yield”)
-- **Senior name/symbol**
-- **Junior name/symbol**
+- **Senior Tranche name/symbol**
+- **Junior Tranche name/symbol**
 - **Data source**
 - **Is price NAV or total-return data?**
 - **Are fees already included?**
-- **Desired Senior yield** (a range, as decimals in the manifest)
-- **Desired Junior yield** (a range, as decimals in the manifest)
-- **Desired LP yield** (optional guardrail range; both bounds are required when used)
+- **Desired ST yield** (a range, as decimals in the manifest)
+- **Desired JT yield** (a range, as decimals in the manifest)
+- **Desired SLP yield** (optional guardrail range; both bounds are required when used)
 - **Desired minimum coverage**
 - **Anything that must differ from the standard template**
 
@@ -82,7 +92,7 @@ For an explicitly authorized presentation difference, use only supported manifes
 
 Supported hidden sections are `senior-summary`, `roles`, `market-inputs`, `liquidity-and-coverage`, `observation-period`, `backtest`, `junior-funding`, and `disclosure`. Supported copy overrides are `heroTitle` and `heroDescription`. Unsupported keys fail verification.
 
-An explicitly authorized reverse market may configure `customization.forwardTest` together with `customization.reverseMarket`. A forward test may use either the standard three-outcome set (`good`, `normal`, and `bad`) or a fixed-return two-outcome set (`expected` and `bad`) when the lender has no contractual participation in borrower upside. It requires a finite facility term, a payment delay, and either full recovery or an explicit terminal recovery amount. Capacity, issuer-funded/closed Junior status, and Senior support are declared under `reverseMarket`. The shared runtime accrues the configured published APY through maturity, holds value flat during a payment delay, and routes terminal recovery through the existing accountant and observation logic. When the generated anchor produces a zero-return calendar period, an authorized market may set `omitInitialZeroReturnPeriod` to omit only that anchor from the chart, brush, and monthly table while preserving it for accountant accrual and return calculations. The market manifest may contain only these assumptions—not derived prices, tranche formulas, waterfall math, or UI logic. In this mode the shared `backtest` section remains visible and is labeled Forward test.
+An explicitly authorized reverse market may configure `customization.forwardTest` together with `customization.reverseMarket`. A forward test may use either the standard three-outcome set (`good`, `normal`, and `bad`) or a fixed-return two-outcome set (`expected` and `bad`) when the lender has no contractual participation in borrower upside. It requires a finite facility term, a payment delay, and either full recovery or an explicit terminal recovery amount. Capacity, issuer-funded/closed JT status, and ST support are declared under `reverseMarket`. The shared runtime accrues the configured published APY through maturity, holds value flat during a payment delay, and routes terminal recovery through the existing accountant and observation logic. When the generated anchor produces a zero-return calendar period, an authorized market may set `omitInitialZeroReturnPeriod` to omit only that anchor from the chart, brush, and monthly table while preserving it for accountant accrual and return calculations. The market manifest may contain only these assumptions—not derived prices, tranche formulas, waterfall math, or UI logic. In this mode the shared `backtest` section remains visible and is labeled Forward test.
 
 Hidden defaults are still accountant inputs. Keep them explicit. Never guess a fee, curve endpoint, liquidity assumption, observation duration, refill rule, notional, or protocol parameter. Ask the user when a required value is missing.
 
@@ -92,13 +102,13 @@ Hidden defaults are still accountant inputs. Keep them explicit. Never guess a f
 npm run day-sim:calibrate -- <market-id>
 ```
 
-This searches the Junior and LP yield-share settings by repeatedly running `lib/day/engine`. It does not use an approximate yield formula. Review the report. If every configured Senior, Junior, and optional LP target range passes, write the result with:
+This searches the JT risk-premium and SLP liquidity-premium settings by repeatedly running `lib/day/engine`. It does not use an approximate yield formula. Review the report. If every configured ST, JT, and optional SLP target range passes, write the result with:
 
 ```bash
 npm run day-sim:calibrate -- <market-id> --write
 ```
 
-Never hand-calculate or rewrite tranche-yield, coverage, waterfall, observation, fee, NAV, YDM, LP, or E-CLP formulas.
+Never hand-calculate or rewrite tranche-yield, coverage, waterfall, observation, fee, NAV, YDM, SLP, or E-CLP formulas.
 
 ### 4. Verify and preview
 
@@ -148,13 +158,13 @@ The SHA-256 lock file makes that boundary machine-verifiable. It prevents a mark
 
 All Day state transitions and outputs flow through `lib/day/engine`. Shared wiring in `lib/day-simulator-template/runtime.ts` is the only adapter allowed to build initial balances and accountant configuration. The UI, market files, calibration command, and verifier consume this shared adapter; none may duplicate its formulas.
 
-The Solidity suite contains 52 Foundry-generated core accountant vectors and 22 pinned current-contract vectors. It covers LT commitment/reinvestment, all four fee rates, Senior liquidity-premium share minting, all six post-operation paths, coverage/liquidity gates, self-liquidation, one-wei rounding, and the mint-dilution clamp. Regenerate vectors only from the locked compiled contracts using the documented generator—never from TypeScript.
+The Solidity suite contains 52 Foundry-generated core accountant vectors and 22 pinned current-contract vectors. It covers SLP commitment/reinvestment (contract symbol LT), all four fee rates, ST liquidity-premium share minting, all six post-operation paths, coverage/liquidity gates, Protected Exit, one-wei rounding, and the mint-dilution clamp. Regenerate vectors only from the locked compiled contracts using the documented generator—never from TypeScript.
 
-LP stable yield, trading-fee income, turnover, and execution-liquidity economics are variable off-chain model inputs. They are invariant-tested, but they are not fixed onchain economics.
+SLP stable-asset yield, trading-fee income, turnover, and execution-liquidity economics are variable off-chain model inputs. They are invariant-tested, but they are not fixed onchain economics.
 
 ## Locked presentation contract
 
-The strict shell renders the approved executive page by default. It includes the same section order, plain-language role text, mechanism diagrams, expandable market-input bar, six sliders, three APY cards, auto-scaled liquidity curve with dynamic exit-percentage outputs, fixed-scale coverage loss waterfall, full accountant-backed history chart, ISO-date hover behavior, observation/erasure/loss annotations, unified two-handle backtest scrubber, month-over-month table, refill control, and source disclosure as Pareto FalconX v3. The observation-period explainer is shown only when the supplied source history contains an observed drawdown. An authorized finite forward test reuses that same chart and scrubber, adding only shared scenario and capacity controls driven by the manifest.
+The strict shell renders the approved executive page by default. It includes the same section order, plain-language role text, mechanism diagrams, expandable market-input bar, six sliders, three APY cards, a shared 0.25%–20% E-CLP downside-band control with near-par presets, focused atomic and illustrative 0–100% arbitrage-assisted liquidity views with executable-capacity outputs, fixed-scale coverage loss waterfall, full accountant-backed history chart, hover/tap/focus chart tooltips, observation/erasure/loss annotations, unified two-handle backtest scrubber with a hoverable overview, month-over-month table, refill control, and source disclosure as Pareto FalconX v3. The observation-period explainer is shown only when the supplied source history contains an observed drawdown. An authorized finite forward test reuses that same chart and scrubber, adding only shared scenario and capacity controls driven by the manifest.
 
 Fonts, palette, borders, radii, shadows, card dimensions, spacing, breakpoints, chart geometry, label placement, and mobile/high-zoom behavior are shared code. A market route cannot pass a variant, class, or style override. Market folders cannot contain React or CSS. Supported market customizations flow through the manifest and shared component, so disabling a section does not alter or duplicate its accounting.
 

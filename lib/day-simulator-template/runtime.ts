@@ -103,6 +103,7 @@ export function buildDayFiniteForwardSeries(
 export type DayEditableTerms = {
   coverage: number;
   minLiquidity: number;
+  eclpBandWidth: number;
   observationDays: number;
   riskYieldShare: number;
   liquidityYieldShare: number;
@@ -155,7 +156,7 @@ export function buildDayMarketConfig(
     stableYield: defaults.stableYield,
     swapFeeBps: defaults.swapFeeBps,
     poolTurnoverPerYear: defaults.poolTurnoverPerYear,
-    eclpBandWidth: defaults.eclpBandWidth,
+    eclpBandWidth: terms.eclpBandWidth,
     reinvestLiquidityPremium: defaults.reinvestLiquidityPremium,
   });
 }
@@ -167,6 +168,7 @@ export function runDayTargetScenario(
   const terms: DayEditableTerms = {
     coverage: defaults.coverage,
     minLiquidity: defaults.minLiquidity,
+    eclpBandWidth: defaults.eclpBandWidth,
     observationDays: defaults.observationDays,
     riskYieldShare: overrides.riskYieldShare ?? defaults.riskYDM.yTarget,
     liquidityYieldShare: overrides.liquidityYieldShare ?? defaults.liqYDM.yTarget,

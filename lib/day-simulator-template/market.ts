@@ -436,8 +436,8 @@ export function describeDayMarketCustomizations(
       : []),
     ...(customization.reverseMarket
       ? [
-        `reverse market: ${customization.reverseMarket.issuerName}-funded Junior capped at ${customization.reverseMarket.juniorCap}`,
-        `Senior cap: ${customization.reverseMarket.seniorCap}`,
+        `reverse market: ${customization.reverseMarket.issuerName}-funded JT capped at ${customization.reverseMarket.juniorCap}`,
+        `ST cap: ${customization.reverseMarket.seniorCap}`,
       ]
       : []),
   ];
@@ -528,7 +528,7 @@ export function buildDayMarketCopy(manifest: DayMarketManifest): DayMarketCopy {
   return {
     eyebrow: `ROYCO DAY · ${manifest.identity.marketName.toUpperCase()} MARKET`,
     title: `${manifest.identity.marketName} Day Simulator`,
-    description: `Explore a hypothetical three-tranche Royco Day market over ${manifest.identity.underlyingAsset}. Senior receives first-loss coverage from Junior, while a ${percentage(manifest.defaults.minLiquidity)}% minimum liquidity requirement supports secondary-market exits.`,
+    description: `Explore a hypothetical three-tranche Royco Day market built on ${manifest.identity.underlyingAsset}. JT provides first-loss coverage for ST, while a ${percentage(manifest.defaults.minLiquidity)}% minimum liquidity requirement supports ST sales through the SLP pool.`,
     disclosure,
   };
 }

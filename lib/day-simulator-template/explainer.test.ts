@@ -107,6 +107,58 @@ check(
   ),
 );
 
+const bandComparisons = [0.1, 0.05, 0.03, 0.01].map((eclpBandWidth) => {
+  const comparisonConfig = defaultConfig({
+    coverage: 0.03,
+    beta: 1,
+    minLiquidity: 0.15,
+    eclpBandWidth,
+  });
+  return buildDayExplainerMetrics(comparisonConfig, initial);
+});
+check(
+  'tighter E-CLP bands increase the amount of ST sellable at 1% slippage',
+  bandComparisons.every(
+    (comparison, index) => index === 0
+      || comparison.liquidity.referenceSellShareOfSenior
+        > bandComparisons[index - 1].liquidity.referenceSellShareOfSenior,
+  ),
+);
+
+const nearParBandComparisons = [0.01, 0.005, 0.0025].map((eclpBandWidth) => {
+  const comparisonConfig = defaultConfig({
+    coverage: 0.03,
+    beta: 1,
+    minLiquidity: 0.15,
+    eclpBandWidth,
+  });
+  return buildDayExplainerMetrics(comparisonConfig, initial);
+});
+check(
+  'sub-1% E-CLP bands produce finite executable quotes',
+  nearParBandComparisons.every((comparison) =>
+    Number.isFinite(comparison.liquidity.referenceQuote.executionPrice)
+      && Number.isFinite(comparison.liquidity.boundaryQuote.executionPrice)
+      && comparison.liquidity.referenceSellNAV > 0
+      && comparison.liquidity.boundarySellNAV > 0,
+  ),
+);
+check(
+  'sub-1% bands use the pool boundary when it arrives before 1% average slippage',
+  nearParBandComparisons.every((comparison) =>
+    approx(comparison.liquidity.referenceSellNAV, comparison.liquidity.boundarySellNAV, 1e-6)
+      && comparison.liquidity.referenceQuote.slippage <= 0.01 + 1e-9,
+  ),
+);
+check(
+  'tighter E-CLP bands reduce average slippage at the pool boundary',
+  bandComparisons.every(
+    (comparison, index) => index === 0
+      || comparison.liquidity.boundaryQuote.slippage
+        < bandComparisons[index - 1].liquidity.boundaryQuote.slippage,
+  ),
+);
+
 const coverageComparisons = [0.03, 0.06, 0.12].map((coverage) => {
   const comparisonConfig = defaultConfig({
     coverage,

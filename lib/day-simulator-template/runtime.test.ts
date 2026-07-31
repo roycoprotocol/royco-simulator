@@ -119,8 +119,8 @@ assert.deepEqual(describeDayMarketCustomizations(forwardCustomization), [
   "hide section: junior-funding",
   "finite forward test: 90 days with good/normal/bad scenarios",
   "omit initial zero-return period from forward chart and monthly table",
-  "reverse market: Muga-funded Junior capped at 100000",
-  "Senior cap: 1400000",
+    "reverse market: Muga-funded JT capped at 100000",
+    "ST cap: 1400000",
 ]);
 assert.ok(validateDayMarketCustomization({
   ...forwardCustomization,
@@ -165,6 +165,7 @@ assert.ok(validateDayMarketCustomization({
 const terms = {
   coverage: market.defaults.coverage,
   minLiquidity: market.defaults.minLiquidity,
+  eclpBandWidth: market.defaults.eclpBandWidth,
   observationDays: market.defaults.observationDays,
   riskYieldShare: market.defaults.riskYDM.yTarget,
   liquidityYieldShare: market.defaults.liqYDM.yTarget,
@@ -175,7 +176,7 @@ assert.equal(copy.eyebrow, "ROYCO DAY · PARETO FALCONX MARKET");
 assert.equal(copy.title, "Pareto FalconX Day Simulator");
 assert.equal(
   copy.description,
-  "Explore a hypothetical three-tranche Royco Day market over AA_FalconXUSDC. Senior receives first-loss coverage from Junior, while a 15% minimum liquidity requirement supports secondary-market exits.",
+  "Explore a hypothetical three-tranche Royco Day market built on AA_FalconXUSDC. JT provides first-loss coverage for ST, while a 15% minimum liquidity requirement supports ST sales through the SLP pool.",
 );
 assert.equal(
   copy.disclosure,
@@ -222,9 +223,16 @@ assert.equal(config.targetUtilization, 0.9);
 assert.equal(config.liqTargetUtilization, 0.9);
 assert.equal(config.fixedTermDurationSec, 7 * 86_400);
 assert.equal(config.liquidationUtilization, 100);
+assert.equal(config.eclpBandWidth, market.defaults.eclpBandWidth);
 assert.equal(config.yieldShareProtocolFee, market.defaults.jtYieldShareProtocolFee);
 assert.equal(config.ltYieldShareProtocolFee, market.defaults.ltYieldShareProtocolFee);
 assert.equal(config.reinvestLiquidityPremium, true);
+
+const tighterBandConfig = buildDayMarketConfig(market.defaults, {
+  ...terms,
+  eclpBandWidth: 0.05,
+});
+assert.equal(tighterBandConfig.eclpBandWidth, 0.05);
 
 const yields = runDayTargetScenario(market.defaults);
 assert.ok(Math.abs(yields.seniorApy - 0.07249497552408601) < 1e-12);

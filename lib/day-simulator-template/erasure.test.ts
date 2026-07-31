@@ -56,11 +56,14 @@ check('covered loss enters the observation period', sim.last().state === MarketS
 const eventStart = sim.events.length;
 sim.step({ dtSec: 8 * 86_400, stReturn: 0, jtReturn: 0 });
 const preRefill = sim.last();
-const erasure = sim.events.slice(eventStart).find((event) => event.kind === 'jt-il-erased');
+const stepEvents = sim.events.slice(eventStart);
+const erasure = stepEvents.find((event) => event.kind === 'jt-il-erased');
+const observationExit = stepEvents.find((event) => event.kind === 'exit-fixed-term');
 const erasedAmount = erasure?.amountNAV ?? 0;
 const navPerIndexPoint = (sim.state.jtShares * first.jtPrice) / 100;
 
 check('engine emits an exact structured erased amount', approx(erasedAmount, 10), `amount=${erasedAmount}`);
+check('engine emits a structured Observation Period exit reason', observationExit?.observationExitReason === 'period-ended');
 check('display text formatting is not used as accounting data', erasure?.msg.includes('$10') === true);
 
 const numerator =

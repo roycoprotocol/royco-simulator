@@ -3,9 +3,9 @@ import type { MarketConfig } from "@/lib/day/engine/types";
 export type DayTemplateManifest = {
   id: "day";
   route: "/day-sim";
-  version: 1;
+  version: 2;
   accountant: "lib/day/engine";
-  dataMode: "deterministic-scenarios";
+  dataMode: "source-explorer";
   defaults: Pick<
     MarketConfig,
     | "coverage"
@@ -19,9 +19,9 @@ export type DayTemplateManifest = {
 export const DAY_TEMPLATE_MANIFEST: DayTemplateManifest = {
   id: "day",
   route: "/day-sim",
-  version: 1,
+  version: 2,
   accountant: "lib/day/engine",
-  dataMode: "deterministic-scenarios",
+  dataMode: "source-explorer",
   defaults: {
     coverage: 0.2,
     targetUtilization: 0.9,

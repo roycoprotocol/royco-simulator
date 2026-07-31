@@ -22,4 +22,4 @@ console.log("Calibration guardrails: PASS");
 console.log("Locked copy: PASS");
 console.log("Design contract: PASS");
 console.log("Tests and build: PASS");
-console.log("LP yield/volume economics: OFF-CHAIN MODEL SCOPE — invariant-tested, not represented as fixed onchain economics");
+console.log("SLP yield/volume economics: OFF-CHAIN MODEL SCOPE — invariant-tested, not represented as fixed onchain economics");

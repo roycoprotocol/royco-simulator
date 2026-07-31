@@ -55,6 +55,7 @@ async function main() {
   const terms = {
     coverage: runtimeDefaults.coverage,
     minLiquidity: runtimeDefaults.minLiquidity,
+    eclpBandWidth: runtimeDefaults.eclpBandWidth,
     observationDays: runtimeDefaults.observationDays,
     riskYieldShare: runtimeDefaults.riskYDM.yTarget,
     liquidityYieldShare: runtimeDefaults.liqYDM.yTarget,
@@ -79,7 +80,7 @@ async function main() {
       const actualApy = annualizedSeriesApy(calibrated);
       if (Math.abs(actualApy - targetApy) > 1e-10) {
         throw new Error(
-          `Day base-strategy calibration missed target ${(targetApy * 100).toFixed(2)}%: ${(actualApy * 100).toFixed(8)}%`,
+          `Day strategy base-asset calibration missed target ${(targetApy * 100).toFixed(2)}%: ${(actualApy * 100).toFixed(8)}%`,
         );
       }
     }
@@ -115,7 +116,7 @@ async function main() {
     throw new Error("Day maximum yield shares exceed the contract's 100% combined limit");
   }
   if (market && cfg.fixedTermDurationSec !== market.defaults.observationDays * 86_400) {
-    throw new Error("Day observation period diverges from the market manifest");
+    throw new Error("Day Observation Period diverges from the market manifest");
   }
   if (market && cfg.liquidationUtilization !== 100 / market.defaults.exitBufferPct) {
     throw new Error("Day coverage-based exit threshold diverges from the Dawn exit-buffer rule");
@@ -131,7 +132,7 @@ async function main() {
       || target.seniorApy > market.targets.seniorApyMax
     ) {
       throw new Error(
-        `Day accountant Senior APY ${(target.seniorApy * 100).toFixed(2)}% is outside the configured target range`,
+        `Day accountant ST APY ${(target.seniorApy * 100).toFixed(2)}% is outside the configured target range`,
       );
     }
     if (
@@ -139,7 +140,7 @@ async function main() {
       || target.juniorApy > market.targets.juniorApyMax
     ) {
       throw new Error(
-        `Day accountant Junior APY ${(target.juniorApy * 100).toFixed(2)}% is outside the configured target range`,
+        `Day accountant JT APY ${(target.juniorApy * 100).toFixed(2)}% is outside the configured target range`,
       );
     }
     if (
@@ -151,7 +152,7 @@ async function main() {
       )
     ) {
       throw new Error(
-        `Day accountant LP APY ${(target.liquidityApy * 100).toFixed(2)}% is outside the configured target range`,
+        `Day accountant SLP APY ${(target.liquidityApy * 100).toFixed(2)}% is outside the configured target range`,
       );
     }
     const forwardTest = market.customization.forwardTest;
@@ -190,10 +191,10 @@ async function main() {
         }
       }
       if (market.defaults.initialST > reverseMarket.seniorCap) {
-        throw new Error("Day initial Senior balance exceeds the reverse-market Senior cap");
+        throw new Error("Day initial ST balance exceeds the reverse-market ST cap");
       }
       if (market.defaults.initialJT > reverseMarket.juniorCap) {
-        throw new Error("Day initial Junior balance exceeds the reverse-market Junior cap");
+        throw new Error("Day initial JT balance exceeds the reverse-market JT cap");
       }
       if (market.defaults.initialST + market.defaults.initialJT > reverseMarket.strategyCap) {
         throw new Error("Day initial strategy balances exceed the reverse-market strategy cap");
@@ -201,10 +202,10 @@ async function main() {
       console.log(`${market.id} finite ${forwardTest.scenarios.map((scenario) => scenario.id).join("/")} accountant scenarios: PASS`);
       console.log(`${market.id} reverse-market capacity guardrails: PASS`);
     }
-    console.log(`${market.id} accountant Senior APY: ${(target.seniorApy * 100).toFixed(2)}% PASS`);
-    console.log(`${market.id} accountant Junior APY: ${(target.juniorApy * 100).toFixed(2)}% PASS`);
+    console.log(`${market.id} accountant ST APY: ${(target.seniorApy * 100).toFixed(2)}% PASS`);
+    console.log(`${market.id} accountant JT APY: ${(target.juniorApy * 100).toFixed(2)}% PASS`);
     if (market.targets.liquidityApyMin !== undefined) {
-      console.log(`${market.id} accountant LP APY: ${(target.liquidityApy * 100).toFixed(2)}% PASS`);
+      console.log(`${market.id} accountant SLP APY: ${(target.liquidityApy * 100).toFixed(2)}% PASS`);
     }
     const customizations = describeDayMarketCustomizations(market.customization);
     if (customizations.length) {
@@ -216,10 +217,10 @@ async function main() {
   }
 
   console.log("Day runtime defaults: PASS");
-  console.log("Day base-strategy APY calibration: PASS");
+  console.log("Day strategy base-asset APY calibration: PASS");
   console.log("Day NAV conservation: PASS");
   if (market) {
-    console.log(`${market.id} minimum LP ratio: ${(cfg.minLiquidity * 100).toFixed(0)}% PASS`);
+    console.log(`${market.id} minimum SLP liquidity ratio: ${(cfg.minLiquidity * 100).toFixed(0)}% PASS`);
   }
 }
 

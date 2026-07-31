@@ -18,22 +18,18 @@ import {
 import { Sim } from '@/lib/day/engine/runner';
 import { MarketState } from '@/lib/day/engine/types';
 import { DAY_LOCKED_COPY } from '@/lib/day-simulator-template/locked-copy';
-import { LOCKED_COPY } from '@/lib/simulator-template/locked-copy';
 import {
   buildDayExplainerMetrics,
   type DayExplainerMetrics,
 } from '@/lib/day-simulator-template/explainer';
+import { DAY_EXPLORER_TEMPLATE_MARKET } from '@/lib/day-simulator-template/explorer-market';
 import { isFullRange, normalizeRange, type IndexRange } from '@/lib/hybond/timeframe';
 import type {
   DayForwardScenarioId,
   DayMarket,
-  DayMarketManifest,
   DaySeriesPoint,
 } from '@/lib/day-simulator-template/market';
-import {
-  dayMarketFromManifest,
-  isDaySectionVisible,
-} from '@/lib/day-simulator-template/market';
+import { isDaySectionVisible } from '@/lib/day-simulator-template/market';
 import {
   buildDayErasureEvent,
   formatDayErasureLabel,
@@ -47,6 +43,10 @@ import {
   buildDayMarketConfig,
   buildDayForwardSeries,
 } from '@/lib/day-simulator-template/runtime';
+import {
+  DayChartTooltip,
+  useDayChartHover,
+} from '@/components/day-simulator/DayChartTooltip';
 import { DayTimeframeBrush } from '@/components/day-simulator/DayTimeframeBrush';
 
 const ResponsiveContainerNoSSR = dynamic(
@@ -54,27 +54,27 @@ const ResponsiveContainerNoSSR = dynamic(
   { ssr: false },
 );
 
-// Exact Dawn / Tenbin visual contract. Keep synchronized with MarketSimulator.
+// Royco Explorer visual contract. Tranche colors remain semantic.
 const C = {
-  pageBg: '#FBFAF7',
-  cardBg: '#FFFDF9',
-  border: '#E8E2D8',
-  text: '#171511',
-  muted: '#6D6860',
-  eyebrow: '#967756',
-  kpiLabel: '#A49B90',
-  accent: '#967756',
-  olive: '#319C61',
-  danger: '#8F4D42',
-  faint: '#B9B1A5',
-  seniorLine: '#8E7355',
-  juniorLine: '#1B1A17',
-  strategyLine: '#A7A39A',
+  pageBg: '#F4F3EF',
+  cardBg: '#FFFFFF',
+  border: '#DEDDD7',
+  text: '#1D1C19',
+  muted: '#68665F',
+  eyebrow: '#817A70',
+  kpiLabel: '#969188',
+  accent: '#A65B20',
+  olive: '#3F7D5A',
+  danger: '#A24737',
+  faint: '#B7B3AB',
+  seniorLine: '#8B6B4B',
+  juniorLine: '#25231F',
+  strategyLine: '#9A968F',
   obsFill: '#F4C77B',
-  freeLine: '#4BCB81',
+  freeLine: '#51A473',
 };
 
-const SERIF = "Georgia, 'Times New Roman', serif";
+const SERIF = "var(--font-inter), Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
 const MONO = '"SFMono-Regular", Consolas, monospace';
 const DAY = 86_400;
 const MONTH_NAMES = [
@@ -90,6 +90,16 @@ const monthLabel = (key: string): string => {
 
 const dateLabel = (key: string): string =>
   /^\d{4}-\d{2}-\d{2}$/.test(key) ? key : monthLabel(key);
+
+const formatEclpBandPercent = (bandPct: number): string =>
+  bandPct.toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
+
+const formatEclpFloor = (bandPct: number): string => {
+  const floor = 1 - bandPct / 100;
+  return bandPct < 1
+    ? floor.toFixed(4).replace(/0+$/, '').replace(/\.$/, '')
+    : floor.toFixed(2);
+};
 
 type DayObservationPeriod = {
   aIndex: number;
@@ -107,91 +117,43 @@ type DaySeniorLossEvent = {
   lossIndexPts: number;
 };
 
-const FALLBACK_MANIFEST: DayMarketManifest = {
-  id: 'day',
-  route: '/day-sim',
-  identity: {
-    marketName: 'Royco Day',
-    displayAssetName: 'Template strategy',
-    underlyingAsset: 'the template strategy',
-    seniorName: 'Senior',
-    seniorSymbol: 'ST',
-    juniorName: 'Junior',
-    juniorSymbol: 'JT',
-  },
-  defaults: {
-    sourceApy: 0.12,
-    coverage: 0.2,
-    minLiquidity: 0.12,
-    liquidationUtilization: 1.5,
-    observationDays: 30,
-    exitBufferPct: 66.67,
-    linkJuniorToFirstLoss: true,
-    maintainCoverage: true,
-    riskYDM: { mode: 'static', y0: 0.25, yTarget: 0.35, y100: 0.55 },
-    liqYDM: { mode: 'static', y0: 0.08, yTarget: 0.12, y100: 0.2 },
-    selfLiquidationBonus: 0.02,
-    stProtocolFee: 0,
-    jtProtocolFee: 0,
-    jtYieldShareProtocolFee: 0,
-    ltYieldShareProtocolFee: 0,
-    stableYield: 0.035,
-    swapFeeBps: 10,
-    poolTurnoverPerYear: 8,
-    eclpBandWidth: 0.1,
-    reinvestLiquidityPremium: true,
-    initialST: 40_000_000,
-    initialJT: 10_000_000,
-    initialLT: 6_000_000,
-  },
-  targets: {
-    seniorApyMin: 0,
-    seniorApyMax: 1,
-    juniorApyMin: 0,
-    juniorApyMax: 10,
-  },
-  certification: {
-    intakeConfirmed: true,
-  },
-  customization: {
-    explicitlyAuthorized: false,
-    authorizationNote: '',
-    hiddenSections: [],
-    copyOverrides: {},
-  },
-  provenance: {
-    source: 'Deterministic one-year template path',
-    sourceUrl: 'https://github.com/roycoprotocol/dawn-simulator',
-    sourceProvider: 'Royco',
-    dataMode: 'historical-series',
-    dataCadence: 'monthly',
-    priceType: 'nav',
-    feesIncluded: true,
-    observationCount: 13,
-    firstDate: '2025-01-01',
-    lastDate: '2026-01-01',
-  },
-};
-
-const FALLBACK_SERIES: DaySeriesPoint[] = Array.from({ length: 13 }, (_, index) => ({
-  date: new Date(Date.UTC(2025, index, 1)).toISOString().slice(0, 10),
-  price: Math.pow(1.12, index / 12),
-}));
-
-const FALLBACK_MARKET: DayMarket = dayMarketFromManifest(FALLBACK_MANIFEST, FALLBACK_SERIES);
-
 const cardStyle = {
   background: C.cardBg,
   border: `1px solid ${C.border}`,
-  borderRadius: 0,
+  borderRadius: 12,
   padding: 14,
-  boxShadow: '0 34px 70px rgba(60,45,28,.045)',
+  boxShadow: '0 1px 2px rgba(29,28,25,.035)',
 } as const;
 
 const estimateText = (text: string): number => text.length * 6;
 
 type SvgPoint = { x: number; y: number };
 type SvgRect = { left: number; right: number; top: number; bottom: number };
+type LiquidityChartMode = 'atomic' | 'arbitrage';
+type LiquidityHoverPoint = {
+  share: number;
+  batchShare: number;
+  cycle: number;
+  executionPrice: number;
+  slippage: number;
+};
+
+const isReferenceAtPoolBoundary = (
+  metrics: DayExplainerMetrics['liquidity'],
+): boolean =>
+  Math.abs(metrics.referenceSellNAV - metrics.boundarySellNAV)
+    <= Math.max(1e-6, metrics.boundarySellNAV * 1e-8);
+
+const niceChartMaximum = (value: number): number => {
+  if (!Number.isFinite(value) || value <= 0) return 1;
+  const magnitude = 10 ** Math.floor(Math.log10(value));
+  const normalized = value / magnitude;
+  const step = normalized <= 2 ? 0.5 : normalized <= 5 ? 1 : 2;
+  return Math.ceil(normalized / step) * step * magnitude;
+};
+
+const formatBasisPoints = (value: number): string =>
+  `${value < 10 ? value.toFixed(1) : value.toFixed(0)} bps`;
 
 const segmentIntersectsRect = (start: SvgPoint, end: SvgPoint, rect: SvgRect) => {
   if (start.x === end.x) {
@@ -208,6 +170,24 @@ const segmentIntersectsRect = (start: SvgPoint, end: SvgPoint, rect: SvgRect) =>
   const segmentTop = Math.min(yAt(segmentLeft), yAt(segmentRight));
   const segmentBottom = Math.max(yAt(segmentLeft), yAt(segmentRight));
   return segmentBottom >= rect.top && segmentTop <= rect.bottom;
+};
+
+const nearestPointIndex = <T,>(
+  points: T[],
+  target: number,
+  valueOf: (point: T) => number,
+): number => {
+  if (!points.length) return -1;
+  let nearest = 0;
+  let distance = Math.abs(valueOf(points[0]) - target);
+  for (let index = 1; index < points.length; index += 1) {
+    const candidateDistance = Math.abs(valueOf(points[index]) - target);
+    if (candidateDistance < distance) {
+      nearest = index;
+      distance = candidateDistance;
+    }
+  }
+  return nearest;
 };
 
 function ErasureIBeam(props: {
@@ -443,7 +423,7 @@ function ChartTooltip(props: {
         row(
           '■',
           C.eyebrow,
-          `Observation period: ${observationSplit(observation, false)} (${observation.startDate} -> ${observation.endDate})`,
+          `Observation Period: ${observationSplit(observation, false)} (${observation.startDate} -> ${observation.endDate})`,
         )}
       {nonObservation &&
         row(
@@ -455,10 +435,10 @@ function ChartTooltip(props: {
         row(
           '▼',
           C.danger,
-          `Junior recovery erased (${erasure.reason}): ${erasure.forfeitPctOfJuniorNav.toFixed(1)}% of Junior's NAV at the time`,
+          `JT recovery claim reset (${erasure.reason}): ${erasure.forfeitPctOfJuniorNav.toFixed(1)}% of JT NAV at the time`,
         )}
       {seniorLoss &&
-        row('●', C.danger, `Senior loss event: $${seniorLoss.lossIndexPts.toFixed(2)} per $100 of Senior`)}
+        row('●', C.danger, `ST loss event: $${seniorLoss.lossIndexPts.toFixed(2)} per $100 of ST`)}
     </div>
   );
 }
@@ -493,7 +473,7 @@ function Kpi({
   noteColor?: string;
 }) {
   return (
-    <div style={{ background: C.cardBg, border: `1px solid ${C.border}`, borderRadius: 0, padding: '12px 14px', minHeight: 76 }}>
+    <div style={{ background: C.cardBg, border: `1px solid ${C.border}`, borderRadius: 10, padding: '12px 14px', minHeight: 76 }}>
       <p
         style={{
           color: C.kpiLabel,
@@ -536,7 +516,7 @@ function ExecutiveMetric({
   valueColor: string;
 }) {
   return (
-    <div style={{ background: C.cardBg, border: `1px solid ${C.border}`, minHeight: 88, padding: '14px 16px' }}>
+    <div style={{ background: C.cardBg, border: `1px solid ${C.border}`, borderRadius: 10, minHeight: 88, padding: '14px 16px' }}>
       <p style={{ color: C.kpiLabel, fontSize: 8.8, fontWeight: 700, letterSpacing: '0.14em', textTransform: 'uppercase' }}>
         {label}
       </p>
@@ -563,6 +543,7 @@ function FlowBox({
       style={{
         background: C.cardBg,
         border: `1px solid ${C.border}`,
+        borderRadius: 10,
         minHeight: 92,
         padding: '12px 14px',
       }}
@@ -582,150 +563,460 @@ function FlowBox({
 
 function LiquidityExecutionDiagram({
   metrics,
-  avoidLabelOverlap = false,
 }: {
   metrics: DayExplainerMetrics['liquidity'];
-  avoidLabelOverlap?: boolean;
 }) {
+  const [mode, setMode] = useState<LiquidityChartMode>('arbitrage');
   const width = 520;
-  const height = 400;
-  const margin = { left: 70, right: 24, top: 52, bottom: 68 };
+  const height = 360;
+  const margin = { left: 66, right: 22, top: 48, bottom: 64 };
   const plotWidth = width - margin.left - margin.right;
   const plotHeight = height - margin.top - margin.bottom;
-  const xMax = metrics.boundarySellNAV;
-  const curve = [
+  const baseline = margin.top + plotHeight;
+  const atomicCapacity = Math.max(metrics.boundarySellShareOfSenior, 1e-9);
+  const cycleCount = Math.max(1, Math.ceil((1 - 1e-9) / atomicCapacity));
+  const atomicCurve = [
     { sellNAV: 0, executionPrice: 1, slippage: 0 },
     ...metrics.curve,
-  ];
-  const minExecutionPrice = Math.min(...curve.map((point) => point.executionPrice));
-  const yMin = Math.max(0, minExecutionPrice - 0.006);
-  const yRange = Math.max(0.001, 1 - yMin);
-  const x = (sellNAV: number) => margin.left + (sellNAV / xMax) * plotWidth;
-  const y = (executionPrice: number) => margin.top + ((1 - executionPrice) / yRange) * plotHeight;
-  const baseline = margin.top + plotHeight;
-  const referenceX = x(metrics.referenceSellNAV);
-  const boundaryX = x(metrics.boundarySellNAV);
-  const referenceY = y(metrics.referenceQuote.executionPrice);
-  const boundaryY = y(metrics.boundaryQuote.executionPrice);
-  const referenceSlippage = metrics.referenceQuote.slippage * 100;
-  const boundarySlippage = metrics.boundaryQuote.slippage * 100;
-  const referenceSellPct = metrics.referenceSellShareOfSenior * 100;
-  const boundarySellPct = metrics.boundarySellShareOfSenior * 100;
-  const curvePixels = curve.map((point) => ({ x: x(point.sellNAV), y: y(point.executionPrice) }));
-  const curveLine = curvePixels.map((point) => `${point.x},${point.y}`).join(' ');
-  const labelPosition = (preferredX: number, pointY: number, textWidth: number, anchor: 'start' | 'end') => {
-    if (!avoidLabelOverlap) return { x: preferredX, y: pointY - 13 };
-    const horizontalOffsets = anchor === 'start' ? [0, 32, 64] : [0, -32, -64, -96, -128];
-    const verticalOffsets = [-13, -34, -55, -76, -97, 28];
-    for (const horizontalOffset of horizontalOffsets) {
-      const candidateX = preferredX + horizontalOffset;
-      const left = anchor === 'start' ? candidateX : candidateX - textWidth;
-      for (const verticalOffset of verticalOffsets) {
-        const candidateY = pointY + verticalOffset;
-        const rect = {
-          left: left - 4,
-          right: left + textWidth + 4,
-          top: candidateY - 15,
-          bottom: candidateY + 4,
-        };
-        if (
-          rect.left < margin.left + 4
-          || rect.right > margin.left + plotWidth - 4
-          || rect.top < margin.top + 4
-          || rect.bottom > baseline - 4
-        ) continue;
-        const intersectsCurve = curvePixels.some((point, index) =>
-          index > 0 && segmentIntersectsRect(curvePixels[index - 1], point, rect));
-        if (!intersectsCurve) return { x: candidateX, y: candidateY };
-      }
-    }
-    const fallbackX = anchor === 'end' ? preferredX - 96 : preferredX;
+  ].filter(
+    (point, index, points) =>
+      index === 0 || Math.abs(point.sellNAV - points[index - 1].sellNAV) > 1e-9,
+  );
+  const quoteAtBatchShare = (batchShare: number) => {
+    const clampedShare = Math.max(0, Math.min(atomicCapacity, batchShare));
+    const targetNAV = atomicCapacity > 0
+      ? (clampedShare / atomicCapacity) * metrics.boundarySellNAV
+      : 0;
+    const upperIndex = atomicCurve.findIndex((point) => point.sellNAV >= targetNAV - 1e-9);
+    const upper = atomicCurve[upperIndex < 0 ? atomicCurve.length - 1 : upperIndex];
+    const lower = atomicCurve[Math.max(0, (upperIndex < 0 ? atomicCurve.length - 1 : upperIndex) - 1)];
+    const span = upper.sellNAV - lower.sellNAV;
+    const weight = span > 1e-9 ? (targetNAV - lower.sellNAV) / span : 0;
     return {
-      x: fallbackX,
-      y: Math.max(margin.top + 20, pointY - 34),
+      executionPrice: lower.executionPrice
+        + (upper.executionPrice - lower.executionPrice) * weight,
+      slippage: lower.slippage + (upper.slippage - lower.slippage) * weight,
     };
   };
-  const referenceLabel = labelPosition(referenceX + 12, referenceY, 104, 'start');
-  const boundaryLabel = labelPosition(boundaryX - 10, boundaryY, 112, 'end');
-  const arbitrageArea = [
-    `${x(0)},${y(1)}`,
-    `${boundaryX},${y(1)}`,
-    ...curve.slice().reverse().map((point) => `${x(point.sellNAV)},${y(point.executionPrice)}`),
-  ].join(' ');
+  const atomicPoints: LiquidityHoverPoint[] = atomicCurve.map((point) => {
+    const share = metrics.boundarySellNAV > 0
+      ? (point.sellNAV / metrics.boundarySellNAV) * atomicCapacity
+      : 0;
+    return {
+      share,
+      batchShare: share,
+      cycle: 1,
+      executionPrice: point.executionPrice,
+      slippage: point.slippage,
+    };
+  });
+  const arbitrageCycles = Array.from({ length: cycleCount }, (_, index) => {
+    const startShare = index * atomicCapacity;
+    const endShare = Math.min(1, startShare + atomicCapacity);
+    const cycleSize = endShare - startShare;
+    const points = atomicPoints
+      .filter((point) => point.batchShare <= cycleSize + 1e-9)
+      .map((point) => ({
+        ...point,
+        share: startShare + point.batchShare,
+        cycle: index + 1,
+      }));
+    const lastPoint = points[points.length - 1];
+    if (!lastPoint || Math.abs(lastPoint.share - endShare) > 1e-9) {
+      const quote = quoteAtBatchShare(cycleSize);
+      points.push({
+        share: endShare,
+        batchShare: cycleSize,
+        cycle: index + 1,
+        executionPrice: quote.executionPrice,
+        slippage: quote.slippage,
+      });
+    }
+    return { index, startShare, endShare, points };
+  });
+  const xMaximum = mode === 'atomic' ? atomicCapacity : 1;
+  const xFromShare = (share: number) =>
+    margin.left + (Math.max(0, Math.min(xMaximum, share)) / xMaximum) * plotWidth;
+  const boundarySlippageBps = metrics.boundaryQuote.slippage * 10_000;
+  const yMaximumBps = niceChartMaximum(boundarySlippageBps * 1.08);
+  const yFromSlippage = (slippage: number) =>
+    baseline - ((slippage * 10_000) / yMaximumBps) * plotHeight;
+  const referenceAtPoolBoundary = isReferenceAtPoolBoundary(metrics);
+  const referenceX = xFromShare(metrics.referenceSellShareOfSenior);
+  const referenceY = yFromSlippage(metrics.referenceQuote.slippage);
+  const boundaryX = xFromShare(atomicCapacity);
+  const boundaryY = yFromSlippage(metrics.boundaryQuote.slippage);
+  const hoverPointAtShare = (requestedShare: number): LiquidityHoverPoint => {
+    const share = Math.max(0, Math.min(xMaximum, requestedShare));
+    if (mode === 'atomic') {
+      const quote = quoteAtBatchShare(share);
+      return {
+        share,
+        batchShare: share,
+        cycle: 1,
+        executionPrice: quote.executionPrice,
+        slippage: quote.slippage,
+      };
+    }
+    const cycleIndex = Math.min(
+      cycleCount - 1,
+      Math.floor(Math.max(0, share - 1e-12) / atomicCapacity),
+    );
+    const startShare = cycleIndex * atomicCapacity;
+    const batchShare = Math.max(0, share - startShare);
+    const quote = quoteAtBatchShare(batchShare);
+    return {
+      share,
+      batchShare,
+      cycle: cycleIndex + 1,
+      executionPrice: quote.executionPrice,
+      slippage: quote.slippage,
+    };
+  };
+  const [hoveredPoint, setHoveredPoint] = useDayChartHover<LiquidityHoverPoint>('liquidity');
+  const keyboardPoints = Array.from(
+    { length: 41 },
+    (_, index) => hoverPointAtShare((xMaximum * index) / 40),
+  );
+  const selectFromPointer = (event: React.PointerEvent<SVGSVGElement>) => {
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const plotLeft = bounds.left + (margin.left / width) * bounds.width;
+    const renderedPlotWidth = (plotWidth / width) * bounds.width;
+    const fraction = Math.max(
+      0,
+      Math.min(1, (event.clientX - plotLeft) / Math.max(renderedPlotWidth, 1)),
+    );
+    setHoveredPoint(hoverPointAtShare(fraction * xMaximum));
+  };
+  const moveByKeyboard = (direction: -1 | 1) => {
+    const defaultShare = mode === 'atomic'
+      ? Math.min(metrics.referenceSellShareOfSenior, atomicCapacity)
+      : 0.5;
+    const currentIndex = nearestPointIndex(
+      keyboardPoints,
+      hoveredPoint?.share ?? defaultShare,
+      (point) => point.share,
+    );
+    const nextIndex = Math.max(0, Math.min(keyboardPoints.length - 1, currentIndex + direction));
+    setHoveredPoint(keyboardPoints[nextIndex] ?? null);
+  };
+  const xTicks = [0, 0.25, 0.5, 0.75, 1].map((fraction) => fraction * xMaximum);
+  const yTicks = [0, yMaximumBps / 2, yMaximumBps];
+  const visibleCycles = mode === 'atomic'
+    ? [{ index: 0, startShare: 0, endShare: atomicCapacity, points: atomicPoints }]
+    : arbitrageCycles;
+  const liquidityAriaLabel = mode === 'atomic'
+    ? `Atomic ST sale into the current SLP pool with no intervening arbitrage. The current pool can fill ${(
+      atomicCapacity * 100
+    ).toFixed(1)}% of opening ST NAV before reaching its boundary.`
+    : `Illustrative sale of the full ST position across ${cycleCount} segments. Each new segment assumes arbitrage fully recenters the SLP pool to marked redemption value. This is not a timing or fill guarantee.`;
+
   return (
-    <div data-accountant-source="buildDayExplainerMetrics.liquidity">
-      <svg
-        aria-label={`Atomic Senior exits execute immediately against the liquidity pool. An exit equal to ${referenceSellPct.toFixed(1)}% of opening Senior NAV has ${referenceSlippage.toFixed(1)}% slippage, while an exit equal to ${boundarySellPct.toFixed(1)}% of opening Senior NAV has ${boundarySlippage.toFixed(1)}% slippage. The widening discount to underlying redemption value represents a growing arbitrage incentive to restore the price.`}
-        className="mt-3 w-full"
-        role="img"
-        viewBox={`0 0 ${width} ${height}`}
+    <div data-accountant-source="buildDayExplainerMetrics.liquidity" style={{ position: 'relative' }}>
+      <div
+        aria-label="Liquidity chart view"
+        className="mt-3 grid grid-cols-2"
+        role="tablist"
+        style={{ gap: 6 }}
       >
-        {[0.25, 0.5, 0.75].map((fraction) => (
+        {([
+          { id: 'arbitrage' as const, label: 'With arbitrage between sales' },
+          { id: 'atomic' as const, label: 'One atomic sale' },
+        ]).map((option) => {
+          const active = mode === option.id;
+          return (
+            <button
+              aria-selected={active}
+              key={option.id}
+              onClick={() => {
+                setMode(option.id);
+                setHoveredPoint(null);
+              }}
+              role="tab"
+              style={{
+                background: active ? `${C.olive}12` : C.cardBg,
+                border: `1px solid ${active ? C.olive : C.border}`,
+                color: active ? C.olive : C.muted,
+                fontFamily: MONO,
+                fontSize: 9.5,
+                fontWeight: 700,
+                minHeight: 34,
+                padding: '7px 8px',
+                textTransform: 'uppercase',
+              }}
+              type="button"
+            >
+              {option.label}
+            </button>
+          );
+        })}
+      </div>
+      <p
+        className="mt-2"
+        style={{
+          background: C.pageBg,
+          border: `1px solid ${C.border}`,
+          color: C.muted,
+          fontSize: 10.8,
+          lineHeight: 1.45,
+          padding: '8px 10px',
+        }}
+      >
+        {mode === 'atomic'
+          ? 'How one transaction moves the current pool before arbitrage has time to respond.'
+          : `Illustrative full-position sequence across ${cycleCount} sale segments. Every dotted reset assumes arbitrage fully restores today’s pool state before selling resumes.`}
+      </p>
+      <svg
+        aria-label={`${liquidityAriaLabel} Hover, tap, or focus and use the arrow keys to inspect the chart.`}
+        className="mt-2 w-full"
+        onBlur={() => setHoveredPoint(null)}
+        onFocus={() => {
+          setHoveredPoint(
+            hoverPointAtShare(
+              mode === 'atomic'
+                ? Math.min(metrics.referenceSellShareOfSenior, atomicCapacity)
+                : Math.min(0.5, xMaximum),
+            ),
+          );
+        }}
+        onKeyDown={(event) => {
+          if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+          event.preventDefault();
+          moveByKeyboard(event.key === 'ArrowLeft' ? -1 : 1);
+        }}
+        onMouseLeave={() => setHoveredPoint(null)}
+        onPointerDown={selectFromPointer}
+        onPointerLeave={(event) => {
+          if (event.pointerType !== 'touch') setHoveredPoint(null);
+        }}
+        onPointerMove={selectFromPointer}
+        role="img"
+        tabIndex={0}
+        viewBox={`0 0 ${width} ${height}`}
+        style={{ cursor: 'crosshair' }}
+      >
+        {yTicks.slice(1).map((tick) => (
           <line
-            key={fraction}
+            key={`y-${tick}`}
             x1={margin.left}
-            y1={margin.top + plotHeight * fraction}
+            y1={yFromSlippage(tick / 10_000)}
             x2={margin.left + plotWidth}
-            y2={margin.top + plotHeight * fraction}
+            y2={yFromSlippage(tick / 10_000)}
+            stroke={C.border}
+            strokeDasharray="4 4"
+          />
+        ))}
+        {xTicks.slice(1).map((tick) => (
+          <line
+            key={`x-${tick}`}
+            x1={xFromShare(tick)}
+            y1={margin.top}
+            x2={xFromShare(tick)}
+            y2={baseline}
             stroke={C.border}
             strokeDasharray="4 4"
           />
         ))}
         <line x1={margin.left} y1={margin.top} x2={margin.left} y2={baseline} stroke={C.border} />
-        <line x1={margin.left} y1={baseline} x2={margin.left + plotWidth} y2={baseline} stroke={C.border} />
-        <polygon points={arbitrageArea} fill={C.olive} fillOpacity={0.09} />
-        <line x1={margin.left} y1={y(1)} x2={margin.left + plotWidth} y2={y(1)} stroke={C.olive} strokeWidth={2} strokeDasharray="6 4" />
-        <polyline points={curveLine} fill="none" stroke={C.seniorLine} strokeWidth={4} strokeLinejoin="round" strokeLinecap="round" />
-        <line x1={referenceX} y1={referenceY - 3} x2={referenceX} y2={y(1) + 10} stroke={C.olive} strokeWidth={2} />
-        <path d={`M ${referenceX - 5} ${y(1) + 17} L ${referenceX} ${y(1) + 9} L ${referenceX + 5} ${y(1) + 17}`} fill="none" stroke={C.olive} strokeWidth={2} />
-        <line x1={boundaryX} y1={boundaryY - 3} x2={boundaryX} y2={y(1) + 10} stroke={C.olive} strokeWidth={3} />
-        <path d={`M ${boundaryX - 6} ${y(1) + 19} L ${boundaryX} ${y(1) + 9} L ${boundaryX + 6} ${y(1) + 19}`} fill="none" stroke={C.olive} strokeWidth={3} />
-        <circle cx={referenceX} cy={referenceY} r={5} fill={C.cardBg} stroke={C.olive} strokeWidth={2.5} />
-        <circle cx={boundaryX} cy={boundaryY} r={6} fill={C.cardBg} stroke={C.danger} strokeWidth={3} />
-        <text x={margin.left + 8} y={margin.top - 15} fill={C.olive} fontSize={13} fontWeight={600}>
-          Underlying redemption value
+        <line x1={margin.left} y1={baseline} x2={margin.left + plotWidth} y2={baseline} stroke={C.olive} strokeWidth={2} />
+        {visibleCycles.map((cycle) => {
+          const line = cycle.points
+            .map((point) => `${xFromShare(point.share)},${yFromSlippage(point.slippage)}`)
+            .join(' ');
+          const area = [
+            `${xFromShare(cycle.startShare)},${baseline}`,
+            line,
+            `${xFromShare(cycle.endShare)},${baseline}`,
+          ].join(' ');
+          const endpoint = cycle.points[cycle.points.length - 1];
+          return (
+            <g key={cycle.index}>
+              <polygon points={area} fill={C.olive} fillOpacity={cycle.index % 2 === 0 ? 0.1 : 0.055} />
+              <polyline
+                fill="none"
+                points={line}
+                stroke={C.seniorLine}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={3.5}
+              />
+              {mode === 'arbitrage' && cycle.index < visibleCycles.length - 1 && endpoint && (
+                <line
+                  x1={xFromShare(cycle.endShare)}
+                  y1={yFromSlippage(endpoint.slippage)}
+                  x2={xFromShare(cycle.endShare)}
+                  y2={baseline}
+                  stroke={C.olive}
+                  strokeDasharray="3 3"
+                  strokeWidth={2}
+                />
+              )}
+            </g>
+          );
+        })}
+        {mode === 'atomic' && !referenceAtPoolBoundary && (
+          <>
+            <line
+              x1={referenceX}
+              y1={referenceY}
+              x2={referenceX}
+              y2={baseline}
+              stroke={C.olive}
+              strokeDasharray="3 3"
+            />
+            <circle cx={referenceX} cy={referenceY} r={5} fill={C.cardBg} stroke={C.olive} strokeWidth={2.5} />
+            <text
+              x={referenceX > margin.left + plotWidth * 0.68 ? referenceX - 9 : referenceX + 9}
+              y={Math.max(margin.top + 14, referenceY - 10)}
+              fill={C.olive}
+              fontFamily={MONO}
+              fontSize={10.5}
+              fontWeight={600}
+              textAnchor={referenceX > margin.left + plotWidth * 0.68 ? 'end' : 'start'}
+            >
+              100 bps at {(metrics.referenceSellShareOfSenior * 100).toFixed(1)}% sold
+            </text>
+          </>
+        )}
+        {mode === 'atomic' && (
+          <>
+            <line
+              x1={boundaryX}
+              y1={margin.top}
+              x2={boundaryX}
+              y2={baseline}
+              stroke={C.danger}
+              strokeDasharray="4 3"
+              strokeWidth={2}
+            />
+            <circle cx={boundaryX} cy={boundaryY} r={6} fill={C.cardBg} stroke={C.danger} strokeWidth={3} />
+            <text
+              x={boundaryX - 9}
+              y={Math.max(margin.top + 15, boundaryY - 12)}
+              fill={C.danger}
+              fontFamily={MONO}
+              fontSize={10.5}
+              fontWeight={600}
+              textAnchor="end"
+            >
+              <tspan x={boundaryX - 9}>{(atomicCapacity * 100).toFixed(1)}% atomic limit</tspan>
+              <tspan x={boundaryX - 9} dy="14">{formatBasisPoints(boundarySlippageBps)} average slippage</tspan>
+            </text>
+          </>
+        )}
+        {hoveredPoint && (
+          <>
+            <line
+              x1={xFromShare(hoveredPoint.share)}
+              y1={margin.top}
+              x2={xFromShare(hoveredPoint.share)}
+              y2={baseline}
+              stroke={C.olive}
+              strokeDasharray="3 3"
+              strokeWidth={1.5}
+            />
+            <circle
+              cx={xFromShare(hoveredPoint.share)}
+              cy={yFromSlippage(hoveredPoint.slippage)}
+              r={5}
+              fill={C.cardBg}
+              stroke={C.olive}
+              strokeWidth={2.5}
+            />
+          </>
+        )}
+        <text x={margin.left + 6} y={26} fill={C.olive} fontSize={11.5} fontWeight={600}>
+          {mode === 'atomic' ? 'Current pool · no intervening arbitrage' : 'Illustrative full-reset sequence'}
         </text>
-        <text x={margin.left + plotWidth} y={margin.top - 15} fill={C.olive} fontSize={13} fontWeight={600} textAnchor="end">
-          Arbitrage incentive grows →
+        <text x={margin.left + plotWidth} y={26} fill={C.kpiLabel} fontSize={10.5} textAnchor="end">
+          {mode === 'atomic'
+            ? `${(atomicCapacity * 100).toFixed(1)}% maximum atomic fill`
+            : 'Dotted reset = arbitrage recenters'}
+        </text>
+        {yTicks.map((tick) => (
+          <text
+            key={`y-label-${tick}`}
+            x={margin.left - 10}
+            y={yFromSlippage(tick / 10_000) + 4}
+            fill={tick === 0 ? C.olive : C.kpiLabel}
+            fontFamily={MONO}
+            fontSize={10.5}
+            textAnchor="end"
+          >
+            {formatBasisPoints(tick)}
+          </text>
+        ))}
+        {xTicks.map((tick, index) => (
+          <text
+            key={`x-label-${tick}`}
+            x={xFromShare(tick)}
+            y={height - 34}
+            fill={index === xTicks.length - 1 ? C.text : C.kpiLabel}
+            fontFamily={MONO}
+            fontSize={index === xTicks.length - 1 ? 12 : 10.5}
+            fontWeight={index === xTicks.length - 1 ? 700 : 400}
+            textAnchor={index === 0 ? 'start' : index === xTicks.length - 1 ? 'end' : 'middle'}
+          >
+            {mode === 'atomic' ? `${(tick * 100).toFixed(1)}%` : `${(tick * 100).toFixed(0)}%`}
+          </text>
+        ))}
+        <text
+          transform={`translate(13 ${margin.top + plotHeight / 2}) rotate(-90)`}
+          fill={C.kpiLabel}
+          fontSize={11.5}
+          textAnchor="middle"
+        >
+          Average slippage
         </text>
         <text
-          x={referenceLabel.x}
-          y={referenceLabel.y}
-          fill={C.danger}
-          fontFamily={MONO}
-          fontSize={12.5}
-          fontWeight={600}
+          x={margin.left + plotWidth / 2}
+          y={height - 7}
+          fill={C.kpiLabel}
+          fontSize={11.5}
+          textAnchor="middle"
         >
-          {referenceSlippage.toFixed(1)}% slippage
-        </text>
-        <text
-          x={boundaryLabel.x}
-          y={boundaryLabel.y}
-          fill={C.danger}
-          fontFamily={MONO}
-          fontSize={12.5}
-          fontWeight={600}
-          textAnchor="end"
-        >
-          {boundarySlippage.toFixed(1)}% slippage
-        </text>
-        <text x={referenceX} y={height - 37} fill={C.olive} fontFamily={MONO} fontSize={15} fontWeight={700} textAnchor="middle">
-          {referenceSellPct.toFixed(1)}%
-        </text>
-        <text x={boundaryX} y={height - 37} fill={C.danger} fontFamily={MONO} fontSize={15} fontWeight={700} textAnchor="end">
-          {boundarySellPct.toFixed(1)}%
-        </text>
-        <text x={14} y={margin.top + 4} fill={C.olive} fontFamily={MONO} fontSize={11}>100%</text>
-        <text x={14} y={baseline + 4} fill={C.kpiLabel} fontFamily={MONO} fontSize={11}>
-          {(yMin * 100).toFixed(1)}%
-        </text>
-        <text transform={`translate(13 ${margin.top + plotHeight / 2}) rotate(-90)`} fill={C.kpiLabel} fontSize={12} textAnchor="middle">
-          Execution value
-        </text>
-        <text x={margin.left + plotWidth / 2} y={height - 8} fill={C.kpiLabel} fontSize={12} textAnchor="middle">
-          Atomic Senior exit (% of Senior notional)
+          {mode === 'atomic'
+            ? 'ST sold in one atomic transaction (% of all ST NAV)'
+            : 'Cumulative ST sold across arbitrage-assisted segments'}
         </text>
       </svg>
+      {hoveredPoint && (
+        <DayChartTooltip
+          title={mode === 'atomic' ? 'Atomic SLP quote' : `Illustrative sale segment ${hoveredPoint.cycle}`}
+          xPct={(hoveredPoint.share / xMaximum) * 100}
+          rows={[
+            {
+              label: mode === 'atomic' ? 'ST offered' : 'Cumulative ST sold',
+              value: `${(hoveredPoint.share * 100).toFixed(1)}%`,
+            },
+            ...(mode === 'arbitrage'
+              ? [
+                  {
+                    label: 'Current sale segment',
+                    value: `${(hoveredPoint.batchShare * 100).toFixed(1)}% of ST`,
+                  },
+                  {
+                    label: 'Segment',
+                    value: `${hoveredPoint.cycle} of ${cycleCount}`,
+                  },
+                ]
+              : []),
+            {
+              label: 'Average price',
+              value: `$${hoveredPoint.executionPrice.toFixed(4)}`,
+              color: C.olive,
+            },
+            {
+              label: 'Average slippage',
+              value: formatBasisPoints(hoveredPoint.slippage * 10_000),
+              color: C.danger,
+            },
+          ]}
+          note={mode === 'atomic'
+            ? 'One transaction against the current pool, with no intervening arbitrage.'
+            : 'Illustrative only: the next segment assumes arbitrage fully restores the current pool to marked redemption value.'}
+        />
+      )}
     </div>
   );
 }
@@ -753,6 +1044,24 @@ function CoverageLossDiagram({
   const breakpointX = x(metrics.coverageLossLimit);
   const endpointX = x(metrics.displayMaxLoss);
   const endpointY = y(metrics.endingSeniorBalancePer100);
+  const [hoveredLossIndex, setHoveredLossIndex] = useDayChartHover<number>('coverage');
+  const hoveredLossPoint = hoveredLossIndex === null ? null : metrics.points[hoveredLossIndex];
+  const selectLossFromPointer = (event: React.PointerEvent<SVGSVGElement>) => {
+    const bounds = event.currentTarget.getBoundingClientRect();
+    const plotLeft = bounds.left + (margin.left / width) * bounds.width;
+    const renderedPlotWidth = (plotWidth / width) * bounds.width;
+    const fraction = Math.max(0, Math.min(1, (event.clientX - plotLeft) / Math.max(renderedPlotWidth, 1)));
+    const loss = fraction * metrics.displayMaxLoss;
+    setHoveredLossIndex(nearestPointIndex(metrics.points, loss, (point) => point.loss));
+  };
+  const moveLossByKeyboard = (direction: -1 | 1) => {
+    const currentIndex = hoveredLossIndex ?? nearestPointIndex(
+      metrics.points,
+      metrics.coverageLossLimit,
+      (point) => point.loss,
+    );
+    setHoveredLossIndex(Math.max(0, Math.min(metrics.points.length - 1, currentIndex + direction)));
+  };
   const narrowCoverageZone = metrics.coverageLossLimit / metrics.displayMaxLoss < 0.18;
   const narrowSeniorZone = (metrics.displayMaxLoss - metrics.coverageLossLimit) / metrics.displayMaxLoss < 0.18;
   type CoverageLabelCandidate = { x: number; y: number; anchor: 'start' | 'middle' | 'end' };
@@ -778,8 +1087,8 @@ function CoverageLossDiagram({
     }
     return candidates[candidates.length - 1];
   };
-  const juniorZoneLabel = 'Junior absorbs loss';
-  const seniorZoneLabel = 'Senior absorbs excess';
+  const juniorZoneLabel = 'JT absorbs loss';
+  const seniorZoneLabel = 'ST absorbs excess';
   const coveredBalanceLabel = '$100 covered';
   const juniorZoneLabelPosition = placeCoverageLabel(juniorZoneLabel, [
     { x: (margin.left + breakpointX) / 2, y: margin.top + 27, anchor: 'middle' },
@@ -794,12 +1103,33 @@ function CoverageLossDiagram({
     { x: margin.left + 10, y: margin.top + plotHeight - 16, anchor: 'start' },
   ]);
   return (
-    <div data-accountant-source="buildDayExplainerMetrics.coverage">
+    <div data-accountant-source="buildDayExplainerMetrics.coverage" style={{ position: 'relative' }}>
       <svg
-        aria-label={`Senior stays at $100 through a ${(metrics.coverageLossLimit * 100).toFixed(1)}% strategy loss, then declines to $${metrics.endingSeniorBalancePer100.toFixed(1)} at a ${(metrics.displayMaxLoss * 100).toFixed(1)}% loss.`}
+        aria-label={`ST stays at $100 through a ${(metrics.coverageLossLimit * 100).toFixed(1)}% base-asset loss, then declines to $${metrics.endingSeniorBalancePer100.toFixed(1)} at a ${(metrics.displayMaxLoss * 100).toFixed(1)}% loss. Hover, tap, or focus and use the arrow keys to inspect the chart.`}
         className="mt-3 w-full"
+        onBlur={() => setHoveredLossIndex(null)}
+        onFocus={() => {
+          setHoveredLossIndex(nearestPointIndex(
+            metrics.points,
+            metrics.coverageLossLimit,
+            (point) => point.loss,
+          ));
+        }}
+        onKeyDown={(event) => {
+          if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+          event.preventDefault();
+          moveLossByKeyboard(event.key === 'ArrowLeft' ? -1 : 1);
+        }}
+        onMouseLeave={() => setHoveredLossIndex(null)}
+        onPointerDown={selectLossFromPointer}
+        onPointerLeave={(event) => {
+          if (event.pointerType !== 'touch') setHoveredLossIndex(null);
+        }}
+        onPointerMove={selectLossFromPointer}
         role="img"
+        tabIndex={0}
         viewBox={`0 0 ${width} ${height}`}
+        style={{ cursor: 'crosshair' }}
       >
         <rect
           x={margin.left}
@@ -828,6 +1158,27 @@ function CoverageLossDiagram({
           strokeDasharray="4 4"
         />
         <polyline points={line} fill="none" stroke={C.seniorLine} strokeWidth={4} strokeLinejoin="round" strokeLinecap="round" />
+        {hoveredLossPoint && (
+          <>
+            <line
+              x1={x(hoveredLossPoint.loss)}
+              y1={margin.top}
+              x2={x(hoveredLossPoint.loss)}
+              y2={margin.top + plotHeight}
+              stroke={hoveredLossPoint.loss <= metrics.coverageLossLimit ? C.olive : C.danger}
+              strokeDasharray="3 3"
+              strokeWidth={1.5}
+            />
+            <circle
+              cx={x(hoveredLossPoint.loss)}
+              cy={y(hoveredLossPoint.seniorBalancePer100)}
+              r={5}
+              fill={C.cardBg}
+              stroke={hoveredLossPoint.loss <= metrics.coverageLossLimit ? C.olive : C.danger}
+              strokeWidth={2.5}
+            />
+          </>
+        )}
         <circle cx={breakpointX} cy={y(100)} r={7} fill={C.cardBg} stroke={C.olive} strokeWidth={3} />
         <circle cx={endpointX} cy={endpointY} r={7} fill={C.cardBg} stroke={C.danger} strokeWidth={3} />
         <text x={14} y={margin.top + 5} fill={C.kpiLabel} fontFamily={MONO} fontSize={12}>$100</text>
@@ -893,12 +1244,34 @@ function CoverageLossDiagram({
           ${metrics.endingSeniorBalancePer100.toFixed(1)}
         </text>
         <text transform={`translate(13 ${margin.top + plotHeight / 2}) rotate(-90)`} fill={C.kpiLabel} fontSize={12} textAnchor="middle">
-          Senior $ balance
+          ST $ balance
         </text>
         <text x={margin.left + plotWidth / 2} y={height - 8} fill={C.kpiLabel} fontSize={12} textAnchor="middle">
-          Base strategy loss
+          Strategy base-asset loss
         </text>
       </svg>
+      {hoveredLossPoint && (
+        <DayChartTooltip
+          title="Loss waterfall"
+          xPct={(hoveredLossPoint.loss / metrics.displayMaxLoss) * 100}
+          rows={[
+            { label: 'Source loss', value: `${(hoveredLossPoint.loss * 100).toFixed(1)}%` },
+            {
+              label: 'ST value',
+              value: `$${hoveredLossPoint.seniorBalancePer100.toFixed(1)}`,
+              color: hoveredLossPoint.seniorBalancePer100 >= 100 - 1e-8 ? C.olive : C.danger,
+            },
+            {
+              label: 'JT buffer',
+              value: hoveredLossPoint.loss <= metrics.coverageLossLimit ? 'Protecting ST' : 'Exhausted',
+              color: hoveredLossPoint.loss <= metrics.coverageLossLimit ? C.olive : C.danger,
+            },
+          ]}
+          note={hoveredLossPoint.loss <= metrics.coverageLossLimit
+            ? 'JT absorbs this modeled source loss before ST.'
+            : 'The modeled JT buffer is depleted, so additional loss reaches ST.'}
+        />
+      )}
     </div>
   );
 }
@@ -931,15 +1304,15 @@ function GuidedChartGuide() {
       </div>
       <div style={itemStyle}>
         <span aria-hidden="true" style={{ background: C.obsFill, height: 24, opacity: 0.32, width: 28 }} />
-        <span style={copyStyle}>A shaded band is an observation period.</span>
+        <span style={copyStyle}>A shaded band is an Observation Period.</span>
       </div>
       <div style={itemStyle}>
         <span aria-hidden="true" style={{ background: C.danger, borderRadius: 9999, height: 9, width: 9 }} />
-        <span style={copyStyle}>A Junior mark means covered loss became permanent.</span>
+        <span style={copyStyle}>A JT mark means its covered loss was finalized.</span>
       </div>
       <div style={itemStyle}>
         <span aria-hidden="true" style={{ border: `2px solid ${C.danger}`, borderRadius: 9999, height: 10, width: 10 }} />
-        <span style={copyStyle}>A Senior mark means loss reached Senior.</span>
+        <span style={copyStyle}>An ST mark means loss reached ST.</span>
       </div>
     </div>
   );
@@ -960,7 +1333,7 @@ function GuidedObservationSteps({
     {
       number: '1',
       title: 'Drawdown',
-      body: 'Junior covers Senior first. The covered amount is tracked for possible recovery.',
+      body: 'JT covers ST first. The covered amount becomes JT’s first claim on a recovery.',
       art: (
         <svg aria-hidden="true" className="mt-3 w-full" viewBox="0 0 210 54">
           <line x1="5" x2="205" y1="15" y2="15" stroke={C.kpiLabel} strokeDasharray="4 4" />
@@ -971,10 +1344,10 @@ function GuidedObservationSteps({
     },
     {
       number: '2',
-      title: generalizeObservation ? 'Observation period' : `${days}-day observation`,
+      title: generalizeObservation ? 'Observation Period' : `${days}-day Observation Period`,
       body: generalizeObservation
-        ? `Its duration is market-specific (${days} days here). Direct Senior and Junior deposits/redemptions pause; LP withdrawals pause. Senior can still sell through the LP.`
-        : 'Direct Senior and Junior deposits/redemptions pause; LP withdrawals pause. Senior can still sell through the LP.',
+        ? `Its duration is market-specific (${days} days here). Direct ST and JT deposits and redemptions pause; SLP redemptions pause. ST can still sell through the SLP pool.`
+        : 'Direct ST and JT deposits and redemptions pause; SLP redemptions pause. ST can still sell through the SLP pool.',
       art: (
         <svg aria-hidden="true" className="mt-3 w-full" viewBox="0 0 210 66">
           <rect x={observationStartX} y="2" width={observationEndX - observationStartX} height="48" fill={C.obsFill} fillOpacity="0.32" />
@@ -991,8 +1364,8 @@ function GuidedObservationSteps({
       number: '3',
       title: 'Recover or finalize',
       body: generalizeObservation
-        ? "A full recovery restores Junior. If the window ends before full recovery, Junior's covered loss becomes permanent."
-        : "Recovery restores Junior first. If the window ends before recovery, Junior's covered loss becomes permanent.",
+        ? "A full recovery restores JT. If the window ends before full recovery, JT's covered loss is finalized."
+        : "Recovery restores JT first. If the window ends before recovery, JT's covered loss is finalized.",
       art: (
         <svg aria-hidden="true" className="mt-3 w-full" viewBox="0 0 210 54">
           <rect x="5" y="2" width={recoveryObservationEndX - 5} height="48" fill={C.obsFill} fillOpacity="0.32" />
@@ -1075,6 +1448,7 @@ function SliderControl({
         <span style={{ color: tone, fontFamily: MONO, fontSize: 13, fontWeight: 600 }}>{display}</span>
       </div>
       <input
+        aria-label={label}
         type="range"
         min={min}
         max={max}
@@ -1101,6 +1475,8 @@ const annualized = (end: number, start: number, days: number) =>
     : 0;
 const pct = (value: number, digits = 1) =>
   `${value >= 0 ? '+' : ''}${(value * 100).toFixed(digits)}%`;
+const drawdownPct = (value: number) =>
+  value * 100 >= 0.05 ? `−${(value * 100).toFixed(1)}%` : '0.0%';
 const usd0 = (value: number) => `$${Math.round(value).toLocaleString('en-US')}`;
 const signColor = (value: number) => (value < 0 ? C.danger : C.text);
 
@@ -1111,15 +1487,23 @@ export default function DayMarketSimulator({
   market?: DayMarket;
   variant?: 'standard' | 'guided' | 'executive';
 }) {
-  const activeMarket = market ?? FALLBACK_MARKET;
+  const activeMarket = market ?? DAY_EXPLORER_TEMPLATE_MARKET;
   const isGuided = variant === 'guided';
   const isExecutive = variant === 'executive';
+  const sourceFeeLabel = activeMarket.provenance.feesIncluded === true
+    ? 'Fee-inclusive'
+    : activeMarket.provenance.feesIncluded === false
+      ? 'Fee-exclusive'
+      : 'Fee treatment unknown';
+  const sourceValueLabel = activeMarket.provenance.priceType === 'unknown'
+    ? 'price/NAV'
+    : activeMarket.provenance.priceType.replaceAll('-', ' ');
   const showSection = (section: (typeof activeMarket.customization.hiddenSections)[number]) =>
     isDaySectionVisible(activeMarket.customization, section);
   const heroTitle = activeMarket.customization.copyOverrides.heroTitle
     ?? 'Make illiquid yield easier to own.';
   const heroDescription = activeMarket.customization.copyOverrides.heroDescription
-    ?? 'Royco Day turns one yield opportunity into three choices. Senior does not take losses until Junior\'s buffer is used. Junior earns more for taking losses first, and the liquidity provider (LP) earns more for supplying assets Senior holders can sell into.';
+    ?? 'Royco Day splits one strategy base asset into three positions. ST pays JT a risk premium for first-loss coverage and SLP a liquidity premium for secondary liquidity.';
   const defaults = activeMarket.defaults;
   const backtestDisplay = activeMarket.customization.backtestDisplay;
   const forwardTest = activeMarket.customization.forwardTest;
@@ -1156,12 +1540,16 @@ export default function DayMarketSimulator({
     [activeMarket.series],
   );
   const [showInputs, setShowInputs] = useState(false);
-  const [showReview, setShowReview] = useState(true);
+  const [showLiquidityDetail, setShowLiquidityDetail] = useState(false);
+  const [showCoverageDetail, setShowCoverageDetail] = useState(false);
+  const [showReview, setShowReview] = useState(!isGuided);
+  const [showMonthly, setShowMonthly] = useState(false);
   const [hoverDate, setHoverDate] = useState<string | null>(null);
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const [chartTickCount, setChartTickCount] = useState(7);
   const [coveragePct, setCoveragePct] = useState(defaults.coverage * 100);
   const [minLiquidityPct, setMinLiquidityPct] = useState(defaults.minLiquidity * 100);
+  const [eclpBandWidthPct, setEclpBandWidthPct] = useState(defaults.eclpBandWidth * 100);
   const [riskSharePct, setRiskSharePct] = useState(defaults.riskYDM.yTarget * 100);
   const [liqSharePct, setLiqSharePct] = useState(defaults.liqYDM.yTarget * 100);
   const [maintainCoverage, setMaintainCoverage] = useState(defaults.maintainCoverage);
@@ -1204,12 +1592,14 @@ export default function DayMarketSimulator({
     const run = (series: DaySeriesPoint[]) => {
     const coverage = coveragePct / 100;
     const minLiquidity = minLiquidityPct / 100;
+    const eclpBandWidth = eclpBandWidthPct / 100;
     const riskTarget = riskSharePct / 100;
     const liqTarget = liqSharePct / 100;
     const initial = buildDayInitialBalances(defaults, { coverage, minLiquidity });
     const cfg = buildDayMarketConfig(defaults, {
       coverage,
       minLiquidity,
+      eclpBandWidth,
       observationDays,
       riskYieldShare: riskTarget,
       liquidityYieldShare: liqTarget,
@@ -1235,13 +1625,13 @@ export default function DayMarketSimulator({
       const erasureEvent = stepEvents.find((event) => event.kind === 'jt-il-erased');
       if (erasureEvent?.amountNAV !== undefined) {
         const exitEvent = stepEvents.find((event) => event.kind === 'exit-fixed-term');
-        const reason = /term expired/i.test(exitEvent?.msg ?? '')
-          ? 'observation period ended'
-          : /liquidation breach/i.test(exitEvent?.msg ?? '')
-            ? 'coverage-based Senior exit opened'
-            : /ST impairment/i.test(exitEvent?.msg ?? '')
-              ? 'Senior impairment'
-              : 'recovery claim erased';
+        const reason = exitEvent?.observationExitReason === 'period-ended'
+          ? 'Observation Period ended'
+          : exitEvent?.observationExitReason === 'protected-exit'
+            ? 'Protected Exit opened'
+            : exitEvent?.observationExitReason === 'st-impairment'
+              ? 'ST impairment'
+              : 'JT recovery claim reset';
         const currentJuniorIndex = firstSnapshot.jtPrice > 0
           ? (postReturn.jtPrice / firstSnapshot.jtPrice) * 100
           : 0;
@@ -1339,7 +1729,7 @@ export default function DayMarketSimulator({
           (event) => event.t === chart[closeIndex].t && event.kind === 'exit-fixed-term',
         );
         observationPeriods.push(
-          makePeriod(index, closeIndex, /term expired/i.test(exitEvent?.msg ?? '')),
+          makePeriod(index, closeIndex, exitEvent?.observationExitReason === 'period-ended'),
         );
       }
     }
@@ -1372,7 +1762,7 @@ export default function DayMarketSimulator({
           totalObservedDays) *
         100
       : 0;
-    const maxDrawdown = (key: 'senior' | 'junior' | 'liquidity') => {
+    const maxDrawdown = (key: 'strategy' | 'senior' | 'junior' | 'liquidity') => {
       let peak = chart[0][key];
       let worst = 0;
       for (const point of chart) {
@@ -1436,6 +1826,7 @@ export default function DayMarketSimulator({
       erasedRecoveryClaims: erasureEvents.length,
       seniorLossEvents: seniorLossEventDetails.length,
       juniorCapitalInjected,
+      strategyMaxDrawdown: maxDrawdown('strategy'),
       seniorMaxDrawdown: maxDrawdown('senior'),
       juniorMaxDrawdown: maxDrawdown('junior'),
       liquidityMaxDrawdown: maxDrawdown('liquidity'),
@@ -1452,6 +1843,7 @@ export default function DayMarketSimulator({
   }, [
     coveragePct,
     defaults,
+    eclpBandWidthPct,
     liqSharePct,
     maintainCoverage,
     modeledSeries,
@@ -1639,7 +2031,7 @@ export default function DayMarketSimulator({
     hoverObservationBand && hoverObservation
       ? {
           band: hoverObservationBand,
-          label: `Observation period ${observationSplit(hoverObservation, true)}`,
+          label: `Observation Period ${observationSplit(hoverObservation, true)}`,
           color: C.eyebrow,
         }
       : hoverNonObservationBand && hoverNonObservation
@@ -1655,10 +2047,34 @@ export default function DayMarketSimulator({
   const selectedForwardScenario = forwardTest?.scenarios.find(
     (scenario) => scenario.id === forwardScenario,
   );
+  const from100 = (value: number) =>
+    isNativeReturnUnit
+      ? `100 → ${value.toFixed(0)}`
+      : `$100 → $${value.toFixed(0)}`;
+  const guidedSectionStyle = {
+    background: 'transparent',
+    border: 'none',
+    borderBottom: `1px solid ${C.border}`,
+    borderRadius: 0,
+    boxShadow: 'none',
+    padding: 16,
+  } as const;
 
   return (
-    <div className="flex flex-col" style={{ gap: 10 }}>
-      <section>
+    <div
+      className="flex flex-col"
+      style={isGuided
+        ? {
+            background: C.cardBg,
+            border: `1px solid ${C.border}`,
+            borderRadius: 12,
+            boxShadow: '0 1px 2px rgba(29,28,25,.035)',
+            gap: 0,
+            overflow: 'hidden',
+          }
+        : { gap: 10 }}
+    >
+      {!isGuided && <section>
         <div className="flex items-center gap-2">
           <span style={{ background: C.olive, borderRadius: 9999, display: 'inline-block', height: 6, width: 6 }} />
           <span
@@ -1678,79 +2094,83 @@ export default function DayMarketSimulator({
           style={{
             color: C.text,
             fontFamily: SERIF,
-            fontSize: 'clamp(32px,3.4vw,44px)',
-            fontWeight: 400,
-            letterSpacing: '-0.02em',
-            lineHeight: 1,
-            margin: '12px 0 6px',
+            fontSize: isGuided ? 'clamp(22px,2.2vw,28px)' : 'clamp(30px,3.2vw,42px)',
+            fontWeight: 500,
+            letterSpacing: '-0.035em',
+            lineHeight: 1.08,
+            margin: '10px 0 6px',
           }}
         >
-          {isExecutive ? heroTitle : activeMarket.copy.title}
+          {isExecutive
+            ? heroTitle
+            : isGuided
+              ? `How ${activeMarket.identity.displayAssetName} could behave in Royco Day`
+              : activeMarket.copy.title}
         </h1>
         <p className="max-w-3xl" style={{ color: C.muted, fontSize: 12.5, lineHeight: 1.38, margin: '0 0 12px' }}>
           {isExecutive
             ? heroDescription
             : isGuided
-            ? 'See how one yield strategy can support three different positions.'
-            : activeMarket.copy.description}
+              ? 'Understand the structure, confirm the assumptions, and then compare the modeled outcomes. Each step explains what the next result means.'
+              : activeMarket.copy.description}
         </p>
-      </section>
+      </section>}
 
       {isExecutive && showSection('roles') && (
         <section style={{ ...cardStyle, padding: 16 }}>
           <Eyebrow>One investment · three choices</Eyebrow>
           <h2 className="mt-2" style={{ color: C.text, fontFamily: SERIF, fontSize: 24, fontWeight: 400, lineHeight: 1.12 }}>
-            Choose how you want to earn from the same underlying opportunity.
+            Choose how you want to participate in the same strategy base asset.
           </h2>
           <p className="mt-2" style={{ color: C.muted, fontSize: 12.5, lineHeight: 1.45 }}>
-            Senior, Junior, and LP all use the same investment. They earn different returns because each takes a different role.
+            ST and JT are invested in the strategy base asset. SLP provides secondary liquidity through a separate AMM pool.
           </p>
           <div className="mt-4 grid grid-cols-1 md:grid-cols-3" style={{ gap: 8 }}>
             <div style={{ background: C.pageBg, border: `1px solid ${C.seniorLine}`, minHeight: 178, padding: 14 }}>
-              <Eyebrow>Senior · yield and liquidity</Eyebrow>
+              <Eyebrow>Senior Tranche (ST) · coverage and liquidity</Eyebrow>
               <p className="mt-3" style={{ color: C.accent, fontFamily: MONO, fontSize: 26, fontWeight: 700 }}>
                 {pct(result.seniorApy)}/yr
               </p>
-              <p className="mt-2" style={{ color: C.text, fontFamily: SERIF, fontSize: 18 }}>Can sell before the underlying asset matures.</p>
+              <p className="mt-2" style={{ color: C.text, fontFamily: SERIF, fontSize: 18 }}>Receives first-loss coverage and secondary liquidity.</p>
               <p className="mt-2" style={{ color: C.muted, fontSize: 11.5, lineHeight: 1.45 }}>
-                LP supplies assets for Senior sales, while Junior takes investment losses before Senior does.
+                JT absorbs losses before ST. ST can redeem through the primary route or sell immediately into the SLP pool at the current market price.
               </p>
             </div>
             <div style={{ background: C.pageBg, border: `1px solid ${C.juniorLine}`, minHeight: 178, padding: 14 }}>
-              <Eyebrow>Junior · first-loss capital</Eyebrow>
+              <Eyebrow>Junior Tranche (JT) · first-loss capital</Eyebrow>
               <p className="mt-3" style={{ color: C.juniorLine, fontFamily: MONO, fontSize: 26, fontWeight: 700 }}>
                 {pct(result.juniorApy)}/yr
               </p>
-              <p className="mt-2" style={{ color: C.text, fontFamily: SERIF, fontSize: 18 }}>Earns more by taking losses first.</p>
+              <p className="mt-2" style={{ color: C.text, fontFamily: SERIF, fontSize: 18 }}>Earns a risk premium for taking losses first.</p>
               <p className="mt-2" style={{ color: C.muted, fontSize: 11.5, lineHeight: 1.45 }}>
-                Junior receives part of the yield because it takes investment losses before Senior does.
+                JT shares the strategy base asset&apos;s exposure with ST and absorbs losses before ST.
               </p>
             </div>
             <div style={{ background: C.pageBg, border: `1px solid ${C.olive}`, minHeight: 178, padding: 14 }}>
-              <Eyebrow>LP · supplies assets for Senior sales</Eyebrow>
+              <Eyebrow>Senior Liquidity Provider (SLP) · secondary liquidity</Eyebrow>
               <p className="mt-3" style={{ color: C.olive, fontFamily: MONO, fontSize: 26, fontWeight: 700 }}>
                 {pct(result.liquidityApy)}/yr
               </p>
-              <p className="mt-2" style={{ color: C.text, fontFamily: SERIF, fontSize: 18 }}>Earns more by funding Senior sales.</p>
+              <p className="mt-2" style={{ color: C.text, fontFamily: SERIF, fontSize: 18 }}>Earns by providing the secondary exit for ST.</p>
               <p className="mt-2" style={{ color: C.muted, fontSize: 11.5, lineHeight: 1.45 }}>
-                LP receives part of the yield for providing the assets Senior holders can sell into.
+                SLP return can include the liquidity premium, trading fees, ST appreciation, and stable-asset yield, less impermanent loss.
               </p>
             </div>
           </div>
           <div className="mt-3 grid grid-cols-1 md:grid-cols-[1fr_56px_1fr]" style={{ alignItems: 'center', gap: 8 }}>
             <div style={{ background: `${C.strategyLine}12`, border: `1px solid ${C.border}`, padding: 12 }}>
-              <p style={{ color: C.kpiLabel, fontFamily: MONO, fontSize: 9.5, letterSpacing: '0.1em', textTransform: 'uppercase' }}>Underlying opportunity</p>
-              <p className="mt-1" style={{ color: C.strategyLine, fontFamily: SERIF, fontSize: 18 }}>{activeMarket.identity.displayAssetName} base yield</p>
+              <p style={{ color: C.kpiLabel, fontFamily: MONO, fontSize: 9.5, letterSpacing: '0.1em', textTransform: 'uppercase' }}>Strategy base asset</p>
+              <p className="mt-1" style={{ color: C.strategyLine, fontFamily: SERIF, fontSize: 18 }}>{activeMarket.identity.displayAssetName} yield</p>
             </div>
             <div className="hidden items-center justify-center md:flex" aria-hidden="true" style={{ color: C.faint, fontFamily: MONO, fontSize: 20 }}>→</div>
             <div className="grid grid-cols-1 sm:grid-cols-2" style={{ gap: 8 }}>
               <div style={{ borderLeft: `3px solid ${C.eyebrow}`, padding: '7px 10px' }}>
-                <p style={{ color: C.eyebrow, fontFamily: MONO, fontSize: 9.5, fontWeight: 700, textTransform: 'uppercase' }}>Senior pays Junior</p>
-                <p className="mt-1" style={{ color: C.muted, fontSize: 11 }}>Junior takes losses first.</p>
+                <p style={{ color: C.eyebrow, fontFamily: MONO, fontSize: 9.5, fontWeight: 700, textTransform: 'uppercase' }}>ST pays JT</p>
+                <p className="mt-1" style={{ color: C.muted, fontSize: 11 }}>JT provides first-loss coverage.</p>
               </div>
               <div style={{ borderLeft: `3px solid ${C.olive}`, padding: '7px 10px' }}>
-                <p style={{ color: C.olive, fontFamily: MONO, fontSize: 9.5, fontWeight: 700, textTransform: 'uppercase' }}>Senior pays LP</p>
-                <p className="mt-1" style={{ color: C.muted, fontSize: 11 }}>LP supplies assets for Senior sales.</p>
+                <p style={{ color: C.olive, fontFamily: MONO, fontSize: 9.5, fontWeight: 700, textTransform: 'uppercase' }}>ST pays SLP</p>
+                <p className="mt-1" style={{ color: C.muted, fontSize: 11 }}>SLP provides secondary liquidity.</p>
               </div>
             </div>
           </div>
@@ -1759,22 +2179,17 @@ export default function DayMarketSimulator({
 
       {isExecutive && showSection('senior-summary') && (
         <section style={{ ...cardStyle, padding: 16 }}>
-          <Eyebrow>What Senior gets</Eyebrow>
+          <Eyebrow>What ST gets</Eyebrow>
           <div className="mt-3 grid grid-cols-1 md:grid-cols-3" style={{ gap: 8 }}>
-            <ExecutiveMetric label="Senior average yield" value={`${pct(result.seniorApy)}/yr`} valueColor={C.accent} />
-            <ExecutiveMetric label="First-loss coverage for Senior" value={`${coveragePct.toFixed(0)}% minimum`} valueColor={C.juniorLine} />
-            <ExecutiveMetric label="Minimum liquidity" value={`${minLiquidityPct.toFixed(0)}% minimum`} valueColor={C.olive} />
+            <ExecutiveMetric label="ST average yield" value={`${pct(result.seniorApy)}/yr`} valueColor={C.accent} />
+            <ExecutiveMetric label="Minimum JT coverage" value={`${coveragePct.toFixed(0)}% minimum`} valueColor={C.juniorLine} />
+            <ExecutiveMetric label="Minimum SLP liquidity" value={`${minLiquidityPct.toFixed(0)}% minimum`} valueColor={C.olive} />
           </div>
         </section>
       )}
 
-      {!isExecutive && <section style={{ ...cardStyle, padding: 16 }}>
+      {!isExecutive && !isGuided && <section style={{ ...cardStyle, padding: 16 }}>
         <Eyebrow>How Day works</Eyebrow>
-        {isGuided && (
-          <h2 className="mt-2" style={{ color: C.text, fontFamily: SERIF, fontSize: 22, fontWeight: 400, lineHeight: 1.12 }}>
-            One strategy. Three positions. Each is paid for a different role.
-          </h2>
-        )}
         <div
           className="mt-3 grid grid-cols-1 xl:grid-cols-[minmax(0,2.3fr)_minmax(290px,1fr)]"
           style={{ gap: 8, alignItems: 'center' }}
@@ -1784,11 +2199,13 @@ export default function DayMarketSimulator({
             style={{ gap: 8, alignItems: 'center', minWidth: 0 }}
           >
             <FlowBox
-              eyebrow="Underlying"
-              value="Base yield"
+              eyebrow="Strategy base asset"
+              value={isGuided ? 'Yield source' : 'Base-asset yield'}
               note={activeMarket.provenance.dataMode === 'published-apy-forward'
                 ? `Published ${(defaults.sourceApy * 100).toFixed(1)}% APY forward input`
-                : `${activeMarket.provenance.feesIncluded ? 'Fee-inclusive' : 'Fee-exclusive'} source ${activeMarket.provenance.priceType.toUpperCase()} path`}
+                : isGuided
+                  ? 'The historical values selected above'
+                  : `${sourceFeeLabel} source ${sourceValueLabel} path`}
               color={C.strategyLine}
             />
             <div className="flex items-center justify-center md:hidden" aria-hidden="true" style={{ height: 34 }}>
@@ -1801,9 +2218,11 @@ export default function DayMarketSimulator({
               →
             </div>
             <FlowBox
-              eyebrow="Tranche"
-              value="Senior (ST)"
-              note="Keeps residual yield after premiums"
+              eyebrow="Senior Tranche"
+              value="ST"
+              note={isGuided
+                ? 'Gives up some yield for first-loss coverage and a secondary exit'
+                : 'Keeps base-asset yield after premiums'}
               color={C.seniorLine}
             />
             <div className="md:hidden" aria-hidden="true" style={{ height: 112 }}>
@@ -1830,7 +2249,7 @@ export default function DayMarketSimulator({
             </div>
             <div className="hidden md:block" aria-hidden="true" style={{ alignSelf: 'stretch', minHeight: 192 }}>
               <svg className="h-full w-full" viewBox="0 0 112 192">
-                <title>Risk premium from Senior to Junior; Liquidity premium from Senior to LP</title>
+                <title>Risk premium from ST to JT; liquidity premium from ST to SLP</title>
                 <line x1="0" y1="96" x2="24" y2="96" stroke={C.seniorLine} strokeWidth="2" vectorEffect="non-scaling-stroke" />
                 <circle cx="24" cy="96" r="3" fill={C.seniorLine} />
                 <path d="M 24 96 V 46 H 106" fill="none" stroke={C.eyebrow} strokeWidth="2" vectorEffect="non-scaling-stroke" />
@@ -1853,15 +2272,15 @@ export default function DayMarketSimulator({
             </div>
             <div className="grid grid-cols-2 md:grid-cols-1" style={{ gap: 8 }}>
               <FlowBox
-                eyebrow="Coverage"
-                value="Junior (JT)"
-                note="Funds Senior downside coverage"
+                eyebrow="First-loss coverage"
+                value="JT"
+                note={isGuided ? 'Earns more for taking losses before ST' : 'Absorbs losses before ST'}
                 color={C.juniorLine}
               />
               <FlowBox
-                eyebrow="Liquidity"
-                value="LP"
-                note="Funds secondary-market liquidity"
+                eyebrow="Secondary liquidity"
+                value="SLP"
+                note={isGuided ? 'Earns for making ST easier to sell' : 'Provides AMM exit liquidity for ST'}
                 color={C.olive}
               />
             </div>
@@ -1875,7 +2294,7 @@ export default function DayMarketSimulator({
               <div>
                 <div className="flex items-center gap-3">
                   <span style={{ background: C.juniorLine, borderRadius: 9999, height: 8, width: 8 }} />
-                  <span style={{ color: C.text, fontFamily: SERIF, fontSize: 18 }}>Coverage</span>
+                  <span style={{ color: C.text, fontFamily: SERIF, fontSize: 18 }}>First-loss coverage</span>
                 </div>
                 <p className="mt-2" style={{ color: C.muted, fontSize: 11.5, lineHeight: 1.45 }}>
                   {DAY_LOCKED_COPY.coverageBenefit}
@@ -1884,7 +2303,7 @@ export default function DayMarketSimulator({
               <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 14 }}>
                 <div className="flex items-center gap-3">
                   <span style={{ background: C.olive, borderRadius: 9999, height: 8, width: 8 }} />
-                  <span style={{ color: C.text, fontFamily: SERIF, fontSize: 18 }}>Liquidity</span>
+                  <span style={{ color: C.text, fontFamily: SERIF, fontSize: 18 }}>Secondary liquidity</span>
                 </div>
                 <p className="mt-2" style={{ color: C.muted, fontSize: 11.5, lineHeight: 1.45 }}>
                   {DAY_LOCKED_COPY.liquidityBenefit}
@@ -1895,9 +2314,16 @@ export default function DayMarketSimulator({
         </div>
       </section>}
 
-      {showSection('market-inputs') && <section style={{ ...cardStyle, padding: '10px 12px' }}>
+      {showSection('market-inputs') && <section style={isGuided ? guidedSectionStyle : { ...cardStyle, padding: 16 }}>
         <div className="flex items-center justify-between gap-4">
-          <Eyebrow>Market inputs</Eyebrow>
+          <div>
+            <Eyebrow>{isGuided ? 'Market setup' : 'Market inputs'}</Eyebrow>
+            {isGuided && (
+              <p className="mt-1" style={{ color: C.muted, fontSize: 11.5, lineHeight: 1.4 }}>
+                These values drive every result below.
+              </p>
+            )}
+          </div>
           <button
             type="button"
             onClick={() => setShowInputs((value) => !value)}
@@ -1905,156 +2331,416 @@ export default function DayMarketSimulator({
             aria-expanded={showInputs}
             style={{
               border: `1px solid ${C.border}`,
-              borderRadius: 0,
+              borderRadius: 8,
               color: C.accent,
-              width: 28,
+              width: isGuided ? 'auto' : 28,
               height: 28,
               fontFamily: MONO,
-              fontSize: 18,
+              fontSize: isGuided ? 9.5 : 18,
+              fontWeight: isGuided ? 700 : 400,
+              letterSpacing: isGuided ? '0.08em' : undefined,
               lineHeight: 1,
               background: 'transparent',
               flexShrink: 0,
+              padding: isGuided ? '0 10px' : 0,
+              textTransform: isGuided ? 'uppercase' : undefined,
             }}
           >
-            {showInputs ? '−' : '+'}
+            {isGuided ? (showInputs ? 'Done' : 'Edit') : (showInputs ? '−' : '+')}
           </button>
         </div>
 
+        {isGuided && !showInputs && (
+          <>
+            <div className="mt-3 grid grid-cols-2 md:grid-cols-4" style={{ gap: 6 }}>
+              {[
+                ['Source APY', `${sourceApyPct.toFixed(1)}%`],
+                ['JT coverage', `${coveragePct.toFixed(0)}%`],
+                ['SLP liquidity', `${minLiquidityPct.toFixed(0)}%`],
+                ['Pool band', `${formatEclpBandPercent(eclpBandWidthPct)}%`],
+              ].map(([label, value]) => (
+                <div key={label} style={{ background: C.pageBg, borderRadius: 8, padding: '9px 10px' }}>
+                  <p style={{ color: C.kpiLabel, fontSize: 8.5, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase' }}>{label}</p>
+                  <p className="mt-1" style={{ color: C.text, fontFamily: MONO, fontSize: 13, fontWeight: 600 }}>{value}</p>
+                </div>
+              ))}
+            </div>
+            <p className="mt-2" style={{ color: C.kpiLabel, fontSize: 10.5, lineHeight: 1.45 }}>
+              Premium split: {riskSharePct.toFixed(0)}% to JT / {liqSharePct.toFixed(0)}% to SLP · {observationDays}-day recovery window · JT capital {maintainCoverage ? 'restored' : 'not restored'} after finalized losses
+            </p>
+          </>
+        )}
+
         {showInputs && (
           <div className="mt-3 grid grid-cols-1 md:grid-cols-2" style={{ gap: 8 }}>
-            <div style={{ background: `${C.strategyLine}14`, border: `1px solid ${C.strategyLine}`, padding: 12 }}>
+            <div style={{ background: `${C.strategyLine}14`, border: `1px solid ${C.strategyLine}`, borderRadius: 10, padding: 12 }}>
               <SliderControl
-                label="Base strategy APY (%)"
+                label="Strategy base-asset APY (%)"
                 value={sourceApyPct}
                 min={0}
                 max={30}
                 step={0.1}
                 display={`${sourceApyPct.toFixed(1)}%`}
-                description=""
+                description={isGuided ? "Annualized return applied to the selected source history." : ""}
                 tone={C.muted}
                 labelColor={C.muted}
                 onChange={setSourceApyPct}
               />
             </div>
-            <div style={{ background: C.pageBg, border: `1px solid ${C.border}`, padding: 12 }}>
+            <div style={{ background: C.pageBg, border: `1px solid ${C.border}`, borderRadius: 10, padding: 12 }}>
               <SliderControl
-                label="Minimum coverage (%)"
+                label="Minimum coverage requirement (%)"
                 value={coveragePct}
                 min={3}
                 max={65}
                 step={1}
                 display={`${coveragePct.toFixed(0)}%`}
-                description=""
+                description={isGuided ? "How much JT first-loss capital the market requires relative to ST and JT combined." : ""}
                 onChange={setCoveragePct}
               />
             </div>
-            <div style={{ background: C.pageBg, border: `1px solid ${C.border}`, padding: 12 }}>
+            <div style={{ background: C.pageBg, border: `1px solid ${C.border}`, borderRadius: 10, padding: 12 }}>
               <SliderControl
-                label="Minimum liquidity (%)"
+                label="Minimum liquidity requirement (%)"
                 value={minLiquidityPct}
                 min={1}
                 max={50}
                 step={1}
                 display={`${minLiquidityPct.toFixed(0)}%`}
-                description=""
+                description={isGuided ? "How much SLP capital the market requires relative to ST." : ""}
                 onChange={setMinLiquidityPct}
               />
             </div>
-            <div style={{ background: C.pageBg, border: `1px solid ${C.border}`, padding: 12 }}>
+            {isGuided && (
+              <div style={{ background: C.pageBg, border: `1px solid ${C.border}`, borderRadius: 10, padding: 12 }}>
+                <SliderControl
+                  label="E-CLP downside band (%)"
+                  value={eclpBandWidthPct}
+                  min={0.25}
+                  max={20}
+                  step={0.25}
+                  display={`${formatEclpBandPercent(eclpBandWidthPct)}% · $${formatEclpFloor(eclpBandWidthPct)} floor`}
+                  description="How far the pool price can move below $1. Very tight bands concentrate nearly all executable liquidity close to par; wider bands allow more price movement."
+                  tone={C.olive}
+                  labelColor={C.olive}
+                  onChange={setEclpBandWidthPct}
+                >
+                  <div aria-label="E-CLP band presets" className="mt-2 grid grid-cols-2 sm:grid-cols-4" role="group" style={{ gap: 6 }}>
+                    {[
+                      { label: 'Near par', value: 0.5 },
+                      { label: 'Very tight', value: 1 },
+                      { label: 'Tight', value: 3 },
+                      { label: 'Standard', value: 10 },
+                    ].map((preset) => {
+                      const active = eclpBandWidthPct === preset.value;
+                      return (
+                        <button
+                          aria-pressed={active}
+                          key={preset.value}
+                          onClick={() => setEclpBandWidthPct(preset.value)}
+                          style={{
+                            background: active ? `${C.olive}14` : C.cardBg,
+                            border: `1px solid ${active ? C.olive : C.border}`,
+                            color: active ? C.olive : C.muted,
+                            fontFamily: MONO,
+                            fontSize: 9.5,
+                            fontWeight: 700,
+                            minHeight: 30,
+                            padding: '6px 8px',
+                            textTransform: 'uppercase',
+                          }}
+                          type="button"
+                        >
+                          {preset.label} · {formatEclpBandPercent(preset.value)}%
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <div className="mt-2 flex items-center justify-between gap-3" style={{ color: C.kpiLabel, fontFamily: MONO, fontSize: 9 }}>
+                    <span>Tighter · more depth near $1</span>
+                    <span>Wider · more downside range</span>
+                  </div>
+                </SliderControl>
+              </div>
+            )}
+            <div style={{ background: C.pageBg, border: `1px solid ${C.border}`, borderRadius: 10, padding: 12 }}>
               <SliderControl
-                label="Junior yield share (%)"
+                label="JT risk premium (% of ST yield)"
                 value={riskSharePct}
                 min={0}
                 max={80}
                 step={1}
                 display={`${riskSharePct.toFixed(0)}%`}
-                description=""
+                description={isGuided ? "The share of ST yield paid to JT for taking losses first." : ""}
                 onChange={(value) => {
                   setRiskSharePct(value);
                   if (value + liqSharePct > 100) setLiqSharePct(100 - value);
                 }}
               />
             </div>
-            <div style={{ background: C.pageBg, border: `1px solid ${C.border}`, padding: 12 }}>
+            <div style={{ background: C.pageBg, border: `1px solid ${C.border}`, borderRadius: 10, padding: 12 }}>
               <SliderControl
-                label="LP yield share (%)"
+                label="SLP liquidity premium (% of ST yield)"
                 value={liqSharePct}
                 min={0}
                 max={80}
                 step={1}
                 display={`${liqSharePct.toFixed(0)}%`}
-                description=""
+                description={isGuided ? "The share of ST yield paid to SLP for providing secondary liquidity." : ""}
                 onChange={(value) => {
                   setLiqSharePct(value);
                   if (value + riskSharePct > 100) setRiskSharePct(100 - value);
                 }}
               />
             </div>
-            <div style={{ background: C.pageBg, border: `1px solid ${C.border}`, padding: 12 }}>
+            <div style={{ background: C.pageBg, border: `1px solid ${C.border}`, borderRadius: 10, padding: 12 }}>
               <SliderControl
-                label="Observation period duration (days)"
+                label="Observation Period duration (days)"
                 value={observationDays}
                 min={7}
                 max={194}
                 step={1}
                 display={`${observationDays} days`}
-                description=""
+                description={isGuided ? "How long the source has to recover before a covered JT loss is finalized." : ""}
                 onChange={setObservationDays}
               />
             </div>
+            {isGuided && (
+              <label
+                className="flex cursor-pointer items-center gap-3"
+                style={{ background: C.pageBg, border: `1px solid ${C.border}`, borderRadius: 10, color: C.muted, fontSize: 11.5, lineHeight: 1.4, padding: 12 }}
+              >
+                <input
+                  checked={maintainCoverage}
+                  onChange={(event) => setMaintainCoverage(event.target.checked)}
+                  style={{ accentColor: C.accent }}
+                  type="checkbox"
+                />
+                <span>
+                  <strong style={{ color: C.text, display: 'block', fontWeight: 600 }}>Restore JT after finalized losses</strong>
+                  Adds fresh JT capital to rebuild the minimum coverage buffer.
+                </span>
+              </label>
+            )}
           </div>
         )}
       </section>}
 
-      {!isExecutive && <section style={{ ...cardStyle, padding: 14 }}>
-        <Eyebrow>APYs</Eyebrow>
+      {isGuided && endStep && (
+        <section style={guidedSectionStyle}>
+          <Eyebrow>Market snapshot</Eyebrow>
+          <h2 className="mt-2" style={{ color: C.text, fontFamily: SERIF, fontSize: 22, fontWeight: 500, letterSpacing: '-0.025em', lineHeight: 1.12 }}>
+            One source, three different jobs
+          </h2>
+          <p className="mt-1 max-w-4xl" style={{ color: C.muted, fontSize: 11.5, lineHeight: 1.45 }}>
+            {activeMarket.provenance.dataMode === 'published-apy-forward'
+              ? `Modeled from the published ${((activeMarket.provenance.publishedApy ?? defaults.sourceApy) * 100).toFixed(1)}% APY.`
+              : `Modeled from ${view.length} ${activeMarket.provenance.dataCadence} source values, ${startDate} to ${endDate}.`}{' '}
+            Not live performance or a forecast.
+          </p>
+          <div className="mt-3 overflow-x-auto" style={{ border: `1px solid ${C.border}`, borderRadius: 10 }}>
+            <table className="w-full" style={{ borderCollapse: 'collapse', minWidth: 720, textAlign: 'left' }}>
+              <thead style={{ background: C.pageBg }}>
+                <tr>
+                  {['Position', 'What it does', 'End value', 'Avg / year', 'Worst drop'].map((label) => (
+                    <th
+                      key={label}
+                      style={{
+                        borderBottom: `1px solid ${C.border}`,
+                        color: C.kpiLabel,
+                        fontSize: 8.5,
+                        fontWeight: 700,
+                        letterSpacing: '0.1em',
+                        padding: '8px 10px',
+                        textTransform: 'uppercase',
+                      }}
+                    >
+                      {label}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {[
+                  ['Source', 'Baseline', from100(endStep.strategy), pct(result.strategyApy), drawdownPct(result.strategyMaxDrawdown), C.strategyLine],
+                  ['ST', 'Protected; JT loses first', from100(endStep.senior), pct(result.seniorApy), drawdownPct(result.seniorMaxDrawdown), C.seniorLine],
+                  ['JT', 'First loss; earns risk premium', from100(endStep.junior), pct(result.juniorApy), drawdownPct(result.juniorMaxDrawdown), C.juniorLine],
+                  ['SLP', 'Makes ST sellable', from100(endStep.liquidity), pct(result.liquidityApy), drawdownPct(result.liquidityMaxDrawdown), C.olive],
+                ].map(([position, role, ending, apy, drawdown, color], index) => (
+                  <tr key={position} style={{ background: index % 2 === 0 ? C.cardBg : C.pageBg }}>
+                    <td style={{ borderBottom: index < 3 ? `1px solid ${C.border}` : undefined, color, fontFamily: MONO, fontSize: 13, fontWeight: 700, padding: '10px' }}>{position}</td>
+                    <td style={{ borderBottom: index < 3 ? `1px solid ${C.border}` : undefined, color: C.muted, fontSize: 11.5, padding: '10px' }}>{role}</td>
+                    <td style={{ borderBottom: index < 3 ? `1px solid ${C.border}` : undefined, color, fontFamily: MONO, fontSize: 14, fontWeight: 600, padding: '10px' }}>{ending}</td>
+                    <td style={{ borderBottom: index < 3 ? `1px solid ${C.border}` : undefined, color: C.text, fontFamily: MONO, fontSize: 11.5, padding: '10px' }}>{apy}</td>
+                    <td style={{ borderBottom: index < 3 ? `1px solid ${C.border}` : undefined, color: C.text, fontFamily: MONO, fontSize: 11.5, padding: '10px' }}>{drawdown}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <p className="mt-2" style={{ color: C.muted, fontSize: 10.5, lineHeight: 1.4 }}>Different return comes from a different job—not a universally better position.</p>
+        </section>
+      )}
+
+      {!isExecutive && !isGuided && <section style={{ ...cardStyle, padding: 14 }}>
+        <Eyebrow>Simulated APYs</Eyebrow>
         <div className="mt-3 grid grid-cols-1 md:grid-cols-3" style={{ gap: 8 }}>
-          <Kpi label="Senior avg/yr" value={`${pct(result.seniorApy)}/yr`} valueColor={C.accent} />
-          <Kpi label="Junior avg/yr" value={`${pct(result.juniorApy)}/yr`} valueColor={C.text} />
-          <Kpi label="LP avg/yr" value={`${pct(result.liquidityApy)}/yr`} valueColor={C.olive} />
+          <Kpi label="ST avg/yr" value={`${pct(result.seniorApy)}/yr`} valueColor={C.accent} />
+          <Kpi label="JT avg/yr" value={`${pct(result.juniorApy)}/yr`} valueColor={C.text} />
+          <Kpi label="SLP avg/yr" value={`${pct(result.liquidityApy)}/yr`} valueColor={C.olive} />
         </div>
       </section>}
 
-      {showSection('liquidity-and-coverage') && <section className="grid grid-cols-1 md:grid-cols-2" style={{ gap: 10 }}>
-        <div style={{ ...cardStyle, padding: 14 }}>
-          {isExecutive ? <Eyebrow>If a Senior wants to exit</Eyebrow> : <Eyebrow>Liquidity</Eyebrow>}
+      {showSection('liquidity-and-coverage') && <section className="grid grid-cols-1 md:grid-cols-2" style={isGuided ? { borderBottom: `1px solid ${C.border}`, gap: 0 } : { gap: 10 }}>
+        <div
+          className={isGuided ? "border-b md:border-b-0 md:border-r" : undefined}
+          style={isGuided
+            ? { background: 'transparent', borderColor: C.border, padding: 16 }
+            : { ...cardStyle, padding: 14 }}
+        >
+          {isExecutive
+            ? <Eyebrow>If an ST holder wants to sell</Eyebrow>
+            : <Eyebrow>{isGuided ? 'Key risk · Liquidity' : 'Secondary liquidity'}</Eyebrow>}
+          {isGuided && (
+            <>
+              <h2 className="mt-2" style={{ color: C.text, fontFamily: SERIF, fontSize: 22, fontWeight: 400, lineHeight: 1.12 }}>
+                How much ST can sell?
+              </h2>
+              <p className="mt-2" style={{ color: C.muted, fontSize: 11.5, lineHeight: 1.45 }}>
+                Larger atomic sales move the price down. Arbitrage between sales can reopen capacity.
+              </p>
+              <div className="mt-3">
+                <p style={{ color: C.olive, fontFamily: MONO, fontSize: 28, fontWeight: 600, letterSpacing: '-0.05em' }}>
+                  {(result.explainer.liquidity.referenceSellShareOfSenior * 100).toFixed(1)}% of ST
+                </p>
+                <p style={{ color: C.text, fontSize: 11.5 }}>
+                  can sell at about {(result.explainer.liquidity.referenceQuote.slippage * 100).toFixed(1)}% average slippage
+                </p>
+                <div
+                  aria-label={`${(result.explainer.liquidity.referenceSellShareOfSenior * 100).toFixed(1)} percent near-par capacity and ${(result.explainer.liquidity.boundarySellShareOfSenior * 100).toFixed(1)} percent maximum atomic capacity`}
+                  className="mt-3"
+                  role="img"
+                  style={{ background: C.pageBg, borderRadius: 9999, height: 9, overflow: 'hidden', position: 'relative' }}
+                >
+                  <div style={{ background: `${C.seniorLine}35`, height: '100%', width: `${Math.min(100, result.explainer.liquidity.boundarySellShareOfSenior * 100)}%` }} />
+                  <div style={{ background: C.olive, height: '100%', left: 0, position: 'absolute', top: 0, width: `${Math.min(100, result.explainer.liquidity.referenceSellShareOfSenior * 100)}%` }} />
+                </div>
+                <p className="mt-2" style={{ color: C.muted, fontSize: 10.5, lineHeight: 1.4 }}>
+                  Up to <strong style={{ color: C.seniorLine, fontWeight: 600 }}>{(result.explainer.liquidity.boundarySellShareOfSenior * 100).toFixed(1)}%</strong> can fill atomically at the current boundary, averaging {(result.explainer.liquidity.boundaryQuote.slippage * 100).toFixed(1)}% below marked redemption value.
+                </p>
+              </div>
+            </>
+          )}
           {isExecutive && (
             <>
               <h2 className="mt-2" style={{ color: C.text, fontFamily: SERIF, fontSize: 22, fontWeight: 400, lineHeight: 1.12 }}>
-                Sell through the dedicated LP.
+                Sell immediately through the SLP pool.
               </h2>
               <p className="mt-2" style={{ color: C.muted, fontSize: 11.5, lineHeight: 1.45 }}>
-                Senior does not have to wait for the underlying asset to mature.
+                ST can sell at the pool&apos;s current market price instead of waiting for primary redemption.
               </p>
             </>
           )}
-          <LiquidityExecutionDiagram metrics={result.explainer.liquidity} avoidLabelOverlap={isExecutive} />
+          {isGuided && (
+            <button
+              aria-expanded={showLiquidityDetail}
+              onClick={() => setShowLiquidityDetail((value) => !value)}
+              style={{
+                background: 'transparent',
+                border: `1px solid ${C.border}`,
+                borderRadius: 8,
+                color: C.accent,
+                fontFamily: MONO,
+                fontSize: 9.5,
+                fontWeight: 700,
+                marginTop: 10,
+                minHeight: 32,
+                padding: '7px 10px',
+                textTransform: 'uppercase',
+              }}
+              type="button"
+            >
+              {showLiquidityDetail ? 'Hide curve' : 'See liquidity curve'}
+            </button>
+          )}
+          {(!isGuided || showLiquidityDetail) && <LiquidityExecutionDiagram metrics={result.explainer.liquidity} />}
           {(isGuided || isExecutive) && (
             <p style={{ color: C.muted, fontSize: 11.5, lineHeight: 1.45 }}>
-              {isExecutive
-                ? 'Larger sale → larger discount → stronger arbitrage incentive to buy below underlying redemption value.'
-                : 'Senior can exit through the LP. Larger atomic sales move farther down the curve and create a larger arbitrage opportunity.'}
+              Modeled quotes only. The sequence does not guarantee arbitrage timing, total fill, or realized price.
             </p>
           )}
         </div>
 
-        <div style={{ ...cardStyle, padding: 14 }}>
-          {isExecutive ? <Eyebrow>Loss waterfall</Eyebrow> : <Eyebrow>Coverage</Eyebrow>}
+        <div style={isGuided
+          ? { background: 'transparent', padding: 16 }
+          : { ...cardStyle, padding: 14 }}
+        >
+          {isExecutive
+            ? <Eyebrow>Loss waterfall</Eyebrow>
+            : <Eyebrow>{isGuided ? 'Key risk · Loss protection' : 'First-loss coverage'}</Eyebrow>}
+          {isGuided && (
+            <>
+              <h2 className="mt-2" style={{ color: C.text, fontFamily: SERIF, fontSize: 22, fontWeight: 400, lineHeight: 1.12 }}>
+                When does ST lose money?
+              </h2>
+              <p className="mt-2" style={{ color: C.muted, fontSize: 11.5, lineHeight: 1.45 }}>
+                JT absorbs losses first; losses beyond that buffer reduce ST.
+              </p>
+              <div className="mt-3">
+                <p style={{ color: C.olive, fontFamily: MONO, fontSize: 28, fontWeight: 600, letterSpacing: '-0.05em' }}>
+                  {(result.explainer.coverage.coverageLossLimit * 100).toFixed(1)}% source loss
+                </p>
+                <p style={{ color: C.text, fontSize: 11.5 }}>before ST starts falling below $100</p>
+                <div
+                  aria-label={`ST is covered through ${(result.explainer.coverage.coverageLossLimit * 100).toFixed(1)} percent source loss on the displayed ${(result.explainer.coverage.displayMaxLoss * 100).toFixed(1)} percent loss range`}
+                  className="mt-3 flex"
+                  role="img"
+                  style={{ background: `${C.danger}18`, borderRadius: 9999, height: 9, overflow: 'hidden' }}
+                >
+                  <div style={{ background: C.olive, width: `${Math.min(100, result.explainer.coverage.coverageLossLimit / result.explainer.coverage.displayMaxLoss * 100)}%` }} />
+                </div>
+                <p className="mt-2" style={{ color: C.muted, fontSize: 10.5, lineHeight: 1.4 }}>
+                  If the source loses {(result.explainer.coverage.displayMaxLoss * 100).toFixed(1)}%, <strong style={{ color: C.danger, fontWeight: 600 }}>$100 of ST falls to ${result.explainer.coverage.endingSeniorBalancePer100.toFixed(0)}</strong>.
+                </p>
+              </div>
+            </>
+          )}
           {isExecutive && (
             <>
               <h2 className="mt-2" style={{ color: C.text, fontFamily: SERIF, fontSize: 22, fontWeight: 400, lineHeight: 1.12 }}>
-                Senior is shielded from the first losses.
+                JT absorbs losses before ST.
               </h2>
               <p className="mt-2" style={{ color: C.muted, fontSize: 11.5, lineHeight: 1.45 }}>
-                Junior capital takes losses before Senior. Senior starts losing value only after that Junior buffer is used.
+                The minimum coverage requirement sets the JT buffer, but does not guarantee ST principal against losses beyond that buffer.
               </p>
             </>
           )}
-          <CoverageLossDiagram metrics={result.explainer.coverage} />
+          {isGuided && (
+            <button
+              aria-expanded={showCoverageDetail}
+              onClick={() => setShowCoverageDetail((value) => !value)}
+              style={{
+                background: 'transparent',
+                border: `1px solid ${C.border}`,
+                borderRadius: 8,
+                color: C.accent,
+                fontFamily: MONO,
+                fontSize: 9.5,
+                fontWeight: 700,
+                marginTop: 10,
+                minHeight: 32,
+                padding: '7px 10px',
+                textTransform: 'uppercase',
+              }}
+              type="button"
+            >
+              {showCoverageDetail ? 'Hide curve' : 'See loss curve'}
+            </button>
+          )}
+          {(!isGuided || showCoverageDetail) && <CoverageLossDiagram metrics={result.explainer.coverage} />}
           {(isGuided || isExecutive) && (
             <p style={{ color: C.muted, fontSize: 11.5, lineHeight: 1.45 }}>
-              {isExecutive ? 'At the current starting balance, ' : 'Coverage is Junior\'s first-loss buffer. At the current starting balance, '}
-              Junior can absorb about {(result.explainer.coverage.coverageLossLimit * 100).toFixed(1)}% of strategy losses before Senior declines.
+              Coverage is a buffer, not a guarantee. ST declines after about {(result.explainer.coverage.coverageLossLimit * 100).toFixed(1)}% of base-asset loss.
             </p>
           )}
         </div>
@@ -2062,34 +2748,40 @@ export default function DayMarketSimulator({
 
       {isExecutive && showSection('observation-period') && sourceHasObservedDrawdown && (
         <section style={{ ...cardStyle, padding: 16 }}>
-          <Eyebrow>What is an observation period?</Eyebrow>
+          <Eyebrow>What is an Observation Period?</Eyebrow>
           <h2 className="mt-2" style={{ color: C.text, fontFamily: SERIF, fontSize: 24, fontWeight: 400, lineHeight: 1.12 }}>
-            A defined recovery window after Junior begins covering a loss.
+            A defined recovery window after JT begins covering an ST drawdown.
           </h2>
           <p className="mt-2 max-w-3xl" style={{ color: C.muted, fontSize: 12.5, lineHeight: 1.45 }}>
-            The window gives the strategy time to recover before Junior&apos;s covered loss becomes permanent. Senior can still sell through the LP while direct Senior and Junior deposits and redemptions are paused.
+            The window gives the strategy base asset time to recover before JT&apos;s covered loss is finalized. ST can still sell through the SLP pool while direct ST and JT deposits and redemptions are paused.
           </p>
           <GuidedObservationSteps days={observationDays} generalizeObservation />
         </section>
       )}
 
-      {showSection('backtest') && <section style={cardStyle}>
+      {showSection('backtest') && <section style={isGuided ? guidedSectionStyle : cardStyle}>
         <div className="flex items-start justify-between gap-4">
           <div>
-            {forwardTest ? <Eyebrow>Forward test</Eyebrow> : <Eyebrow>Backtest</Eyebrow>}
+            {forwardTest
+              ? <Eyebrow>Forward test</Eyebrow>
+              : <Eyebrow>{isGuided ? 'Full history · Optional' : 'Backtest'}</Eyebrow>}
             <h2 className="mt-2" style={{ color: C.text, fontFamily: SERIF, fontSize: 22, fontWeight: 400, lineHeight: 1.08 }}>
               {forwardTest
                 ? `Test the ${forwardTest.termDays}-day facility under ${forwardTest.scenarios.length} payment outcomes.`
-                : isExecutive ? 'See it in the market history.' : isGuided ? 'See the rules play out over time.' : LOCKED_COPY.reviewTitle}
+                : isExecutive
+                  ? 'See it in the market history.'
+                  : isGuided
+                    ? 'See how $100 changed through the selected history.'
+                    : DAY_LOCKED_COPY.reviewTitle}
             </h2>
             <p className="mt-1" style={{ color: C.muted, fontSize: 12.5, lineHeight: 1.38 }}>
               {forwardTest
-                ? 'The shared accountant applies each forward path to Senior, Junior, and LP. Select an outcome to compare timing and loss absorption.'
+                ? 'The shared accountant applies each forward path to the strategy base asset, ST, JT, and SLP. Select an outcome to compare timing and loss absorption.'
                 : isExecutive
-                ? 'This accountant-backed chart shows each position, every observation period, and any loss that becomes permanent.'
+                ? 'This accountant-backed chart shows each position, every Observation Period, and every finalized loss.'
                 : isGuided
-                ? 'Use the chart to see when Junior coverage is active, when a loss can still recover, and when it becomes permanent.'
-                : LOCKED_COPY.reviewDescription}
+                ? 'This applies the current assumptions to the source data. It is not the historical performance of a live Royco Day market.'
+                : DAY_LOCKED_COPY.reviewDescription}
             </p>
           </div>
           <button
@@ -2098,18 +2790,22 @@ export default function DayMarketSimulator({
             aria-label={showReview ? 'Collapse' : 'Expand'}
             style={{
               border: `1px solid ${C.border}`,
-              borderRadius: 0,
+              borderRadius: 8,
               color: C.accent,
-              width: 28,
+              width: isGuided ? 'auto' : 28,
               height: 28,
               fontFamily: MONO,
-              fontSize: 18,
+              fontSize: isGuided ? 9.5 : 18,
+              fontWeight: isGuided ? 700 : 400,
+              letterSpacing: isGuided ? '0.08em' : undefined,
               lineHeight: 1,
               background: 'transparent',
               flexShrink: 0,
+              padding: isGuided ? '0 10px' : 0,
+              textTransform: isGuided ? 'uppercase' : undefined,
             }}
           >
-            {showReview ? '−' : '+'}
+            {isGuided ? (showReview ? 'Hide history' : 'Show history') : (showReview ? '−' : '+')}
           </button>
         </div>
 
@@ -2156,11 +2852,11 @@ export default function DayMarketSimulator({
                 </div>
                 <div className="mt-3 grid grid-cols-1 md:grid-cols-3" style={{ gap: 8 }}>
                   <ExecutiveMetric label="Total strategy cap" value={usd0(reverseMarket.strategyCap)} valueColor={C.text} />
-                  <ExecutiveMetric label="Senior cap" value={usd0(reverseMarket.seniorCap)} valueColor={C.accent} />
-                  <ExecutiveMetric label={`${reverseMarket.issuerName} Junior commitment`} value={usd0(reverseMarket.juniorCap)} valueColor={C.juniorLine} />
+                  <ExecutiveMetric label="ST cap" value={usd0(reverseMarket.seniorCap)} valueColor={C.accent} />
+                  <ExecutiveMetric label={`${reverseMarket.issuerName} JT commitment`} value={usd0(reverseMarket.juniorCap)} valueColor={C.juniorLine} />
                 </div>
                 <p className="mt-2" style={{ color: C.muted, fontSize: 11, lineHeight: 1.45 }}>
-                  {reverseMarket.seniorSupportLabel}: {usd0(reverseMarket.seniorSupportAmount)}. Junior deposits are closed and issuer-funded. LP uses the shared 10% Senior / 90% stable composition.
+                  {reverseMarket.seniorSupportLabel}: {usd0(reverseMarket.seniorSupportAmount)}. JT deposits are closed and issuer-funded. SLP uses the shared 10% ST / 90% stable-asset composition.
                 </p>
                 {selectedForwardScenario && (
                   <p className="mt-1" style={{ color: C.kpiLabel, fontSize: 10.5, lineHeight: 1.45 }}>
@@ -2171,19 +2867,19 @@ export default function DayMarketSimulator({
             )}
             {isGuided && <GuidedChartGuide />}
             <div className="flex flex-wrap items-center gap-x-5 gap-y-1.5 mb-3" style={{ fontSize: 11.5, color: C.muted }}>
-              <LegendSwatch color={C.seniorLine}>Senior share price</LegendSwatch>
-              <LegendSwatch color={C.juniorLine}>Junior share price</LegendSwatch>
-              <LegendSwatch color={C.olive}>LP share price</LegendSwatch>
-              <LegendSwatch color={C.strategyLine}>Base strategy</LegendSwatch>
+              <LegendSwatch color={C.seniorLine}>ST share price</LegendSwatch>
+              <LegendSwatch color={C.juniorLine}>JT share price</LegendSwatch>
+              <LegendSwatch color={C.olive}>SLP share price</LegendSwatch>
+              <LegendSwatch color={C.strategyLine}>Strategy base asset</LegendSwatch>
               <span className="flex items-center gap-2">
-                <span style={{ color: C.danger }}>●</span> Junior loss locked
+                <span style={{ color: C.danger }}>●</span> JT loss finalized
               </span>
               <span className="flex items-center gap-2">
-                <span style={{ color: C.danger }}>●</span> Senior loss event
+                <span style={{ color: C.danger }}>●</span> ST loss event
               </span>
               <span className="flex items-center gap-2">
                 <span style={{ width: 18, height: 10, background: C.obsFill, opacity: 0.32, display: 'inline-block' }} />
-                observation period
+                Observation Period
               </span>
               {isNativeReturnUnit && (
                 <span style={{ color: C.eyebrow, fontFamily: MONO, fontWeight: 600 }}>
@@ -2288,10 +2984,10 @@ export default function DayMarketSimulator({
                       }}
                     />
                   ))}
-                  <Line type="monotone" dataKey="strategy" name="Base strategy" stroke={C.strategyLine} dot={false} strokeWidth={1.3} />
-                  <Line type="monotone" dataKey="junior" name="Junior" stroke={C.juniorLine} dot={false} strokeWidth={2.2} />
-                  <Line type="monotone" dataKey="senior" name="Senior" stroke={C.seniorLine} dot={false} strokeWidth={2.2} />
-                  <Line type="monotone" dataKey="liquidity" name="LP" stroke={C.olive} dot={false} strokeWidth={2.2} />
+                  <Line type="monotone" dataKey="strategy" name="Strategy base asset" stroke={C.strategyLine} dot={false} strokeWidth={1.3} />
+                  <Line type="monotone" dataKey="junior" name="JT" stroke={C.juniorLine} dot={false} strokeWidth={2.2} />
+                  <Line type="monotone" dataKey="senior" name="ST" stroke={C.seniorLine} dot={false} strokeWidth={2.2} />
+                  <Line type="monotone" dataKey="liquidity" name="SLP" stroke={C.olive} dot={false} strokeWidth={2.2} />
                   {result.erasureEvents.map((event) => (
                     <ReferenceLine
                       key={`erasure-${event.index}`}
@@ -2322,7 +3018,7 @@ export default function DayMarketSimulator({
                       y={endStep.junior}
                       shape={
                         <EndValueTag
-                          text={`Jr ${endStep.junior.toFixed(0)}`}
+                          text={`JT ${endStep.junior.toFixed(0)}`}
                           color={C.juniorLine}
                           tagIndex={0}
                           peerValues={[endStep.junior, endStep.senior, endStep.liquidity]}
@@ -2338,7 +3034,7 @@ export default function DayMarketSimulator({
                       y={endStep.senior}
                       shape={
                         <EndValueTag
-                          text={`Sr ${endStep.senior.toFixed(0)}`}
+                          text={`ST ${endStep.senior.toFixed(0)}`}
                           color={C.seniorLine}
                           tagIndex={1}
                           peerValues={[endStep.junior, endStep.senior, endStep.liquidity]}
@@ -2354,7 +3050,7 @@ export default function DayMarketSimulator({
                       y={endStep.liquidity}
                       shape={
                         <EndValueTag
-                          text={`LP ${endStep.liquidity.toFixed(0)}`}
+                          text={`SLP ${endStep.liquidity.toFixed(0)}`}
                           color={C.olive}
                           tagIndex={2}
                           peerValues={[endStep.junior, endStep.senior, endStep.liquidity]}
@@ -2402,7 +3098,35 @@ export default function DayMarketSimulator({
               onChange={setDisplayedRange}
             />
 
-            <div className="mt-4 overflow-x-auto">
+            {isGuided && (
+              <div className="mt-4 flex items-center justify-between gap-3 border-t pt-3" style={{ borderColor: C.border }}>
+                <div>
+                  <p style={{ color: C.text, fontSize: 12, fontWeight: 600 }}>Monthly return table</p>
+                  <p className="mt-0.5" style={{ color: C.muted, fontSize: 10.5 }}>For users who want every monthly change.</p>
+                </div>
+                <button
+                  aria-expanded={showMonthly}
+                  onClick={() => setShowMonthly((value) => !value)}
+                  style={{
+                    background: 'transparent',
+                    border: `1px solid ${C.border}`,
+                    color: C.accent,
+                    fontFamily: MONO,
+                    fontSize: 9.5,
+                    fontWeight: 700,
+                    letterSpacing: '0.08em',
+                    minHeight: 30,
+                    padding: '0 10px',
+                    textTransform: 'uppercase',
+                  }}
+                  type="button"
+                >
+                  {showMonthly ? 'Hide table' : 'Show table'}
+                </button>
+              </div>
+            )}
+
+            {(!isGuided || showMonthly) && <div className="mt-4 overflow-x-auto">
               <table className="w-full" style={{ fontVariantNumeric: 'tabular-nums', fontFamily: MONO, fontSize: 11.8 }}>
                 <thead>
                   <tr
@@ -2431,20 +3155,27 @@ export default function DayMarketSimulator({
                   </tr>
                 </thead>
                 <tbody>
-                  <ReturnRow label="Base strategy" values={result.monthly.map((row) => row.strategyReturn)} end={endStep?.strategy ?? 100} annualized={result.strategyApy} showCurrency={!isNativeReturnUnit} />
-                  <ReturnRow label="Senior return" values={result.monthly.map((row) => row.seniorReturn)} end={endStep?.senior ?? 100} annualized={result.seniorApy} showCurrency={!isNativeReturnUnit} />
-                  <ReturnRow label="Junior return" values={result.monthly.map((row) => row.juniorReturn)} end={endStep?.junior ?? 100} annualized={result.juniorApy} showCurrency={!isNativeReturnUnit} />
-                  <ReturnRow label="LPT return" values={result.monthly.map((row) => row.liquidityReturn)} end={endStep?.liquidity ?? 100} annualized={result.liquidityApy} showCurrency={!isNativeReturnUnit} />
+                  <ReturnRow label="Strategy base asset" values={result.monthly.map((row) => row.strategyReturn)} end={endStep?.strategy ?? 100} annualized={result.strategyApy} showCurrency={!isNativeReturnUnit} />
+                  <ReturnRow label="ST return" values={result.monthly.map((row) => row.seniorReturn)} end={endStep?.senior ?? 100} annualized={result.seniorApy} showCurrency={!isNativeReturnUnit} />
+                  <ReturnRow label="JT return" values={result.monthly.map((row) => row.juniorReturn)} end={endStep?.junior ?? 100} annualized={result.juniorApy} showCurrency={!isNativeReturnUnit} />
+                  <ReturnRow label="SLP return" values={result.monthly.map((row) => row.liquidityReturn)} end={endStep?.liquidity ?? 100} annualized={result.liquidityApy} showCurrency={!isNativeReturnUnit} />
                 </tbody>
               </table>
-            </div>
+            </div>}
           </div>
         )}
       </section>}
 
-      {showSection('junior-funding') && <section style={{ ...cardStyle, borderLeft: `3px solid ${C.accent}` }}>
+      {showSection('junior-funding') && !isGuided && <section style={{ ...cardStyle, borderLeft: `3px solid ${C.accent}` }}>
         <div className="flex items-start justify-between gap-4 flex-wrap">
-          <Eyebrow>Junior funding</Eyebrow>
+          <div>
+            <Eyebrow>{isGuided ? 'Model assumption' : 'JT funding assumption'}</Eyebrow>
+            {isGuided && (
+              <p className="mt-1" style={{ color: C.muted, fontSize: 11.5, lineHeight: 1.4 }}>
+                Decide whether fresh JT capital replaces first-loss capital after a finalized loss.
+              </p>
+            )}
+          </div>
           <label className="flex items-center gap-2 cursor-pointer select-none" style={{ color: C.muted, fontSize: 12 }}>
             <input
               type="checkbox"
@@ -2452,13 +3183,13 @@ export default function DayMarketSimulator({
               onChange={(event) => setMaintainCoverage(event.target.checked)}
               style={{ accentColor: C.accent }}
             />
-            Refill Junior after losses
+            {isGuided ? 'Add fresh JT capital after a finalized loss' : 'Add JT capital after finalized losses'}
           </label>
         </div>
         <p className="mt-2" style={{ color: C.text, fontSize: 13, lineHeight: 1.5 }}>
           {maintainCoverage
-            ? `Junior is refilled after each observation period to restore the ${coveragePct.toFixed(0)}% minimum coverage. This run adds ${usd0(result.juniorCapitalInjected)}.`
-            : 'Junior is not refilled after losses. Everything else stays the same.'}
+            ? `Fresh JT capital is added after each Observation Period closes to restore the ${coveragePct.toFixed(0)}% minimum coverage requirement. This run adds ${usd0(result.juniorCapitalInjected)}.`
+            : 'No fresh JT capital is added after finalized losses, so coverage can remain below its starting level.'}
         </p>
         <p className="mt-3" style={{ color: C.kpiLabel, fontSize: 11, lineHeight: 1.45 }}>
           Illustrative parameters. Not an offer or investment advice.
@@ -2466,21 +3197,31 @@ export default function DayMarketSimulator({
       </section>}
 
       {showSection('disclosure') && <footer
-        style={{ color: C.kpiLabel, fontSize: 11, lineHeight: 1.45 }}
-        className="pb-8 border-t pt-4"
+        style={{
+          background: isGuided ? C.pageBg : undefined,
+          color: C.kpiLabel,
+          fontSize: 11,
+          lineHeight: 1.45,
+          padding: isGuided ? 16 : undefined,
+        }}
+        className={isGuided ? undefined : "pb-8 border-t pt-4"}
       >
         <p style={{ borderColor: C.border }}>
           <strong style={{ fontWeight: 600 }}>What this is, and what it is not.</strong>{' '}
           {activeMarket.provenance.dataMode === 'published-apy-forward'
-            ? `The underlying is ${activeMarket.provenance.source}. This forward test uses the published ${(activeMarket.provenance.publishedApy ?? defaults.sourceApy) * 100}% APY and does not present historical performance.`
-            : `The underlying is ${activeMarket.provenance.source}, covering ${startDate} through ${endDate}.`}
+            ? `The strategy base asset source is ${activeMarket.provenance.source}. This forward test uses the published ${(activeMarket.provenance.publishedApy ?? defaults.sourceApy) * 100}% APY and does not present historical performance.`
+            : `The strategy base asset source is ${activeMarket.provenance.source}, covering ${startDate} through ${endDate}.`}
         </p>
         <p className="mt-1">{activeMarket.copy.disclosure}</p>
         <p className="mt-1">
           Source:{' '}
-          <a href={activeMarket.provenance.sourceUrl} rel="noreferrer" style={{ color: C.eyebrow, overflowWrap: 'anywhere' }} target="_blank">
-            {activeMarket.provenance.sourceUrl}
-          </a>
+          {activeMarket.provenance.sourceUrl
+            ? (
+              <a href={activeMarket.provenance.sourceUrl} rel="noreferrer" style={{ color: C.eyebrow, overflowWrap: 'anywhere' }} target="_blank">
+                {activeMarket.provenance.sourceUrl}
+              </a>
+            )
+            : `${activeMarket.provenance.sourceProvider} · ${activeMarket.provenance.source}`}
         </p>
         {activeMarket.provenance.supportingSources?.map((source) => (
           <p className="mt-1" key={source.url}>

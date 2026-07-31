@@ -3,6 +3,10 @@
 import { useCallback, useMemo, useRef } from 'react';
 
 import {
+  DayChartTooltip,
+  useDayChartHover,
+} from '@/components/day-simulator/DayChartTooltip';
+import {
   indexFromFraction,
   moveHandle,
   nearestSide,
@@ -54,6 +58,7 @@ export function DayTimeframeBrush({
 }) {
   const trackRef = useRef<HTMLDivElement>(null);
   const dragRef = useRef<DragMode | null>(null);
+  const [hoverIndex, setHoverIndex] = useDayChartHover<number>('timeframe');
   const max = Math.max(0, dates.length - 1);
 
   const indexFromEvent = useCallback(
@@ -74,9 +79,10 @@ export function DayTimeframeBrush({
   };
 
   const onPointerMove = (event: React.PointerEvent) => {
+    const index = indexFromEvent(event.clientX);
+    setHoverIndex(index);
     const drag = dragRef.current;
     if (!drag) return;
-    const index = indexFromEvent(event.clientX);
     if (drag.kind === 'handle') onChange(moveHandle(view, drag.side, index, max));
     else onChange(panRange(drag.origin, index - drag.grabIndex, max));
   };
@@ -90,6 +96,7 @@ export function DayTimeframeBrush({
 
   const onTrackDown = (event: React.PointerEvent) => {
     const index = indexFromEvent(event.clientX);
+    setHoverIndex(index);
     const side = nearestSide(view, index);
     begin({ kind: 'handle', side }, event);
     onChange(moveHandle(view, side, index, max));
@@ -105,6 +112,7 @@ export function DayTimeframeBrush({
 
   const leftPct = pctOf(view.a, max);
   const rightPct = pctOf(view.b, max);
+  const hoverPct = hoverIndex === null ? null : pctOf(hoverIndex, max);
 
   const years = useMemo(() => {
     const output: { year: number; pct: number }[] = [];
@@ -201,10 +209,32 @@ export function DayTimeframeBrush({
       <div style={{ padding: '2px 4px 0' }}>
         <div
           ref={trackRef}
+          aria-label={`${isForward ? 'Forward scenario' : 'Full history'} overview. Hover, tap, or focus and use the arrow keys to inspect values.`}
+          onBlur={(event) => {
+            if (!event.currentTarget.contains(event.relatedTarget as Node | null)) setHoverIndex(null);
+          }}
+          onFocus={(event) => {
+            if (event.target === event.currentTarget) setHoverIndex(Math.round((view.a + view.b) / 2));
+          }}
+          onKeyDown={(event) => {
+            if (event.target !== event.currentTarget) return;
+            if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+            event.preventDefault();
+            const direction = event.key === 'ArrowLeft' ? -1 : 1;
+            setHoverIndex(Math.max(0, Math.min(max, (hoverIndex ?? Math.round((view.a + view.b) / 2)) + direction)));
+          }}
+          onMouseLeave={() => {
+            if (!dragRef.current) setHoverIndex(null);
+          }}
           onPointerDown={onTrackDown}
+          onPointerLeave={(event) => {
+            if (event.pointerType !== 'touch' && !dragRef.current) setHoverIndex(null);
+          }}
           onPointerMove={onPointerMove}
           onPointerUp={endDrag}
           onPointerCancel={endDrag}
+          role="group"
+          tabIndex={0}
           style={{
             position: 'relative',
             height: BRUSH_TRACK_H,
@@ -242,6 +272,36 @@ export function DayTimeframeBrush({
               <path d={preview.junior} fill="none" stroke={C.juniorLine} strokeWidth={2} vectorEffect="non-scaling-stroke" />
               <path d={preview.liquidity} fill="none" stroke={C.liquidityLine} strokeWidth={2} vectorEffect="non-scaling-stroke" />
             </svg>
+          )}
+
+          {hoverIndex !== null && hoverPct !== null && (
+            <>
+              <div
+                aria-hidden="true"
+                style={{
+                  background: C.eyebrow,
+                  bottom: 0,
+                  left: `${hoverPct}%`,
+                  opacity: 0.7,
+                  pointerEvents: 'none',
+                  position: 'absolute',
+                  top: 0,
+                  width: 1,
+                  zIndex: 15,
+                }}
+              />
+              <DayChartTooltip
+                compact
+                title={dateLabel(dates[hoverIndex])}
+                xPct={hoverPct}
+                rows={[
+                  { label: 'Source', value: series.strategy[hoverIndex]?.toFixed(1) ?? '—', color: C.strategyLine },
+                  { label: 'ST', value: series.senior[hoverIndex]?.toFixed(1) ?? '—', color: C.seniorLine },
+                  { label: 'JT', value: series.junior[hoverIndex]?.toFixed(1) ?? '—', color: C.juniorLine },
+                  { label: 'SLP', value: series.liquidity[hoverIndex]?.toFixed(1) ?? '—', color: C.liquidityLine },
+                ]}
+              />
+            </>
           )}
 
           <div

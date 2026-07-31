@@ -68,17 +68,17 @@ const p1 = (x: number) => (x * 100).toFixed(1) + "%";
 const C = { bg: "#FBFBF8", panel: "#ffffff", panel2: "#fafaf7", line: "#e5e5e0", text: "#0a0a0a", mut: "#666666", dim: "#999999", sr: "#C8873E", jt: "#16A34A", lt: "#2563EB", neg: "#DC2626", pos: "#16A34A", warn: "#D97706", sizeTint: "rgba(37,99,235,0.06)", priceTint: "rgba(200,135,62,0.06)" };
 
 const EXPL: Record<string, [string, string, string]> = {
-  APY: ["APY — yield of the source", C.text, "The raw return of the underlying yield source. Every tranche yield below is just a split of this number. These are my estimates — edit to your real figures."],
-  coverage: ["coverage → JT size", C.lt, "SIZES the junior tranche. The minimum % of senior losses the JT must always be able to absorb. Higher coverage = a bigger JT = more first-loss capital. Because the same risk premium is spread over more JT dollars, higher coverage LOWERS the JT's per-dollar yield."],
-  minLiq: ["minLiq → LT size", C.lt, "SIZES the LP tranche. The minimum % of senior value that must be backed by secondary (pool) LP at all times. Higher minLiq = a bigger LT. Because the LP premium is spread over more LT dollars, higher minLiq LOWERS the LT's per-dollar yield."],
-  sRisk: ["s_risk → JT cut", C.jt, "PRICES the junior tranche. The share of the senior's yield handed to the JT in exchange for coverage. Higher s_risk = the senior keeps less, the JT earns more. This is a price, not a size."],
-  sLiq: ["s_liq → LT cut", C.jt, "PRICES the LP tranche. The share of the senior's yield handed to the LT in exchange for providing exit LP. Higher s_liq = the senior keeps less, the LT earns more. A price, not a size."],
-  beta: ["β — JT deployment", C.jt, "Where the junior's capital sits. 0 = a risk-free asset (uncorrelated to senior losses, cleaner coverage, earns only RFR + premium). 1 = the same asset as the senior (earns the source yield too, but is exposed to the very losses it is covering). β also feeds the JT sizing formula."],
+  APY: ["Strategy base-asset APY", C.text, "The modeled return of the strategy base asset. ST and JT economics begin with this yield; SLP return also includes pool carry and trading fees. Edit it to match the source you are evaluating."],
+  coverage: ["coverage → JT size", C.lt, "SIZES the Junior Tranche (JT). Coverage is JT divided by JT plus ST. A higher minimum means more first-loss capital; because the same risk premium is spread over more JT capital, it lowers JT's per-dollar yield."],
+  minLiq: ["minLiq → SLP size", C.lt, "SIZES the SLP. This is the minimum SLP capital required relative to ST. A higher minimum creates a larger SLP; because the liquidity premium is spread across more SLP capital, it lowers per-dollar SLP yield."],
+  sRisk: ["s_risk → JT premium", C.jt, "PRICES first-loss coverage. This is the share of ST yield paid to JT as the risk premium. A higher value means ST keeps less and JT earns more. It is a premium, not a size."],
+  sLiq: ["s_liq → SLP premium", C.jt, "PRICES secondary liquidity. This is the share of ST yield paid to SLP for providing the immediate secondary exit. A higher s_liq means ST keeps less and SLP earns more. It is a premium, not a size."],
+  beta: ["β — JT deployment", C.jt, "Where JT capital sits. 0 = a risk-free asset; 1 = the same strategy base asset as ST. Co-investment earns the base-asset yield but also exposes JT to the losses it covers. β also feeds the JT sizing formula."],
   Ustar: ["coverage util target", C.mut, "How fully the JT's coverage capacity is used at steady state. 90% means the JT runs slightly larger than the bare minimum so it stays perpetually liquid. Feeds JT sizing."],
-  Lustar: ["LP util target", C.mut, "Same idea for the LT: how fully the LP tranche is utilized at steady state. Feeds LT sizing."],
+  Lustar: ["Liquidity-utilization target", C.mut, "How close SLP capital sits to its required minimum at steady state. This drives the SLP liquidity premium."],
   rfr: ["risk-free rate", C.mut, "What the JT earns on its own capital when β=0 (parked in T-bills / a money-market asset)."],
-  stable: ["T-bill leg yield", C.mut, "Yield on the stablecoin half of the E-CLP pool. The 90% stable leg sits in T-bills / a tokenized-treasury stablecoin (≈3.5%), so it earns the bill rate on top of swap fees. Feeds BPT carry."],
-  wST: ["BPT % in ST", C.mut, "Share of the E-CLP pool held as senior shares vs T-bill stables. Default 10% senior / 90% stable — the pool is quote-heavy in the healthy state so it can absorb senior sells, and fills with senior shares only under exit pressure. The 10% senior slice earns senior net yield; the 90% stable slice earns the T-bill rate (≈3.5%). Feeds BPT carry."],
+  stable: ["Stable-asset yield", C.mut, "Yield on the stable-asset side of the SLP pool. It contributes to SLP pool carry alongside the liquidity premium and trading fees."],
+  wST: ["SLP pool % in ST", C.mut, "Share of the SLP pool held as ST versus stable assets. The pool is stable-asset-heavy in the healthy state so it can absorb ST sales, then fills with ST under exit pressure. The ST side earns ST yield; the stable-asset side earns its configured yield."],
   turnover: ["turnover ×/yr", C.mut, "How many times per year the pool's value trades through it. Drives swap-fee income. Swap APY = turnover × fee."],
   feeBps: ["swap fee", C.mut, "The pool's trading fee in basis points. Swap APY = turnover × fee."],
 };
@@ -106,24 +106,24 @@ function breakdown(kind: string, s: Source, g: GlobalsWithSwap, c: Computed): Br
   if (kind === "st") return { name: "Senior net (both designs)", color: C.sr, total: c.dayST, rows: [
     { l: "Base APY", v: s.apy, sub: "the source yield" },
     { l: "− Risk premium", v: -s.sRisk * s.apy, sub: `s_risk ${p0(s.sRisk)} × APY → paid to JT` },
-    { l: "− LP premium", v: -s.sLiq * s.apy, sub: `s_liq ${p0(s.sLiq)} × APY → paid to LT` },
+    { l: "− Liquidity premium", v: -s.sLiq * s.apy, sub: `s_liq ${p0(s.sLiq)} × APY → paid to SLP` },
   ] };
   if (kind === "duskjt") { const prem = ((s.sRisk + s.sLiq) * s.apy) / c.duskSize;
-    return { name: "Dusk JT (one tranche, both jobs)", color: C.jt, total: c.duskJT, rows: [
-      { l: "Premium income", v: prem, sub: `both cuts (s_risk+s_liq ${p0(s.sRisk + s.sLiq)}) × APY = ${p1((s.sRisk + s.sLiq) * s.apy)} of senior, ÷ JT size ${p0(c.duskSize)} → ${c.liqBinds ? "liquidity" : "coverage"} sets the size` },
+    return { name: "Dusk JT (one position, both roles)", color: C.jt, total: c.duskJT, rows: [
+      { l: "Premium income", v: prem, sub: `both premiums (s_risk+s_liq ${p0(s.sRisk + s.sLiq)}) × APY = ${p1((s.sRisk + s.sLiq) * s.apy)} of ST yield, ÷ JT size ${p0(c.duskSize)} → ${c.liqBinds ? "liquidity" : "coverage"} sets the size` },
       { l: "Swap fees", v: g.swap, sub: swapSub },
       { l: "BPT carry", v: carry(c.duskST), sub: carrySub(c.duskST) },
     ] };
   }
   if (kind === "dayjt") { const prem = (s.sRisk * s.apy) / c.jtSize;
-    return { name: "Day JT (pure coverage)", color: C.jt, total: c.dayJT, rows: [
+    return { name: "Royco Day JT (first-loss coverage)", color: C.jt, total: c.dayJT, rows: [
       { l: "Deployment (co-invested)", v: c.dep, sub: "JT sits in the same asset as ST (β=1) → earns the source APY" },
-      { l: "Risk premium", v: prem, sub: `s_risk ${p0(s.sRisk)} × APY = ${p1(s.sRisk * s.apy)} of senior, ÷ JT size ${p0(c.jtSize)}` },
+      { l: "Risk premium", v: prem, sub: `s_risk ${p0(s.sRisk)} × APY = ${p1(s.sRisk * s.apy)} of ST yield, ÷ JT size ${p0(c.jtSize)}` },
     ] };
   }
   const prem = (s.sLiq * s.apy) / c.ltSize;
-  return { name: "Day LT (pure liquidity)", color: C.lt, total: c.dayLT, rows: [
-    { l: "LP premium", v: prem, sub: `s_liq ${p0(s.sLiq)} × APY = ${p1(s.sLiq * s.apy)} of senior, ÷ LT size ${p0(c.ltSize)}` },
+  return { name: "Royco Day SLP (secondary liquidity)", color: C.lt, total: c.dayLT, rows: [
+    { l: "Liquidity premium", v: prem, sub: `s_liq ${p0(s.sLiq)} × APY = ${p1(s.sLiq * s.apy)} of ST yield, ÷ SLP size ${p0(c.ltSize)}` },
     { l: "Swap fees", v: g.swap, sub: swapSub },
     { l: "BPT carry", v: carry(c.dayST), sub: carrySub(c.dayST) },
   ] };
@@ -177,7 +177,7 @@ export default function Comparison() {
     <div style={{ background: C.bg, color: C.text }} className="w-full font-sans">
       <div className="max-w-[1180px] mx-auto">
         <div className="flex items-end justify-between flex-wrap gap-3 mb-3">
-          <h1 className="text-[22px] font-semibold tracking-tight">Dusk <span style={{ color: C.dim }}>vs</span> Day — projected tranche yields</h1>
+          <h1 className="text-[22px] font-semibold tracking-tight">Dusk <span style={{ color: C.dim }}>vs</span> Royco Day — modeled position yields</h1>
           <div className="flex items-center gap-2">
             <span style={{ color: C.mut }} className="text-[10px] uppercase tracking-wider">swap scenario</span>
             {["cons", "base"].map((k) => (
@@ -189,15 +189,15 @@ export default function Comparison() {
         <div style={{ background: C.panel, border: `1px solid ${C.line}` }} className="rounded-lg p-3.5 mb-4 text-[12px] leading-relaxed">
           <div className="font-semibold mb-1.5" style={{ color: C.text }}>Every yield comes from two separate levers — read them apart</div>
           <div className="grid sm:grid-cols-2 gap-x-6 gap-y-1.5" style={{ color: C.mut }}>
-            <div><span style={{ color: C.lt }} className="font-medium">SIZE</span> — how much capital the tranche is, as a % of senior.
-              <div style={{ color: C.dim }} className="font-mono text-[10.5px] mt-0.5">JT size = coverage ÷ (util − coverage) &nbsp;·&nbsp; LT size = minLiq ÷ liq-util</div></div>
-            <div><span style={{ color: C.jt }} className="font-medium">PRICE</span> — the tranche&apos;s cut of senior yield.
-              <div style={{ color: C.dim }} className="font-mono text-[10.5px] mt-0.5">JT cut = s_risk &nbsp;·&nbsp; LT cut = s_liq</div></div>
+            <div><span style={{ color: C.lt }} className="font-medium">SIZE</span> — how much capital the position uses, as a % of ST.
+              <div style={{ color: C.dim }} className="font-mono text-[10.5px] mt-0.5">JT size = coverage ÷ (util − coverage) &nbsp;·&nbsp; SLP size = minLiq ÷ liquidity utilization</div></div>
+            <div><span style={{ color: C.jt }} className="font-medium">PRICE</span> — the position&apos;s premium share of ST yield.
+              <div style={{ color: C.dim }} className="font-mono text-[10.5px] mt-0.5">JT risk premium = s_risk &nbsp;·&nbsp; SLP liquidity premium = s_liq</div></div>
           </div>
           <div className="mt-2 pt-2" style={{ borderTop: `1px solid ${C.line}`, color: C.mut }}>
-            Per-dollar yield ≈ <span style={{ color: C.text }} className="font-mono text-[11px]">PRICE ÷ SIZE</span> (+ swap + carry). A smaller tranche earns a fatter yield because the same cut is spread over fewer dollars.
-            <span className="block mt-1"><span style={{ color: C.jt }}>Dusk</span> runs <b>one</b> junior for both jobs: its size = the larger of the two requirements, and it collects <b>both</b> cuts (s_risk + s_liq).
-            <span style={{ color: C.lt }}> Day</span> runs <b>two</b>: a lean coverage-only JT (size = coverage need) and a separate LT (size = liquidity need) — so Day deploys more total capital but prices each risk on its own.</span>
+            Per-dollar yield ≈ <span style={{ color: C.text }} className="font-mono text-[11px]">PRICE ÷ SIZE</span> (+ swap + carry). A smaller position earns a higher modeled yield because the same premium is spread over fewer dollars.
+            <span className="block mt-1"><span style={{ color: C.jt }}>Dusk</span> runs <b>one</b> junior position for both jobs: its size = the larger of the two requirements, and it collects both premiums (s_risk + s_liq).
+            <span style={{ color: C.lt }}> Royco Day</span> separates the roles: JT provides first-loss coverage, while SLP provides secondary liquidity. That uses more total capital but prices each role independently.</span>
           </div>
         </div>
 
@@ -218,13 +218,13 @@ export default function Comparison() {
                 <th className="text-left font-medium px-3 py-2 align-bottom">Source</th>
                 <th className="font-medium px-1.5 py-2 align-bottom" {...hovT("APY")}><span style={{ borderBottom: `1px dotted ${C.dim}` }} className="cursor-help">APY</span></th>
                 <th className="font-medium px-1.5 py-2 align-bottom cursor-help" style={{ background: C.sizeTint }} {...hovT("coverage")}>coverage<br /><span style={{ color: C.lt }}>→ JT size</span></th>
-                <th className="font-medium px-1.5 py-2 align-bottom cursor-help" style={{ background: C.sizeTint }} {...hovT("minLiq")}>minLiq<br /><span style={{ color: C.lt }}>→ LT size</span></th>
-                <th className="font-medium px-1.5 py-2 align-bottom cursor-help" style={{ background: C.priceTint }} {...hovT("sRisk")}>s_risk<br /><span style={{ color: C.jt }}>→ JT cut</span></th>
-                <th className="font-medium px-1.5 py-2 align-bottom cursor-help" style={{ background: C.priceTint }} {...hovT("sLiq")}>s_liq<br /><span style={{ color: C.jt }}>→ LT cut</span></th>
+                <th className="font-medium px-1.5 py-2 align-bottom cursor-help" style={{ background: C.sizeTint }} {...hovT("minLiq")}>minLiq<br /><span style={{ color: C.lt }}>→ SLP size</span></th>
+                <th className="font-medium px-1.5 py-2 align-bottom cursor-help" style={{ background: C.priceTint }} {...hovT("sRisk")}>s_risk<br /><span style={{ color: C.jt }}>→ JT premium</span></th>
+                <th className="font-medium px-1.5 py-2 align-bottom cursor-help" style={{ background: C.priceTint }} {...hovT("sLiq")}>s_liq<br /><span style={{ color: C.jt }}>→ SLP premium</span></th>
                 <th style={{ borderLeft: `2px solid ${C.line}`, color: C.sr }} className="font-medium px-2 py-2 align-bottom">ST<br />net</th>
                 <th style={{ borderLeft: `2px solid ${C.line}`, color: C.jt }} className="font-medium px-2 py-2 align-bottom">DUSK<br />JT</th>
                 <th style={{ borderLeft: `2px solid ${C.line}`, color: C.jt }} className="font-medium px-2 py-2 align-bottom">DAY<br />JT</th>
-                <th style={{ color: C.lt }} className="font-medium px-2 py-2 align-bottom">DAY<br />LT</th>
+                <th style={{ color: C.lt }} className="font-medium px-2 py-2 align-bottom">DAY<br />SLP</th>
               </tr>
             </thead>
             <tbody className="font-mono tabular-nums">
@@ -253,7 +253,7 @@ export default function Comparison() {
         </div>
 
         <div style={{ color: C.mut }} className="text-[11px] mt-3 leading-relaxed">
-          The <span style={{ color: C.dim }}>size</span> line under each yield is that tranche&apos;s capital as a % of senior. Only the <span style={{ color: C.jt }}>JT</span> is first-loss capital that covers senior drawdowns — the <span style={{ color: C.lt }}>LT</span> is liquidity capital and absorbs none of the senior&apos;s losses. <span style={{ color: C.jt }}>Day JT size</span> + <span style={{ color: C.lt }}>Day LT size</span> is the total capital Day deploys (coverage + liquidity, each priced on its own risk); <span style={{ color: C.jt }}>Dusk JT size</span> is the single pool Dusk reuses to do both jobs at once — bearing the losses <em>and</em> providing the liquidity. Hover any header to see what the input does; hover any yield to see its components.
+          The <span style={{ color: C.dim }}>size</span> line under each yield is that position&apos;s capital as a percentage of ST. Only <span style={{ color: C.jt }}>JT</span> is first-loss capital for ST; <span style={{ color: C.lt }}>SLP</span> provides secondary liquidity. Royco Day sizes JT and SLP independently, then combines their capital requirements. Dusk instead reuses one JT pool for both roles. Hover any header to see what the input does; hover any yield to see its components.
         </div>
       </div>
 

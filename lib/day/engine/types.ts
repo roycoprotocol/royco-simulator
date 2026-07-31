@@ -213,6 +213,12 @@ export type EventKind =
   | "blocked"
   | "invariant-violation";
 
+export type ObservationExitReason =
+  | "period-ended"
+  | "protected-exit"
+  | "st-impairment"
+  | "recovered";
+
 export interface SimEvent {
   t: number;
   kind: EventKind;
@@ -220,4 +226,6 @@ export interface SimEvent {
   level: "info" | "warn" | "danger" | "good";
   /** Exact NAV amount for value-bearing events. Never recover accounting data from msg. */
   amountNAV?: number;
+  /** Structured lifecycle reason for Observation Period exits. Never infer this from msg. */
+  observationExitReason?: ObservationExitReason;
 }

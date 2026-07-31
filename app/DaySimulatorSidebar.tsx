@@ -253,7 +253,7 @@ export default function DaySimulatorSidebar({
 
   // --- operating utilization (drives premium shares → APYs / split bar / chart dots) ---
   const [covUtil, setCovUtil] = useState(90); // coverage utilization %, 0–100
-  const [lqUtil, setLqUtil] = useState(90); // LP utilization %, 0–100
+  const [lqUtil, setLqUtil] = useState(90); // SLP liquidity utilization %, 0–100
 
   // --- advanced inputs ---
   const [showAdvanced, setShowAdvanced] = useState(false);
@@ -469,7 +469,7 @@ export default function DaySimulatorSidebar({
   // ---------------------------------------------------------------------------
   // YDM chart data — 101 points sweeping each curve over its OWN utilization
   // axis. The risk YDM (→JT) is keyed on coverage utilization; the liquidity
-  // YDM (→LT) is keyed on LP utilization. These two utilizations move
+  // Liquidity YDM (→SLP; contract symbol LT) is keyed on liquidity utilization. These two utilizations move
   // independently, so each curve gets its own chart and axis.
   // ---------------------------------------------------------------------------
   const riskCurveData = useMemo(() => {
@@ -540,7 +540,7 @@ export default function DaySimulatorSidebar({
             </div>
             <div>
               <h3 className="text-lg font-medium text-[var(--primary-text)]">
-                How V2 - Day works
+                How Royco Day works
               </h3>
               <p className="text-sm text-[var(--secondary-text)]">
                 Click to learn about the three-tranche structure
@@ -573,7 +573,7 @@ export default function DaySimulatorSidebar({
                     Key Takeaway
                   </div>
                   <p className="text-sm text-[var(--secondary-text)]">
-                    Day adds an LP tranche (LT) that backs senior redemptions via an E-CLP BPT pool, earning swap fees and an LP premium from the YDM.
+                    Royco Day adds the Senior Liquidity Provider (SLP; contract symbol LT), which provides secondary liquidity for ST sales through an E-CLP BPT pool and earns a liquidity premium and trading fees.
                   </p>
                 </div>
               </div>
@@ -586,11 +586,11 @@ export default function DaySimulatorSidebar({
                       1
                     </span>
                     <p className="text-sm font-medium text-[var(--primary-text)]">
-                      One pool, three slices
+                      One market, three positions
                     </p>
                   </div>
                   <p className="text-sm text-[var(--secondary-text)] leading-relaxed">
-                    Senior (ST) = paid first, protected. Junior (JT) = first-loss buffer. LP (LT) = pool-backed redemption layer.
+                    Senior Tranche (ST) = first-loss covered capital. Junior Tranche (JT) = first-loss capital. Senior Liquidity Provider (SLP; LT in the contracts) = the AMM-backed secondary-liquidity position.
                   </p>
                 </div>
 
@@ -604,7 +604,7 @@ export default function DaySimulatorSidebar({
                     </p>
                   </div>
                   <p className="text-sm text-[var(--secondary-text)] leading-relaxed">
-                    Utilization drives a <span className="font-medium text-[var(--info)]">risk premium to JT</span> and a separate <span className="font-medium text-[var(--insight)]">LP premium to LT</span>. Senior keeps what remains. Combined, the two premiums are capped at 100% of senior yield — raising one reduces the other, so senior yield never goes negative.
+                    Utilization drives a <span className="font-medium text-[var(--info)]">risk premium to JT</span> and a separate <span className="font-medium text-[var(--insight)]">liquidity premium to SLP</span>. ST keeps what remains. Combined, the two premiums are capped at 100% of ST yield.
                   </p>
                 </div>
 
@@ -618,7 +618,7 @@ export default function DaySimulatorSidebar({
                     </p>
                   </div>
                   <p className="text-sm text-[var(--secondary-text)] leading-relaxed">
-                    The pool targets a concentrated mix — roughly <strong>10% senior shares to 90% tokenized T-bills</strong> by default — but the actual split shifts with market conditions and the E-CLP concentration band (advanced). Min LP = the % of senior assets that must stay pool-backed.
+                    The pool targets a concentrated mix — roughly <strong>10% ST shares to 90% stable assets</strong> by default — but the actual split shifts with market conditions and the E-CLP concentration band. Minimum liquidity is the SLP capital required relative to ST.
                   </p>
                 </div>
 
@@ -628,11 +628,11 @@ export default function DaySimulatorSidebar({
                       4
                     </span>
                     <p className="text-sm font-medium text-[var(--primary-text)]">
-                      LP slice (LT)
+                      SLP position (contract: LT)
                     </p>
                   </div>
                   <p className="text-sm text-[var(--secondary-text)] leading-relaxed">
-                    LT earns swap fees + T-bill yield + net senior yield on its ST leg + an LP premium routed by the LP YDM.
+                    SLP return can include trading fees, stable-asset yield, ST appreciation, and the liquidity premium, less impermanent loss.
                   </p>
                 </div>
               </div>
@@ -642,9 +642,9 @@ export default function DaySimulatorSidebar({
                 <div className="bg-[var(--success)] text-white rounded-xl p-4 flex items-center justify-between">
                   <div>
                     <p className="text-xs uppercase tracking-wide text-white/70">
-                      Senior slice (ST)
+                      Senior Tranche (ST)
                     </p>
-                    <p className="text-base font-medium">Gets paid first</p>
+                    <p className="text-base font-medium">First-loss covered</p>
                   </div>
                   <span className="text-sm bg-[var(--theme-background)] text-[var(--success)] px-3 py-1 rounded-full font-medium">
                     Lower risk
@@ -653,10 +653,10 @@ export default function DaySimulatorSidebar({
                 <div className="bg-[var(--theme-background)] rounded-xl border border-[var(--theme-border)] p-4 flex items-center justify-between shadow-[0_8px_24px_rgba(0,0,0,0.04)]">
                   <div>
                     <p className="text-xs uppercase tracking-wide text-[var(--info)]">
-                      Junior slice (JT)
+                      Junior Tranche (JT)
                     </p>
                     <p className="text-base font-medium text-[var(--primary-text)]">
-                      Takes first losses
+                      Absorbs first losses
                     </p>
                   </div>
                   <span className="text-sm bg-[var(--info)] text-white px-3 py-1 rounded-full font-medium">
@@ -666,14 +666,14 @@ export default function DaySimulatorSidebar({
                 <div className="bg-[var(--theme-background)] rounded-xl border border-[var(--insight)] p-4 flex items-center justify-between shadow-[0_8px_24px_rgba(0,0,0,0.04)]">
                   <div>
                     <p className="text-xs uppercase tracking-wide text-[var(--insight)]">
-                      LP slice (LT)
+                      Senior Liquidity Provider (SLP)
                     </p>
                     <p className="text-base font-medium text-[var(--primary-text)]">
-                      Backs redemptions
+                      Provides secondary liquidity
                     </p>
                   </div>
                   <span className="text-sm bg-[var(--insight)] text-white px-3 py-1 rounded-full font-medium">
-                    Pool provider
+                    AMM provider
                   </span>
                 </div>
               </div>
@@ -685,13 +685,13 @@ export default function DaySimulatorSidebar({
                 </p>
                 <div className="space-y-2">
                   <div className="rounded-xl border border-[var(--warning)] bg-[var(--warning-background)] px-4 py-3 text-xs text-[var(--warning)]">
-                    <span className="font-medium">TBD — needs input:</span> Exact utilization threshold / governance rule at which LT redemptions are blocked versus allowed (the simulation blocks when LP utilization exceeds 1 but the on-chain threshold and any override path are not yet specified).
+                    <span className="font-medium">TBD — needs input:</span> Exact utilization threshold and governance rule at which SLP redemptions are blocked or allowed.
                   </div>
                   <div className="rounded-xl border border-[var(--warning)] bg-[var(--warning-background)] px-4 py-3 text-xs text-[var(--warning)]">
-                    <span className="font-medium">TBD — needs input:</span> LP-facing fee-split framing and headline-APY presentation beyond the formula above (swap fee + T-bill yield + net senior yield on the ST leg + LP premium).
+                    <span className="font-medium">TBD — needs input:</span> SLP-facing return decomposition and headline-APY presentation beyond the formula above.
                   </div>
                   <div className="rounded-xl border border-[var(--warning)] bg-[var(--warning-background)] px-4 py-3 text-xs text-[var(--warning)]">
-                    <span className="font-medium">TBD — needs input:</span> Lock-up period, secondary-market access, and &apos;run&apos; mitigation narrative for LP holders beyond what the scenario engine models.
+                    <span className="font-medium">TBD — needs input:</span> SLP redemption constraints, secondary-market access, and liquidity-risk framing beyond what the scenario engine models.
                   </div>
                 </div>
               </div>
@@ -715,14 +715,14 @@ export default function DaySimulatorSidebar({
             <span className="flex-1 h-px bg-gradient-to-r from-[var(--theme-border)] via-[var(--theme-border)] to-transparent" />
           </div>
 
-          <Card title="Coverage (Dawn)">
-            <Field label="Source APY" hint="underlying yield">
+          <Card title="Royco Day market">
+            <Field label="Strategy base-asset APY" hint="yield source">
               <NumIn value={apy} scale={100} step={0.5} suffix="%" onChange={setApy} />
             </Field>
-            <Field label="Coverage" hint="min senior protection">
+            <Field label="Minimum coverage" hint="JT protection for ST">
               <NumIn value={coverage} scale={100} step={1} suffix="%" onChange={setCoverage} />
             </Field>
-            <Field label="Min LP" hint="% of senior that must be pool-backed">
+            <Field label="Minimum liquidity" hint="SLP capital required per ST">
               <NumIn value={minLiq} scale={100} step={1} suffix="%" onChange={setMinLiq} />
             </Field>
           </Card>
@@ -734,7 +734,7 @@ export default function DaySimulatorSidebar({
             <Field label="Junior (JT)">
               <NumIn value={initJT} step={1_000_000} w={96} onChange={setInitJT} />
             </Field>
-              <Field label="LP (LT)">
+              <Field label="SLP (contract: LT)">
               <NumIn value={initLT} step={500_000} w={96} onChange={setInitLT} />
             </Field>
           </Card>
@@ -750,8 +750,8 @@ export default function DaySimulatorSidebar({
           {showAdvanced && (
             <>
               {/* Pool / LT */}
-              <Card title="LP Tranche (E-CLP BPT)">
-                <Field label="T-bill stable yield" hint="yield on the tokenized-treasury leg (≈90% of the pool at the default peg)">
+              <Card title="Senior Liquidity Provider (SLP · E-CLP BPT)">
+                <Field label="Stable-asset yield" hint="yield on the stable-asset leg (≈90% of the pool at the default peg)">
                   <NumIn value={stableYield} scale={100} step={0.5} suffix="%" onChange={setStableYield} />
                 </Field>
                 <Field label="Swap fee">
@@ -782,7 +782,7 @@ export default function DaySimulatorSidebar({
                     onChange={(v) => setRiskAnchor('y100', v)}
                   />
                   <div className="border-t border-[var(--theme-border)] my-1" />
-                <p className="text-[9px] uppercase tracking-wider text-[var(--insight)] mb-0.5">LP premium → LT</p>
+                <p className="text-[9px] uppercase tracking-wider text-[var(--insight)] mb-0.5">Liquidity premium → SLP</p>
                   <AnchorSlider
                     label="@0% util"
                     value={liqYDM.y0}
@@ -830,13 +830,13 @@ export default function DaySimulatorSidebar({
               <div className="group relative kpi-flash bg-[var(--theme-background)] rounded-xl border border-[var(--theme-border)] p-4 shadow-sm">
                 <div className="flex items-center gap-2 mb-1">
                   <span className="w-2 h-2 rounded-full" style={{ background: 'var(--success)' }} />
-                  <span className="text-[13px] text-[var(--secondary-text)]">Senior · ST</span>
+                  <span className="text-[13px] text-[var(--secondary-text)]">Senior Tranche · ST</span>
                 </div>
                 <p className="tabular-nums text-4xl sm:text-5xl leading-none text-[var(--success)]" style={{ fontWeight: 500 }}>
                   {(stAPY * 100).toFixed(1)}
                   <span className="text-2xl sm:text-3xl">%</span>
                 </p>
-                <p className="text-[12px] text-[var(--tertiary-text)] mt-1.5">paid first · lower risk</p>
+                <p className="text-[12px] text-[var(--tertiary-text)] mt-1.5">first-loss covered · lower risk</p>
                 <p className="text-[12px] tabular-nums text-[var(--success)] mt-1">NAV {usd(cur.stEffectiveNAV)}</p>
                 {/* Hover breakdown */}
                 <div className="hidden group-hover:block absolute left-0 top-full mt-2 z-20 w-80 text-left bg-[var(--theme-background)] border border-[var(--theme-border)] rounded-xl shadow-lg p-3">
@@ -856,10 +856,10 @@ export default function DaySimulatorSidebar({
                     </div>
                     <p className="text-[10px] text-[var(--tertiary-text)] -mt-1">paid to JT</p>
                     <div className="flex items-start justify-between gap-3">
-                      <span className="text-[11px] text-[var(--secondary-text)] flex-shrink-0 whitespace-nowrap">&#8722; LP premium</span>
+                      <span className="text-[11px] text-[var(--secondary-text)] flex-shrink-0 whitespace-nowrap">&#8722; Liquidity premium</span>
                       <span className="text-[11px] text-right" style={{ color: 'var(--success)' }}>{Math.round(liqShare * 100)}% &#215; APY</span>
                     </div>
-                    <p className="text-[10px] text-[var(--tertiary-text)] -mt-1">paid to LT</p>
+                    <p className="text-[10px] text-[var(--tertiary-text)] -mt-1">paid to SLP</p>
                   </div>
                 </div>
               </div>
@@ -867,7 +867,7 @@ export default function DaySimulatorSidebar({
               <div className="group relative kpi-flash bg-[var(--theme-background)] rounded-xl border border-[var(--theme-border)] p-4 shadow-sm">
                 <div className="flex items-center gap-2 mb-1">
                   <span className="w-2 h-2 rounded-full" style={{ background: 'var(--info)' }} />
-                  <span className="text-[13px] text-[var(--secondary-text)]">Junior · JT</span>
+                  <span className="text-[13px] text-[var(--secondary-text)]">Junior Tranche · JT</span>
                 </div>
                 <p className="tabular-nums text-4xl sm:text-5xl leading-none text-[var(--info)]" style={{ fontWeight: 500 }}>
                   {(jtAPY * 100).toFixed(1)}
@@ -878,7 +878,7 @@ export default function DaySimulatorSidebar({
                 {/* Hover breakdown */}
                 <div className="hidden group-hover:block absolute left-1/2 -translate-x-1/2 top-full mt-2 z-20 w-80 text-left bg-[var(--theme-background)] border border-[var(--theme-border)] rounded-xl shadow-lg p-3">
                   <p className="text-[12px] font-medium text-[var(--primary-text)]">
-                    Day JT &#183; <span style={{ color: 'var(--info)' }}>{(jtAPY * 100).toFixed(1)}%</span>
+                    JT &#183; <span style={{ color: 'var(--info)' }}>{(jtAPY * 100).toFixed(1)}%</span>
                   </p>
                   <p className="text-[11px] text-[var(--secondary-text)] mt-0.5">APY + (risk &#215; APY) &#247; JT size</p>
                   <div className="mt-2 space-y-1.5">
@@ -898,24 +898,24 @@ export default function DaySimulatorSidebar({
               <div className="group relative kpi-flash bg-[var(--theme-background)] rounded-xl border border-[var(--theme-border)] p-4 shadow-sm">
                 <div className="flex items-center gap-2 mb-1">
                   <span className="w-2 h-2 rounded-full" style={{ background: 'var(--insight)' }} />
-                  <span className="text-[13px] text-[var(--secondary-text)]">Liquidity · LT</span>
+                  <span className="text-[13px] text-[var(--secondary-text)]">SLP</span>
                 </div>
                 <p className="tabular-nums text-4xl sm:text-5xl leading-none text-[var(--insight)]" style={{ fontWeight: 500 }}>
                   {(ltAPY * 100).toFixed(1)}
                   <span className="text-2xl sm:text-3xl">%</span>
                 </p>
-                <p className="text-[12px] text-[var(--tertiary-text)] mt-1.5">backs redemptions · earns LP premium</p>
+                <p className="text-[12px] text-[var(--tertiary-text)] mt-1.5">provides ST secondary liquidity · earns liquidity premium</p>
                 <p className="text-[12px] tabular-nums text-[var(--insight)] mt-1">NAV {usd(cur.ltNAV)}</p>
                 {/* Hover breakdown */}
                 <div className="hidden group-hover:block absolute right-0 top-full mt-2 z-20 w-80 text-left bg-[var(--theme-background)] border border-[var(--theme-border)] rounded-xl shadow-lg p-3">
                   <p className="text-[12px] font-medium text-[var(--primary-text)]">
-                    Day LT &#183; <span style={{ color: 'var(--insight)' }}>{(ltAPY * 100).toFixed(1)}%</span>
+                    SLP &#183; <span style={{ color: 'var(--insight)' }}>{(ltAPY * 100).toFixed(1)}%</span>
                   </p>
-                  <p className="text-[11px] text-[var(--secondary-text)] mt-0.5">(liq &#215; APY) &#247; LT size + swap + BPT carry</p>
+                  <p className="text-[11px] text-[var(--secondary-text)] mt-0.5">(liquidity premium &#215; APY) &#247; SLP size + trading fees + pool carry</p>
                   <div className="mt-2 space-y-1.5">
                     <div className="flex items-start justify-between gap-3">
-                      <span className="text-[11px] text-[var(--secondary-text)] flex-shrink-0 whitespace-nowrap">LP premium</span>
-                      <span className="text-[11px] text-right" style={{ color: 'var(--insight)' }}>{Math.round(liqShare * 100)}%&#215;APY&#247;LT size {(ltSize * 100).toFixed(1)}%</span>
+                      <span className="text-[11px] text-[var(--secondary-text)] flex-shrink-0 whitespace-nowrap">Liquidity premium</span>
+                      <span className="text-[11px] text-right" style={{ color: 'var(--insight)' }}>{Math.round(liqShare * 100)}%&#215;APY&#247;SLP size {(ltSize * 100).toFixed(1)}%</span>
                     </div>
                     <div className="flex items-start justify-between gap-3">
                       <span className="text-[11px] text-[var(--secondary-text)] flex-shrink-0 whitespace-nowrap">Swap fees</span>
@@ -932,7 +932,7 @@ export default function DaySimulatorSidebar({
 
             {/* Yield-split bar */}
             <div className="mt-4">
-              <p className="text-[12px] text-[var(--secondary-text)] mb-1.5">Where each $1 of senior yield goes</p>
+              <p className="text-[12px] text-[var(--secondary-text)] mb-1.5">Where each $1 of ST yield goes</p>
               <div
                 ref={barRef}
                 className="w-full flex overflow-hidden rounded-md border border-[var(--theme-border)]"
@@ -1002,7 +1002,7 @@ export default function DaySimulatorSidebar({
                     </div>
                   );
                 })()}
-                {/* Segment: LP → LT — hidden when 0% */}
+                {/* Segment: liquidity premium → SLP — hidden when 0% */}
                 {liqShareFrac > 0.005 && (() => {
                   const w = segWidths[2];
                   return (
@@ -1025,7 +1025,7 @@ export default function DaySimulatorSidebar({
                     >
                       {w >= 96 ? (
                         <>
-                      <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.85)', lineHeight: 1.2 }}>LP &#x2192; LT</span>
+                      <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.85)', lineHeight: 1.2 }}>Liquidity &#x2192; SLP</span>
                           <span style={{ fontSize: 15, fontWeight: 600, color: '#fff', lineHeight: 1.2 }}>{liqSharePct}%</span>
                         </>
                       ) : w >= 36 ? (
@@ -1046,11 +1046,11 @@ export default function DaySimulatorSidebar({
                 </span>
                 <span className="flex items-center gap-1.5 text-[12px] text-[var(--secondary-text)]">
                   <span className="w-2 h-2 rounded-full" style={{ background: 'var(--insight)' }} />
-                  LP &#x2192; LT <span className="tabular-nums font-medium text-[var(--primary-text)]">{liqSharePct}%</span>
+                  Liquidity premium &#x2192; SLP <span className="tabular-nums font-medium text-[var(--primary-text)]">{liqSharePct}%</span>
                 </span>
               </div>
               <p className="mt-2 text-[12px] text-[var(--tertiary-text)]">
-                Risk + LP premiums can never exceed 100% combined &#8212; at any utilization.
+                Risk and liquidity premiums can never exceed 100% combined.
               </p>
             </div>
           </div>
@@ -1088,7 +1088,7 @@ export default function DaySimulatorSidebar({
                     />
                     <YAxis
                       label={{
-                        value: 'Premium share of senior yield (%)',
+                        value: 'Premium share of ST yield (%)',
                         angle: -90,
                         position: 'insideLeft',
                         style: { textAnchor: 'middle' },
@@ -1184,7 +1184,7 @@ export default function DaySimulatorSidebar({
                   style={{ accentColor: '#3b82f6', background: '#3b82f6' }}
                 />
                 <p className="mt-0.5 text-[9px] text-[var(--tertiary-text)]">
-                  &#x2192; risk premium {Math.round(riskShare * 100)}% of senior yield
+                  &#x2192; risk premium {Math.round(riskShare * 100)}% of ST yield
                 </p>
               </div>
 
@@ -1200,12 +1200,12 @@ export default function DaySimulatorSidebar({
               </div>
             </div>
 
-              {/* RIGHT chart card — LP premium → LT */}
+              {/* RIGHT chart card — liquidity premium → SLP */}
             <div className="bg-[var(--theme-background)] rounded-xl border border-[var(--theme-border)] p-6 shadow-sm">
               <p className="text-sm font-medium text-[var(--insight)] mb-0.5">
-                LP premium → LT
+                Liquidity premium → SLP
               </p>
-              <p className="text-xs text-[var(--secondary-text)] mb-2">vs LP utilization</p>
+              <p className="text-xs text-[var(--secondary-text)] mb-2">vs liquidity utilization</p>
               <div className="h-64">
                 <ResponsiveContainerNoSSR width="100%" height="100%" minWidth={0} minHeight={256}>
                   <LineChart
@@ -1219,7 +1219,7 @@ export default function DaySimulatorSidebar({
                       domain={[0, 100]}
                       ticks={[0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100]}
                       label={{
-                        value: 'LP utilization (%)',
+                        value: 'Liquidity utilization (%)',
                         position: 'insideBottom',
                         offset: -10,
                         fill: '#908b78',
@@ -1231,7 +1231,7 @@ export default function DaySimulatorSidebar({
                     />
                     <YAxis
                       label={{
-                        value: 'Premium share of senior yield (%)',
+                        value: 'Premium share of ST yield (%)',
                         angle: -90,
                         position: 'insideLeft',
                         style: { textAnchor: 'middle' },
@@ -1253,10 +1253,10 @@ export default function DaySimulatorSidebar({
                           return (
                             <div className="bg-[var(--theme-background)] p-3 rounded-xl border-2 border-[var(--theme-border)] shadow-lg">
                               <p className="text-xs font-medium text-[var(--primary-text)] mb-1">
-                              At {d.x.toFixed(0)}% LP utilization
+                              At {d.x.toFixed(0)}% liquidity utilization
                               </p>
                               <div className="flex justify-between gap-4 text-sm">
-                      <span className="text-[var(--insight)]">LP share (LT):</span>
+                      <span className="text-[var(--insight)]">SLP liquidity premium:</span>
                                 <span className="font-medium text-[var(--insight)]">
                                   {d.share.toFixed(2)}%
                                 </span>
@@ -1292,7 +1292,7 @@ export default function DaySimulatorSidebar({
                     <Line
                       type="monotone"
                       dataKey="share"
-                      name="Liq share → LT"
+                      name="Liquidity premium → SLP"
                       stroke="#f92672"
                       strokeWidth={3}
                       dot={false}
@@ -1303,11 +1303,11 @@ export default function DaySimulatorSidebar({
                 </ResponsiveContainerNoSSR>
               </div>
 
-              {/* LP utilization slider */}
+              {/* Liquidity utilization slider */}
               <div className="mt-4">
                 <div className="flex items-center justify-between mb-1">
                   <span className="text-[10.5px] uppercase tracking-wider text-[var(--secondary-text)]">
-                    LP utilization
+                    Liquidity utilization
                   </span>
                   <span
                     className="text-[11px] tabular-nums font-medium"
@@ -1327,14 +1327,14 @@ export default function DaySimulatorSidebar({
                   style={{ accentColor: '#f92672', background: '#f92672' }}
                 />
                 <p className="mt-0.5 text-[9px] text-[var(--tertiary-text)]">
-                  &#x2192; LP premium {Math.round(liqShare * 100)}% of senior yield
+                  &#x2192; Liquidity premium {Math.round(liqShare * 100)}% of ST yield
                 </p>
               </div>
 
-              {/* LP premium → LT @90% target slider */}
+              {/* Liquidity premium → SLP @90% target slider */}
               <div className="mt-4 pt-3 border-t border-[var(--theme-border)]">
                 <AnchorSlider
-                  label="LP premium → LT"
+                  label="Liquidity premium → SLP"
                   value={liqYDM.yTarget}
                   accent="#f92672"
                   onChange={(v) => setLiqAnchor('yTarget', v)}

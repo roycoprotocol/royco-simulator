@@ -17,12 +17,12 @@ export default function DayPage() {
           <span className="text-[11px] tracking-wide uppercase text-[#0a0a0a] bg-[#eef0f4] border border-[#e5e5e0] rounded-full px-3 py-1">Internal · Day</span>
         </div>
         <h1 className="text-4xl md:text-5xl font-semibold text-[#0a0a0a] mb-3 tracking-tight text-center">Royco Day Simulator</h1>
-        <p className="text-lg text-[#666666] max-w-2xl mx-auto text-center mb-8">LP tranche dynamics across market scenarios</p>
+        <p className="text-lg text-[#666666] max-w-2xl mx-auto text-center mb-8">SLP and secondary-liquidity dynamics across market scenarios</p>
 
         {/* tab nav */}
         <div className="flex justify-center mb-8">
           <div className="inline-flex rounded-md border border-[#e5e5e0] bg-white text-sm overflow-hidden">
-            {([["sim", "Simulator"], ["compare", "Dusk vs Day"], ["capital", "Capital efficiency"]] as [Tab, string][]).map(([k, l]) => {
+            {([["sim", "Simulator"], ["compare", "Dusk vs Royco Day"], ["capital", "Capital efficiency"]] as [Tab, string][]).map(([k, l]) => {
               const on = tab === k;
               return (
                 <button
@@ -45,7 +45,7 @@ export default function DayPage() {
           {tab === "sim" ? <Simulator /> : tab === "compare" ? <Comparison /> : <CapitalEfficiency />}
         </main>
         <footer style={{ color: C.dim, borderTop: `1px solid ${C.line}` }} className="mt-8 pt-4 text-[10.5px] font-mono">
-        Engine mirrors Royco Dawn (RoycoAccountant / RoycoKernel) + the Royco Day LP tranche spec. NAV conservation enforced every step. See AUDIT.md for the line-by-line mapping.
+        Engine mirrors the Royco Day accountant (RoycoAccountant / RoycoKernel), including SLP mechanics. NAV conservation is enforced every step. See AUDIT.md for the line-by-line mapping.
         </footer>
       </div>
     </div>

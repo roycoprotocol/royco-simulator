@@ -103,6 +103,10 @@ console.log("\n4. Fixed-term lifecycle: enter on covered drawdown, natural recov
   const a = sim.last();
   check("jtIL fully repaid on recovery", a.jtIL < 1e-6, `jtIL=${a.jtIL}`);
   check("natural exit back to PERPETUAL", a.state === MarketState.PERPETUAL);
+  check(
+    "natural exit exposes a structured recovered reason",
+    sim.events.some((event) => event.kind === "exit-fixed-term" && event.observationExitReason === "recovered"),
+  );
   check("JT made whole then earns premium (jtEff >= 250)", a.jtEffectiveNAV >= 250 - 1e-2, `jtEff=${a.jtEffectiveNAV}`);
 }
 {
@@ -112,6 +116,10 @@ console.log("\n4. Fixed-term lifecycle: enter on covered drawdown, natural recov
   sim.step(hold(20 * 86400, 0, 0)); // 20 days pass > 10 day term, no recovery
   const a = sim.last();
   check("term expiry forces PERPETUAL", a.state === MarketState.PERPETUAL);
+  check(
+    "term expiry exposes a structured period-ended reason",
+    sim.events.some((event) => event.kind === "exit-fixed-term" && event.observationExitReason === "period-ended"),
+  );
   check("jtIL erased on expiry (JT realizes the loss)", a.jtIL < 1e-6, `jtIL=${a.jtIL}`);
   check("jtEff stays reduced (~200) — loss is now permanent for JT", approx(a.jtEffectiveNAV, 200, 1), `jtEff=${a.jtEffectiveNAV}`);
 }

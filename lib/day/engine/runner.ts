@@ -67,7 +67,7 @@ export class Sim {
   constructor(cfg: MarketConfig, init: { st: number; jt: number; lt: number }) {
     this.cfg = cfg;
     this._state = newMarket(cfg, init);
-    this.events.push({ t: 0, kind: "init", msg: `Market opened: ST ${init.st}, JT ${init.jt}, LT ${init.lt}. Coverage ${(cfg.coverage * 100).toFixed(0)}%, β ${cfg.beta}.`, level: "good" });
+    this.events.push({ t: 0, kind: "init", msg: `Market opened: ST ${init.st}, JT ${init.jt}, SLP ${init.lt}. Coverage ${(cfg.coverage * 100).toFixed(0)}%, β ${cfg.beta}.`, level: "good" });
     this.snap(0, 0);
   }
 
@@ -153,7 +153,7 @@ export function defaultConfig(over: Partial<MarketConfig> = {}): MarketConfig {
     cfg.maxLTYieldShare = Math.max(cfg.liqYDM.y0, cfg.liqYDM.yTarget, cfg.liqYDM.y100);
   }
   if (cfg.maxJTYieldShare + cfg.maxLTYieldShare > 1 + 1e-12) {
-    throw new Error("INVALID_YIELD_SHARE_CONFIG: maximum JT and LT shares exceed 100%");
+    throw new Error("INVALID_YIELD_SHARE_CONFIG: maximum JT and SLP shares exceed 100%");
   }
   return cfg;
 }

@@ -270,13 +270,20 @@ export function reconcile(
 ): ReconcileExtras {
   const dust = dustWad(cfg);
   const events: SimEvent[] = [];
-  const push = (kind: EventKind, msg: string, level: SimEvent['level'], amount?: bigint) => {
+  const push = (
+    kind: EventKind,
+    msg: string,
+    level: SimEvent['level'],
+    amount?: bigint,
+    observationExitReason?: SimEvent['observationExitReason'],
+  ) => {
     events.push({
       t: Number(state.t),
       kind,
       msg,
       level,
       ...(amount === undefined ? {} : { amountNAV: fromWad(amount) }),
+      ...(observationExitReason === undefined ? {} : { observationExitReason }),
     });
   };
   const initialState = state.marketState;
@@ -487,21 +494,29 @@ export function reconcile(
   }
 
   if (initialState === MarketState.PERPETUAL && nextState === MarketState.FIXED_TERM) {
-    push('enter-fixed-term', 'JT covered an ST drawdown — FIXED_TERM begins (ST redemptions & JT deposits blocked; YDM frozen).', 'warn');
+    push('enter-fixed-term', 'JT covered an ST drawdown — the Observation Period begins. Primary ST redemption pauses, YDM freezes, and secondary ST sales through SLP remain available.', 'warn');
   }
   if (initialState === MarketState.FIXED_TERM && nextState === MarketState.PERPETUAL) {
     if (erased > dust) {
       push(
         'exit-fixed-term',
-        `Forced to PERPETUAL (${expired ? 'term expired' : breached ? 'liquidation breach' : 'ST impairment'}) — JT forfeits its recovery claim.`,
+        `Observation Period closes without full recovery (${expired ? 'period ended' : breached ? 'Protected Exit threshold breached' : 'ST impairment'}) — the JT recovery claim resets.`,
         'danger',
+        undefined,
+        expired ? 'period-ended' : breached ? 'protected-exit' : 'st-impairment',
       );
     } else {
-      push('exit-fixed-term', 'Drawdown fully recovered — back to PERPETUAL, JT made whole.', 'good');
+      push(
+        'exit-fixed-term',
+        'Strategy base asset fully recovered — the Observation Period closes and JT is made whole.',
+        'good',
+        undefined,
+        'recovered',
+      );
     }
   }
   if (erased > dust) {
-    push('jt-il-erased', `JT impermanent loss erased: ${fmt(erased)} realized as a JT loss.`, 'danger', erased);
+    push('jt-il-erased', `JT recovery claim reset: ${fmt(erased)} finalized as a JT loss.`, 'danger', erased);
   }
 
   let feeNAV = 0n;
@@ -773,7 +788,7 @@ export function jtDeposit(state: LiveState, _cfg: MarketConfig, amount: number):
 export function stRedeem(state: LiveState, cfg: MarketConfig, shareAmount: number, bypass = false): OpResult {
   const dust = dustWad(cfg);
   let shares = toWad(shareAmount);
-  if (state.marketState !== MarketState.PERPETUAL && !bypass) return blocked(state, 'ST redeem blocked: only enabled in PERPETUAL (the secondary pool is the intended exit in FIXED_TERM).');
+  if (state.marketState !== MarketState.PERPETUAL && !bypass) return blocked(state, 'Primary ST redemption is paused during the Observation Period; secondary sale through SLP remains available.');
   if (shares <= 0n || state.stShares <= 0n) return blocked(state, 'ST redeem blocked: shares must be positive.');
   if (shares > state.stShares) shares = state.stShares;
   const redemptionNAV = mulDiv(shares, state.stEffectiveNAV, state.stShares);
@@ -814,7 +829,7 @@ export function stRedeem(state: LiveState, cfg: MarketConfig, shareAmount: numbe
     state.stImpermanentLoss = mulDiv(state.stImpermanentLoss, state.stShares, state.stShares + shares);
   }
   const events: SimEvent[] = [{ t: Number(state.t), kind: 'st-redeem', msg: `ST redeem ${fromWad(shares).toFixed(2)} shares → ${fmt(redemptionNAV + bonus)}.`, level: 'info' }];
-  if (bonus > dust) events.push({ t: Number(state.t), kind: 'self-liq-bonus', msg: `Self-liquidation bonus ${fmt(bonus)} paid from JT to delever (util ${(utilizationNumber(coverage) * 100).toFixed(0)}% > liq threshold).`, level: 'warn' });
+  if (bonus > dust) events.push({ t: Number(state.t), kind: 'self-liq-bonus', msg: `Protected Exit bonus ${fmt(bonus)} paid from JT to reduce ST exposure (coverage utilization ${(utilizationNumber(coverage) * 100).toFixed(0)}% exceeded the threshold).`, level: 'warn' });
   return { ok: true, events };
 }
 
@@ -848,7 +863,7 @@ export function jtRedeem(state: LiveState, cfg: MarketConfig, shareAmount: numbe
 
 export function ltDeposit(state: LiveState, cfg: MarketConfig, amount: number): OpResult {
   const amountWad = toWad(amount);
-  if (amountWad <= 0n) return blocked(state, 'LT deposit blocked: amount must be positive.');
+  if (amountWad <= 0n) return blocked(state, 'SLP deposit blocked: amount must be positive.');
   const shares = sharesForValueWad(amountWad, ltEffectiveNAVWad(state, cfg), state.ltShares);
   const rawBefore = ltRawNAVWad(state, cfg);
   if (rawBefore <= dustWad(cfg)) {
@@ -859,13 +874,13 @@ export function ltDeposit(state: LiveState, cfg: MarketConfig, amount: number): 
     state.pool.stable += mulDiv(state.pool.stable, amountWad, rawBefore);
   }
   state.ltShares += shares;
-  return { ok: true, events: [{ t: Number(state.t), kind: 'lt-deposit', msg: `LT deposit ${fmt(amountWad)} BPT → ${fromWad(shares).toFixed(2)} shares.`, level: 'info' }] };
+  return { ok: true, events: [{ t: Number(state.t), kind: 'lt-deposit', msg: `SLP deposit ${fmt(amountWad)} BPT → ${fromWad(shares).toFixed(2)} shares.`, level: 'info' }] };
 }
 
 export function ltRedeem(state: LiveState, cfg: MarketConfig, shareAmount: number, bypass = false): OpResult {
   let shares = toWad(shareAmount);
-  if (state.marketState !== MarketState.PERPETUAL) return blocked(state, 'LT redeem blocked: only enabled in PERPETUAL (per spec).');
-  if (shares <= 0n || state.ltShares <= 0n) return blocked(state, 'LT redeem blocked: shares must be positive.');
+  if (state.marketState !== MarketState.PERPETUAL) return blocked(state, 'SLP redemption blocked during the Observation Period.');
+  if (shares <= 0n || state.ltShares <= 0n) return blocked(state, 'SLP redemption blocked: shares must be positive.');
   if (shares > state.ltShares) shares = state.ltShares;
   const remainingShares = state.ltShares - shares;
   const poolAfter = {
@@ -876,14 +891,14 @@ export function ltRedeem(state: LiveState, cfg: MarketConfig, shareAmount: numbe
   const liquidityAfter = liquidityUtilizationWad(state.stEffectiveNAV, toWad(cfg.minLiquidity), rawAfter);
   const coverage = coverageUtilizationWad(state.stRawNAV, state.jtRawNAV, cfg.beta, toWad(cfg.coverage), state.jtEffectiveNAV);
   const liquidationExemption = coverage >= toWad(cfg.liquidationUtilization);
-  if (liquidityAfter > WAD && !liquidationExemption && !bypass) return blocked(state, `LT redeem blocked: secondary liquidity would fall below minimum (liqUtil ${(utilizationNumber(liquidityAfter) * 100).toFixed(0)}% > 100% after redemption).`);
+  if (liquidityAfter > WAD && !liquidationExemption && !bypass) return blocked(state, `SLP redemption blocked: secondary liquidity would fall below minimum (liquidity utilization ${(utilizationNumber(liquidityAfter) * 100).toFixed(0)}% > 100% after redemption).`);
   const bptOut = mulDiv(shares, ltRawNAVWad(state, cfg), state.ltShares);
   const premiumSharesOut = mulDiv(shares, state.ltOwnedSTShares, state.ltShares);
   const premiumValueOut = mulDiv(premiumSharesOut, stPriceWad(state), WAD);
   state.pool = poolAfter;
   state.ltOwnedSTShares -= premiumSharesOut;
   state.ltShares -= shares;
-  return { ok: true, events: [{ t: Number(state.t), kind: 'lt-redeem', msg: `LT redeem ${fromWad(shares).toFixed(2)} shares → ${fmt(bptOut)} BPT + ${fromWad(premiumSharesOut).toFixed(2)} Senior shares (${fmt(premiumValueOut)}; liqUtil ${(utilizationNumber(liquidityAfter) * 100).toFixed(0)}% after).`, level: 'info' }] };
+  return { ok: true, events: [{ t: Number(state.t), kind: 'lt-redeem', msg: `SLP redemption ${fromWad(shares).toFixed(2)} shares → ${fmt(bptOut)} BPT + ${fromWad(premiumSharesOut).toFixed(2)} ST shares (${fmt(premiumValueOut)}; liquidity utilization ${(utilizationNumber(liquidityAfter) * 100).toFixed(0)}% after).`, level: 'info' }] };
 }
 
 export function secondarySell(state: LiveState, cfg: MarketConfig, amount: number): OpResult {
@@ -896,7 +911,7 @@ export function secondarySell(state: LiveState, cfg: MarketConfig, amount: numbe
   state.pool.stShares += mulDiv(filled, WAD, priceWad);
   state.pool.stable = saturatingSub(state.pool.stable, stableOut);
   const events: SimEvent[] = [{ t: Number(state.t), kind: 'secondary-sell', msg: `Secondary sell ${fmt(filled)} ST → ${fmt(stableOut)} stable (${(quote.slippage * 100).toFixed(1)}% slippage). Pool now ${(poolPctST(state) * 100).toFixed(0)}% ST.`, level: quote.slippage > 0.05 ? 'danger' : 'info' }];
-  if (unfilled > dustWad(cfg)) events.push({ t: Number(state.t), kind: 'secondary-sell', msg: `${fmt(unfilled)} of the sell could NOT fill — stable depleted, BPT is all-ST. Remaining sellers are stuck at primary redemption (blocked in FIXED_TERM).`, level: 'danger' });
+  if (unfilled > dustWad(cfg)) events.push({ t: Number(state.t), kind: 'secondary-sell', msg: `${fmt(unfilled)} of the ST sale could not fill — stable assets are depleted and the pool is all-ST. Remaining holders must wait for primary redemption, which is paused during the Observation Period.`, level: 'danger' });
   return { ok: true, events };
 }
 

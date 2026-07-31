@@ -67,11 +67,11 @@ function buildScenario(key: ScenarioKey, cfg: MarketConfig, apy: number, init: {
 }
 
 const SCENARIOS: { key: ScenarioKey; label: string; blurb: string }[] = [
-  { key: "calm", label: "Calm year", blurb: "12 months of steady yield. Watch the three premiums split senior yield." },
-  { key: "recover", label: "Drawdown & recover", blurb: "A covered ST loss enters FIXED_TERM; recovery repays JT and exits cleanly." },
-  { key: "distress", label: "Exceed coverage", blurb: "A loss larger than the JT buffer creates ST IL — distressed, JT claim erased." },
-  { key: "liquidation", label: "Liquidation + self-liq", blurb: "Losses breach the liquidation threshold; ST self-liquidates, JT pays the bonus." },
-  { key: "run", label: "Secondary run on LT", blurb: "ST holders exit into the pool; it fills with ST right before a shock." },
+  { key: "calm", label: "Calm year", blurb: "12 months of steady yield. Watch the risk and liquidity premiums split ST yield." },
+  { key: "recover", label: "Drawdown & recover", blurb: "A covered ST loss begins an Observation Period; recovery makes JT whole and closes it cleanly." },
+  { key: "distress", label: "Exceed coverage", blurb: "A loss larger than JT first-loss coverage creates an uncovered ST loss and resets JT's recovery claim." },
+  { key: "liquidation", label: "Protected Exit", blurb: "Losses breach the Protected Exit threshold; ST redeems at marked value and JT bears the configured bonus." },
+  { key: "run", label: "Heavy ST sales into SLP", blurb: "ST holders sell into the SLP pool; it fills with ST immediately before a shock." },
 ];
 
 // ---------------------------------------------------------------------------
@@ -189,7 +189,7 @@ export default function Simulator() {
       <div className="flex items-end justify-between flex-wrap gap-3 mb-3">
         <div>
           <h1 className="text-[22px] font-semibold tracking-tight">Royco Day — high-fidelity simulator</h1>
-          <p style={{ color: C.mut }} className="text-[11.5px] mt-0.5">Time-stepped Dawn accountant + the LP tranche. Loss waterfall, dual YDM, fixed-term state machine, self-liquidation, and a concentrated E-CLP BPT (10% ST / 90% T-bill) — all live.</p>
+          <p style={{ color: C.mut }} className="text-[11.5px] mt-0.5">Time-stepped Royco Day accountant with ST, JT, and SLP. Loss waterfall, dual YDM, Observation Period state machine, Protected Exit, and a concentrated E-CLP BPT (10% ST / 90% stable asset) — all live.</p>
         </div>
         <div style={{ background: worstResidual < 1e-3 ? "rgba(79,180,119,0.1)" : "rgba(229,83,75,0.12)", border: `1px solid ${worstResidual < 1e-3 ? C.pos : C.neg}` }} className="rounded px-2.5 py-1.5 font-mono text-[10.5px]">
           <span style={{ color: C.mut }}>NAV conservation </span>
@@ -212,34 +212,34 @@ export default function Simulator() {
             </div>
           </Panel>
 
-          <Panel title="Coverage (Dawn)">
-            <Field label="source APY" hint="underlying yield"><NumIn value={apy} scale={100} step={0.5} suffix="%" onChange={setApy} /></Field>
-            <Field label="coverage" hint="min senior protection"><NumIn value={coverage} scale={100} step={1} suffix="%" onChange={setCoverage} /></Field>
-            <Field label="liq. utilization" hint="self-liquidation threshold (>1)"><NumIn value={liqUtil} scale={1} step={0.05} suffix="×" onChange={setLiqUtil} /></Field>
-            <Field label="fixed term" hint="recovery window"><NumIn value={termDays} scale={1} step={5} suffix="d" onChange={setTermDays} /></Field>
-            <Field label="self-liq bonus"><NumIn value={selfLiq} scale={100} step={0.5} suffix="%" onChange={setSelfLiq} /></Field>
+          <Panel title="Royco Day market">
+            <Field label="Strategy base-asset APY" hint="yield source"><NumIn value={apy} scale={100} step={0.5} suffix="%" onChange={setApy} /></Field>
+            <Field label="Minimum coverage" hint="JT protection for ST"><NumIn value={coverage} scale={100} step={1} suffix="%" onChange={setCoverage} /></Field>
+            <Field label="Liquidity utilization" hint="Protected Exit threshold (>1)"><NumIn value={liqUtil} scale={1} step={0.05} suffix="×" onChange={setLiqUtil} /></Field>
+            <Field label="Observation Period" hint="recovery window"><NumIn value={termDays} scale={1} step={5} suffix="d" onChange={setTermDays} /></Field>
+            <Field label="Protected Exit bonus"><NumIn value={selfLiq} scale={100} step={0.5} suffix="%" onChange={setSelfLiq} /></Field>
           </Panel>
 
           <Panel title="Premiums (two YDMs)">
-            <YDMEditor name="risk premium → JT" cfg={riskYDM} onChange={setRiskYDM} accent={C.jt} />
+            <YDMEditor name="Risk premium → JT" cfg={riskYDM} onChange={setRiskYDM} accent={C.jt} />
             <div className="my-2" style={{ borderTop: `1px solid ${C.line}` }} />
-            <YDMEditor name="LP premium → LT" cfg={liqYDM} onChange={setLiqYDM} accent={C.lt} />
+            <YDMEditor name="Liquidity premium → SLP" cfg={liqYDM} onChange={setLiqYDM} accent={C.lt} />
             <div className="mt-2 pt-2" style={{ borderTop: `1px solid ${C.line}` }}>
             </div>
           </Panel>
 
-          <Panel title="LP tranche (E-CLP BPT)">
-            <Field label="min LP" hint="% of senior pool-backed"><NumIn value={minLiq} scale={100} step={1} suffix="%" onChange={setMinLiq} /></Field>
-            <Field label="T-bill stable yield" hint="90% leg in tokenized treasuries"><NumIn value={stableYield} scale={100} step={0.5} suffix="%" onChange={setStableYield} /></Field>
-            <Field label="swap fee"><NumIn value={swapBps} scale={1} step={1} suffix="bps" onChange={setSwapBps} /></Field>
-            <Field label="turnover /yr"><NumIn value={turnover} scale={1} step={1} suffix="×" onChange={setTurnover} /></Field>
+          <Panel title="Senior Liquidity Provider (SLP · E-CLP BPT)">
+            <Field label="Minimum liquidity" hint="SLP capital required per ST"><NumIn value={minLiq} scale={100} step={1} suffix="%" onChange={setMinLiq} /></Field>
+            <Field label="Stable-asset yield" hint="yield on the stable-asset leg"><NumIn value={stableYield} scale={100} step={0.5} suffix="%" onChange={setStableYield} /></Field>
+            <Field label="Swap fee"><NumIn value={swapBps} scale={1} step={1} suffix="bps" onChange={setSwapBps} /></Field>
+            <Field label="Annual turnover"><NumIn value={turnover} scale={1} step={1} suffix="×" onChange={setTurnover} /></Field>
             <Field label="E-CLP band" hint="price drop to stable exhaustion (concentration)"><NumIn value={bandWidth} scale={100} step={1} suffix="%" onChange={setBandWidth} /></Field>
           </Panel>
 
           <Panel title="Initial deposits">
-            <Field label="senior (ST)"><NumIn value={initST} step={1_000_000} w={96} onChange={setInitST} /></Field>
-            <Field label="junior (JT)"><NumIn value={initJT} step={1_000_000} w={96} onChange={setInitJT} /></Field>
-            <Field label="LP (LT)"><NumIn value={initLT} step={500_000} w={96} onChange={setInitLT} /></Field>
+            <Field label="Senior Tranche (ST)"><NumIn value={initST} step={1_000_000} w={96} onChange={setInitST} /></Field>
+            <Field label="Junior Tranche (JT)"><NumIn value={initJT} step={1_000_000} w={96} onChange={setInitJT} /></Field>
+            <Field label="SLP (contract: LT)"><NumIn value={initLT} step={500_000} w={96} onChange={setInitLT} /></Field>
           </Panel>
         </div>
 
@@ -249,25 +249,25 @@ export default function Simulator() {
           <Panel>
             <div className="flex items-center justify-between flex-wrap gap-2 mb-2">
               <div className="flex items-center gap-2">
-                <span style={{ background: stateColor(cur.state), color: "#ffffff" }} className="rounded px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider">{cur.state}</span>
-                {cur.state === MarketState.FIXED_TERM && <span style={{ color: C.warn }} className="text-[10px] font-mono">term {days(cur.fixedTermRemaining)} left</span>}
+                <span style={{ background: stateColor(cur.state), color: "#ffffff" }} className="rounded px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider">{cur.state === MarketState.FIXED_TERM ? "Observation Period" : "Open market"}</span>
+                {cur.state === MarketState.FIXED_TERM && <span style={{ color: C.warn }} className="text-[10px] font-mono">{days(cur.fixedTermRemaining)} left</span>}
                 <span style={{ color: C.dim }} className="text-[10px] font-mono">t = {days(cur.t)}</span>
               </div>
               <div className="flex items-center gap-3 font-mono text-[10.5px]">
-                <span><span style={{ color: C.mut }}>util </span><span style={{ color: cur.utilization > liqUtil ? C.neg : cur.coverageOK ? C.text : C.warn }}>{isFinite(cur.utilization) ? pct(cur.utilization) : "∞"}</span></span>
-                <span><span style={{ color: C.mut }}>liqUtil </span><span style={{ color: cur.liquidityUtilization > 1 ? C.neg : C.lt }}>{isFinite(cur.liquidityUtilization) ? pct(cur.liquidityUtilization) : "∞"}</span></span>
+                <span><span style={{ color: C.mut }}>coverage </span><span style={{ color: cur.utilization > liqUtil ? C.neg : cur.coverageOK ? C.text : C.warn }}>{isFinite(cur.utilization) ? pct(cur.utilization) : "∞"}</span></span>
+                <span><span style={{ color: C.mut }}>liquidity </span><span style={{ color: cur.liquidityUtilization > 1 ? C.neg : C.lt }}>{isFinite(cur.liquidityUtilization) ? pct(cur.liquidityUtilization) : "∞"}</span></span>
               </div>
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
               {[
                 { l: "ST effective", v: usd(cur.stEffectiveNAV), c: C.sr, sub: `price ${cur.stPrice.toFixed(4)}` },
                 { l: "JT effective", v: usd(cur.jtEffectiveNAV), c: C.jt, sub: `price ${cur.jtPrice.toFixed(4)}` },
-                { l: "LT value", v: usd(cur.ltNAV), c: C.lt, sub: `pool ${pct(cur.poolPctST)} ST` },
-                { l: "LP premium", v: usd(cur.accruedLiquidityPremium), c: C.lt, sub: "accrued to LT" },
-                { l: "ST IL", v: usd(cur.stIL), c: cur.stIL > 1e-6 ? C.neg : C.dim, sub: "senior impairment" },
-                { l: "JT IL", v: usd(cur.jtIL), c: cur.jtIL > 1e-6 ? C.warn : C.dim, sub: "coverage claim" },
+                { l: "SLP value", v: usd(cur.ltNAV), c: C.lt, sub: `pool ${pct(cur.poolPctST)} ST` },
+                { l: "Liquidity premium", v: usd(cur.accruedLiquidityPremium), c: C.lt, sub: "accrued to SLP" },
+                { l: "ST uncovered loss", v: usd(cur.stIL), c: cur.stIL > 1e-6 ? C.neg : C.dim, sub: "after JT is depleted" },
+                { l: "JT coverage claim", v: usd(cur.jtIL), c: cur.jtIL > 1e-6 ? C.warn : C.dim, sub: "pending recovery" },
                 { l: "BPT oracle value", v: usd(cur.ltRawNAV), c: C.lt, sub: `pool ${pct(cur.poolPctST)} ST (EclpLPOracle)` },
-                { l: "risk / liq share", v: `${p1(cur.riskShare)} / ${p1(cur.liqShare)}`, c: C.text, sub: "this step" },
+                { l: "Risk / liquidity share", v: `${p1(cur.riskShare)} / ${p1(cur.liqShare)}`, c: C.text, sub: "of ST yield this step" },
               ].map((s, i) => (
                 <div key={i} style={{ background: C.panel2, border: `1px solid ${C.line}` }} className="rounded px-2 py-1.5">
                   <div style={{ color: C.mut }} className="text-[9px] uppercase tracking-wider">{s.l}</div>
@@ -279,42 +279,42 @@ export default function Simulator() {
           </Panel>
 
           {/* charts */}
-          <Panel title="Tranche NAV over time">
+          <Panel title="Position NAV over time">
             <LineChart xs={xs} cursor={cursorX} yFmt={(y) => usd(y)} xFmt={xFmt} height={170}
               series={[
                 { label: "ST effective", color: C.sr, data: H.map((h) => h.stEffectiveNAV) },
                 { label: "JT effective", color: C.jt, data: H.map((h) => h.jtEffectiveNAV) },
-                { label: "LT value", color: C.lt, data: H.map((h) => h.ltNAV) },
+                { label: "SLP value", color: C.lt, data: H.map((h) => h.ltNAV) },
               ]} />
-            <Legend items={[["ST effective", C.sr], ["JT effective", C.jt], ["LT value", C.lt]]} />
+            <Legend items={[["ST effective", C.sr], ["JT effective", C.jt], ["SLP value", C.lt]]} />
           </Panel>
 
           <Panel title="Utilization — coverage health">
             <LineChart xs={xs} cursor={cursorX} yFmt={(y) => pct(y)} xFmt={xFmt} height={150} y0={0} yMaxClamp={Math.max(2, liqUtil + 0.5)}
-              bands={[{ y: 1, color: C.mut, label: "100% collateralized" }, { y: liqUtil, color: C.neg, label: "liquidation" }, { y: 0.9, color: C.dim, label: "target" }]}
+              bands={[{ y: 1, color: C.mut, label: "100% collateralized" }, { y: liqUtil, color: C.neg, label: "Protected Exit" }, { y: 0.9, color: C.dim, label: "target" }]}
               series={[{ label: "utilization", color: C.sr, data: H.map((h) => h.utilization) }]} />
           </Panel>
 
-          <Panel title="LP utilization — secondary-market health">
+          <Panel title="Liquidity utilization — secondary-market health">
             <LineChart xs={xs} cursor={cursorX} yFmt={(y) => pct(y)} xFmt={xFmt} height={130} y0={0} yMaxClamp={2}
-              bands={[{ y: 1, color: C.neg, label: "min LP breached" }, { y: cfg.liqTargetUtilization, color: C.dim, label: "target" }]}
-              series={[{ label: "LP utilization", color: C.lt, data: H.map((h) => h.liquidityUtilization) }]} />
+              bands={[{ y: 1, color: C.neg, label: "minimum liquidity breached" }, { y: cfg.liqTargetUtilization, color: C.dim, label: "target" }]}
+              series={[{ label: "Liquidity utilization", color: C.lt, data: H.map((h) => h.liquidityUtilization) }]} />
           </Panel>
 
-          <Panel title="Premium shares (YDM output)">
+          <Panel title="Premium shares of ST yield (YDM output)">
             <LineChart xs={xs} cursor={cursorX} yFmt={(y) => pct(y)} xFmt={xFmt} height={120} y0={0}
               series={[
                 { label: "risk share → JT", color: C.jt, data: H.map((h) => h.riskShare) },
-                { label: "LP share → LT", color: C.lt, data: H.map((h) => h.liqShare) },
+                { label: "Liquidity premium → SLP", color: C.lt, data: H.map((h) => h.liqShare) },
               ]} />
-            <Legend items={[["risk → JT", C.jt], ["LP → LT", C.lt]]} />
+            <Legend items={[["Risk premium → JT", C.jt], ["Liquidity premium → SLP", C.lt]]} />
           </Panel>
 
           <Panel>
             <StateTimeline xs={xs} states={H.map((h) => h.state)} xFmt={xFmt} />
             <div className="mt-2">
               <div className="flex items-center justify-between">
-                <span style={{ color: C.mut }} className="text-[10px] uppercase tracking-wider">scrub timeline</span>
+                <span style={{ color: C.mut }} className="text-[10px] uppercase tracking-wider">Timeline</span>
                 <span style={{ color: C.dim }} className="text-[10px] font-mono">step {idx} / {H.length - 1} · {days(cur.t)}</span>
               </div>
               <input type="range" min={0} max={H.length - 1} value={idx} onChange={(e) => setCursor(Number(e.target.value))} className="w-full mt-1" style={{ accentColor: C.sr }} />

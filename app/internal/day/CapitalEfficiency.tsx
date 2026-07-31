@@ -14,7 +14,7 @@
 //   Day JT = APY + s_risk·APY/jtSize                           (co-invested in source)
 //   Day LT = s_liq·APY/ltSize + carry
 //   Dusk JT = (s_risk+s_liq)·APY/duskSize + carry              (one junior, both jobs)
-//   Dusk LT = N/A                                              (no separate LP tranche)
+//   Dusk LT = N/A                                              (no separate SLP)
 //   carry = wST·ST_net + (1−wST)·stable + swap   (BPT carry).  See CLAUDE.md §5 / §7.
 // =============================================================================
 import { useState, type ReactNode } from "react";
@@ -111,7 +111,7 @@ export default function CapitalEfficiency() {
   const jtGapPt = (c.duskJT - c.dayJT) * 100;
   const jtCmp = Math.abs(jtGapPt) < 0.75 ? "about the same"
     : jtGapPt > 0 ? `Dusk's ${jtGapPt.toFixed(1)}pt higher`
-    : `Day's ${(-jtGapPt).toFixed(1)}pt higher`;
+    : `Royco Day's ${(-jtGapPt).toFixed(1)}pt higher`;
 
   return (
     <div className="w-full" style={{ color: C.text, background: `radial-gradient(1100px 460px at 74% -8%, ${DAY}0E, transparent), radial-gradient(900px 460px at 2% 2%, ${DUSK}0A, transparent)` }}>
@@ -119,11 +119,11 @@ export default function CapitalEfficiency() {
         {/* header */}
         <div className="flex items-start justify-between flex-wrap gap-3 mb-1">
           <div>
-            <h1 className="text-[24px] font-semibold tracking-tight leading-none">Capital Efficiency</h1>
-            <p style={{ color: C.mut }} className="text-[12.5px] mt-2">Coverage, capital, and per-tranche yield — <span style={{ color: DAY }}>Day</span> <span style={{ color: C.dim }}>vs</span> <span style={{ color: DUSK }}>Dusk</span>, per $1 of senior.</p>
+            <h1 className="text-[24px] font-semibold tracking-tight leading-none">Capital efficiency</h1>
+            <p style={{ color: C.mut }} className="text-[12.5px] mt-2">Coverage, capital, and modeled position yield — <span style={{ color: DAY }}>Royco Day</span> <span style={{ color: C.dim }}>vs</span> <span style={{ color: DUSK }}>Dusk</span>, per $1 of ST.</p>
           </div>
           <div style={{ background: `linear-gradient(135deg, ${POS}22, ${POS}08)`, border: `1px solid ${POS}55`, color: POS }} className="rounded-full px-3.5 py-1.5 text-[11px] font-semibold flex items-center gap-1.5">
-            <span style={{ width: 7, height: 7, borderRadius: 99, background: POS, boxShadow: `0 0 8px ${POS}` }} /> Both guarantee min coverage
+            <span style={{ width: 7, height: 7, borderRadius: 99, background: POS, boxShadow: `0 0 8px ${POS}` }} /> Both modeled to minimum coverage
           </div>
         </div>
 
@@ -148,40 +148,40 @@ export default function CapitalEfficiency() {
           <div className="flex items-stretch" style={{ borderBottom: `1px solid ${C.line}` }}>
             <div style={{ width: 188 }} />
             <div className="flex flex-1" style={{ borderLeft: `1px solid ${C.line}` }}>
-              <div className="flex-1 px-6 py-3.5 flex items-center gap-2.5" style={{ background: `${DAY}0E` }}><span style={{ background: DAY, color: "#ffffff" }} className="rounded-md text-[12px] font-bold px-2.5 py-1">DAY</span><span style={{ color: C.dim }} className="text-[10px]">JT + LT</span></div>
+              <div className="flex-1 px-6 py-3.5 flex items-center gap-2.5" style={{ background: `${DAY}0E` }}><span style={{ background: DAY, color: "#ffffff" }} className="rounded-md text-[12px] font-bold px-2.5 py-1">ROYCO DAY</span><span style={{ color: C.dim }} className="text-[10px]">JT + SLP</span></div>
               <div style={{ width: 1, background: C.line }} />
               <div className="flex-1 px-6 py-3.5 flex items-center gap-2.5" style={{ background: `${DUSK}0E` }}><span style={{ background: DUSK, color: "#ffffff" }} className="rounded-md text-[12px] font-bold px-2.5 py-1">DUSK</span><span style={{ color: C.dim }} className="text-[10px]">one BPT-junior</span></div>
             </div>
           </div>
 
-          <Row label="Min coverage"
-            day={{ v: "Guaranteed", mark: "✓", dim: true }}
-            dusk={{ v: "Guaranteed", mark: "✓", dim: true }} />
+          <Row label="Minimum coverage"
+            day={{ v: "Modeled to meet", mark: "✓", dim: true }}
+            dusk={{ v: "Modeled to meet", mark: "✓", dim: true }} />
 
-          <Row label="Capital locked / $1 senior"
+          <Row label="Capital / $1 ST"
             day={{ v: mlt(c.dayCap), big: true, bar: c.dayCap / capMax }}
             dusk={{ v: mlt(c.duskCap), big: true, bar: c.duskCap / capMax, win: `${Math.round(c.capSave * 100)}% leaner` }} />
 
-          <Row label="Senior (ST) yield" accentRow={C.sr}
+          <Row label="ST yield" accentRow={C.sr}
             day={{ v: pc1(c.stNet), big: true, bar: c.stNet / yMax, note: "net of both premiums" }}
             dusk={{ v: pc1(c.stNet), big: true, bar: c.stNet / yMax, note: "identical — same premiums" }} />
 
-          <Row label="Junior (JT) yield" accentRow={DUSK}
-            day={{ v: pc1(c.dayJT), big: true, bar: c.dayJT / yMax, note: "mostly source yield + premium" }}
-            dusk={{ v: pc1(c.duskJT), big: true, bar: c.duskJT / yMax, note: "premium-heavy (both cuts, lazy BPT)" }} />
+          <Row label="JT yield" accentRow={DUSK}
+            day={{ v: pc1(c.dayJT), big: true, bar: c.dayJT / yMax, note: "strategy base-asset yield + risk premium" }}
+            dusk={{ v: pc1(c.duskJT), big: true, bar: c.duskJT / yMax, note: "both premiums + pool carry" }} />
 
-            <Row label="LP (LT) yield" accentRow={DAY}
-            day={{ v: pc1(c.dayLT), big: true, bar: c.dayLT / yMax, note: "separate BPT tranche" }}
-            dusk={{ v: "N/A", na: true, note: "no LT — the junior provides liquidity" }} />
+            <Row label="SLP yield" accentRow={DAY}
+            day={{ v: pc1(c.dayLT), big: true, bar: c.dayLT / yMax, note: "liquidity premium + fees + pool carry" }}
+            dusk={{ v: "N/A", na: true, note: "no separate SLP — JT also provides liquidity" }} />
 
-          <Row label="Failure mode" last
-            day={{ v: "Graceful", mark: "✓", note: "coverage independent of the pool" }}
-            dusk={{ v: "Reflexive", mark: "✗", note: "a run drifts the pool senior-heavy → β→1 (fixed point)" }} />
+          <Row label="Coverage structure" last
+            day={{ v: "Independent", mark: "✓", note: "JT coverage is separate from the SLP pool" }}
+            dusk={{ v: "Pool-coupled", mark: "✗", note: "a run drifts the pool ST-heavy → β→1 (fixed point)" }} />
         </div>
 
         {/* takeaway */}
         <div style={{ color: C.mut }} className="text-[12.5px] leading-relaxed mt-4 px-1">
-          <b style={{ color: C.text }}>The read:</b> the senior earns the same, and the juniors are {jtCmp} (<span style={{ color: DAY }}>Day {pc1(c.dayJT)}</span> from source + premium; <span style={{ color: DUSK }}>Dusk {pc1(c.duskJT)}</span>, premium-heavy on lazy BPT capital). So the trade is structural: <span style={{ color: DUSK }}>Dusk</span> locks <b style={{ color: POS }}>{Math.round(c.capSave * 100)}% less capital</b> (one pool, sized to <span className="font-mono">max(coverage, liquidity)</span>) — but its coverage is <b style={{ color: DUSK }}>reflexive</b> (a run drives the pool senior-heavy → β→1, the fixed point), and it has no separate LT. <span style={{ color: DAY }}>Day</span> pays more capital for coverage that&apos;s independent of the pool and a distinct LT ({pc1(c.dayLT)}). <span style={{ color: C.dim }}>Less capital vs robustness — that&apos;s the trade.</span>
+          <b style={{ color: C.text }}>The read:</b> ST earns the same, and JT returns are {jtCmp} (<span style={{ color: DAY }}>Royco Day {pc1(c.dayJT)}</span> from strategy base-asset yield plus risk premium; <span style={{ color: DUSK }}>Dusk {pc1(c.duskJT)}</span> from both premiums and pool carry). The trade is structural: <span style={{ color: DUSK }}>Dusk</span> uses <b style={{ color: POS }}>{Math.round(c.capSave * 100)}% less modeled capital</b> by combining coverage and liquidity in one pool, but its coverage is pool-coupled. <span style={{ color: DAY }}>Royco Day</span> uses independent JT coverage and a distinct SLP ({pc1(c.dayLT)}). <span style={{ color: C.dim }}>Less capital versus independent roles is the trade.</span>
         </div>
 
         {/* all sources */}
@@ -191,9 +191,9 @@ export default function CapitalEfficiency() {
             <table className="w-full border-collapse text-[12px]">
               <thead><tr style={{ background: C.panel2, color: C.dim }} className="text-[9px] uppercase tracking-wider">
                 <th className="text-left px-4 py-2.5">Source</th>
-                <th className="px-3 py-2.5 text-right" style={{ color: DAY }}>Day cap</th><th className="px-3 py-2.5 text-right" style={{ color: DUSK }}>Dusk cap</th>
+                <th className="px-3 py-2.5 text-right" style={{ color: DAY }}>Royco Day cap</th><th className="px-3 py-2.5 text-right" style={{ color: DUSK }}>Dusk cap</th>
                 <th className="px-3 py-2.5 text-right" style={{ color: C.sr }}>ST yld</th>
-                <th className="px-3 py-2.5 text-right" style={{ color: DAY }}>Day JT</th><th className="px-3 py-2.5 text-right" style={{ color: DUSK }}>Dusk JT</th><th className="px-4 py-2.5 text-right" style={{ color: DAY }}>Day LT</th>
+                <th className="px-3 py-2.5 text-right" style={{ color: DAY }}>Royco Day JT</th><th className="px-3 py-2.5 text-right" style={{ color: DUSK }}>Dusk JT</th><th className="px-4 py-2.5 text-right" style={{ color: DAY }}>Royco Day SLP</th>
               </tr></thead>
               <tbody className="font-mono tabular-nums">
                 {rows.map((x, i) => { const cc = calc(x, g); return (
