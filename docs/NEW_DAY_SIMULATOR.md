@@ -14,6 +14,12 @@ The Explorer renders a compact guided variant. The source selector is followed b
 
 Registered market manifests populate the Explorer source selector. Individual market routes remain compatibility and review surfaces until the Explorer supports every authorized customization and those routes are deliberately migrated. A future migration may redirect them to `/day-sim?market=<market-id>`; do not remove generated routes as part of ordinary market creation.
 
+### Internal learning-lab boundary
+
+`/internal/day-lab` is a parallel, non-indexed learning experiment. It reuses the Explorer registry, import workflow, market defaults, shared runtime configuration, and accountant-derived result object. Its required reading order is source input, editable market assumptions, then model outputs. The learning renderer must label those categories explicitly, define SLP as Senior Liquidity Provider, and use a single LP workbench that places the primary editable terms beside the live SLP result. Visual explanations must show the market-wide SLP-to-ST capital relationship, the configured price band, the yield split, the disclosed SLP return drivers, and the sell/pool-move/arbitrage sequence without restating accountant formulas. The liquidity output must use a focused lane normalized to the current executable one-trade pool boundary, directly label the near-marked and boundary capacities, and show arbitrage as a possible reset before a later trade; it may not render the rest of a 0–100% position as empty or permanently blocked. Every fixed model assumption that materially drives the SLP result must remain visible, while advanced ST/JT controls and position results may be collapsed as supporting market context. The lab must link back to the canonical Explorer for the full hoverable curves and history.
+
+The learning lab is not a public Day route, a market customization, or a replacement for `/day-sim`. It may not add market-local math, components, CSS, or manifest fields. Its learning renderer remains shared code under `components/day-simulator/`, and any change to it or its wiring requires the full template lock, verification, certification, and visual review. Publishing or promoting the experiment requires an intentional template decision after user approval; ordinary market creation must never route through it.
+
 ## Required intake
 
 Do not start until all fields below are answered. Never infer an unanswered field.

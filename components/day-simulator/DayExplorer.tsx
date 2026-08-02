@@ -101,9 +101,13 @@ function errorMessage(error: unknown): string {
 export default function DayExplorer({
   markets,
   initialMarket,
+  experience = "guided",
+  routePath = "/day-sim",
 }: {
   markets: readonly DayMarket[];
   initialMarket: DayMarket;
+  experience?: "guided" | "learning";
+  routePath?: string;
 }) {
   const [selectedMarketId, setSelectedMarketId] = useState(initialMarket.id);
   const [draftSource, setDraftSource] = useState<DayDraftSource | null>(null);
@@ -131,7 +135,7 @@ export default function DayExplorer({
     setSelectedMarketId(marketId);
     setError("");
     const nextUrl = new URL(window.location.href);
-    nextUrl.pathname = "/day-sim";
+    nextUrl.pathname = routePath;
     nextUrl.search = "";
     nextUrl.searchParams.set("market", marketId);
     window.history.replaceState(null, "", nextUrl);
@@ -143,7 +147,7 @@ export default function DayExplorer({
     setDraftVersion((current) => current + 1);
     setError("");
     const nextUrl = new URL(window.location.href);
-    nextUrl.pathname = "/day-sim";
+    nextUrl.pathname = routePath;
     nextUrl.search = "";
     window.history.replaceState(null, "", nextUrl);
   };
@@ -243,7 +247,7 @@ export default function DayExplorer({
               textTransform: "uppercase",
             }}
           >
-            Royco Day simulator
+            {experience === "learning" ? "Step 1 · Source input" : "Royco Day simulator"}
           </span>
         </div>
         <h1
@@ -258,10 +262,14 @@ export default function DayExplorer({
             marginBottom: 0,
           }}
         >
-          {activeMarket.identity.displayAssetName} in Royco Day
+          {experience === "learning"
+            ? "Choose a yield source"
+            : `${activeMarket.identity.displayAssetName} in Royco Day`}
         </h1>
         <p className="mt-1.5" style={{ color: COLORS.muted, fontSize: 12.5, lineHeight: 1.5 }}>
-          Compare modeled outcomes, liquidity, and first-loss protection.
+          {experience === "learning"
+            ? `${activeMarket.identity.displayAssetName} is loaded. Keep it, choose another example, or import your own history.`
+            : "Compare modeled outcomes, liquidity, and first-loss protection."}
         </p>
 
         <div
@@ -279,7 +287,7 @@ export default function DayExplorer({
                 textTransform: "uppercase",
               }}
             >
-              Yield source
+              {experience === "learning" ? "Input · Yield source" : "Yield source"}
             </span>
             <select
               aria-label="Explore a yield source"
@@ -315,7 +323,11 @@ export default function DayExplorer({
             }}
             type="button"
           >
-            {showImport || isDraft ? "Hide import" : "Use your own data"}
+            {showImport || isDraft
+              ? "Hide import"
+              : experience === "learning"
+                ? "Import source data"
+                : "Use your own data"}
           </button>
         </div>
 
@@ -516,11 +528,19 @@ export default function DayExplorer({
         </div>
       </section>
 
-      <DayMarketSimulator
-        key={activeKey}
-        market={activeMarket}
-        variant="guided"
-      />
+      {experience === "learning" ? (
+        <DayMarketSimulator
+          key={activeKey}
+          market={activeMarket}
+          variant="learning"
+        />
+      ) : (
+        <DayMarketSimulator
+          key={activeKey}
+          market={activeMarket}
+          variant="guided"
+        />
+      )}
     </div>
   );
 }

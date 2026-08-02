@@ -8,9 +8,11 @@ const marketId = process.argv[2];
 const failures = [];
 const requiredFiles = [
   "app/day-sim/page.tsx",
+  "app/internal/day-lab/page.tsx",
   "app/api/day-explorer/import/route.ts",
   "components/day-simulator/DayExplorer.tsx",
   "components/day-simulator/DayChartTooltip.tsx",
+  "components/day-simulator/DayLearningExperience.tsx",
   "components/day-simulator/DayMarketSimulator.tsx",
   "components/day-simulator/DayTimeframeBrush.tsx",
   "components/day-simulator/DaySimulatorPageShell.tsx",
@@ -76,6 +78,14 @@ const explorerImportRoute = await readFile(
   path.join(root, "app/api/day-explorer/import/route.ts"),
   "utf8",
 );
+const learningLabRoute = await readFile(
+  path.join(root, "app/internal/day-lab/page.tsx"),
+  "utf8",
+);
+const learningExperience = await readFile(
+  path.join(root, "components/day-simulator/DayLearningExperience.tsx"),
+  "utf8",
+);
 if (!shell.includes("SimulatorPageShell")) {
   failures.push("Day page shell must use the Dawn/Tenbin SimulatorPageShell");
 }
@@ -112,6 +122,53 @@ for (const importSafetyContract of [
 ]) {
   if (!explorerImportRoute.includes(importSafetyContract)) {
     failures.push(`Day Explorer URL import missing safety contract: ${importSafetyContract}`);
+  }
+}
+for (const learningRouteContract of [
+  'experience="learning"',
+  'routePath="/internal/day-lab"',
+  "DAY_MARKETS",
+  "robots: { index: false, follow: false }",
+]) {
+  if (!learningLabRoute.includes(learningRouteContract)) {
+    failures.push(`Day learning lab route missing experiment boundary: ${learningRouteContract}`);
+  }
+}
+for (const learningContract of [
+  "LP workbench",
+  "SLP (Senior Liquidity Provider)",
+  "Set the pool terms on the left. See the modeled LP result on the right.",
+  "Pool capital",
+  "Market-wide pool setting—not a minimum wallet size.",
+  "Price range presets",
+  "Your share of ST yield",
+  "Your share of ST yield is one input to SLP return—not the return itself.",
+  "Your SLP result",
+  "What 100 SLP did in this test",
+  "One ST sale through your pool",
+  "one-trade pool limit",
+  "Then arbitrage may reset the pool.",
+  "A later sale can start near marked value again.",
+  "How SLP return is formed",
+  "This diagram shows drivers, not a return equation.",
+  "ST enters the pool",
+  "Stable value leaves → seller",
+  "Separate source-risk waterfall",
+  "See source, ST, and JT context",
+  "Open detailed simulator",
+]) {
+  if (!learningExperience.includes(learningContract)) {
+    failures.push(`Day learning lab missing educational contract: ${learningContract}`);
+  }
+}
+for (const forbiddenLearningMath of [
+  "new Sim(",
+  "buildDayMarketConfig(",
+  "buildDayInitialBalances(",
+  "previewSecondarySell(",
+]) {
+  if (learningExperience.includes(forbiddenLearningMath)) {
+    failures.push(`Day learning lab may not duplicate accountant math: ${forbiddenLearningMath}`);
   }
 }
 

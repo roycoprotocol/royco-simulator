@@ -47,6 +47,7 @@ import {
   DayChartTooltip,
   useDayChartHover,
 } from '@/components/day-simulator/DayChartTooltip';
+import DayLearningExperience from '@/components/day-simulator/DayLearningExperience';
 import { DayTimeframeBrush } from '@/components/day-simulator/DayTimeframeBrush';
 
 const ResponsiveContainerNoSSR = dynamic(
@@ -1485,11 +1486,12 @@ export default function DayMarketSimulator({
   variant = 'standard',
 }: {
   market?: DayMarket;
-  variant?: 'standard' | 'guided' | 'executive';
+  variant?: 'standard' | 'guided' | 'executive' | 'learning';
 }) {
   const activeMarket = market ?? DAY_EXPLORER_TEMPLATE_MARKET;
   const isGuided = variant === 'guided';
   const isExecutive = variant === 'executive';
+  const isLearning = variant === 'learning';
   const sourceFeeLabel = activeMarket.provenance.feesIncluded === true
     ? 'Fee-inclusive'
     : activeMarket.provenance.feesIncluded === false
@@ -2059,6 +2061,94 @@ export default function DayMarketSimulator({
     boxShadow: 'none',
     padding: 16,
   } as const;
+
+  if (isLearning && endStep) {
+    const dataSummary = activeMarket.provenance.dataMode === 'published-apy-forward'
+      ? `Modeled from the published ${((activeMarket.provenance.publishedApy ?? defaults.sourceApy) * 100).toFixed(1)}% APY. These are mechanism outputs, not live performance or a forecast.`
+      : `Modeled from ${view.length} ${activeMarket.provenance.dataCadence} source values, ${startDate} to ${endDate}. These are mechanism outputs, not live performance or a forecast.`;
+    return (
+      <DayLearningExperience
+        assetName={activeMarket.identity.displayAssetName}
+        coverage={result.explainer.coverage}
+        coveragePct={coveragePct}
+        dataSummary={dataSummary}
+        defaults={{
+          sourceApyPct: defaults.sourceApy * 100,
+          coveragePct: defaults.coverage * 100,
+          minLiquidityPct: defaults.minLiquidity * 100,
+          eclpBandWidthPct: defaults.eclpBandWidth * 100,
+          riskSharePct: defaults.riskYDM.yTarget * 100,
+          liqSharePct: defaults.liqYDM.yTarget * 100,
+          observationDays: defaults.observationDays,
+          maintainCoverage: defaults.maintainCoverage,
+        }}
+        modelAssumptions={{
+          stableYieldPct: defaults.stableYield * 100,
+          swapFeeBps: defaults.swapFeeBps,
+          poolTurnoverPerYear: defaults.poolTurnoverPerYear,
+          reinvestLiquidityPremium: defaults.reinvestLiquidityPremium,
+        }}
+        eclpBandWidthPct={eclpBandWidthPct}
+        liqSharePct={liqSharePct}
+        liquidity={result.explainer.liquidity}
+        maintainCoverage={maintainCoverage}
+        marketId={activeMarket.id}
+        minLiquidityPct={minLiquidityPct}
+        observationDays={observationDays}
+        onCoverageChange={setCoveragePct}
+        onEclpBandWidthChange={setEclpBandWidthPct}
+        onLiquidityShareChange={(value) => {
+          setLiqSharePct(value);
+          if (value + riskSharePct > 100) setRiskSharePct(100 - value);
+        }}
+        onMaintainCoverageChange={setMaintainCoverage}
+        onMinLiquidityChange={setMinLiquidityPct}
+        onObservationDaysChange={setObservationDays}
+        onRiskShareChange={(value) => {
+          setRiskSharePct(value);
+          if (value + liqSharePct > 100) setLiqSharePct(100 - value);
+        }}
+        onSourceApyChange={setSourceApyPct}
+        positions={[
+          {
+            symbol: 'ST',
+            name: activeMarket.identity.seniorName,
+            job: 'Receives first-loss protection and an immediate secondary-market exit.',
+            paidFor: 'ST keeps source yield after paying JT for protection and SLP for liquidity.',
+            endValue: from100(endStep.senior),
+            apy: result.seniorApy,
+            maxDrawdown: result.seniorMaxDrawdown,
+            color: C.seniorLine,
+          },
+          {
+            symbol: 'JT',
+            name: activeMarket.identity.juniorName,
+            job: 'Absorbs covered losses before ST.',
+            paidFor: 'JT earns the risk premium because its capital is the first-loss buffer.',
+            endValue: from100(endStep.junior),
+            apy: result.juniorApy,
+            maxDrawdown: result.juniorMaxDrawdown,
+            color: C.juniorLine,
+          },
+          {
+            symbol: 'SLP',
+            name: 'Senior Liquidity Provider',
+            job: 'Makes ST sellable through the E-CLP pool.',
+            paidFor: 'SLP earns the liquidity premium for providing the pool that buys ST.',
+            endValue: from100(endStep.liquidity),
+            apy: result.liquidityApy,
+            maxDrawdown: result.liquidityMaxDrawdown,
+            color: C.olive,
+          },
+        ]}
+        riskSharePct={riskSharePct}
+        sourceApy={result.strategyApy}
+        sourceApyPct={sourceApyPct}
+        sourceEndValue={from100(endStep.strategy)}
+        sourceMaxDrawdown={result.strategyMaxDrawdown}
+      />
+    );
+  }
 
   return (
     <div

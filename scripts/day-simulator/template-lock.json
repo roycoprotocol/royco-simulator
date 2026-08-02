@@ -1,11 +1,13 @@
 {
   "app/globals.css": "9630f62f3e53beea7b27611c76d82affeea6dc86d29609a1b2a59a3dd9111782",
   "app/day-sim/page.tsx": "117a95c38adb89e6baf077bcdc7f912c5968a04d5d81b2a12cdeefd9f69bdd89",
+  "app/internal/day-lab/page.tsx": "cc24297496366142511b0d660d8bac73f24530bff3375e431e0ba8e931d13cab",
   "app/api/day-explorer/import/route.ts": "569fd3bf24d5f1ab633af6096a2228d6215e3f87da5ce178138666397db6892a",
   "components/simulator/SimulatorPageShell.tsx": "8fa75de54bab9fa6690ccd715f35c3a904639514bb94ffc6e608b525843e29ee",
-  "components/day-simulator/DayExplorer.tsx": "8f13a1abeac556cd526d723f8c92cabe123bd596becb6f0560a11a5be33f824c",
+  "components/day-simulator/DayExplorer.tsx": "f19cbc0bfa67be32e0aafbee0745d9b9a0838d07aee6a16ecbe56ea8e94855e4",
   "components/day-simulator/DayChartTooltip.tsx": "47ae74fa0c3c43ac67ed7d9014ea1def5d9be2edc195687c2547c714b0b91063",
-  "components/day-simulator/DayMarketSimulator.tsx": "e429775db06bc7feb10e951e5b48a3f86aa06d1b0907143314b0817c2eb636a1",
+  "components/day-simulator/DayLearningExperience.tsx": "d69659f17d84cc2e2b18b1df0aea81232c6e73fd36922bb1380d39ac1a24497d",
+  "components/day-simulator/DayMarketSimulator.tsx": "0c4dd6fea268ac73305e3c3869a686c2f945df93ead2a453168c9b624471f427",
   "components/day-simulator/DaySimulatorPageShell.tsx": "8d7bd959278ad100925e9995f8137343eab96429f9fabc09d9fff7faa361a3c2",
   "components/day-simulator/DayTimeframeBrush.tsx": "eaa9224c76a48514e3b8427216d7bdc84b440bc54ab5f802365cc26a0dd811ba",
   "lib/day-markets/registry.ts": "4c09997f9f523c6fb2aa6f2a2dd7cf8e918eff69bfa77f11f85b8d53b13c4aba",
@@ -46,7 +48,7 @@
   "scripts/day-simulator/generate-day-vectors.mjs": "ed5d1911b5f645bbac3892ae52c94e17252d6cde3c23b0ce10d407fa7ef1a4cd",
   "scripts/day-simulator/preview.mjs": "9cdfe3c04fb07c3b78434459cb43ec7cb713a1d9012775140c892665af2fc4af",
   "scripts/day-simulator/verify-runtime.ts": "2d797bcd7cf976c71889d74c5ece3dc84d5bce94d6ea3766b272f08f5b1610c4",
-  "scripts/day-simulator/verify.mjs": "a282f1a81bf73b905241164a1c2bf0e89b690c4fa2a9f7118ee99f7d3085fa81",
-  "docs/NEW_DAY_SIMULATOR.md": "090a949a6c0fa0332aed1c7ab2bc36ed9b0006e57f3586015dabb48aaf07304b",
+  "scripts/day-simulator/verify.mjs": "30b8959a418cb2c9173863c5cb34299bf7313c3f1130041b4376fbad82d014e8",
+  "docs/NEW_DAY_SIMULATOR.md": "8d08775eb1dc7b26c3d6b28bd4e2df1d7f17a8658093be86542e835841a9e132",
   "package.json": "78b50af9f0242dd74d2009e0bba6735f131fe230d776d1ab160ea5405167de54"
 }
