@@ -99,12 +99,18 @@ for (const explorerContract of [
   "buildDayDraftMarket",
   "parseSourceText",
   'variant="guided"',
-  "Certified Royco examples",
+  "Sample yield sources",
   "Unverified upload",
   "Royco Day simulator",
-  "activeMarket.identity.displayAssetName",
-  "in Royco Day",
-  "Compare modeled outcomes, liquidity, and first-loss protection.",
+  "Explore Royco Day",
+  "Royco restructures a single yield source into distinct risk, return, and liquidity profiles, so the same underlying asset can serve participants with different needs.",
+  "Change the yield split, first-loss protection, and exit liquidity to see how each choice reshapes the tradeoffs.",
+  "Educational simulator only.",
+  "No securities are offered or available through this page.",
+  "do not imply issuer participation, endorsement, or proposed market terms.",
+  "All simulation assumptions are illustrative and user-adjustable.",
+  "Historical dataset",
+  "Published APY sample",
   "Use your own data",
   "const [showImport, setShowImport] = useState(false)",
   "activeMarket.provenance.observationCount",
@@ -337,7 +343,7 @@ for (const layoutContract of [
   "overflow: 'hidden'",
   'className="mt-3 max-w-3xl"',
   "!isExecutive && !isGuided && <section",
-  "<Eyebrow>{isGuided ? 'Market setup' : 'Market inputs'}</Eyebrow>",
+  "<Eyebrow>{isGuided ? 'Simulation assumptions' : 'Market inputs'}</Eyebrow>",
   "<Eyebrow>Market snapshot</Eyebrow>",
   "'Key risk · Liquidity'",
   "'Key risk · Loss protection'",
@@ -390,9 +396,9 @@ for (const control of [
 for (const output of [
   'One source, three different jobs',
   "['Position', 'What it does', 'End value', 'Avg / year', 'Worst drop']",
-  "['ST', 'Protected; JT loses first'",
-  "['JT', 'First loss; earns risk premium'",
-  "['SLP', 'Makes ST sellable'",
+  "['ST', 'Protected by JT first-loss capital'",
+  "['JT', 'Takes first loss; earns risk premium'",
+  "['SLP', 'Provides liquidity for ST'",
   'strategyMaxDrawdown',
   'drawdownPct(result.strategyMaxDrawdown)',
   'drawdownPct(result.seniorMaxDrawdown)',
@@ -448,7 +454,7 @@ for (const output of [
 ]) {
   if (!simulator.includes(output)) failures.push(`Day simulator missing compact public output: ${output}`);
 }
-const assumptionsIndex = simulator.indexOf("<Eyebrow>{isGuided ? 'Market setup' : 'Market inputs'}</Eyebrow>");
+const assumptionsIndex = simulator.indexOf("<Eyebrow>{isGuided ? 'Simulation assumptions' : 'Market inputs'}</Eyebrow>");
 const eclpControlIndex = simulator.indexOf('label="E-CLP downside band (%)"');
 const resultsIndex = simulator.indexOf('<Eyebrow>Market snapshot</Eyebrow>');
 const liquiditySectionIndex = simulator.indexOf("showSection('liquidity-and-coverage')");

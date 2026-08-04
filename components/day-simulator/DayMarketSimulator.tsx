@@ -2407,7 +2407,7 @@ export default function DayMarketSimulator({
       {showSection('market-inputs') && <section style={isGuided ? guidedSectionStyle : { ...cardStyle, padding: 16 }}>
         <div className="flex items-center justify-between gap-4">
           <div>
-            <Eyebrow>{isGuided ? 'Market setup' : 'Market inputs'}</Eyebrow>
+            <Eyebrow>{isGuided ? 'Simulation assumptions' : 'Market inputs'}</Eyebrow>
             {isGuided && (
               <p className="mt-1" style={{ color: C.muted, fontSize: 11.5, lineHeight: 1.4 }}>
                 These values drive every result below.
@@ -2653,9 +2653,9 @@ export default function DayMarketSimulator({
               <tbody>
                 {[
                   ['Source', 'Baseline', from100(endStep.strategy), pct(result.strategyApy), drawdownPct(result.strategyMaxDrawdown), C.strategyLine],
-                  ['ST', 'Protected; JT loses first', from100(endStep.senior), pct(result.seniorApy), drawdownPct(result.seniorMaxDrawdown), C.seniorLine],
-                  ['JT', 'First loss; earns risk premium', from100(endStep.junior), pct(result.juniorApy), drawdownPct(result.juniorMaxDrawdown), C.juniorLine],
-                  ['SLP', 'Makes ST sellable', from100(endStep.liquidity), pct(result.liquidityApy), drawdownPct(result.liquidityMaxDrawdown), C.olive],
+                  ['ST', 'Protected by JT first-loss capital', from100(endStep.senior), pct(result.seniorApy), drawdownPct(result.seniorMaxDrawdown), C.seniorLine],
+                  ['JT', 'Takes first loss; earns risk premium', from100(endStep.junior), pct(result.juniorApy), drawdownPct(result.juniorMaxDrawdown), C.juniorLine],
+                  ['SLP', 'Provides liquidity for ST', from100(endStep.liquidity), pct(result.liquidityApy), drawdownPct(result.liquidityMaxDrawdown), C.olive],
                 ].map(([position, role, ending, apy, drawdown, color], index) => (
                   <tr key={position} style={{ background: index % 2 === 0 ? C.cardBg : C.pageBg }}>
                     <td style={{ borderBottom: index < 3 ? `1px solid ${C.border}` : undefined, color, fontFamily: MONO, fontSize: 13, fontWeight: 700, padding: '10px' }}>{position}</td>
@@ -2668,7 +2668,6 @@ export default function DayMarketSimulator({
               </tbody>
             </table>
           </div>
-          <p className="mt-2" style={{ color: C.muted, fontSize: 10.5, lineHeight: 1.4 }}>Different return comes from a different job—not a universally better position.</p>
         </section>
       )}
 

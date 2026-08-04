@@ -58,9 +58,10 @@ const fieldStyle = {
 function marketLabel(market: DayMarket): string {
   const assetLabel = market.customization.vaultTabs?.label
     ?? market.identity.displayAssetName;
-  return assetLabel === market.identity.marketName
-    ? market.identity.marketName
-    : `${market.identity.marketName} · ${assetLabel}`;
+  const datasetType = market.provenance.dataMode === "published-apy-forward"
+    ? "Published APY sample"
+    : "Historical dataset";
+  return `${assetLabel} · ${datasetType}`;
 }
 
 function filenameLabel(filename: string): string {
@@ -264,13 +265,49 @@ export default function DayExplorer({
         >
           {experience === "learning"
             ? "Choose a yield source"
-            : `${activeMarket.identity.displayAssetName} in Royco Day`}
+            : "Explore Royco Day"}
         </h1>
-        <p className="mt-1.5" style={{ color: COLORS.muted, fontSize: 12.5, lineHeight: 1.5 }}>
-          {experience === "learning"
-            ? `${activeMarket.identity.displayAssetName} is loaded. Keep it, choose another example, or import your own history.`
-            : "Compare modeled outcomes, liquidity, and first-loss protection."}
-        </p>
+        {experience === "learning" ? (
+          <p className="mt-1.5" style={{ color: COLORS.muted, fontSize: 12.5, lineHeight: 1.5 }}>
+            {activeMarket.identity.displayAssetName} is loaded. Keep it, choose another example, or import your own history.
+          </p>
+        ) : (
+          <p
+            className="mt-3"
+            style={{
+              color: COLORS.muted,
+              fontSize: "clamp(14px,1.15vw,16px)",
+              lineHeight: 1.5,
+              maxWidth: 900,
+            }}
+          >
+            <strong style={{ color: COLORS.text, fontWeight: 600 }}>
+              Royco restructures a single yield source into distinct risk, return, and liquidity profiles, so the same underlying asset can serve participants with different needs.
+            </strong>{" "}
+            Change the yield split, first-loss protection, and exit liquidity to see how each choice reshapes the tradeoffs.
+          </p>
+        )}
+
+        {experience !== "learning" && (
+          <div
+            aria-label="Educational simulator disclosure"
+            className="mt-3"
+            role="note"
+            style={{
+              background: COLORS.soft,
+              border: `1px solid ${COLORS.border}`,
+              borderLeft: `3px solid ${COLORS.rust}`,
+              borderRadius: 8,
+              color: COLORS.muted,
+              fontSize: 11,
+              lineHeight: 1.5,
+              padding: "10px 12px",
+            }}
+          >
+            <strong style={{ color: COLORS.text, fontWeight: 650 }}>Educational simulator only.</strong>{" "}
+            No securities are offered or available through this page. Sample datasets provide source inputs only and do not imply issuer participation, endorsement, or proposed market terms. All simulation assumptions are illustrative and user-adjustable.
+          </div>
+        )}
 
         <div
           className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_auto]"
@@ -296,7 +333,7 @@ export default function DayExplorer({
               value={isDraft ? DRAFT_OPTION : selectedMarket.id}
             >
               {isDraft && <option value={DRAFT_OPTION}>{draftSource?.label} · Draft</option>}
-              <optgroup label="Certified Royco examples">
+              <optgroup label="Sample yield sources">
                 {markets.map((market) => (
                   <option key={market.id} value={market.id}>
                     {marketLabel(market)}
@@ -512,7 +549,7 @@ export default function DayExplorer({
 
         <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1" style={{ color: COLORS.muted, fontSize: 10.5 }}>
           <strong style={{ color: isDraft ? COLORS.warning : COLORS.olive, fontWeight: 600 }}>
-            {isDraft ? "Unverified upload" : "Certified example"}
+            {isDraft ? "Unverified upload" : "Sample dataset"}
           </strong>
           <span>·</span>
           <span>{activeMarket.provenance.observationCount} {describeCadence(activeMarket.provenance.dataCadence)} values</span>
