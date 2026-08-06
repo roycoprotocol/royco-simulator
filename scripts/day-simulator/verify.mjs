@@ -12,6 +12,7 @@ const requiredFiles = [
   "app/api/day-explorer/import/route.ts",
   "components/day-simulator/DayExplorer.tsx",
   "components/day-simulator/DayChartTooltip.tsx",
+  "components/day-simulator/DayGuidedTutorial.tsx",
   "components/day-simulator/DayLearningExperience.tsx",
   "components/day-simulator/DayMarketSimulator.tsx",
   "components/day-simulator/DayTimeframeBrush.tsx",
@@ -86,6 +87,10 @@ const learningExperience = await readFile(
   path.join(root, "components/day-simulator/DayLearningExperience.tsx"),
   "utf8",
 );
+const guidedTutorial = await readFile(
+  path.join(root, "components/day-simulator/DayGuidedTutorial.tsx"),
+  "utf8",
+);
 if (!shell.includes("SimulatorPageShell")) {
   failures.push("Day page shell must use the Dawn/Tenbin SimulatorPageShell");
 }
@@ -98,13 +103,15 @@ if (!shell.includes("StrictDaySimulatorPageShell")) {
 for (const explorerContract of [
   "buildDayDraftMarket",
   "parseSourceText",
-  'variant="guided"',
+  'variant={showTutorial ? "tutorial" : "guided"}',
   "Sample yield sources",
   "Unverified upload",
   "Royco Day simulator",
   "Explore Royco Day",
-  "Royco restructures a single yield source into distinct risk, return, and liquidity profiles, so the same underlying asset can serve participants with different needs.",
-  "Change the yield split, first-loss protection, and exit liquidity to see how each choice reshapes the tradeoffs.",
+  "Royco Day is a mechanism that splits one yield source into positions with distinct risk, return, and liquidity profiles.",
+  "Use this simulator to adjust the yield split, first-loss protection, and liquidity assumptions, then see how each configuration changes the tradeoffs across positions.",
+  "New to Royco?",
+  "Close tutorial",
   "Educational simulator only.",
   "No securities are offered or available through this page.",
   "do not imply issuer participation, endorsement, or proposed market terms.",
@@ -113,6 +120,7 @@ for (const explorerContract of [
   "Published APY sample",
   "Use your own data",
   "const [showImport, setShowImport] = useState(false)",
+  "const [showTutorial, setShowTutorial] = useState(false)",
   "activeMarket.provenance.observationCount",
   "describePriceType(activeMarket.provenance.priceType)",
 ]) {
@@ -177,11 +185,73 @@ for (const forbiddenLearningMath of [
     failures.push(`Day learning lab may not duplicate accountant math: ${forbiddenLearningMath}`);
   }
 }
+for (const tutorialContract of [
+  "Tutorial · Step",
+  "Meet the three positions",
+  "When does ST lose money?",
+  "Set ST&apos;s first-loss protection",
+  "90% utilization target",
+  "What is SLP Liquidity?",
+  "What is the Pool Band?",
+  "Follow the lessons or use the full simulator below at any time.",
+  "accountant-derived ST loss threshold",
+  "Selling close to $1",
+  "Price impact means",
+  "Largest one-time sale",
+  "Selling more would require multiple sales or waiting for liquidity to return.",
+  "Coverage is a buffer, not a guarantee.",
+  "Continue without tutorial",
+  "Show live outcomes below",
+  "Restart tutorial",
+]) {
+  if (!guidedTutorial.includes(tutorialContract)) {
+    failures.push(`Day tutorial missing educational contract: ${tutorialContract}`);
+  }
+}
+for (const forbiddenTutorialMath of [
+  "new Sim(",
+  "buildDayMarketConfig(",
+  "buildDayInitialBalances(",
+  "previewSecondarySell(",
+]) {
+  if (guidedTutorial.includes(forbiddenTutorialMath)) {
+    failures.push(`Day tutorial may not duplicate accountant math: ${forbiddenTutorialMath}`);
+  }
+}
 
 const simulator = await readFile(
   path.join(root, "components/day-simulator/DayMarketSimulator.tsx"),
   "utf8",
 );
+for (const tutorialIntegrationContract of [
+  "const isGuided = variant === 'guided' || isTutorial;",
+  'id="day-sim-positions"',
+  'id="day-sim-coverage-control"',
+  'id="day-sim-liquidity-control"',
+  'id="day-sim-live-outcomes"',
+  "onShowInSimulator={showTutorialSection}",
+  "Current modeled effect: ST remains at $100 through about",
+  "Current modeled effect:",
+  "Assumptions and their current modeled effects.",
+  "How it works:",
+  "Current result:",
+  "More JT Coverage increases the first-loss buffer protecting Senior (ST).",
+  "Higher SLP Liquidity gives ST holders more liquidity when they want to sell.",
+  "A wider Pool Band lets more ST sell at once",
+  "before ST begins losing value.",
+  "% of ST can sell at once with about",
+  "% of ST is the largest modeled one-time sale",
+  'role="tooltip"',
+  'aria-describedby={tooltipId}',
+  'tabIndex={0}',
+  "data-tooltip-placement={placeAbove ? 'above' : 'below'}",
+  'tooltipRef.current?.offsetHeight',
+  'onPointerEnter={updatePlacement}',
+]) {
+  if (!simulator.includes(tutorialIntegrationContract)) {
+    failures.push(`Day tutorial missing non-blocking simulator integration: ${tutorialIntegrationContract}`);
+  }
+}
 const marketTemplate = await readFile(
   path.join(root, "lib/day-simulator-template/market.ts"),
   "utf8",
@@ -411,7 +481,7 @@ for (const output of [
   'coverageLossLimit',
   'endingSeniorBalancePer100',
   'const eclpBandWidth = eclpBandWidthPct / 100',
-  'Very tight bands concentrate nearly all executable liquidity close to par',
+  'Narrow bands keep sales closer to $1 but allow less to be sold at once',
   'formatEclpFloor(eclpBandWidthPct)',
   'percent near-par capacity',
   'percent maximum atomic capacity',

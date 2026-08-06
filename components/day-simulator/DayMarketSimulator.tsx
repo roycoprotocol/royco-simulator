@@ -47,6 +47,7 @@ import {
   DayChartTooltip,
   useDayChartHover,
 } from '@/components/day-simulator/DayChartTooltip';
+import DayGuidedTutorial from '@/components/day-simulator/DayGuidedTutorial';
 import DayLearningExperience from '@/components/day-simulator/DayLearningExperience';
 import { DayTimeframeBrush } from '@/components/day-simulator/DayTimeframeBrush';
 
@@ -1470,6 +1471,90 @@ function SliderControl({
   );
 }
 
+function AssumptionSummaryTile({
+  index,
+  label,
+  mechanism,
+  outcome,
+  value,
+}: {
+  index: number;
+  label: string;
+  mechanism: string;
+  outcome: string;
+  value: string;
+}) {
+  const cardRef = useRef<HTMLDivElement>(null);
+  const tooltipRef = useRef<HTMLDivElement>(null);
+  const [placeAbove, setPlaceAbove] = useState(false);
+  const tooltipAlignment = index === 0
+    ? 'left-0'
+    : index === 1
+      ? 'right-0 md:left-0 md:right-auto'
+      : index === 2
+        ? 'left-0 md:right-0 md:left-auto'
+        : 'right-0';
+  const tooltipId = `day-sim-assumption-effect-${index}`;
+  const updatePlacement = useCallback(() => {
+    const card = cardRef.current;
+    if (!card) return;
+    const rect = card.getBoundingClientRect();
+    const tooltipHeight = tooltipRef.current?.offsetHeight ?? 128;
+    const requiredSpace = tooltipHeight + 10;
+    const spaceBelow = window.innerHeight - rect.bottom;
+    const spaceAbove = rect.top;
+    const nextPlaceAbove = spaceBelow < requiredSpace && spaceAbove > spaceBelow;
+    setPlaceAbove((current) => current === nextPlaceAbove ? current : nextPlaceAbove);
+  }, []);
+
+  return (
+    <div
+      aria-describedby={tooltipId}
+      aria-label={`${label}: ${value}`}
+      className="group relative cursor-help outline-none focus-visible:ring-1 focus-visible:ring-[#A65B20]"
+      data-tooltip-placement={placeAbove ? 'above' : 'below'}
+      onClick={updatePlacement}
+      onFocus={updatePlacement}
+      onMouseEnter={updatePlacement}
+      onPointerDown={updatePlacement}
+      onPointerEnter={updatePlacement}
+      ref={cardRef}
+      style={{ background: C.pageBg, borderRadius: 8, padding: '9px 10px' }}
+      tabIndex={0}
+    >
+      <p style={{ color: C.kpiLabel, fontSize: 8.5, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase' }}>{label}</p>
+      <p className="mt-1" style={{ color: C.text, fontFamily: MONO, fontSize: 13, fontWeight: 600 }}>{value}</p>
+      <div
+        className={`pointer-events-none absolute z-30 w-72 invisible opacity-0 group-hover:visible group-hover:opacity-100 group-focus:visible group-focus:opacity-100 ${placeAbove ? 'bottom-full mb-2' : 'top-full mt-2'} ${tooltipAlignment}`}
+        id={tooltipId}
+        ref={tooltipRef}
+        role="tooltip"
+        style={{
+          background: C.cardBg,
+          border: `1px solid ${C.border}`,
+          borderRadius: 8,
+          boxShadow: '0 8px 24px rgba(29,28,25,.14)',
+          color: C.text,
+          fontSize: 12.5,
+          lineHeight: 1.45,
+          maxHeight: 'calc(100vh - 20px)',
+          overflowY: 'auto',
+          padding: '9px 10px',
+        }}
+      >
+        <p>
+          <strong style={{ fontWeight: 700 }}>How it works:</strong>{' '}
+          {mechanism}
+        </p>
+        <p className="mt-2" style={{ color: C.muted }}>
+          <strong style={{ color: C.text, fontWeight: 700 }}>Current result:</strong>{' '}
+          {outcome}
+        </p>
+      </div>
+    </div>
+  );
+}
+
 const annualized = (end: number, start: number, days: number) =>
   days > 0 && start > 0 && end >= 0
     ? end === 0 ? -1 : Math.pow(end / start, 365 / days) - 1
@@ -1484,12 +1569,15 @@ const signColor = (value: number) => (value < 0 ? C.danger : C.text);
 export default function DayMarketSimulator({
   market,
   variant = 'standard',
+  onExitTutorial,
 }: {
   market?: DayMarket;
-  variant?: 'standard' | 'guided' | 'executive' | 'learning';
+  variant?: 'standard' | 'guided' | 'executive' | 'learning' | 'tutorial';
+  onExitTutorial?: () => void;
 }) {
   const activeMarket = market ?? DAY_EXPLORER_TEMPLATE_MARKET;
-  const isGuided = variant === 'guided';
+  const isTutorial = variant === 'tutorial';
+  const isGuided = variant === 'guided' || isTutorial;
   const isExecutive = variant === 'executive';
   const isLearning = variant === 'learning';
   const sourceFeeLabel = activeMarket.provenance.feesIncluded === true
@@ -1544,6 +1632,7 @@ export default function DayMarketSimulator({
   const [showInputs, setShowInputs] = useState(false);
   const [showLiquidityDetail, setShowLiquidityDetail] = useState(false);
   const [showCoverageDetail, setShowCoverageDetail] = useState(false);
+  const [tutorialStep, setTutorialStep] = useState(0);
   const [showReview, setShowReview] = useState(!isGuided);
   const [showMonthly, setShowMonthly] = useState(false);
   const [hoverDate, setHoverDate] = useState<string | null>(null);
@@ -1559,6 +1648,25 @@ export default function DayMarketSimulator({
     a: 0,
     b: simulationSeries.length - 1,
   });
+
+  const changeTutorialStep = useCallback((value: number) => {
+    setTutorialStep(value);
+    if (value === 1 || value === 2) setShowInputs(true);
+  }, []);
+
+  const showTutorialSection = useCallback(() => {
+    if (tutorialStep === 1 || tutorialStep === 2) setShowInputs(true);
+    const targetId = tutorialStep === 0
+      ? 'day-sim-positions'
+      : tutorialStep === 1
+        ? 'day-sim-coverage-control'
+        : tutorialStep === 2
+          ? 'day-sim-liquidity-control'
+          : 'day-sim-live-outcomes';
+    window.requestAnimationFrame(() => {
+      document.getElementById(targetId)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+  }, [tutorialStep]);
 
   useEffect(() => {
     const chartContainer = chartContainerRef.current;
@@ -2061,6 +2169,10 @@ export default function DayMarketSimulator({
     boxShadow: 'none',
     padding: 16,
   } as const;
+  const tutorialHighlightStyle = {
+    background: `${C.accent}08`,
+    boxShadow: `inset 3px 0 ${C.accent}`,
+  } as const;
 
   if (isLearning && endStep) {
     const dataSummary = activeMarket.provenance.dataMode === 'published-apy-forward'
@@ -2164,6 +2276,28 @@ export default function DayMarketSimulator({
           }
         : { gap: 10 }}
     >
+      {isTutorial && endStep && (
+        <DayGuidedTutorial
+          assetName={activeMarket.identity.displayAssetName}
+          coverage={result.explainer.coverage}
+          coveragePct={coveragePct}
+          eclpBandWidthPct={eclpBandWidthPct}
+          liquidity={result.explainer.liquidity}
+          minLiquidityPct={minLiquidityPct}
+          onCoverageChange={setCoveragePct}
+          onEclpBandWidthChange={setEclpBandWidthPct}
+          onExit={onExitTutorial ?? (() => undefined)}
+          onMinLiquidityChange={setMinLiquidityPct}
+          onReset={() => {
+            setCoveragePct(defaults.coverage * 100);
+            setMinLiquidityPct(defaults.minLiquidity * 100);
+            setEclpBandWidthPct(defaults.eclpBandWidth * 100);
+          }}
+          onShowInSimulator={showTutorialSection}
+          onStepChange={changeTutorialStep}
+          step={tutorialStep}
+        />
+      )}
       {!isGuided && <section>
         <div className="flex items-center gap-2">
           <span style={{ background: C.olive, borderRadius: 9999, display: 'inline-block', height: 6, width: 6 }} />
@@ -2404,13 +2538,19 @@ export default function DayMarketSimulator({
         </div>
       </section>}
 
-      {showSection('market-inputs') && <section style={isGuided ? guidedSectionStyle : { ...cardStyle, padding: 16 }}>
+      {showSection('market-inputs') && <section
+        id="day-sim-assumptions"
+        style={{
+          ...(isGuided ? guidedSectionStyle : { ...cardStyle, padding: 16 }),
+          ...(isTutorial && (tutorialStep === 1 || tutorialStep === 2) ? tutorialHighlightStyle : {}),
+        }}
+      >
         <div className="flex items-center justify-between gap-4">
           <div>
             <Eyebrow>{isGuided ? 'Simulation assumptions' : 'Market inputs'}</Eyebrow>
             {isGuided && (
               <p className="mt-1" style={{ color: C.muted, fontSize: 11.5, lineHeight: 1.4 }}>
-                These values drive every result below.
+                Assumptions and their current modeled effects.
               </p>
             )}
           </div>
@@ -2444,15 +2584,39 @@ export default function DayMarketSimulator({
           <>
             <div className="mt-3 grid grid-cols-2 md:grid-cols-4" style={{ gap: 6 }}>
               {[
-                ['Source APY', `${sourceApyPct.toFixed(1)}%`],
-                ['JT coverage', `${coveragePct.toFixed(0)}%`],
-                ['SLP liquidity', `${minLiquidityPct.toFixed(0)}%`],
-                ['Pool band', `${formatEclpBandPercent(eclpBandWidthPct)}%`],
-              ].map(([label, value]) => (
-                <div key={label} style={{ background: C.pageBg, borderRadius: 8, padding: '9px 10px' }}>
-                  <p style={{ color: C.kpiLabel, fontSize: 8.5, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase' }}>{label}</p>
-                  <p className="mt-1" style={{ color: C.text, fontFamily: MONO, fontSize: 13, fontWeight: 600 }}>{value}</p>
-                </div>
+                {
+                  mechanism: 'A higher Source APY creates more yield to divide among ST, JT, and SLP.',
+                  label: 'Source APY',
+                  outcome: `The selected source contributes ${sourceApyPct.toFixed(1)}% annualized yield before the premium split.`,
+                  value: `${sourceApyPct.toFixed(1)}%`,
+                },
+                {
+                  mechanism: 'More JT Coverage increases the first-loss buffer protecting Senior (ST).',
+                  label: 'JT coverage',
+                  outcome: `At the current setting, the source can lose about ${(result.explainer.coverage.coverageLossLimit * 100).toFixed(1)}% before ST begins losing value.`,
+                  value: `${coveragePct.toFixed(0)}%`,
+                },
+                {
+                  mechanism: 'Higher SLP Liquidity gives ST holders more liquidity when they want to sell.',
+                  label: 'SLP liquidity',
+                  outcome: `${(result.explainer.liquidity.referenceSellShareOfSenior * 100).toFixed(1)}% of ST can sell at once with about ${(result.explainer.liquidity.referenceQuote.slippage * 100).toFixed(1)}% average price impact.`,
+                  value: `${minLiquidityPct.toFixed(0)}%`,
+                },
+                {
+                  mechanism: 'A wider Pool Band lets more ST sell at once but allows the pool price to move farther below $1.',
+                  label: 'Pool band',
+                  outcome: `${(result.explainer.liquidity.boundarySellShareOfSenior * 100).toFixed(1)}% of ST is the largest modeled one-time sale.`,
+                  value: `${formatEclpBandPercent(eclpBandWidthPct)}%`,
+                },
+              ].map(({ label, mechanism, outcome, value }, index) => (
+                <AssumptionSummaryTile
+                  index={index}
+                  key={label}
+                  label={label}
+                  mechanism={mechanism}
+                  outcome={outcome}
+                  value={value}
+                />
               ))}
             </div>
             <p className="mt-2" style={{ color: C.kpiLabel, fontSize: 10.5, lineHeight: 1.45 }}>
@@ -2477,7 +2641,7 @@ export default function DayMarketSimulator({
                 onChange={setSourceApyPct}
               />
             </div>
-            <div style={{ background: C.pageBg, border: `1px solid ${C.border}`, borderRadius: 10, padding: 12 }}>
+            <div id="day-sim-coverage-control" style={{ background: C.pageBg, border: `1px solid ${isTutorial && tutorialStep === 1 ? C.accent : C.border}`, borderRadius: 10, padding: 12 }}>
               <SliderControl
                 label="Minimum coverage requirement (%)"
                 value={coveragePct}
@@ -2485,11 +2649,11 @@ export default function DayMarketSimulator({
                 max={65}
                 step={1}
                 display={`${coveragePct.toFixed(0)}%`}
-                description={isGuided ? "How much JT first-loss capital the market requires relative to ST and JT combined." : ""}
+                description={isGuided ? `Minimum protection setting used to size the JT buffer. Current modeled effect: ST remains at $100 through about ${(result.explainer.coverage.coverageLossLimit * 100).toFixed(1)}% source loss.` : ""}
                 onChange={setCoveragePct}
               />
             </div>
-            <div style={{ background: C.pageBg, border: `1px solid ${C.border}`, borderRadius: 10, padding: 12 }}>
+            <div id="day-sim-liquidity-control" style={{ background: C.pageBg, border: `1px solid ${isTutorial && tutorialStep === 2 ? C.accent : C.border}`, borderRadius: 10, padding: 12 }}>
               <SliderControl
                 label="Minimum liquidity requirement (%)"
                 value={minLiquidityPct}
@@ -2497,12 +2661,12 @@ export default function DayMarketSimulator({
                 max={50}
                 step={1}
                 display={`${minLiquidityPct.toFixed(0)}%`}
-                description={isGuided ? "How much SLP capital the market requires relative to ST." : ""}
+                description={isGuided ? `Minimum SLP capital supporting ST sales. Current modeled effect: ${(result.explainer.liquidity.referenceSellShareOfSenior * 100).toFixed(1)}% of ST can sell at once with about ${(result.explainer.liquidity.referenceQuote.slippage * 100).toFixed(1)}% average price impact.` : ""}
                 onChange={setMinLiquidityPct}
               />
             </div>
             {isGuided && (
-              <div style={{ background: C.pageBg, border: `1px solid ${C.border}`, borderRadius: 10, padding: 12 }}>
+              <div style={{ background: C.pageBg, border: `1px solid ${isTutorial && tutorialStep === 2 ? C.accent : C.border}`, borderRadius: 10, padding: 12 }}>
                 <SliderControl
                   label="E-CLP downside band (%)"
                   value={eclpBandWidthPct}
@@ -2510,7 +2674,7 @@ export default function DayMarketSimulator({
                   max={20}
                   step={0.25}
                   display={`${formatEclpBandPercent(eclpBandWidthPct)}% · $${formatEclpFloor(eclpBandWidthPct)} floor`}
-                  description="How far the pool price can move below $1. Very tight bands concentrate nearly all executable liquidity close to par; wider bands allow more price movement."
+                  description={`How far the modeled pool price can move below $1. Narrow bands keep sales closer to $1 but allow less to be sold at once. Current modeled effect: ${(result.explainer.liquidity.boundarySellShareOfSenior * 100).toFixed(1)}% of ST is the largest one-time sale, with about ${(result.explainer.liquidity.boundaryQuote.slippage * 100).toFixed(1)}% average price impact.`}
                   tone={C.olive}
                   labelColor={C.olive}
                   onChange={setEclpBandWidthPct}
@@ -2617,7 +2781,13 @@ export default function DayMarketSimulator({
       </section>}
 
       {isGuided && endStep && (
-        <section style={guidedSectionStyle}>
+        <section
+          id="day-sim-positions"
+          style={{
+            ...guidedSectionStyle,
+            ...(isTutorial && tutorialStep === 0 ? tutorialHighlightStyle : {}),
+          }}
+        >
           <Eyebrow>Market snapshot</Eyebrow>
           <h2 className="mt-2" style={{ color: C.text, fontFamily: SERIF, fontSize: 22, fontWeight: 500, letterSpacing: '-0.025em', lineHeight: 1.12 }}>
             One source, three different jobs
@@ -2680,11 +2850,18 @@ export default function DayMarketSimulator({
         </div>
       </section>}
 
-      {showSection('liquidity-and-coverage') && <section className="grid grid-cols-1 md:grid-cols-2" style={isGuided ? { borderBottom: `1px solid ${C.border}`, gap: 0 } : { gap: 10 }}>
+      {showSection('liquidity-and-coverage') && <section
+        className="grid grid-cols-1 md:grid-cols-2"
+        id="day-sim-live-outcomes"
+        style={{
+          ...(isGuided ? { borderBottom: `1px solid ${C.border}`, gap: 0 } : { gap: 10 }),
+          ...(isTutorial && tutorialStep === 3 ? tutorialHighlightStyle : {}),
+        }}
+      >
         <div
           className={isGuided ? "border-b md:border-b-0 md:border-r" : undefined}
           style={isGuided
-            ? { background: 'transparent', borderColor: C.border, padding: 16 }
+            ? { background: isTutorial && tutorialStep === 2 ? `${C.accent}08` : 'transparent', borderColor: C.border, boxShadow: isTutorial && tutorialStep === 2 ? `inset 3px 0 ${C.accent}` : undefined, padding: 16 }
             : { ...cardStyle, padding: 14 }}
         >
           {isExecutive
@@ -2761,7 +2938,7 @@ export default function DayMarketSimulator({
         </div>
 
         <div style={isGuided
-          ? { background: 'transparent', padding: 16 }
+          ? { background: isTutorial && tutorialStep === 1 ? `${C.accent}08` : 'transparent', boxShadow: isTutorial && tutorialStep === 1 ? `inset 3px 0 ${C.accent}` : undefined, padding: 16 }
           : { ...cardStyle, padding: 14 }}
         >
           {isExecutive

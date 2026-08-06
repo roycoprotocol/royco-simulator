@@ -116,6 +116,7 @@ export default function DayExplorer({
   const [sourceUrl, setSourceUrl] = useState("");
   const [importingUrl, setImportingUrl] = useState(false);
   const [showImport, setShowImport] = useState(false);
+  const [showTutorial, setShowTutorial] = useState(false);
   const [error, setError] = useState("");
 
   const selectedMarket = markets.find((market) => market.id === selectedMarketId)
@@ -227,66 +228,95 @@ export default function DayExplorer({
           padding: 20,
         }}
       >
-        <div className="flex items-center gap-2">
-          <span
-            aria-hidden
-            style={{
-              background: COLORS.rust,
-              borderRadius: 9999,
-              display: "inline-block",
-              height: 6,
-              width: 6,
-            }}
-          />
-          <span
-            style={{
-              color: COLORS.eyebrow,
-              fontFamily: MONO,
-              fontSize: 10,
-              fontWeight: 700,
-              letterSpacing: "0.16em",
-              textTransform: "uppercase",
-            }}
-          >
-            {experience === "learning" ? "Step 1 · Source input" : "Royco Day simulator"}
-          </span>
+        <div className={experience === "learning" ? undefined : "grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_auto]"}>
+          <div>
+            <div className="flex items-center gap-2">
+              <span
+                aria-hidden
+                style={{
+                  background: COLORS.rust,
+                  borderRadius: 9999,
+                  display: "inline-block",
+                  height: 6,
+                  width: 6,
+                }}
+              />
+              <span
+                style={{
+                  color: COLORS.eyebrow,
+                  fontFamily: MONO,
+                  fontSize: 10,
+                  fontWeight: 700,
+                  letterSpacing: "0.16em",
+                  textTransform: "uppercase",
+                }}
+              >
+                {experience === "learning" ? "Step 1 · Source input" : "Royco Day simulator"}
+              </span>
+            </div>
+            <h1
+              className="mt-2"
+              style={{
+                color: COLORS.text,
+                fontFamily: SANS,
+                fontSize: "clamp(22px,2vw,28px)",
+                fontWeight: 500,
+                letterSpacing: "-0.035em",
+                lineHeight: 1.08,
+                marginBottom: 0,
+              }}
+            >
+              {experience === "learning"
+                ? "Choose a yield source"
+                : "Explore Royco Day"}
+            </h1>
+            {experience === "learning" ? (
+              <p className="mt-1.5" style={{ color: COLORS.muted, fontSize: 12.5, lineHeight: 1.5 }}>
+                {activeMarket.identity.displayAssetName} is loaded. Keep it, choose another example, or import your own history.
+              </p>
+            ) : (
+              <p
+                className="mt-3"
+                style={{
+                  color: COLORS.muted,
+                  fontSize: "clamp(14px,1.15vw,16px)",
+                  lineHeight: 1.5,
+                  maxWidth: 900,
+                }}
+              >
+                <strong style={{ color: COLORS.text, fontWeight: 600 }}>
+                  Royco Day is a mechanism that splits one yield source into positions with distinct risk, return, and liquidity profiles.
+                </strong>{" "}
+                Use this simulator to adjust the yield split, first-loss protection, and liquidity assumptions, then see how each configuration changes the tradeoffs across positions.
+              </p>
+            )}
+          </div>
+
+          {experience !== "learning" && (
+            <button
+              aria-label={showTutorial ? "Close tutorial" : "New to Royco?"}
+              aria-pressed={showTutorial}
+              className="justify-self-start lg:justify-self-end"
+              onClick={() => setShowTutorial((value) => !value)}
+              style={{
+                background: showTutorial ? `${COLORS.rust}0D` : COLORS.rust,
+                border: `1px solid ${COLORS.rust}`,
+                borderRadius: 8,
+                boxShadow: showTutorial ? "none" : "0 1px 2px rgba(29,28,25,.12)",
+                color: showTutorial ? COLORS.rust : COLORS.card,
+                fontFamily: SANS,
+                fontSize: 13,
+                fontWeight: 700,
+                minHeight: 40,
+                padding: "9px 14px",
+                whiteSpace: "nowrap",
+              }}
+              type="button"
+            >
+              {showTutorial ? "Close tutorial" : "New to Royco?"}
+            </button>
+          )}
         </div>
-        <h1
-          className="mt-2"
-          style={{
-            color: COLORS.text,
-            fontFamily: SANS,
-            fontSize: "clamp(22px,2vw,28px)",
-            fontWeight: 500,
-            letterSpacing: "-0.035em",
-            lineHeight: 1.08,
-            marginBottom: 0,
-          }}
-        >
-          {experience === "learning"
-            ? "Choose a yield source"
-            : "Explore Royco Day"}
-        </h1>
-        {experience === "learning" ? (
-          <p className="mt-1.5" style={{ color: COLORS.muted, fontSize: 12.5, lineHeight: 1.5 }}>
-            {activeMarket.identity.displayAssetName} is loaded. Keep it, choose another example, or import your own history.
-          </p>
-        ) : (
-          <p
-            className="mt-3"
-            style={{
-              color: COLORS.muted,
-              fontSize: "clamp(14px,1.15vw,16px)",
-              lineHeight: 1.5,
-              maxWidth: 900,
-            }}
-          >
-            <strong style={{ color: COLORS.text, fontWeight: 600 }}>
-              Royco restructures a single yield source into distinct risk, return, and liquidity profiles, so the same underlying asset can serve participants with different needs.
-            </strong>{" "}
-            Change the yield split, first-loss protection, and exit liquidity to see how each choice reshapes the tradeoffs.
-          </p>
-        )}
 
         {experience !== "learning" && (
           <div
@@ -575,7 +605,8 @@ export default function DayExplorer({
         <DayMarketSimulator
           key={activeKey}
           market={activeMarket}
-          variant="guided"
+          onExitTutorial={() => setShowTutorial(false)}
+          variant={showTutorial ? "tutorial" : "guided"}
         />
       )}
     </div>
