@@ -36,6 +36,20 @@ import {
   type DayErasureEvent,
 } from '@/lib/day-simulator-template/erasure';
 import { calibrateSeriesApy, hasObservedDrawdown } from '@/lib/day-simulator-template/series';
+import {
+  DAY_ISSUER_PRESETS,
+  matchDayIssuerPreset,
+  type DayIssuerPreset,
+} from '@/lib/day-simulator-template/issuer-presets';
+import {
+  buildDayConfigExport,
+  DAY_DEPLOYMENT_TERM_BOUNDS,
+  dayConfigExportFilename,
+  EMPTY_DAY_DEPLOYMENT_FIELDS,
+  parseDayDeploymentTerm,
+  type DayDeploymentFieldId,
+  type DayDeploymentFieldValues,
+} from '@/lib/day-simulator-template/config-export';
 import { shouldRefillJunior } from '@/lib/day-simulator-template/refill';
 import {
   buildDayFiniteForwardSeries,
@@ -55,6 +69,7 @@ import {
   DAY_SIMULATOR_THEME,
   DAY_SIMULATOR_TYPE,
   DayButton,
+  DayEyebrow,
   DaySectionHeader,
 } from '@/components/day-simulator/DaySimulatorUI';
 
@@ -115,6 +130,12 @@ const cardStyle = {
   borderRadius: 12,
   padding: 14,
   boxShadow: '0 1px 2px rgba(29,28,25,.035)',
+} as const;
+
+const sectionCardStyle = {
+  ...cardStyle,
+  padding: 16,
+  scrollMarginTop: 16,
 } as const;
 
 const estimateText = (text: string): number => text.length * 6;
@@ -436,18 +457,35 @@ function ChartTooltip(props: {
 }
 
 function Eyebrow({ children }: { children: React.ReactNode }) {
+  return <DayEyebrow>{children}</DayEyebrow>;
+}
+
+function SectionTitle({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
-    <span
+    <h2
+      className={className}
       style={{
-        color: C.eyebrow,
-        fontSize: 9.5,
-        fontWeight: 600,
-        letterSpacing: '0.22em',
-        textTransform: 'uppercase',
+        color: C.text,
+        fontFamily: SERIF,
+        fontSize: 22,
+        fontWeight: 500,
+        letterSpacing: '-0.025em',
+        lineHeight: 1.12,
       }}
     >
       {children}
-    </span>
+    </h2>
+  );
+}
+
+function PanelTitle({ children, className }: { children: React.ReactNode; className?: string }) {
+  return (
+    <h3
+      className={className}
+      style={{ color: C.text, fontFamily: SERIF, fontSize: 18, fontWeight: 600, lineHeight: 1.2 }}
+    >
+      {children}
+    </h3>
   );
 }
 
@@ -1580,7 +1618,38 @@ export default function DayMarketSimulator({
     ?? 'Make illiquid yield easier to own.';
   const heroDescription = activeMarket.customization.copyOverrides.heroDescription
     ?? 'Royco Day splits one strategy base asset into three positions. ST pays JT a risk premium for first-loss coverage and SLP a liquidity premium for secondary liquidity.';
-  const defaults = activeMarket.defaults;
+  const marketDefaults = activeMarket.defaults;
+  const [deploymentInputs, setDeploymentInputs] = useState<DayDeploymentFieldValues>(
+    EMPTY_DAY_DEPLOYMENT_FIELDS,
+  );
+  const updateDeploymentInput = useCallback((id: DayDeploymentFieldId, value: string) => {
+    setDeploymentInputs((current) => ({ ...current, [id]: value }));
+  }, []);
+  const y100SharePct = parseDayDeploymentTerm(
+    deploymentInputs.yieldShareAtFullUtilization,
+    marketDefaults.riskYDM.y100 * 100,
+    DAY_DEPLOYMENT_TERM_BOUNDS.yieldShareAtFullUtilization,
+  );
+  const exitBufferPct = parseDayDeploymentTerm(
+    deploymentInputs.protectedExitThreshold,
+    marketDefaults.exitBufferPct,
+    DAY_DEPLOYMENT_TERM_BOUNDS.protectedExitThreshold,
+  );
+  const selfLiquidationBonusPct = parseDayDeploymentTerm(
+    deploymentInputs.selfLiquidationBonus,
+    marketDefaults.selfLiquidationBonus * 100,
+    DAY_DEPLOYMENT_TERM_BOUNDS.selfLiquidationBonus,
+  );
+  // Deployment-checklist terms override the manifest defaults before the accountant runs.
+  const defaults = useMemo(
+    () => ({
+      ...marketDefaults,
+      riskYDM: { ...marketDefaults.riskYDM, y100: y100SharePct / 100 },
+      exitBufferPct,
+      selfLiquidationBonus: selfLiquidationBonusPct / 100,
+    }),
+    [exitBufferPct, marketDefaults, selfLiquidationBonusPct, y100SharePct],
+  );
   const backtestDisplay = activeMarket.customization.backtestDisplay;
   const forwardTest = activeMarket.customization.forwardTest;
   const reverseMarket = activeMarket.customization.reverseMarket;
@@ -2147,18 +2216,108 @@ export default function DayMarketSimulator({
     isNativeReturnUnit
       ? `100 → ${value.toFixed(0)}`
       : `$100 → $${value.toFixed(0)}`;
-  const guidedSectionStyle = {
-    background: 'transparent',
-    border: 'none',
-    borderBottom: `1px solid ${C.border}`,
-    borderRadius: 0,
-    boxShadow: 'none',
-    padding: 16,
-    scrollMarginTop: 16,
-  } as const;
+  const matchedPresetId = useMemo(
+    () => matchDayIssuerPreset({
+      coveragePct,
+      minLiquidityPct,
+      eclpBandWidthPct,
+      riskSharePct,
+      liqSharePct,
+      observationDays,
+      maintainCoverage,
+    }),
+    [
+      coveragePct,
+      eclpBandWidthPct,
+      liqSharePct,
+      maintainCoverage,
+      minLiquidityPct,
+      observationDays,
+      riskSharePct,
+    ],
+  );
+  const selectIssuerPreset = useCallback((preset: DayIssuerPreset) => {
+    setCoveragePct(preset.values.coveragePct);
+    setMinLiquidityPct(preset.values.minLiquidityPct);
+    setEclpBandWidthPct(preset.values.eclpBandWidthPct);
+    setRiskSharePct(preset.values.riskSharePct);
+    setLiqSharePct(preset.values.liqSharePct);
+    setObservationDays(preset.values.observationDays);
+    setMaintainCoverage(preset.values.maintainCoverage);
+  }, []);
+  const exportConfiguration = useCallback(() => {
+    if (typeof window === 'undefined') return;
+    const exportedAt = new Date().toISOString();
+    const payload = buildDayConfigExport({
+      exportedAt,
+      market: {
+        id: activeMarket.id,
+        name: activeMarket.identity.marketName,
+        asset: activeMarket.identity.displayAssetName,
+        variant,
+      },
+      presetId: matchedPresetId,
+      terms: {
+        coveragePct,
+        minLiquidityPct,
+        eclpBandWidthPct,
+        riskSharePct,
+        liqSharePct,
+        observationDays,
+        sourceApyPct,
+        maintainCoverage,
+        y100SharePct,
+        exitBufferPct,
+        selfLiquidationBonusPct,
+      },
+      modeled: {
+        seniorApy: result.seniorApy,
+        juniorApy: result.juniorApy,
+        liquidityApy: result.liquidityApy,
+        coverageLossLimit: result.explainer.coverage.coverageLossLimit,
+        referenceSellShareOfSenior: result.explainer.liquidity.referenceSellShareOfSenior,
+        boundarySellShareOfSenior: result.explainer.liquidity.boundarySellShareOfSenior,
+      },
+      deploymentInputs: {
+        tokenContractSource: deploymentInputs.tokenContractSource,
+        tokenContractAddress: deploymentInputs.tokenContractAddress,
+        chain: deploymentInputs.chain,
+        adaptationSpeed: deploymentInputs.adaptationSpeed,
+      },
+    });
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = dayConfigExportFilename(activeMarket.identity.marketName, exportedAt);
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 0);
+  }, [
+    activeMarket.id,
+    activeMarket.identity.displayAssetName,
+    activeMarket.identity.marketName,
+    coveragePct,
+    deploymentInputs,
+    eclpBandWidthPct,
+    exitBufferPct,
+    liqSharePct,
+    maintainCoverage,
+    matchedPresetId,
+    minLiquidityPct,
+    observationDays,
+    result,
+    riskSharePct,
+    selfLiquidationBonusPct,
+    sourceApyPct,
+    variant,
+    y100SharePct,
+  ]);
   const tutorialHighlightStyle = {
     background: `${C.accent}08`,
-    boxShadow: `inset 3px 0 ${C.accent}`,
+    borderColor: C.accent,
+    boxShadow: `inset 3px 0 ${C.accent}, 0 1px 2px rgba(29,28,25,.035)`,
   } as const;
 
   if (isLearning && endStep) {
@@ -2250,19 +2409,7 @@ export default function DayMarketSimulator({
   }
 
   return (
-    <div
-      className="flex flex-col"
-      style={isGuided
-        ? {
-            background: C.cardBg,
-            border: `1px solid ${C.border}`,
-            borderRadius: 12,
-            boxShadow: '0 1px 2px rgba(29,28,25,.035)',
-            gap: 0,
-            overflow: 'hidden',
-          }
-        : { gap: 10 }}
-    >
+    <div className="flex flex-col" style={{ gap: 12 }}>
       {isTutorial && endStep && (
         <DayGuidedTutorial
           assetName={activeMarket.identity.displayAssetName}
@@ -2288,17 +2435,7 @@ export default function DayMarketSimulator({
       {!isGuided && <section>
         <div className="flex items-center gap-2">
           <span style={{ background: C.olive, borderRadius: 9999, display: 'inline-block', height: 6, width: 6 }} />
-          <span
-            style={{
-              color: C.eyebrow,
-              fontSize: 10.5,
-              fontWeight: 600,
-              letterSpacing: '0.28em',
-              textTransform: 'uppercase',
-            }}
-          >
-            {activeMarket.copy.eyebrow}
-          </span>
+          <DayEyebrow>{activeMarket.copy.eyebrow}</DayEyebrow>
         </div>
         <h1
           className="mt-3 max-w-3xl"
@@ -2328,11 +2465,11 @@ export default function DayMarketSimulator({
       </section>}
 
       {isExecutive && showSection('roles') && (
-        <section style={{ ...cardStyle, padding: 16 }}>
+        <section style={sectionCardStyle}>
           <Eyebrow>One investment · three choices</Eyebrow>
-          <h2 className="mt-2" style={{ color: C.text, fontFamily: SERIF, fontSize: 24, fontWeight: 400, lineHeight: 1.12 }}>
-            Choose how you want to participate in the same strategy base asset.
-          </h2>
+          <SectionTitle className="mt-2">
+            Choose how you want to participate in the same strategy base asset
+          </SectionTitle>
           <p className="mt-2" style={{ color: C.muted, fontSize: 12.5, lineHeight: 1.45 }}>
             ST and JT are invested in the strategy base asset. SLP provides secondary liquidity through a separate AMM pool.
           </p>
@@ -2389,7 +2526,7 @@ export default function DayMarketSimulator({
       )}
 
       {isExecutive && showSection('senior-summary') && (
-        <section style={{ ...cardStyle, padding: 16 }}>
+        <section style={sectionCardStyle}>
           <Eyebrow>What ST gets</Eyebrow>
           <div className="mt-3 grid grid-cols-1 md:grid-cols-3" style={{ gap: 8 }}>
             <ExecutiveMetric label="ST average yield" value={`${pct(result.seniorApy)}/yr`} valueColor={C.accent} />
@@ -2399,7 +2536,7 @@ export default function DayMarketSimulator({
         </section>
       )}
 
-      {!isExecutive && !isGuided && <section style={{ ...cardStyle, padding: 16 }}>
+      {!isExecutive && !isGuided && <section style={sectionCardStyle}>
         <Eyebrow>How Day works</Eyebrow>
         <div
           className="mt-3 grid grid-cols-1 xl:grid-cols-[minmax(0,2.3fr)_minmax(290px,1fr)]"
@@ -2528,12 +2665,20 @@ export default function DayMarketSimulator({
       {showSection('market-inputs') && <section
         id="day-sim-assumptions"
         style={{
-          ...(isGuided ? guidedSectionStyle : { ...cardStyle, padding: 16 }),
+          ...sectionCardStyle,
           ...(isTutorial && (tutorialStep === 1 || tutorialStep === 2) ? tutorialHighlightStyle : {}),
         }}
       >
         <DaySectionHeader
-          action={<DayButton
+          action={<div className="flex items-center gap-2">
+            <DayButton
+              onClick={exportConfiguration}
+              style={{ minHeight: 32, padding: '6px 10px' }}
+              variant="quiet"
+            >
+              Export JSON
+            </DayButton>
+            <DayButton
             onClick={() => setShowInputs((value) => !value)}
             aria-label={showInputs ? 'Collapse market inputs' : 'Expand market inputs'}
             aria-expanded={showInputs}
@@ -2541,12 +2686,64 @@ export default function DayMarketSimulator({
             variant="quiet"
           >
             {isGuided ? (showInputs ? 'Done' : 'Edit') : (showInputs ? '−' : '+')}
-          </DayButton>}
+          </DayButton>
+          </div>}
           description={isGuided ? 'Set protection, liquidity, and yield sharing, then see the related modeled outcomes below.' : undefined}
           eyebrow={isGuided ? undefined : 'Market inputs'}
           step={isGuided ? 2 : undefined}
           title={isGuided ? 'Simulation assumptions' : 'Market inputs'}
         />
+
+        <div
+          aria-label="Senior tranche presets"
+          className="mt-3 grid grid-cols-1 sm:grid-cols-3"
+          role="group"
+          style={{ gap: 6 }}
+        >
+          {DAY_ISSUER_PRESETS.map((preset) => {
+            const active = matchedPresetId === preset.id;
+            return (
+              <button
+                aria-pressed={active}
+                key={preset.id}
+                onClick={() => selectIssuerPreset(preset)}
+                style={{
+                  background: active ? `${C.accent}14` : C.cardBg,
+                  border: `1px solid ${active ? C.accent : C.border}`,
+                  borderRadius: 8,
+                  color: active ? C.accent : C.muted,
+                  minHeight: 44,
+                  padding: '8px 10px',
+                  textAlign: 'left',
+                }}
+                title={preset.rationale}
+                type="button"
+              >
+                <span
+                  style={{
+                    display: 'block',
+                    fontFamily: MONO,
+                    fontSize: 9.5,
+                    fontWeight: 700,
+                    textTransform: 'uppercase',
+                  }}
+                >
+                  {preset.label}
+                </span>
+                <span
+                  className="mt-1"
+                  style={{ color: C.kpiLabel, display: 'block', fontSize: 9.5, lineHeight: 1.35 }}
+                >
+                  {preset.caption}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+        <p className="mt-2" style={{ color: C.kpiLabel, fontSize: 10.5, lineHeight: 1.45 }}>
+          Issuer starting points. Move any slider to tune them.
+          {matchedPresetId === null && ' · Custom'}
+        </p>
 
         {isGuided && !showInputs && (
           <>
@@ -2612,7 +2809,7 @@ export default function DayMarketSimulator({
                 label="Minimum coverage requirement (%)"
                 value={coveragePct}
                 min={3}
-                max={65}
+                max={25}
                 step={1}
                 display={`${coveragePct.toFixed(0)}%`}
                 description={isGuided ? `Minimum protection setting used to size the JT buffer. Current modeled effect: ST remains at $100 through about ${(result.explainer.coverage.coverageLossLimit * 100).toFixed(1)}% source loss.` : ""}
@@ -2623,8 +2820,8 @@ export default function DayMarketSimulator({
               <SliderControl
                 label="Minimum liquidity requirement (%)"
                 value={minLiquidityPct}
-                min={1}
-                max={50}
+                min={5}
+                max={30}
                 step={1}
                 display={`${minLiquidityPct.toFixed(0)}%`}
                 description={isGuided ? `Minimum SLP capital supporting ST sales. Current modeled effect: ${(result.explainer.liquidity.referenceSellShareOfSenior * 100).toFixed(1)}% of ST can sell at once with about ${(result.explainer.liquidity.referenceQuote.slippage * 100).toFixed(1)}% average price impact.` : ""}
@@ -2744,7 +2941,7 @@ export default function DayMarketSimulator({
         )}
       </section>}
 
-      {!isExecutive && !isGuided && <section style={{ ...cardStyle, padding: 14 }}>
+      {!isExecutive && !isGuided && <section style={sectionCardStyle}>
         <Eyebrow>Simulated APYs</Eyebrow>
         <div className="mt-3 grid grid-cols-1 md:grid-cols-3" style={{ gap: 8 }}>
           <Kpi label="ST avg/yr" value={`${pct(result.seniorApy)}/yr`} valueColor={C.accent} />
@@ -2754,36 +2951,41 @@ export default function DayMarketSimulator({
       </section>}
 
       {showSection('liquidity-and-coverage') && <section
-        className="grid grid-cols-1 md:grid-cols-2"
         id="day-sim-live-outcomes"
         style={{
-          ...(isGuided ? { borderBottom: `1px solid ${C.border}`, gap: 0, scrollMarginTop: 16 } : { gap: 10 }),
+          ...sectionCardStyle,
           ...(isTutorial && tutorialStep === 3 ? tutorialHighlightStyle : {}),
         }}
       >
-        {isGuided && (
-          <div className="md:col-span-2" style={{ padding: 16 }}>
+        {isGuided
+          ? (
             <DaySectionHeader
               description="Start with the two questions that translate the structure into practical outcomes."
               step={3}
               title="What do these assumptions mean for ST?"
             />
-          </div>
-        )}
+          )
+          : (
+            <DaySectionHeader
+              eyebrow="Outcomes"
+              title="What do these assumptions mean for ST?"
+            />
+          )}
+        <div className="grid grid-cols-1 md:grid-cols-2" style={{ gap: 10, marginTop: 12 }}>
         <div
-          className={isGuided ? "order-2 mx-2 mb-2 flex flex-col md:ml-1" : undefined}
+          className={isGuided ? "order-2 flex flex-col" : undefined}
           style={isGuided
-            ? { background: C.cardBg, border: `1px solid ${C.border}`, borderRadius: 10, boxShadow: isTutorial && tutorialStep === 2 ? `inset 3px 0 ${C.accent}` : undefined, padding: 16 }
-            : { ...cardStyle, padding: 14 }}
+            ? { background: C.pageBg, border: `1px solid ${C.border}`, borderRadius: 10, boxShadow: isTutorial && tutorialStep === 2 ? `inset 3px 0 ${C.accent}` : undefined, padding: 14 }
+            : { background: C.pageBg, border: `1px solid ${C.border}`, borderRadius: 10, padding: 14 }}
         >
           {isExecutive
             ? <Eyebrow>If an ST holder wants to sell</Eyebrow>
             : <Eyebrow>{isGuided ? 'Key risk · Liquidity' : 'Secondary liquidity'}</Eyebrow>}
           {isGuided && (
             <>
-              <h3 className="mt-2" style={{ color: C.text, fontFamily: SERIF, fontSize: 18, fontWeight: 600, lineHeight: 1.2 }}>
+              <PanelTitle className="mt-2">
                 How much ST can sell?
-              </h3>
+              </PanelTitle>
               <p className="mt-2" style={{ color: C.muted, fontSize: 11.5, lineHeight: 1.45 }}>
                 Larger atomic sales move the price down. Arbitrage between sales can reopen capacity.
               </p>
@@ -2811,9 +3013,9 @@ export default function DayMarketSimulator({
           )}
           {isExecutive && (
             <>
-              <h2 className="mt-2" style={{ color: C.text, fontFamily: SERIF, fontSize: 22, fontWeight: 400, lineHeight: 1.12 }}>
+              <PanelTitle className="mt-2">
                 Sell immediately through the SLP pool.
-              </h2>
+              </PanelTitle>
               <p className="mt-2" style={{ color: C.muted, fontSize: 11.5, lineHeight: 1.45 }}>
                 ST can sell at the pool&apos;s current market price instead of waiting for primary redemption.
               </p>
@@ -2850,18 +3052,18 @@ export default function DayMarketSimulator({
           )}
         </div>
 
-        <div className={isGuided ? "order-1 mx-2 mb-2 flex flex-col md:mr-1" : undefined} style={isGuided
-          ? { background: C.cardBg, border: `1px solid ${C.border}`, borderRadius: 10, boxShadow: isTutorial && tutorialStep === 1 ? `inset 3px 0 ${C.accent}` : undefined, padding: 16 }
-          : { ...cardStyle, padding: 14 }}
+        <div className={isGuided ? "order-1 flex flex-col" : undefined} style={isGuided
+          ? { background: C.pageBg, border: `1px solid ${C.border}`, borderRadius: 10, boxShadow: isTutorial && tutorialStep === 1 ? `inset 3px 0 ${C.accent}` : undefined, padding: 14 }
+          : { background: C.pageBg, border: `1px solid ${C.border}`, borderRadius: 10, padding: 14 }}
         >
           {isExecutive
             ? <Eyebrow>Loss waterfall</Eyebrow>
             : <Eyebrow>{isGuided ? 'Key risk · Loss protection' : 'First-loss coverage'}</Eyebrow>}
           {isGuided && (
             <>
-              <h3 className="mt-2" style={{ color: C.text, fontFamily: SERIF, fontSize: 18, fontWeight: 600, lineHeight: 1.2 }}>
+              <PanelTitle className="mt-2">
                 When does ST lose money?
-              </h3>
+              </PanelTitle>
               <p className="mt-2" style={{ color: C.muted, fontSize: 11.5, lineHeight: 1.45 }}>
                 JT absorbs losses first; losses beyond that buffer reduce ST.
               </p>
@@ -2886,9 +3088,9 @@ export default function DayMarketSimulator({
           )}
           {isExecutive && (
             <>
-              <h2 className="mt-2" style={{ color: C.text, fontFamily: SERIF, fontSize: 22, fontWeight: 400, lineHeight: 1.12 }}>
+              <PanelTitle className="mt-2">
                 JT absorbs losses before ST.
-              </h2>
+              </PanelTitle>
               <p className="mt-2" style={{ color: C.muted, fontSize: 11.5, lineHeight: 1.45 }}>
                 The minimum coverage requirement sets the JT buffer, but does not guarantee ST principal against losses beyond that buffer.
               </p>
@@ -2924,13 +3126,14 @@ export default function DayMarketSimulator({
             </p>
           )}
         </div>
+        </div>
       </section>}
 
       {isGuided && endStep && (
         <section
           id="day-sim-positions"
           style={{
-            ...guidedSectionStyle,
+            ...sectionCardStyle,
             ...(isTutorial && tutorialStep === 0 ? tutorialHighlightStyle : {}),
           }}
         >
@@ -2985,11 +3188,11 @@ export default function DayMarketSimulator({
       )}
 
       {isExecutive && showSection('observation-period') && sourceHasObservedDrawdown && (
-        <section style={{ ...cardStyle, padding: 16 }}>
+        <section style={sectionCardStyle}>
           <Eyebrow>What is an Observation Period?</Eyebrow>
-          <h2 className="mt-2" style={{ color: C.text, fontFamily: SERIF, fontSize: 24, fontWeight: 400, lineHeight: 1.12 }}>
-            A defined recovery window after JT begins covering an ST drawdown.
-          </h2>
+          <SectionTitle className="mt-2">
+            A defined recovery window after JT begins covering an ST drawdown
+          </SectionTitle>
           <p className="mt-2 max-w-3xl" style={{ color: C.muted, fontSize: 12.5, lineHeight: 1.45 }}>
             The window gives the strategy base asset time to recover before JT&apos;s covered loss is finalized. ST can still sell through the SLP pool while direct ST and JT deposits and redemptions are paused.
           </p>
@@ -2997,13 +3200,31 @@ export default function DayMarketSimulator({
         </section>
       )}
 
-      {showSection('backtest') && <section style={isGuided ? guidedSectionStyle : cardStyle}>
+      {showSection('backtest') && <section style={sectionCardStyle}>
         <div className="flex items-start justify-between gap-4">
-          <div>
+          <div className={isGuided ? 'flex items-start gap-3' : undefined}>
+            {isGuided && (
+              <span
+                aria-hidden
+                style={{
+                  color: C.accent,
+                  flex: '0 0 auto',
+                  fontFamily: MONO,
+                  fontSize: 25,
+                  fontWeight: 600,
+                  letterSpacing: '-0.06em',
+                  lineHeight: 1,
+                  paddingTop: 1,
+                }}
+              >
+                5.
+              </span>
+            )}
+            <div>
             {forwardTest
               ? <Eyebrow>Forward test</Eyebrow>
               : <Eyebrow>{isGuided ? 'Full history · Optional' : 'Backtest'}</Eyebrow>}
-            <h2 className="mt-2" style={{ color: C.text, fontFamily: SERIF, fontSize: 22, fontWeight: 400, lineHeight: 1.08 }}>
+            <SectionTitle className="mt-2">
               {forwardTest
                 ? `Test the ${forwardTest.termDays}-day facility under ${forwardTest.scenarios.length} payment outcomes.`
                 : isExecutive
@@ -3011,8 +3232,8 @@ export default function DayMarketSimulator({
                   : isGuided
                     ? 'See how $100 changed through the selected history.'
                     : DAY_LOCKED_COPY.reviewTitle}
-            </h2>
-            <p className="mt-1" style={{ color: C.muted, fontSize: 12.5, lineHeight: 1.38 }}>
+            </SectionTitle>
+            <p className="mt-1" style={{ color: C.muted, fontSize: 11.5, lineHeight: 1.45 }}>
               {forwardTest
                 ? 'The shared accountant applies each forward path to the strategy base asset, ST, JT, and SLP. Select an outcome to compare timing and loss absorption.'
                 : isExecutive
@@ -3021,6 +3242,7 @@ export default function DayMarketSimulator({
                 ? 'This applies the current assumptions to the source data. It is not the historical performance of a live Royco Day market.'
                 : DAY_LOCKED_COPY.reviewDescription}
             </p>
+            </div>
           </div>
           <button
             type="button"
@@ -3404,7 +3626,7 @@ export default function DayMarketSimulator({
         )}
       </section>}
 
-      {showSection('junior-funding') && !isGuided && <section style={{ ...cardStyle, borderLeft: `3px solid ${C.accent}` }}>
+      {showSection('junior-funding') && !isGuided && <section style={{ ...sectionCardStyle, borderLeft: `3px solid ${C.accent}` }}>
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
             <Eyebrow>{isGuided ? 'Model assumption' : 'JT funding assumption'}</Eyebrow>
@@ -3438,24 +3660,35 @@ export default function DayMarketSimulator({
         <DayDeploymentInputs
           adaptationSpeed={defaults.riskYDM.maxAdaptSpeedPerYear}
           coveragePct={coveragePct}
+          deploymentInputs={deploymentInputs}
           marketName={activeMarket.identity.marketName}
           observationDays={observationDays}
+          onDeploymentInputChange={updateDeploymentInput}
           protectedExitThresholdPct={defaults.exitBufferPct}
+          riskSharePct={riskSharePct}
           riskYDM={defaults.riskYDM}
           selfLiquidationBonus={defaults.selfLiquidationBonus}
           sourceApyPct={sourceApyPct}
-        />
+          step={6}
+        >
+          <div className="mt-4 flex flex-wrap items-center gap-3">
+            <DayButton onClick={exportConfiguration} variant="primary">
+              Export configuration (JSON)
+            </DayButton>
+            <span style={{ color: C.kpiLabel, fontSize: 10.5, lineHeight: 1.45 }}>
+              Exports the simulated terms with the values entered above.
+            </span>
+          </div>
+        </DayDeploymentInputs>
       )}
 
       {showSection('disclosure') && <footer
         style={{
-          background: isGuided ? C.pageBg : undefined,
           color: C.kpiLabel,
           fontSize: 11,
           lineHeight: 1.45,
-          padding: isGuided ? 16 : undefined,
         }}
-        className={isGuided ? undefined : "pb-8 border-t pt-4"}
+        className="pb-8 border-t pt-4"
       >
         <p style={{ borderColor: C.border }}>
           <strong style={{ fontWeight: 600 }}>What this is, and what it is not.</strong>{' '}

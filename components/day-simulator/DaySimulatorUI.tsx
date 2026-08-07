@@ -42,7 +42,7 @@ export const DAY_SIMULATOR_SPACE = {
 export const DAY_SIMULATOR_RADIUS = {
   control: 8,
   panel: 10,
-  surface: 14,
+  surface: 12,
 } as const;
 
 const surfacePadding = {

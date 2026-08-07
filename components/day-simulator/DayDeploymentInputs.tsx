@@ -1,3 +1,9 @@
+import type { ReactNode } from "react";
+
+import type {
+  DayDeploymentFieldId,
+  DayDeploymentFieldValues,
+} from "@/lib/day-simulator-template/config-export";
 import type { YDMConfig } from "@/lib/day/engine/types";
 import {
   DAY_SIMULATOR_THEME,
@@ -6,17 +12,37 @@ import {
 } from "@/components/day-simulator/DaySimulatorUI";
 
 type DeploymentInput = {
+  inputId?: DayDeploymentFieldId;
   label: string;
+  placeholder?: string;
+  unit?: string;
   value: string;
-  state?: "modeled" | "required" | "fixed";
+  state?: "modeled" | "required" | "fixed" | "provided";
 };
+
+const inlineFieldStyle = {
+  background: DAY_SIMULATOR_THEME.cardBg,
+  border: `1px solid ${DAY_SIMULATOR_THEME.border}`,
+  borderRadius: 6,
+  color: DAY_SIMULATOR_THEME.text,
+  fontFamily: DAY_SIMULATOR_TYPE.mono,
+  fontSize: 11.5,
+  minHeight: 30,
+  padding: "6px 8px",
+  textAlign: "right",
+  width: 172,
+} as const;
 
 function DeploymentGroup({
   inputs,
+  onInputChange,
   title,
+  values,
 }: {
   inputs: DeploymentInput[];
+  onInputChange: (id: DayDeploymentFieldId, value: string) => void;
   title: string;
+  values: DayDeploymentFieldValues;
 }) {
   return (
     <div>
@@ -52,10 +78,42 @@ function DeploymentGroup({
                     ? "Required before deployment"
                     : input.state === "fixed"
                       ? "Fixed protocol parameter"
-                      : "Current simulation value"}
+                      : input.state === "provided"
+                        ? "Entered for deployment"
+                        : "Current simulation value"}
                 </p>
               )}
             </div>
+            {input.inputId ? (
+              <span className="flex items-center justify-end gap-1.5">
+                <input
+                  aria-label={input.label}
+                  inputMode={input.unit ? "decimal" : undefined}
+                  onChange={(event) => onInputChange(input.inputId as DayDeploymentFieldId, event.target.value)}
+                  placeholder={input.placeholder ?? "Not provided"}
+                  style={{
+                    ...inlineFieldStyle,
+                    borderColor: input.state === "required"
+                      ? DAY_SIMULATOR_THEME.danger
+                      : DAY_SIMULATOR_THEME.border,
+                    width: input.unit ? 96 : 172,
+                  }}
+                  type="text"
+                  value={values[input.inputId]}
+                />
+                {input.unit && (
+                  <span
+                    style={{
+                      color: DAY_SIMULATOR_THEME.kpiLabel,
+                      fontFamily: DAY_SIMULATOR_TYPE.mono,
+                      fontSize: 11.5,
+                    }}
+                  >
+                    {input.unit}
+                  </span>
+                )}
+              </span>
+            ) : (
             <strong
               style={{
                 color: input.state === "required" ? DAY_SIMULATOR_THEME.danger : DAY_SIMULATOR_THEME.text,
@@ -67,6 +125,7 @@ function DeploymentGroup({
             >
               {input.value}
             </strong>
+            )}
           </div>
         ))}
       </div>
@@ -78,52 +137,67 @@ const percent = (value: number, digits = 1) => `${(value * 100).toFixed(digits).
 
 export default function DayDeploymentInputs({
   adaptationSpeed,
-  chain,
-  contractAddress,
+  children,
   coveragePct,
+  deploymentInputs,
   marketName,
   observationDays,
+  onDeploymentInputChange,
   protectedExitThresholdPct,
+  riskSharePct,
   riskYDM,
   selfLiquidationBonus,
   sourceApyPct,
-  tokenSource,
+  step,
 }: {
   adaptationSpeed?: number;
-  chain?: string;
-  contractAddress?: string;
+  children?: ReactNode;
   coveragePct: number;
+  deploymentInputs: DayDeploymentFieldValues;
   marketName?: string;
   observationDays: number;
+  onDeploymentInputChange: (id: DayDeploymentFieldId, value: string) => void;
   protectedExitThresholdPct: number;
+  riskSharePct: number;
   riskYDM: YDMConfig;
   selfLiquidationBonus: number;
   sourceApyPct: number;
-  tokenSource?: string;
+  step?: number;
 }) {
+  const entered = (id: DayDeploymentFieldId): DeploymentInput["state"] =>
+    deploymentInputs[id].trim() ? "provided" : "required";
+  // Sim-wired terms always have a live value, so a blank input is not a blocker.
+  const termState = (id: DayDeploymentFieldId): DeploymentInput["state"] =>
+    deploymentInputs[id].trim() ? "provided" : "modeled";
   return (
     <section
       id="day-sim-deployment-inputs"
       style={{
         background: DAY_SIMULATOR_THEME.cardBg,
-        borderTop: `1px solid ${DAY_SIMULATOR_THEME.border}`,
+        border: `1px solid ${DAY_SIMULATOR_THEME.border}`,
+        borderRadius: 12,
+        boxShadow: "0 1px 2px rgba(29,28,25,.035)",
         padding: 16,
+        scrollMarginTop: 16,
       }}
     >
       <DaySectionHeader
         description="The educational simulator can run with fewer inputs. A deployable market requires the complete configuration below."
         eyebrow="Market deployment"
+        step={step}
         title="Every input needed to define the market"
       />
       <div className="mt-4 grid grid-cols-1 gap-x-6 gap-y-5 md:grid-cols-2 xl:grid-cols-4">
         <DeploymentGroup
           inputs={[
             { label: "Market name", value: marketName || "Not provided", state: marketName ? "modeled" : "required" },
-            { label: "Token contract source", value: tokenSource || "Not provided", state: tokenSource ? "modeled" : "required" },
-            { label: "Token contract address", value: contractAddress || "Not provided", state: contractAddress ? "modeled" : "required" },
-            { label: "Chain", value: chain || "Not provided", state: chain ? "modeled" : "required" },
+            { inputId: "tokenContractSource", label: "Token contract source", value: "", state: entered("tokenContractSource") },
+            { inputId: "tokenContractAddress", label: "Token contract address", value: "", state: entered("tokenContractAddress") },
+            { inputId: "chain", label: "Chain", value: "", state: entered("chain") },
           ]}
+          onInputChange={onDeploymentInputChange}
           title="Token and deployment"
+          values={deploymentInputs}
         />
         <DeploymentGroup
           inputs={[
@@ -131,26 +205,56 @@ export default function DayDeploymentInputs({
             { label: "Minimum coverage", value: `${coveragePct.toFixed(0)}%`, state: "modeled" },
             { label: "Observation period", value: `${observationDays} days`, state: "modeled" },
           ]}
+          onInputChange={onDeploymentInputChange}
           title="Market terms"
+          values={deploymentInputs}
         />
         <DeploymentGroup
           inputs={[
-            { label: "Yield share at low utilization (Y₀)", value: percent(riskYDM.y0), state: "modeled" },
-            { label: "Yield share at target utilization (Yᴛ)", value: percent(riskYDM.yTarget), state: "modeled" },
-            { label: "Yield share at full utilization (Y₁₀₀)", value: percent(riskYDM.y100), state: "modeled" },
+            { label: "Yield share at low utilization (Y₀)", value: percent(Math.min(riskYDM.y0, riskSharePct / 100)), state: "modeled" },
+            { label: "Yield share at target utilization (Yᴛ)", value: percent(riskSharePct / 100), state: "modeled" },
+            {
+              inputId: "yieldShareAtFullUtilization",
+              label: "Yield share at full utilization (Y₁₀₀)",
+              placeholder: percent(riskYDM.y100).replace("%", ""),
+              state: termState("yieldShareAtFullUtilization"),
+              unit: "%",
+              value: "",
+            },
             { label: "Target utilization", value: "90%", state: "fixed" },
-            { label: "Adaptation speed", value: adaptationSpeed === undefined ? "Not provided" : String(adaptationSpeed), state: adaptationSpeed === undefined ? "required" : "modeled" },
+            adaptationSpeed === undefined
+              ? { inputId: "adaptationSpeed", label: "Adaptation speed", value: "", state: entered("adaptationSpeed") }
+              : { label: "Adaptation speed", value: String(adaptationSpeed), state: "modeled" },
           ]}
+          onInputChange={onDeploymentInputChange}
           title="Yield-share curve"
+          values={deploymentInputs}
         />
         <DeploymentGroup
           inputs={[
-            { label: "Protected exit threshold", value: `${protectedExitThresholdPct.toFixed(2).replace(/\.00$/, "")}%`, state: "modeled" },
-            { label: "Self-liquidation bonus", value: percent(selfLiquidationBonus), state: "modeled" },
+            {
+              inputId: "protectedExitThreshold",
+              label: "Protected exit threshold",
+              placeholder: protectedExitThresholdPct.toFixed(2).replace(/\.00$/, ""),
+              state: termState("protectedExitThreshold"),
+              unit: "%",
+              value: "",
+            },
+            {
+              inputId: "selfLiquidationBonus",
+              label: "Self-liquidation bonus",
+              placeholder: percent(selfLiquidationBonus).replace("%", ""),
+              state: termState("selfLiquidationBonus"),
+              unit: "%",
+              value: "",
+            },
           ]}
+          onInputChange={onDeploymentInputChange}
           title="Recovery"
+          values={deploymentInputs}
         />
       </div>
+      {children}
     </section>
   );
 }

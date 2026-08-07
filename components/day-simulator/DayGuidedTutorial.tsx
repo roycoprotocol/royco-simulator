@@ -189,9 +189,8 @@ export default function DayGuidedTutorial({
       aria-label="Royco Day tutorial"
       style={{
         background: C.card,
-        border: "none",
-        borderBottom: `1px solid ${C.border}`,
-        borderRadius: 0,
+        border: `1px solid ${C.border}`,
+        borderRadius: 12,
         boxShadow: "none",
         overflow: "hidden",
       }}
@@ -310,7 +309,7 @@ export default function DayGuidedTutorial({
                   description="Move the requirement and watch the accountant-derived ST loss threshold change."
                   display={`${coveragePct.toFixed(0)}%`}
                   label="JT Coverage"
-                  max={65}
+                  max={25}
                   min={3}
                   onChange={onCoverageChange}
                   step={1}
@@ -346,8 +345,8 @@ export default function DayGuidedTutorial({
                     description="Move the requirement and watch the modeled sale capacity update."
                     display={`${minLiquidityPct.toFixed(0)}%`}
                     label="SLP Liquidity"
-                    max={50}
-                    min={1}
+                    max={30}
+                    min={5}
                     onChange={onMinLiquidityChange}
                     step={1}
                     tone={C.green}
