@@ -37,9 +37,7 @@ import {
 } from '@/lib/day-simulator-template/erasure';
 import { calibrateSeriesApy, hasObservedDrawdown } from '@/lib/day-simulator-template/series';
 import {
-  DAY_ISSUER_PRESETS,
   matchDayIssuerPreset,
-  type DayIssuerPreset,
 } from '@/lib/day-simulator-template/issuer-presets';
 import {
   buildDayConfigExport,
@@ -56,6 +54,7 @@ import {
   buildDayInitialBalances,
   buildDayMarketConfig,
   buildDayForwardSeries,
+  DAY_TARGET_UTILIZATION,
 } from '@/lib/day-simulator-template/runtime';
 import {
   DayChartTooltip,
@@ -768,7 +767,7 @@ function LiquidityExecutionDiagram({
                 border: `1px solid ${active ? C.olive : C.border}`,
                 color: active ? C.olive : C.muted,
                 fontFamily: MONO,
-                fontSize: 9.5,
+                fontSize: 10.5,
                 fontWeight: 700,
                 minHeight: 34,
                 padding: '7px 8px',
@@ -1468,10 +1467,10 @@ function SliderControl({
   return (
     <div style={{ opacity: disabled ? 0.55 : 1 }}>
       <div className="flex items-center justify-between" style={{ marginBottom: 6 }}>
-        <label style={{ color: C.eyebrow, fontSize: 10, fontWeight: 600, letterSpacing: 1, textTransform: 'uppercase' }}>
+        <label style={{ color: C.eyebrow, fontSize: 11, fontWeight: 600, letterSpacing: 1, textTransform: 'uppercase' }}>
           {label}
         </label>
-        <span style={{ color: C.accent, fontFamily: MONO, fontSize: 13, fontWeight: 600 }}>{display}</span>
+        <span style={{ color: C.accent, fontFamily: MONO, fontSize: 15, fontWeight: 700 }}>{display}</span>
       </div>
       <input
         aria-label={label}
@@ -1483,7 +1482,7 @@ function SliderControl({
         disabled={disabled}
         onChange={(event) => handle(event.target.value)}
         className="w-full"
-        style={{ accentColor: C.accent }}
+        style={{ accentColor: C.accent, height: 22 }}
       />
       {description && (
         <p className="mt-1" style={{ color: C.muted, fontSize: 11.5, lineHeight: 1.4 }}>
@@ -1491,6 +1490,47 @@ function SliderControl({
         </p>
       )}
       {children}
+    </div>
+  );
+}
+
+function PresetRow({
+  ariaLabel,
+  activeValue,
+  presets,
+  onSelect,
+}: {
+  ariaLabel: string;
+  activeValue: number;
+  presets: { label: string; value: number }[];
+  onSelect: (value: number) => void;
+}) {
+  return (
+    <div aria-label={ariaLabel} className="mt-2 grid grid-cols-3" role="group" style={{ gap: 6 }}>
+      {presets.map((preset) => {
+        const active = activeValue === preset.value;
+        return (
+          <button
+            aria-pressed={active}
+            key={preset.value}
+            onClick={() => onSelect(preset.value)}
+            style={{
+              background: active ? `${C.accent}14` : C.cardBg,
+              border: `1px solid ${active ? C.accent : C.border}`,
+              color: active ? C.accent : C.muted,
+              fontFamily: MONO,
+              fontSize: 10.5,
+              fontWeight: 700,
+              minHeight: 34,
+              padding: '7px 8px',
+              textTransform: 'uppercase',
+            }}
+            type="button"
+          >
+            {preset.label}
+          </button>
+        );
+      })}
     </div>
   );
 }
@@ -1699,6 +1739,7 @@ export default function DayMarketSimulator({
   const [riskSharePct, setRiskSharePct] = useState(defaults.riskYDM.yTarget * 100);
   const [liqSharePct, setLiqSharePct] = useState(defaults.liqYDM.yTarget * 100);
   const [maintainCoverage, setMaintainCoverage] = useState(defaults.maintainCoverage);
+  const [seniorCapitalUsd, setSeniorCapitalUsd] = useState(10_000_000);
   const [range, setRange] = useState<IndexRange>({
     a: 0,
     b: simulationSeries.length - 1,
@@ -2236,15 +2277,6 @@ export default function DayMarketSimulator({
       riskSharePct,
     ],
   );
-  const selectIssuerPreset = useCallback((preset: DayIssuerPreset) => {
-    setCoveragePct(preset.values.coveragePct);
-    setMinLiquidityPct(preset.values.minLiquidityPct);
-    setEclpBandWidthPct(preset.values.eclpBandWidthPct);
-    setRiskSharePct(preset.values.riskSharePct);
-    setLiqSharePct(preset.values.liqSharePct);
-    setObservationDays(preset.values.observationDays);
-    setMaintainCoverage(preset.values.maintainCoverage);
-  }, []);
   const exportConfiguration = useCallback(() => {
     if (typeof window === 'undefined') return;
     const exportedAt = new Date().toISOString();
@@ -2694,56 +2726,36 @@ export default function DayMarketSimulator({
           title={isGuided ? 'Simulation assumptions' : 'Market inputs'}
         />
 
-        <div
-          aria-label="Senior tranche presets"
-          className="mt-3 grid grid-cols-1 sm:grid-cols-3"
-          role="group"
-          style={{ gap: 6 }}
-        >
-          {DAY_ISSUER_PRESETS.map((preset) => {
-            const active = matchedPresetId === preset.id;
-            return (
-              <button
-                aria-pressed={active}
-                key={preset.id}
-                onClick={() => selectIssuerPreset(preset)}
-                style={{
-                  background: active ? `${C.accent}14` : C.cardBg,
-                  border: `1px solid ${active ? C.accent : C.border}`,
-                  borderRadius: 8,
-                  color: active ? C.accent : C.muted,
-                  minHeight: 44,
-                  padding: '8px 10px',
-                  textAlign: 'left',
-                }}
-                title={preset.rationale}
-                type="button"
-              >
-                <span
-                  style={{
-                    display: 'block',
-                    fontFamily: MONO,
-                    fontSize: 9.5,
-                    fontWeight: 700,
-                    textTransform: 'uppercase',
-                  }}
-                >
-                  {preset.label}
-                </span>
-                <span
-                  className="mt-1"
-                  style={{ color: C.kpiLabel, display: 'block', fontSize: 9.5, lineHeight: 1.35 }}
-                >
-                  {preset.caption}
-                </span>
-              </button>
-            );
-          })}
+        <div className="mt-3">
+          <p style={{ color: C.eyebrow, fontSize: 11, fontWeight: 600, letterSpacing: 1, textTransform: 'uppercase' }}>
+            Volatility coverage
+          </p>
+          <PresetRow
+            activeValue={coveragePct}
+            ariaLabel="Coverage presets"
+            onSelect={setCoveragePct}
+            presets={[
+              { label: 'No coverage · 0%', value: 0 },
+              { label: 'Minimal · 5%', value: 5 },
+              { label: 'High · 25%', value: 25 },
+            ]}
+          />
         </div>
-        <p className="mt-2" style={{ color: C.kpiLabel, fontSize: 10.5, lineHeight: 1.45 }}>
-          Issuer starting points. Move any slider to tune them.
-          {matchedPresetId === null && ' · Custom'}
-        </p>
+        <div className="mt-3">
+          <p style={{ color: C.eyebrow, fontSize: 11, fontWeight: 600, letterSpacing: 1, textTransform: 'uppercase' }}>
+            Liquidity
+          </p>
+          <PresetRow
+            activeValue={minLiquidityPct}
+            ariaLabel="Liquidity presets"
+            onSelect={setMinLiquidityPct}
+            presets={[
+              { label: 'No liquidity · 0%', value: 0 },
+              { label: 'Minimal · 5%', value: 5 },
+              { label: 'High · 25%', value: 25 },
+            ]}
+          />
+        </div>
 
         {isGuided && !showInputs && (
           <>
@@ -2787,6 +2799,9 @@ export default function DayMarketSimulator({
             <p className="mt-2" style={{ color: C.kpiLabel, fontSize: 10.5, lineHeight: 1.45 }}>
               Premium split: {riskSharePct.toFixed(0)}% to JT / {liqSharePct.toFixed(0)}% to SLP · {observationDays}-day recovery window · JT capital {maintainCoverage ? 'restored' : 'not restored'} after finalized losses
             </p>
+            <p className="mt-1" style={{ color: C.kpiLabel, fontSize: 10.5, lineHeight: 1.45 }}>
+              On {usd0(seniorCapitalUsd)} Senior capital: {usd0(seniorCapitalUsd * ((coveragePct / 100) / Math.max(DAY_TARGET_UTILIZATION - coveragePct / 100, 0.001)))} Junior capital · {usd0(seniorCapitalUsd * ((minLiquidityPct / 100) / DAY_TARGET_UTILIZATION))} Liquidity pool capital
+            </p>
           </>
         )}
 
@@ -2808,7 +2823,7 @@ export default function DayMarketSimulator({
               <SliderControl
                 label="Minimum coverage requirement (%)"
                 value={coveragePct}
-                min={3}
+                min={0}
                 max={25}
                 step={1}
                 display={`${coveragePct.toFixed(0)}%`}
@@ -2820,13 +2835,101 @@ export default function DayMarketSimulator({
               <SliderControl
                 label="Minimum liquidity requirement (%)"
                 value={minLiquidityPct}
-                min={5}
-                max={30}
+                min={0}
+                max={25}
                 step={1}
                 display={`${minLiquidityPct.toFixed(0)}%`}
                 description={isGuided ? `Minimum SLP capital supporting ST sales. Current modeled effect: ${(result.explainer.liquidity.referenceSellShareOfSenior * 100).toFixed(1)}% of ST can sell at once with about ${(result.explainer.liquidity.referenceQuote.slippage * 100).toFixed(1)}% average price impact.` : ""}
                 onChange={setMinLiquidityPct}
               />
+            </div>
+            <div className="md:col-span-2" style={{ background: C.pageBg, border: `1px solid ${C.border}`, borderRadius: 10, padding: 12 }}>
+              <p style={{ color: C.eyebrow, fontSize: 11, fontWeight: 600, letterSpacing: 1, textTransform: 'uppercase' }}>Capital</p>
+              <p className="mt-1" style={{ color: C.muted, fontSize: 11.5, lineHeight: 1.4 }}>
+                What the coverage and liquidity settings above mean in dollars for each tranche. Sized at the 90% target utilization the simulator seeds — slightly above the bare minimum the protocol would accept.
+              </p>
+              <div className="mt-3 grid grid-cols-1 sm:grid-cols-3" style={{ gap: 10 }}>
+                <div>
+                  <label style={{ color: C.eyebrow, fontSize: 11, fontWeight: 600, letterSpacing: 1, textTransform: 'uppercase' }}>
+                    Senior capital ($)
+                  </label>
+                  <input
+                    inputMode="numeric"
+                    onChange={(event) => {
+                      const next = Number(event.target.value.replace(/[^0-9]/g, ''));
+                      if (Number.isFinite(next)) setSeniorCapitalUsd(next);
+                    }}
+                    style={{
+                      background: C.cardBg,
+                      border: `1px solid ${C.border}`,
+                      borderRadius: 6,
+                      color: C.text,
+                      fontFamily: MONO,
+                      fontSize: 13.5,
+                      fontWeight: 600,
+                      marginTop: 6,
+                      minHeight: 38,
+                      padding: '10px 12px',
+                      width: '100%',
+                    }}
+                    type="text"
+                    value={seniorCapitalUsd.toLocaleString('en-US')}
+                  />
+                  <p className="mt-1" style={{ color: C.kpiLabel, fontSize: 10.5, lineHeight: 1.4 }}>
+                    Protected tranche principal.
+                  </p>
+                </div>
+                <div>
+                  <label style={{ color: C.eyebrow, fontSize: 11, fontWeight: 600, letterSpacing: 1, textTransform: 'uppercase' }}>
+                    Junior capital ($)
+                  </label>
+                  <div
+                    style={{
+                      background: '#EAE8E1',
+                      border: `1px solid ${C.border}`,
+                      borderRadius: 6,
+                      color: C.text,
+                      fontFamily: MONO,
+                      fontSize: 13.5,
+                      fontWeight: 600,
+                      marginTop: 6,
+                      minHeight: 38,
+                      padding: '10px 12px',
+                      textAlign: 'right',
+                    }}
+                  >
+                    {usd0(seniorCapitalUsd * ((coveragePct / 100) / Math.max(DAY_TARGET_UTILIZATION - coveragePct / 100, 0.001)))}
+                  </div>
+                  <p className="mt-1" style={{ color: C.kpiLabel, fontSize: 10.5, lineHeight: 1.4 }}>
+                    First-loss tranche principal.
+                  </p>
+                </div>
+                <div>
+                  <label style={{ color: C.eyebrow, fontSize: 11, fontWeight: 600, letterSpacing: 1, textTransform: 'uppercase' }}>
+                    Liquidity pool capital ($)
+                  </label>
+                  <div
+                    style={{
+                      background: '#EAE8E1',
+                      border: `1px solid ${C.border}`,
+                      borderRadius: 6,
+                      color: C.text,
+                      fontFamily: MONO,
+                      fontSize: 13.5,
+                      fontWeight: 600,
+                      marginTop: 6,
+                      minHeight: 38,
+                      padding: '10px 12px',
+                      textAlign: 'right',
+                    }}
+                  >
+                    {usd0(seniorCapitalUsd * ((minLiquidityPct / 100) / DAY_TARGET_UTILIZATION))}
+                  </div>
+                  <p className="mt-1" style={{ color: C.kpiLabel, fontSize: 10.5, lineHeight: 1.4 }}>
+                    SLP capital backing secondary liquidity.
+                  </p>
+                </div>
+              </div>
             </div>
             {isGuided && (
               <div style={{ background: C.pageBg, border: `1px solid ${isTutorial && tutorialStep === 2 ? C.accent : C.border}`, borderRadius: 10, padding: 12 }}>
@@ -2858,10 +2961,10 @@ export default function DayMarketSimulator({
                             border: `1px solid ${active ? C.accent : C.border}`,
                             color: active ? C.accent : C.muted,
                             fontFamily: MONO,
-                            fontSize: 9.5,
+                            fontSize: 10.5,
                             fontWeight: 700,
-                            minHeight: 30,
-                            padding: '6px 8px',
+                            minHeight: 34,
+                            padding: '7px 8px',
                             textTransform: 'uppercase',
                           }}
                           type="button"
@@ -3221,10 +3324,7 @@ export default function DayMarketSimulator({
               </span>
             )}
             <div>
-            {forwardTest
-              ? <Eyebrow>Forward test</Eyebrow>
-              : <Eyebrow>{isGuided ? 'Full history · Optional' : 'Backtest'}</Eyebrow>}
-            <SectionTitle className="mt-2">
+            <SectionTitle>
               {forwardTest
                 ? `Test the ${forwardTest.termDays}-day facility under ${forwardTest.scenarios.length} payment outcomes.`
                 : isExecutive
@@ -3655,6 +3755,13 @@ export default function DayMarketSimulator({
           Illustrative parameters. Not an offer or investment advice.
         </p>
       </section>}
+
+      {isGuided && (
+        <hr
+          aria-hidden
+          style={{ border: 'none', borderTop: `1px solid ${C.border}`, margin: '4px 0' }}
+        />
+      )}
 
       {isGuided && (
         <DayDeploymentInputs

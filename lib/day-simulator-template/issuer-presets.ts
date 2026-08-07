@@ -56,10 +56,10 @@ export const DAY_ISSUER_PRESETS: readonly DayIssuerPreset[] = [
     label: 'Maximize ST liquidity',
     caption: 'Deep SLP pool, wide band, short observation lockups',
     rationale:
-      'A 30% SLP pool floor and a 10% downside band let a larger share of ST sell in one transaction, paid for with a 45% liquidity premium, and a 14-day Observation Period keeps fixed-term lockups short.',
+      'A 25% SLP pool floor and a 10% downside band let a larger share of ST sell in one transaction, paid for with a 45% liquidity premium, and a 14-day Observation Period keeps fixed-term lockups short.',
     values: {
       coveragePct: 15,
-      minLiquidityPct: 30,
+      minLiquidityPct: 25,
       eclpBandWidthPct: 10,
       riskSharePct: 20,
       liqSharePct: 45,

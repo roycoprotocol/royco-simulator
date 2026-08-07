@@ -21,14 +21,15 @@ type DeploymentInput = {
 };
 
 const inlineFieldStyle = {
-  background: DAY_SIMULATOR_THEME.cardBg,
+  background: "#fff",
   border: `1px solid ${DAY_SIMULATOR_THEME.border}`,
   borderRadius: 6,
   color: DAY_SIMULATOR_THEME.text,
   fontFamily: DAY_SIMULATOR_TYPE.mono,
-  fontSize: 11.5,
-  minHeight: 30,
-  padding: "6px 8px",
+  fontSize: 13.5,
+  fontWeight: 600,
+  minHeight: 38,
+  padding: "10px 12px",
   textAlign: "right",
   width: 172,
 } as const;
@@ -96,7 +97,7 @@ function DeploymentGroup({
                     borderColor: input.state === "required"
                       ? DAY_SIMULATOR_THEME.danger
                       : DAY_SIMULATOR_THEME.border,
-                    width: input.unit ? 96 : 172,
+                    width: input.unit ? 108 : 172,
                   }}
                   type="text"
                   value={values[input.inputId]}
@@ -183,7 +184,6 @@ export default function DayDeploymentInputs({
     >
       <DaySectionHeader
         description="The educational simulator can run with fewer inputs. A deployable market requires the complete configuration below."
-        eyebrow="Market deployment"
         step={step}
         title="Every input needed to define the market"
       />
