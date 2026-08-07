@@ -15,6 +15,8 @@ const requiredFiles = [
   "components/day-simulator/DayGuidedTutorial.tsx",
   "components/day-simulator/DayLearningExperience.tsx",
   "components/day-simulator/DayMarketSimulator.tsx",
+  "components/day-simulator/DaySimulatorUI.tsx",
+  "components/day-simulator/DayDeploymentInputs.tsx",
   "components/day-simulator/DayTimeframeBrush.tsx",
   "components/day-simulator/DaySimulatorPageShell.tsx",
   "lib/day-simulator-template/locked-copy.ts",
@@ -102,6 +104,7 @@ if (!shell.includes("StrictDaySimulatorPageShell")) {
 }
 for (const explorerContract of [
   "buildDayDraftMarket",
+  "buildDayYieldDraftMarket",
   "parseSourceText",
   'variant={showTutorial ? "tutorial" : "guided"}',
   "Sample yield sources",
@@ -118,7 +121,13 @@ for (const explorerContract of [
   "All simulation assumptions are illustrative and user-adjustable.",
   "Historical dataset",
   "Published APY sample",
-  "Use your own data",
+  "Expected yield only",
+  "One net APY · No historical backtest",
+  "Run yield model",
+  "Import historical data",
+  "<DaySectionHeader",
+  "step={1}",
+  'title="Choose a source model"',
   "const [showImport, setShowImport] = useState(false)",
   "const [showTutorial, setShowTutorial] = useState(false)",
   "activeMarket.provenance.observationCount",
@@ -223,6 +232,14 @@ const simulator = await readFile(
   path.join(root, "components/day-simulator/DayMarketSimulator.tsx"),
   "utf8",
 );
+const daySimulatorUi = await readFile(
+  path.join(root, "components/day-simulator/DaySimulatorUI.tsx"),
+  "utf8",
+);
+const deploymentInputs = await readFile(
+  path.join(root, "components/day-simulator/DayDeploymentInputs.tsx"),
+  "utf8",
+);
 for (const tutorialIntegrationContract of [
   "const isGuided = variant === 'guided' || isTutorial;",
   'id="day-sim-positions"',
@@ -232,7 +249,7 @@ for (const tutorialIntegrationContract of [
   "onShowInSimulator={showTutorialSection}",
   "Current modeled effect: ST remains at $100 through about",
   "Current modeled effect:",
-  "Assumptions and their current modeled effects.",
+  "Set protection, liquidity, and yield sharing, then see the related modeled outcomes below.",
   "How it works:",
   "Current result:",
   "More JT Coverage increases the first-loss buffer protecting Senior (ST).",
@@ -247,6 +264,13 @@ for (const tutorialIntegrationContract of [
   "data-tooltip-placement={placeAbove ? 'above' : 'below'}",
   'tooltipRef.current?.offsetHeight',
   'onPointerEnter={updatePlacement}',
+  "step={isGuided ? 2 : undefined}",
+  "title={isGuided ? 'Simulation assumptions' : 'Market inputs'}",
+  "step={3}",
+  'title="What do these assumptions mean for ST?"',
+  "step={4}",
+  'title="One source, three different jobs"',
+  "style={{ accentColor: C.accent }}",
 ]) {
   if (!simulator.includes(tutorialIntegrationContract)) {
     failures.push(`Day tutorial missing non-blocking simulator integration: ${tutorialIntegrationContract}`);
@@ -281,18 +305,45 @@ const dayChartTooltip = await readFile(
   "utf8",
 );
 for (const contract of [
-  "pageBg: '#F4F3EF'",
-  "cardBg: '#FFFFFF'",
-  "border: '#DEDDD7'",
-  "text: '#1D1C19'",
-  "eyebrow: '#817A70'",
-  "accent: '#A65B20'",
-  "seniorLine: '#8B6B4B'",
-  "juniorLine: '#25231F'",
-  'const SERIF = "var(--font-inter), Inter, -apple-system, BlinkMacSystemFont, \'Segoe UI\', sans-serif"',
-  'const MONO = \'"SFMono-Regular", Consolas, monospace\'',
+  'pageBg: "#F4F3EF"',
+  'cardBg: "#FFFFFF"',
+  'border: "#DEDDD7"',
+  'text: "#1D1C19"',
+  'eyebrow: "#817A70"',
+  'accent: "#A65B20"',
+  'seniorLine: "#8B6B4B"',
+  'juniorLine: "#25231F"',
+  'sans: "var(--font-inter), Inter, -apple-system, BlinkMacSystemFont, \'Segoe UI\', sans-serif"',
+  'mono: \'"SFMono-Regular", Consolas, monospace\'',
 ]) {
-  if (!simulator.includes(contract)) failures.push(`Day simulator violates Royco Explore design token: ${contract}`);
+  if (!daySimulatorUi.includes(contract)) failures.push(`Day simulator violates Royco Explore design token: ${contract}`);
+}
+for (const journeyContract of [
+  "step?: number;",
+  "fontSize: 25",
+  "{step}.",
+]) {
+  if (!daySimulatorUi.includes(journeyContract)) failures.push(`Day Explorer missing numbered section hierarchy: ${journeyContract}`);
+}
+for (const deploymentContract of [
+  "Every input needed to define the market",
+  "Token contract source",
+  "Token contract address",
+  "Net underlying APY",
+  "Minimum coverage",
+  "Observation period",
+  "Yield share at low utilization (Y₀)",
+  "Yield share at target utilization (Yᴛ)",
+  "Yield share at full utilization (Y₁₀₀)",
+  "Target utilization",
+  "Adaptation speed",
+  "Protected exit threshold",
+  "Self-liquidation bonus",
+  "Required before deployment",
+]) {
+  if (!deploymentInputs.includes(deploymentContract)) {
+    failures.push(`Day Explorer missing deployment input contract: ${deploymentContract}`);
+  }
 }
 for (const geometryContract of [
   '<circle cx={boundaryX} cy={boundaryY} r={6}',
@@ -413,8 +464,9 @@ for (const layoutContract of [
   "overflow: 'hidden'",
   'className="mt-3 max-w-3xl"',
   "!isExecutive && !isGuided && <section",
-  "<Eyebrow>{isGuided ? 'Simulation assumptions' : 'Market inputs'}</Eyebrow>",
-  "<Eyebrow>Market snapshot</Eyebrow>",
+  "step={isGuided ? 2 : undefined}",
+  "step={3}",
+  "step={4}",
   "'Key risk · Liquidity'",
   "'Key risk · Loss protection'",
   "'Full history · Optional'",
@@ -441,9 +493,8 @@ for (const layoutContract of [
 }
 for (const control of [
   'Strategy base-asset APY (%)',
-  'tone={C.muted}',
-  'labelColor={C.muted}',
-  'background: `${C.strategyLine}14`',
+  'style={{ accentColor: C.accent }}',
+  'background: active ? `${C.accent}14` : C.cardBg',
   'Minimum coverage requirement (%)',
   'Minimum liquidity requirement (%)',
   'JT risk premium (% of ST yield)',
@@ -462,6 +513,9 @@ for (const control of [
   'Add JT capital after finalized losses',
 ]) {
   if (!simulator.includes(control)) failures.push(`Day simulator missing compact public control: ${control}`);
+}
+if (/\b(?:tone|labelColor)=/.test(simulator)) {
+  failures.push('Day Explorer assumption sliders must use one consistent accent treatment.');
 }
 for (const output of [
   'One source, three different jobs',
@@ -524,17 +578,17 @@ for (const output of [
 ]) {
   if (!simulator.includes(output)) failures.push(`Day simulator missing compact public output: ${output}`);
 }
-const assumptionsIndex = simulator.indexOf("<Eyebrow>{isGuided ? 'Simulation assumptions' : 'Market inputs'}</Eyebrow>");
+const assumptionsIndex = simulator.indexOf("title={isGuided ? 'Simulation assumptions' : 'Market inputs'}");
 const eclpControlIndex = simulator.indexOf('label="E-CLP downside band (%)"');
-const resultsIndex = simulator.indexOf('<Eyebrow>Market snapshot</Eyebrow>');
 const liquiditySectionIndex = simulator.indexOf("showSection('liquidity-and-coverage')");
+const resultsIndex = simulator.indexOf('title="One source, three different jobs"');
 if (
   assumptionsIndex < 0
   || eclpControlIndex < assumptionsIndex
-  || resultsIndex < eclpControlIndex
-  || liquiditySectionIndex < resultsIndex
+  || liquiditySectionIndex < eclpControlIndex
+  || resultsIndex < liquiditySectionIndex
 ) {
-  failures.push('Guided Day narrative must show the compact setup summary before modeled outcomes and key risks.');
+  failures.push('Guided Day narrative must flow from setup to ST impact before comparing positions.');
 }
 if ((simulator.match(/label="E-CLP downside band \(%\)"/g)?.length ?? 0) !== 1) {
   failures.push('Day E-CLP downside-band control must appear exactly once.');

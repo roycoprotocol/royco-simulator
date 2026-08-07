@@ -10,10 +10,12 @@ import { MARKET as MUGA_MARKET } from "@/lib/day-markets/muga/market";
 import { PARETO_FALCONX_DAY_MARKET } from "@/lib/day-markets/pareto-falconx/market";
 import { MARKET as REUSDE_MARKET } from "@/lib/day-markets/reusde/market";
 import { MARKET as SUSDAI_MARKET } from "@/lib/day-markets/susdai/market";
+import { JBBB_SAMPLE_MARKET } from "@/lib/day-sample-sources/jbbb/market";
 import type { DayMarket } from "@/lib/day-simulator-template/market";
 
 export const DAY_MARKETS: readonly DayMarket[] = [
   PARETO_FALCONX_DAY_MARKET,
+  JBBB_SAMPLE_MARKET,
   SUSDAI_MARKET,
   REUSDE_MARKET,
   INFINIFI_MARKET,

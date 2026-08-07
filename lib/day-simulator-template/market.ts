@@ -518,10 +518,13 @@ export function buildDayMarketCopy(manifest: DayMarketManifest): DayMarketCopy {
       ? "fee-exclusive"
       : "fee-treatment-unknown";
   const forwardTest = manifest.customization.forwardTest;
+  const forwardApyKind = manifest.provenance.sourceProvider === "User input"
+    ? "expected"
+    : "published";
   const disclosure = manifest.provenance.dataMode === "published-apy-forward"
     ? forwardTest
-      ? `The forward test models a finite ${forwardTest.termDays}-day facility using the published ${publishedPercentage(manifest.provenance.publishedApy ?? manifest.defaults.sourceApy)}% ${feeTreatment} APY and ${(forwardTest.grossInterestRate * 100).toFixed(2)}% gross interest rate supplied by ${manifest.provenance.sourceProvider}; no historical performance series is supplied. Scenario outputs are user-approved mechanism simulations, not historical backtests or forecasts.`
-      : `The forward test uses the published ${publishedPercentage(manifest.provenance.publishedApy ?? manifest.defaults.sourceApy)}% APY supplied by ${manifest.provenance.sourceProvider}; no historical performance series is supplied. Simulator outputs are forward mechanism simulations, not historical backtests, forecasts, or an announced product.`
+      ? `The forward test models a finite ${forwardTest.termDays}-day facility using the ${forwardApyKind} ${publishedPercentage(manifest.provenance.publishedApy ?? manifest.defaults.sourceApy)}% ${feeTreatment} APY and ${(forwardTest.grossInterestRate * 100).toFixed(2)}% gross interest rate supplied by ${manifest.provenance.sourceProvider}; no historical performance series is supplied. Scenario outputs are user-approved mechanism simulations, not historical backtests or forecasts.`
+      : `The forward model uses the ${forwardApyKind} ${publishedPercentage(manifest.provenance.publishedApy ?? manifest.defaults.sourceApy)}% APY supplied by ${manifest.provenance.sourceProvider}; no historical performance series is supplied. Simulator outputs are mechanism simulations, not historical backtests, forecasts, or an announced product.`
     : manifest.provenance.dataMode === "historical-series-with-published-apy"
       ? `The chart preserves the path of ${manifest.provenance.observationCount} ${feeTreatment} ${manifest.provenance.dataCadence} ${priceTypeLabel(manifest.provenance.priceType)} observations supplied by ${manifest.provenance.sourceProvider}, with its trend calibrated to the published ${publishedPercentage(manifest.provenance.publishedApy ?? manifest.defaults.sourceApy)}% APY input. Simulator outputs are mechanism simulations, not historical backtests, forecasts, or an announced product.`
       : `The source APY is derived from ${manifest.provenance.observationCount} ${feeTreatment} ${manifest.provenance.dataCadence} ${priceTypeLabel(manifest.provenance.priceType)} observations supplied by ${manifest.provenance.sourceProvider}. Simulator outputs are mechanism simulations, not historical backtests, forecasts, or an announced product.`;

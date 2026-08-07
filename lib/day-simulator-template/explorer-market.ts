@@ -86,13 +86,22 @@ export const DAY_EXPLORER_TEMPLATE_MARKET = dayMarketFromManifest(
 );
 
 export type DayDraftSource = {
+  id?: string;
   label: string;
+  source?: string;
   provider: string;
   sourceUrl: string;
   series: DaySeriesPoint[];
   cadence: "daily" | "monthly" | "irregular";
   priceType: DayMarketManifest["provenance"]["priceType"];
-  feesIncluded: DayMarketManifest["provenance"]["feesIncluded"];
+  feesIncluded?: DayMarketManifest["provenance"]["feesIncluded"];
+  retrievedAt?: string;
+  supportingSources?: DayMarketManifest["provenance"]["supportingSources"];
+};
+
+export type DayYieldDraftSource = {
+  label: string;
+  sourceApy: number;
 };
 
 export function buildDayDraftMarket(source: DayDraftSource): DayMarket {
@@ -107,7 +116,7 @@ export function buildDayDraftMarket(source: DayDraftSource): DayMarket {
   const last = source.series.at(-1);
   const manifest: DayMarketManifest = {
     ...DAY_EXPLORER_TEMPLATE_MANIFEST,
-    id: "day-explorer-draft",
+    id: source.id ?? "day-explorer-draft",
     identity: {
       ...DAY_EXPLORER_TEMPLATE_MANIFEST.identity,
       marketName: source.label,
@@ -122,17 +131,63 @@ export function buildDayDraftMarket(source: DayDraftSource): DayMarket {
       intakeConfirmed: false,
     },
     provenance: {
-      source: source.label,
+      source: source.source ?? source.label,
       sourceUrl: source.sourceUrl,
       sourceProvider: source.provider,
       dataMode: "historical-series",
       dataCadence: source.cadence,
       priceType: source.priceType,
-      feesIncluded: source.feesIncluded,
+      feesIncluded: source.feesIncluded ?? true,
       observationCount: source.series.length,
       firstDate: first?.date ?? "unknown",
       lastDate: last?.date ?? "unknown",
+      ...(source.retrievedAt ? { retrievedAt: source.retrievedAt } : {}),
+      ...(source.supportingSources ? { supportingSources: source.supportingSources } : {}),
     },
   };
   return dayMarketFromManifest(manifest, source.series);
+}
+
+export function buildDayYieldDraftMarket(source: DayYieldDraftSource): DayMarket {
+  if (!Number.isFinite(source.sourceApy) || source.sourceApy <= -1) {
+    throw new Error("Net source APY must be a finite percentage greater than -100%.");
+  }
+  const label = source.label.trim() || "Custom yield source";
+  const manifest: DayMarketManifest = {
+    ...DAY_EXPLORER_TEMPLATE_MANIFEST,
+    id: "day-explorer-yield-draft",
+    identity: {
+      ...DAY_EXPLORER_TEMPLATE_MANIFEST.identity,
+      marketName: label,
+      displayAssetName: label,
+      underlyingAsset: `the modeled ${label} yield source`,
+    },
+    defaults: {
+      ...DAY_EXPLORER_TEMPLATE_MANIFEST.defaults,
+      sourceApy: source.sourceApy,
+    },
+    certification: {
+      intakeConfirmed: false,
+    },
+    customization: {
+      explicitlyAuthorized: true,
+      authorizationNote: "The Explorer yield-only path intentionally omits historical analysis because no dated series was supplied.",
+      hiddenSections: ["backtest"],
+      copyOverrides: {},
+    },
+    provenance: {
+      source: `${label} net APY`,
+      sourceUrl: "",
+      sourceProvider: "User input",
+      dataMode: "published-apy-forward",
+      dataCadence: "none",
+      priceType: "published-apy",
+      feesIncluded: true,
+      observationCount: 0,
+      firstDate: "unknown",
+      lastDate: "unknown",
+      publishedApy: source.sourceApy,
+    },
+  };
+  return dayMarketFromManifest(manifest, []);
 }

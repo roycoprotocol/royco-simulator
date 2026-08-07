@@ -5,7 +5,9 @@ import { useMemo, useState } from "react";
 import DayMarketSimulator from "@/components/day-simulator/DayMarketSimulator";
 import {
   buildDayDraftMarket,
+  buildDayYieldDraftMarket,
   type DayDraftSource,
+  type DayYieldDraftSource,
 } from "@/lib/day-simulator-template/explorer-market";
 import type {
   DayMarket,
@@ -16,21 +18,33 @@ import {
   inferCadence,
   parseSourceText,
 } from "@/lib/day-simulator-template/source-parser.mjs";
+import {
+  DAY_SIMULATOR_THEME,
+  DAY_SIMULATOR_TYPE,
+  DayButton,
+  DayDisclosure,
+  DayFieldCaption,
+  DayFieldLabel,
+  DaySectionHeader,
+  DaySegmentedButton,
+  DaySegmentedControl,
+  DaySurface,
+} from "@/components/day-simulator/DaySimulatorUI";
 
 const COLORS = {
-  card: "#FFFFFF",
-  border: "#DEDDD7",
-  text: "#1D1C19",
-  muted: "#68665F",
-  eyebrow: "#817A70",
-  olive: "#3F7D5A",
-  warning: "#A24737",
-  rust: "#A65B20",
-  soft: "#F4F3EF",
+  card: DAY_SIMULATOR_THEME.cardBg,
+  border: DAY_SIMULATOR_THEME.border,
+  text: DAY_SIMULATOR_THEME.text,
+  muted: DAY_SIMULATOR_THEME.muted,
+  eyebrow: DAY_SIMULATOR_THEME.eyebrow,
+  olive: DAY_SIMULATOR_THEME.olive,
+  warning: DAY_SIMULATOR_THEME.danger,
+  rust: DAY_SIMULATOR_THEME.accent,
+  soft: DAY_SIMULATOR_THEME.pageBg,
 };
 
-const MONO = '"SFMono-Regular", Consolas, monospace';
-const SANS = "var(--font-inter), Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
+const MONO = DAY_SIMULATOR_TYPE.mono;
+const SANS = DAY_SIMULATOR_TYPE.sans;
 const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 const DRAFT_OPTION = "__draft__";
 
@@ -112,7 +126,13 @@ export default function DayExplorer({
 }) {
   const [selectedMarketId, setSelectedMarketId] = useState(initialMarket.id);
   const [draftSource, setDraftSource] = useState<DayDraftSource | null>(null);
+  const [yieldDraft, setYieldDraft] = useState<DayYieldDraftSource | null>(null);
   const [draftVersion, setDraftVersion] = useState(0);
+  const [sourceMode, setSourceMode] = useState<"yield" | "history">(
+    initialMarket.provenance.dataMode === "published-apy-forward" ? "yield" : "history",
+  );
+  const [yieldLabel, setYieldLabel] = useState("Custom yield source");
+  const [yieldApyPct, setYieldApyPct] = useState(initialMarket.defaults.sourceApy * 100);
   const [sourceUrl, setSourceUrl] = useState("");
   const [importingUrl, setImportingUrl] = useState(false);
   const [showImport, setShowImport] = useState(false);
@@ -125,15 +145,22 @@ export default function DayExplorer({
     () => draftSource ? buildDayDraftMarket(draftSource) : null,
     [draftSource],
   );
-  const activeMarket = draftMarket ?? selectedMarket;
-  const activeKey = draftMarket
-    ? `${draftMarket.id}-${draftVersion}`
+  const yieldDraftMarket = useMemo(
+    () => yieldDraft ? buildDayYieldDraftMarket(yieldDraft) : null,
+    [yieldDraft],
+  );
+  const activeMarket = yieldDraftMarket ?? draftMarket ?? selectedMarket;
+  const activeKey = yieldDraftMarket || draftMarket
+    ? `${activeMarket.id}-${draftVersion}`
     : activeMarket.id;
-  const isDraft = draftMarket !== null;
+  const isDraft = draftMarket !== null || yieldDraftMarket !== null;
+  const isYieldDraft = yieldDraftMarket !== null;
 
   const selectMarket = (marketId: string) => {
     if (marketId === DRAFT_OPTION && draftSource) return;
     setDraftSource(null);
+    setYieldDraft(null);
+    setSourceMode("history");
     setSelectedMarketId(marketId);
     setError("");
     const nextUrl = new URL(window.location.href);
@@ -146,6 +173,24 @@ export default function DayExplorer({
   const activateDraft = (nextSource: DayDraftSource) => {
     buildDayDraftMarket(nextSource);
     setDraftSource(nextSource);
+    setYieldDraft(null);
+    setSourceMode("history");
+    setDraftVersion((current) => current + 1);
+    setError("");
+    const nextUrl = new URL(window.location.href);
+    nextUrl.pathname = routePath;
+    nextUrl.search = "";
+    window.history.replaceState(null, "", nextUrl);
+  };
+
+  const activateYieldDraft = () => {
+    const nextSource: DayYieldDraftSource = {
+      label: yieldLabel,
+      sourceApy: yieldApyPct / 100,
+    };
+    buildDayYieldDraftMarket(nextSource);
+    setYieldDraft(nextSource);
+    setDraftSource(null);
     setDraftVersion((current) => current + 1);
     setError("");
     const nextUrl = new URL(window.location.href);
@@ -172,7 +217,6 @@ export default function DayExplorer({
         series,
         cadence: inferCadence(series),
         priceType: "unknown",
-        feesIncluded: "unknown",
       });
     } catch (fileError) {
       setError(errorMessage(fileError));
@@ -204,7 +248,6 @@ export default function DayExplorer({
         series: imported.series,
         cadence: imported.cadence,
         priceType: "unknown",
-        feesIncluded: "unknown",
       });
     } catch (urlError) {
       setError(errorMessage(urlError));
@@ -219,15 +262,7 @@ export default function DayExplorer({
 
   return (
     <div className="flex flex-col" style={{ gap: 12 }}>
-      <section
-        style={{
-          background: COLORS.card,
-          border: `1px solid ${COLORS.border}`,
-          borderRadius: 14,
-          boxShadow: "0 1px 2px rgba(29,28,25,.04)",
-          padding: 20,
-        }}
-      >
+      <DaySurface id="day-sim-source" padding="spacious" style={{ scrollMarginTop: 16 }}>
         <div className={experience === "learning" ? undefined : "grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_auto]"}>
           <div>
             <div className="flex items-center gap-2">
@@ -293,204 +328,112 @@ export default function DayExplorer({
           </div>
 
           {experience !== "learning" && (
-            <button
+            <DayButton
               aria-label={showTutorial ? "Close tutorial" : "New to Royco?"}
               aria-pressed={showTutorial}
               className="justify-self-start lg:justify-self-end"
               onClick={() => setShowTutorial((value) => !value)}
-              style={{
-                background: showTutorial ? `${COLORS.rust}0D` : COLORS.rust,
-                border: `1px solid ${COLORS.rust}`,
-                borderRadius: 8,
-                boxShadow: showTutorial ? "none" : "0 1px 2px rgba(29,28,25,.12)",
-                color: showTutorial ? COLORS.rust : COLORS.card,
-                fontFamily: SANS,
-                fontSize: 13,
-                fontWeight: 700,
-                minHeight: 40,
-                padding: "9px 14px",
-                whiteSpace: "nowrap",
-              }}
-              type="button"
+              variant={showTutorial ? "quiet" : "primary"}
             >
               {showTutorial ? "Close tutorial" : "New to Royco?"}
-            </button>
+            </DayButton>
           )}
         </div>
 
         {experience !== "learning" && (
-          <div
-            aria-label="Educational simulator disclosure"
-            className="mt-3"
-            role="note"
-            style={{
-              background: COLORS.soft,
-              border: `1px solid ${COLORS.border}`,
-              borderLeft: `3px solid ${COLORS.rust}`,
-              borderRadius: 8,
-              color: COLORS.muted,
-              fontSize: 11,
-              lineHeight: 1.5,
-              padding: "10px 12px",
-            }}
-          >
-            <strong style={{ color: COLORS.text, fontWeight: 650 }}>Educational simulator only.</strong>{" "}
-            No securities are offered or available through this page. Sample datasets provide source inputs only and do not imply issuer participation, endorsement, or proposed market terms. All simulation assumptions are illustrative and user-adjustable.
+          <div className="mt-3">
+            <DayDisclosure>
+              <strong style={{ color: COLORS.text, fontWeight: 600 }}>Educational simulator only.</strong>{" "}
+              No securities are offered or available through this page. Sample datasets provide source inputs only and do not imply issuer participation, endorsement, or proposed market terms. All simulation assumptions are illustrative and user-adjustable.
+            </DayDisclosure>
           </div>
         )}
 
-        <div
-          className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_auto]"
-        >
-          <label>
-            <span
-              className="mb-1.5 block"
-              style={{
-                color: COLORS.eyebrow,
-                fontFamily: MONO,
-                fontSize: 9.5,
-                fontWeight: 700,
-                letterSpacing: "0.1em",
-                textTransform: "uppercase",
-              }}
-            >
-              {experience === "learning" ? "Input · Yield source" : "Yield source"}
-            </span>
-            <select
-              aria-label="Explore a yield source"
-              onChange={(event) => selectMarket(event.target.value)}
-              style={fieldStyle}
-              value={isDraft ? DRAFT_OPTION : selectedMarket.id}
-            >
-              {isDraft && <option value={DRAFT_OPTION}>{draftSource?.label} · Draft</option>}
-              <optgroup label="Sample yield sources">
-                {markets.map((market) => (
-                  <option key={market.id} value={market.id}>
-                    {marketLabel(market)}
-                  </option>
-                ))}
-              </optgroup>
-            </select>
-          </label>
-          <button
-            aria-expanded={showImport || isDraft}
-            onClick={() => setShowImport((value) => !value)}
-            style={{
-              background: COLORS.card,
-              border: `1px solid ${COLORS.border}`,
-              borderRadius: 8,
-              color: COLORS.text,
-              fontFamily: SANS,
-              fontSize: 12,
-              fontWeight: 600,
-              minHeight: 44,
-              padding: "10px 14px",
-              whiteSpace: "nowrap",
-              alignSelf: "end",
-            }}
-            type="button"
-          >
-            {showImport || isDraft
-              ? "Hide import"
-              : experience === "learning"
-                ? "Import source data"
-                : "Use your own data"}
-          </button>
+        <div className="mt-4">
+          {experience === "learning" ? (
+            <DayFieldCaption>Input · Yield source</DayFieldCaption>
+          ) : (
+            <DaySectionHeader
+              description="Start with one net APY or a dated source history."
+              step={1}
+              title="Choose a source model"
+            />
+          )}
+          <div className="mt-2">
+            <DaySegmentedControl label="Source model">
+              <DaySegmentedButton
+                active={sourceMode === "yield"}
+                onClick={() => setSourceMode("yield")}
+              >
+                <strong style={{ display: "block" }}>Expected yield only</strong>
+                <span style={{ color: COLORS.muted, display: "block", fontSize: 10.5, marginTop: 2 }}>One net APY · No historical backtest</span>
+              </DaySegmentedButton>
+              <DaySegmentedButton
+                active={sourceMode === "history"}
+                onClick={() => {
+                  setSourceMode("history");
+                  setYieldDraft(null);
+                }}
+              >
+                <strong style={{ display: "block" }}>Historical data</strong>
+                <span style={{ color: COLORS.muted, display: "block", fontSize: 10.5, marginTop: 2 }}>Sample or imported dated values</span>
+              </DaySegmentedButton>
+            </DaySegmentedControl>
+          </div>
         </div>
 
-        {(showImport || isDraft) && (
-          <div
-            className="mt-3"
-            style={{
-              background: COLORS.soft,
-              border: `1px solid ${COLORS.border}`,
-              borderRadius: 10,
-              padding: 12,
-            }}
-          >
-            <span
-              className="mb-1 block"
-              style={{
-                color: COLORS.eyebrow,
-                fontFamily: MONO,
-                fontSize: 9.5,
-                fontWeight: 700,
-                letterSpacing: "0.1em",
-                textTransform: "uppercase",
-              }}
-            >
-              Import dated values
-            </span>
-            <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-[auto_minmax(0,1fr)_auto]">
-              <label
-                style={{
-                  alignItems: "center",
-                  background: COLORS.card,
-                  border: `1px solid ${COLORS.border}`,
-                  borderRadius: 8,
-                  color: COLORS.text,
-                  cursor: "pointer",
-                  display: "flex",
-                  fontSize: 12,
-                  fontWeight: 600,
-                  justifyContent: "center",
-                  minHeight: 44,
-                  padding: "10px 12px",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                <input
-                  accept=".csv,.tsv,.txt,.json,.html,.htm,text/csv,text/tab-separated-values,application/json,text/html"
-                  aria-label="Upload dated NAV or price history"
-                  className="sr-only"
-                  onChange={(event) => {
-                    void importFile(event.target.files?.[0]);
-                    event.target.value = "";
-                  }}
-                  type="file"
-                />
-                Upload file
-              </label>
-              <input
-                aria-label="Public yield source URL"
-                onChange={(event) => setSourceUrl(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Enter") {
-                    event.preventDefault();
-                    void importUrl();
-                  }
-                }}
-                placeholder="Paste a CSV, Google Sheet, JSON, or HTML table URL"
-                style={fieldStyle}
-                type="url"
-                value={sourceUrl}
-              />
-              <button
-                disabled={importingUrl}
-                onClick={() => void importUrl()}
-                style={{
-                  background: COLORS.rust,
-                  border: `1px solid ${COLORS.rust}`,
-                  borderRadius: 8,
-                  color: COLORS.card,
-                  cursor: importingUrl ? "wait" : "pointer",
-                  fontFamily: SANS,
-                  fontSize: 12,
-                  fontWeight: 600,
-                  minHeight: 44,
-                  opacity: importingUrl ? 0.65 : 1,
-                  padding: "10px 14px",
-                  whiteSpace: "nowrap",
-                }}
-                type="button"
-              >
-                {importingUrl ? "Importing…" : "Import link"}
-              </button>
-            </div>
-            <p className="mt-2" style={{ color: COLORS.muted, fontSize: 10.5 }}>
-              CSV, JSON, Google Sheet, or public HTML table. Imports stay private and unverified.
-            </p>
+        {sourceMode === "yield" ? (
+          <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1.2fr)_minmax(150px,.55fr)_auto]" style={{ alignItems: "end" }}>
+            <DayFieldLabel>
+              <DayFieldCaption>Source name</DayFieldCaption>
+              <input aria-label="Yield source name" onChange={(event) => setYieldLabel(event.target.value)} style={fieldStyle} value={yieldLabel} />
+            </DayFieldLabel>
+            <DayFieldLabel>
+              <DayFieldCaption>Net APY</DayFieldCaption>
+              <input aria-label="Net source APY" inputMode="decimal" min="-99.99" onChange={(event) => setYieldApyPct(Number(event.target.value))} step="0.1" style={fieldStyle} type="number" value={yieldApyPct} />
+            </DayFieldLabel>
+            <DayButton onClick={activateYieldDraft} style={{ minHeight: 44, whiteSpace: "nowrap" }} variant="primary">Run yield model</DayButton>
           </div>
+        ) : (
+          <>
+            <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
+              <DayFieldLabel>
+                <DayFieldCaption>Sample yield source</DayFieldCaption>
+                <select aria-label="Explore a yield source" onChange={(event) => selectMarket(event.target.value)} style={fieldStyle} value={draftSource ? DRAFT_OPTION : selectedMarket.id}>
+                  {draftSource && <option value={DRAFT_OPTION}>{draftSource.label} · Draft</option>}
+                  <optgroup label="Sample yield sources">
+                    {markets.map((market) => <option key={market.id} value={market.id}>{marketLabel(market)}</option>)}
+                  </optgroup>
+                </select>
+              </DayFieldLabel>
+              <DayButton aria-expanded={showImport || Boolean(draftSource)} onClick={() => setShowImport((value) => !value)} style={{ alignSelf: "end", minHeight: 44, whiteSpace: "nowrap" }}>
+                {showImport || draftSource ? "Hide import" : "Import historical data"}
+              </DayButton>
+            </div>
+
+            {(showImport || draftSource) && (
+              <div className="mt-3" style={{ background: COLORS.soft, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: 12 }}>
+                <DayFieldCaption>Import dated values</DayFieldCaption>
+                <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-[auto_minmax(0,1fr)_auto]">
+                  <label style={{ alignItems: "center", background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 8, color: COLORS.text, cursor: "pointer", display: "flex", fontSize: 12, fontWeight: 600, justifyContent: "center", minHeight: 44, padding: "10px 12px", whiteSpace: "nowrap" }}>
+                    <input accept=".csv,.tsv,.txt,.json,.html,.htm,text/csv,text/tab-separated-values,application/json,text/html" aria-label="Upload dated NAV or price history" className="sr-only" onChange={(event) => { void importFile(event.target.files?.[0]); event.target.value = ""; }} type="file" />
+                    Upload file
+                  </label>
+                  <input aria-label="Public yield source URL" onChange={(event) => setSourceUrl(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); void importUrl(); } }} placeholder="Paste a CSV, Google Sheet, JSON, or HTML table URL" style={fieldStyle} type="url" value={sourceUrl} />
+                  <DayButton disabled={importingUrl} onClick={() => void importUrl()} style={{ cursor: importingUrl ? "wait" : "pointer", minHeight: 44, opacity: importingUrl ? 0.65 : 1, whiteSpace: "nowrap" }} variant="primary">{importingUrl ? "Importing…" : "Import link"}</DayButton>
+                </div>
+                <p className="mt-2" style={{ color: COLORS.muted, fontSize: 10.5 }}>CSV, JSON, Google Sheet, or public HTML table. Imports stay private and unverified.</p>
+              </div>
+            )}
+
+            {draftSource && (
+              <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2" style={{ background: COLORS.soft, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: 12 }}>
+                <DayFieldLabel><DayFieldCaption>Source name</DayFieldCaption><input aria-label="Imported source name" onChange={(event) => updateDraft({ label: event.target.value || "Imported yield source" })} style={fieldStyle} value={draftSource.label} /></DayFieldLabel>
+                <DayFieldLabel><DayFieldCaption>Value type</DayFieldCaption><select aria-label="Imported data value type" onChange={(event) => updateDraft({ priceType: event.target.value as DayDraftSource["priceType"] })} style={fieldStyle} value={draftSource.priceType}><option value="unknown">Not specified</option><option value="nav">NAV — accounting value</option><option value="price">Price — tradable market value</option><option value="total-return-index">Total-return index</option></select></DayFieldLabel>
+                <p className="sm:col-span-2" style={{ color: COLORS.muted, fontSize: 10.5 }}>Imported values are treated as net of source-level fees.</p>
+              </div>
+            )}
+          </>
         )}
 
         {error && (
@@ -503,97 +446,32 @@ export default function DayExplorer({
           </p>
         )}
 
-        {draftSource && (
-          <div
-            className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-3"
-            style={{
-              background: COLORS.soft,
-              border: `1px solid ${COLORS.border}`,
-              borderRadius: 10,
-              padding: 12,
-            }}
-          >
-            <label>
-              <span
-                className="mb-1.5 block"
-                style={{ color: COLORS.muted, fontFamily: MONO, fontSize: 9.5, textTransform: "uppercase" }}
-              >
-                Source name
-              </span>
-              <input
-                aria-label="Imported source name"
-                onChange={(event) => updateDraft({ label: event.target.value || "Imported yield source" })}
-                style={fieldStyle}
-                value={draftSource.label}
-              />
-            </label>
-
-            <label>
-              <span
-                className="mb-1.5 block"
-                style={{ color: COLORS.muted, fontFamily: MONO, fontSize: 9.5, textTransform: "uppercase" }}
-              >
-                What does each value represent?
-              </span>
-              <select
-                aria-label="Imported data value type"
-                onChange={(event) => updateDraft({
-                  priceType: event.target.value as DayDraftSource["priceType"],
-                })}
-                style={fieldStyle}
-                value={draftSource.priceType}
-              >
-                <option value="unknown">I&apos;m not sure yet</option>
-                <option value="nav">NAV — accounting value</option>
-                <option value="price">Price — tradable market value</option>
-                <option value="total-return-index">Total-return index — value plus distributions</option>
-              </select>
-            </label>
-
-            <label>
-              <span
-                className="mb-1.5 block"
-                style={{ color: COLORS.muted, fontFamily: MONO, fontSize: 9.5, textTransform: "uppercase" }}
-              >
-                Are fees included?
-              </span>
-              <select
-                aria-label="Imported data fee treatment"
-                onChange={(event) => updateDraft({
-                  feesIncluded: event.target.value === "true"
-                    ? true
-                    : event.target.value === "false"
-                      ? false
-                      : "unknown",
-                })}
-                style={fieldStyle}
-                value={String(draftSource.feesIncluded)}
-              >
-                <option value="unknown">I&apos;m not sure yet</option>
-                <option value="true">Yes — values are after fees</option>
-                <option value="false">No — fees are not deducted</option>
-              </select>
-            </label>
-          </div>
-        )}
-
         <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1" style={{ color: COLORS.muted, fontSize: 10.5 }}>
+          {sourceMode === "yield" && !isYieldDraft ? (
+            <span>Enter a net APY and run the yield model to replace the current sample.</span>
+          ) : (
+            <>
           <strong style={{ color: isDraft ? COLORS.warning : COLORS.olive, fontWeight: 600 }}>
-            {isDraft ? "Unverified upload" : "Sample dataset"}
+            {isYieldDraft ? "Yield-only model" : isDraft ? "Unverified upload" : "Sample dataset"}
           </strong>
-          <span>·</span>
-          <span>{activeMarket.provenance.observationCount} {describeCadence(activeMarket.provenance.dataCadence)} values</span>
-          <span>·</span>
-          <span>{activeMarket.provenance.firstDate} to {activeMarket.provenance.lastDate}</span>
-          <span>·</span>
-          <span>{describePriceType(activeMarket.provenance.priceType)} · {describeFees(activeMarket.provenance.feesIncluded)}</span>
-          {isDraft && (
+          {isYieldDraft ? (
+            <>
+              <span>·</span><span>{yieldApyPct.toFixed(1)}% net APY</span><span>·</span><span>No historical backtest</span>
+            </>
+          ) : (
+            <>
+              <span>·</span><span>{activeMarket.provenance.observationCount} {describeCadence(activeMarket.provenance.dataCadence)} values</span><span>·</span><span>{activeMarket.provenance.firstDate} to {activeMarket.provenance.lastDate}</span><span>·</span><span>{describePriceType(activeMarket.provenance.priceType)} · {describeFees(activeMarket.provenance.feesIncluded)}</span>
+            </>
+          )}
+          {draftSource && (
             <p className="basis-full" style={{ color: COLORS.muted, fontSize: 10.5 }}>
-              Confirm the value type, fees, and source before publishing.
+              Confirm the value type and source before publishing.
             </p>
           )}
+            </>
+          )}
         </div>
-      </section>
+      </DaySurface>
 
       {experience === "learning" ? (
         <DayMarketSimulator

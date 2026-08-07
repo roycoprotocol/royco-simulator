@@ -49,7 +49,14 @@ import {
 } from '@/components/day-simulator/DayChartTooltip';
 import DayGuidedTutorial from '@/components/day-simulator/DayGuidedTutorial';
 import DayLearningExperience from '@/components/day-simulator/DayLearningExperience';
+import DayDeploymentInputs from '@/components/day-simulator/DayDeploymentInputs';
 import { DayTimeframeBrush } from '@/components/day-simulator/DayTimeframeBrush';
+import {
+  DAY_SIMULATOR_THEME,
+  DAY_SIMULATOR_TYPE,
+  DayButton,
+  DaySectionHeader,
+} from '@/components/day-simulator/DaySimulatorUI';
 
 const ResponsiveContainerNoSSR = dynamic(
   () => import('recharts').then((mod) => mod.ResponsiveContainer),
@@ -57,27 +64,10 @@ const ResponsiveContainerNoSSR = dynamic(
 );
 
 // Royco Explorer visual contract. Tranche colors remain semantic.
-const C = {
-  pageBg: '#F4F3EF',
-  cardBg: '#FFFFFF',
-  border: '#DEDDD7',
-  text: '#1D1C19',
-  muted: '#68665F',
-  eyebrow: '#817A70',
-  kpiLabel: '#969188',
-  accent: '#A65B20',
-  olive: '#3F7D5A',
-  danger: '#A24737',
-  faint: '#B7B3AB',
-  seniorLine: '#8B6B4B',
-  juniorLine: '#25231F',
-  strategyLine: '#9A968F',
-  obsFill: '#F4C77B',
-  freeLine: '#51A473',
-};
+const C = DAY_SIMULATOR_THEME;
 
-const SERIF = "var(--font-inter), Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif";
-const MONO = '"SFMono-Regular", Consolas, monospace';
+const SERIF = DAY_SIMULATOR_TYPE.sans;
+const MONO = DAY_SIMULATOR_TYPE.mono;
 const DAY = 86_400;
 const MONTH_NAMES = [
   'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
@@ -1418,8 +1408,6 @@ function SliderControl({
   step,
   display,
   description,
-  tone = C.accent,
-  labelColor = C.eyebrow,
   disabled = false,
   onChange,
   children,
@@ -1431,8 +1419,6 @@ function SliderControl({
   step: number;
   display: string;
   description?: string;
-  tone?: string;
-  labelColor?: string;
   disabled?: boolean;
   onChange: (value: number) => void;
   children?: React.ReactNode;
@@ -1444,10 +1430,10 @@ function SliderControl({
   return (
     <div style={{ opacity: disabled ? 0.55 : 1 }}>
       <div className="flex items-center justify-between" style={{ marginBottom: 6 }}>
-        <label style={{ color: labelColor, fontSize: 10, fontWeight: 600, letterSpacing: 1, textTransform: 'uppercase' }}>
+        <label style={{ color: C.eyebrow, fontSize: 10, fontWeight: 600, letterSpacing: 1, textTransform: 'uppercase' }}>
           {label}
         </label>
-        <span style={{ color: tone, fontFamily: MONO, fontSize: 13, fontWeight: 600 }}>{display}</span>
+        <span style={{ color: C.accent, fontFamily: MONO, fontSize: 13, fontWeight: 600 }}>{display}</span>
       </div>
       <input
         aria-label={label}
@@ -1459,7 +1445,7 @@ function SliderControl({
         disabled={disabled}
         onChange={(event) => handle(event.target.value)}
         className="w-full"
-        style={{ accentColor: tone }}
+        style={{ accentColor: C.accent }}
       />
       {description && (
         <p className="mt-1" style={{ color: C.muted, fontSize: 11.5, lineHeight: 1.4 }}>
@@ -2168,6 +2154,7 @@ export default function DayMarketSimulator({
     borderRadius: 0,
     boxShadow: 'none',
     padding: 16,
+    scrollMarginTop: 16,
   } as const;
   const tutorialHighlightStyle = {
     background: `${C.accent}08`,
@@ -2545,40 +2532,21 @@ export default function DayMarketSimulator({
           ...(isTutorial && (tutorialStep === 1 || tutorialStep === 2) ? tutorialHighlightStyle : {}),
         }}
       >
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <Eyebrow>{isGuided ? 'Simulation assumptions' : 'Market inputs'}</Eyebrow>
-            {isGuided && (
-              <p className="mt-1" style={{ color: C.muted, fontSize: 11.5, lineHeight: 1.4 }}>
-                Assumptions and their current modeled effects.
-              </p>
-            )}
-          </div>
-          <button
-            type="button"
+        <DaySectionHeader
+          action={<DayButton
             onClick={() => setShowInputs((value) => !value)}
             aria-label={showInputs ? 'Collapse market inputs' : 'Expand market inputs'}
             aria-expanded={showInputs}
-            style={{
-              border: `1px solid ${C.border}`,
-              borderRadius: 8,
-              color: C.accent,
-              width: isGuided ? 'auto' : 28,
-              height: 28,
-              fontFamily: MONO,
-              fontSize: isGuided ? 9.5 : 18,
-              fontWeight: isGuided ? 700 : 400,
-              letterSpacing: isGuided ? '0.08em' : undefined,
-              lineHeight: 1,
-              background: 'transparent',
-              flexShrink: 0,
-              padding: isGuided ? '0 10px' : 0,
-              textTransform: isGuided ? 'uppercase' : undefined,
-            }}
+            style={{ minHeight: 32, padding: '6px 10px' }}
+            variant="quiet"
           >
             {isGuided ? (showInputs ? 'Done' : 'Edit') : (showInputs ? '−' : '+')}
-          </button>
-        </div>
+          </DayButton>}
+          description={isGuided ? 'Set protection, liquidity, and yield sharing, then see the related modeled outcomes below.' : undefined}
+          eyebrow={isGuided ? undefined : 'Market inputs'}
+          step={isGuided ? 2 : undefined}
+          title={isGuided ? 'Simulation assumptions' : 'Market inputs'}
+        />
 
         {isGuided && !showInputs && (
           <>
@@ -2627,7 +2595,7 @@ export default function DayMarketSimulator({
 
         {showInputs && (
           <div className="mt-3 grid grid-cols-1 md:grid-cols-2" style={{ gap: 8 }}>
-            <div style={{ background: `${C.strategyLine}14`, border: `1px solid ${C.strategyLine}`, borderRadius: 10, padding: 12 }}>
+            <div style={{ background: C.pageBg, border: `1px solid ${C.border}`, borderRadius: 10, padding: 12 }}>
               <SliderControl
                 label="Strategy base-asset APY (%)"
                 value={sourceApyPct}
@@ -2636,8 +2604,6 @@ export default function DayMarketSimulator({
                 step={0.1}
                 display={`${sourceApyPct.toFixed(1)}%`}
                 description={isGuided ? "Annualized return applied to the selected source history." : ""}
-                tone={C.muted}
-                labelColor={C.muted}
                 onChange={setSourceApyPct}
               />
             </div>
@@ -2675,8 +2641,6 @@ export default function DayMarketSimulator({
                   step={0.25}
                   display={`${formatEclpBandPercent(eclpBandWidthPct)}% · $${formatEclpFloor(eclpBandWidthPct)} floor`}
                   description={`How far the modeled pool price can move below $1. Narrow bands keep sales closer to $1 but allow less to be sold at once. Current modeled effect: ${(result.explainer.liquidity.boundarySellShareOfSenior * 100).toFixed(1)}% of ST is the largest one-time sale, with about ${(result.explainer.liquidity.boundaryQuote.slippage * 100).toFixed(1)}% average price impact.`}
-                  tone={C.olive}
-                  labelColor={C.olive}
                   onChange={setEclpBandWidthPct}
                 >
                   <div aria-label="E-CLP band presets" className="mt-2 grid grid-cols-2 sm:grid-cols-4" role="group" style={{ gap: 6 }}>
@@ -2693,9 +2657,9 @@ export default function DayMarketSimulator({
                           key={preset.value}
                           onClick={() => setEclpBandWidthPct(preset.value)}
                           style={{
-                            background: active ? `${C.olive}14` : C.cardBg,
-                            border: `1px solid ${active ? C.olive : C.border}`,
-                            color: active ? C.olive : C.muted,
+                            background: active ? `${C.accent}14` : C.cardBg,
+                            border: `1px solid ${active ? C.accent : C.border}`,
+                            color: active ? C.accent : C.muted,
                             fontFamily: MONO,
                             fontSize: 9.5,
                             fontWeight: 700,
@@ -2780,67 +2744,6 @@ export default function DayMarketSimulator({
         )}
       </section>}
 
-      {isGuided && endStep && (
-        <section
-          id="day-sim-positions"
-          style={{
-            ...guidedSectionStyle,
-            ...(isTutorial && tutorialStep === 0 ? tutorialHighlightStyle : {}),
-          }}
-        >
-          <Eyebrow>Market snapshot</Eyebrow>
-          <h2 className="mt-2" style={{ color: C.text, fontFamily: SERIF, fontSize: 22, fontWeight: 500, letterSpacing: '-0.025em', lineHeight: 1.12 }}>
-            One source, three different jobs
-          </h2>
-          <p className="mt-1 max-w-4xl" style={{ color: C.muted, fontSize: 11.5, lineHeight: 1.45 }}>
-            {activeMarket.provenance.dataMode === 'published-apy-forward'
-              ? `Modeled from the published ${((activeMarket.provenance.publishedApy ?? defaults.sourceApy) * 100).toFixed(1)}% APY.`
-              : `Modeled from ${view.length} ${activeMarket.provenance.dataCadence} source values, ${startDate} to ${endDate}.`}{' '}
-            Not live performance or a forecast.
-          </p>
-          <div className="mt-3 overflow-x-auto" style={{ border: `1px solid ${C.border}`, borderRadius: 10 }}>
-            <table className="w-full" style={{ borderCollapse: 'collapse', minWidth: 720, textAlign: 'left' }}>
-              <thead style={{ background: C.pageBg }}>
-                <tr>
-                  {['Position', 'What it does', 'End value', 'Avg / year', 'Worst drop'].map((label) => (
-                    <th
-                      key={label}
-                      style={{
-                        borderBottom: `1px solid ${C.border}`,
-                        color: C.kpiLabel,
-                        fontSize: 8.5,
-                        fontWeight: 700,
-                        letterSpacing: '0.1em',
-                        padding: '8px 10px',
-                        textTransform: 'uppercase',
-                      }}
-                    >
-                      {label}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {[
-                  ['Source', 'Baseline', from100(endStep.strategy), pct(result.strategyApy), drawdownPct(result.strategyMaxDrawdown), C.strategyLine],
-                  ['ST', 'Protected by JT first-loss capital', from100(endStep.senior), pct(result.seniorApy), drawdownPct(result.seniorMaxDrawdown), C.seniorLine],
-                  ['JT', 'Takes first loss; earns risk premium', from100(endStep.junior), pct(result.juniorApy), drawdownPct(result.juniorMaxDrawdown), C.juniorLine],
-                  ['SLP', 'Provides liquidity for ST', from100(endStep.liquidity), pct(result.liquidityApy), drawdownPct(result.liquidityMaxDrawdown), C.olive],
-                ].map(([position, role, ending, apy, drawdown, color], index) => (
-                  <tr key={position} style={{ background: index % 2 === 0 ? C.cardBg : C.pageBg }}>
-                    <td style={{ borderBottom: index < 3 ? `1px solid ${C.border}` : undefined, color, fontFamily: MONO, fontSize: 13, fontWeight: 700, padding: '10px' }}>{position}</td>
-                    <td style={{ borderBottom: index < 3 ? `1px solid ${C.border}` : undefined, color: C.muted, fontSize: 11.5, padding: '10px' }}>{role}</td>
-                    <td style={{ borderBottom: index < 3 ? `1px solid ${C.border}` : undefined, color, fontFamily: MONO, fontSize: 14, fontWeight: 600, padding: '10px' }}>{ending}</td>
-                    <td style={{ borderBottom: index < 3 ? `1px solid ${C.border}` : undefined, color: C.text, fontFamily: MONO, fontSize: 11.5, padding: '10px' }}>{apy}</td>
-                    <td style={{ borderBottom: index < 3 ? `1px solid ${C.border}` : undefined, color: C.text, fontFamily: MONO, fontSize: 11.5, padding: '10px' }}>{drawdown}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      )}
-
       {!isExecutive && !isGuided && <section style={{ ...cardStyle, padding: 14 }}>
         <Eyebrow>Simulated APYs</Eyebrow>
         <div className="mt-3 grid grid-cols-1 md:grid-cols-3" style={{ gap: 8 }}>
@@ -2854,14 +2757,23 @@ export default function DayMarketSimulator({
         className="grid grid-cols-1 md:grid-cols-2"
         id="day-sim-live-outcomes"
         style={{
-          ...(isGuided ? { borderBottom: `1px solid ${C.border}`, gap: 0 } : { gap: 10 }),
+          ...(isGuided ? { borderBottom: `1px solid ${C.border}`, gap: 0, scrollMarginTop: 16 } : { gap: 10 }),
           ...(isTutorial && tutorialStep === 3 ? tutorialHighlightStyle : {}),
         }}
       >
+        {isGuided && (
+          <div className="md:col-span-2" style={{ padding: 16 }}>
+            <DaySectionHeader
+              description="Start with the two questions that translate the structure into practical outcomes."
+              step={3}
+              title="What do these assumptions mean for ST?"
+            />
+          </div>
+        )}
         <div
-          className={isGuided ? "border-b md:border-b-0 md:border-r" : undefined}
+          className={isGuided ? "order-2 mx-2 mb-2 flex flex-col md:ml-1" : undefined}
           style={isGuided
-            ? { background: isTutorial && tutorialStep === 2 ? `${C.accent}08` : 'transparent', borderColor: C.border, boxShadow: isTutorial && tutorialStep === 2 ? `inset 3px 0 ${C.accent}` : undefined, padding: 16 }
+            ? { background: C.cardBg, border: `1px solid ${C.border}`, borderRadius: 10, boxShadow: isTutorial && tutorialStep === 2 ? `inset 3px 0 ${C.accent}` : undefined, padding: 16 }
             : { ...cardStyle, padding: 14 }}
         >
           {isExecutive
@@ -2869,9 +2781,9 @@ export default function DayMarketSimulator({
             : <Eyebrow>{isGuided ? 'Key risk · Liquidity' : 'Secondary liquidity'}</Eyebrow>}
           {isGuided && (
             <>
-              <h2 className="mt-2" style={{ color: C.text, fontFamily: SERIF, fontSize: 22, fontWeight: 400, lineHeight: 1.12 }}>
+              <h3 className="mt-2" style={{ color: C.text, fontFamily: SERIF, fontSize: 18, fontWeight: 600, lineHeight: 1.2 }}>
                 How much ST can sell?
-              </h2>
+              </h3>
               <p className="mt-2" style={{ color: C.muted, fontSize: 11.5, lineHeight: 1.45 }}>
                 Larger atomic sales move the price down. Arbitrage between sales can reopen capacity.
               </p>
@@ -2919,10 +2831,11 @@ export default function DayMarketSimulator({
                 fontFamily: MONO,
                 fontSize: 9.5,
                 fontWeight: 700,
-                marginTop: 10,
+                marginTop: 'auto',
                 minHeight: 32,
                 padding: '7px 10px',
                 textTransform: 'uppercase',
+                width: 'fit-content',
               }}
               type="button"
             >
@@ -2937,8 +2850,8 @@ export default function DayMarketSimulator({
           )}
         </div>
 
-        <div style={isGuided
-          ? { background: isTutorial && tutorialStep === 1 ? `${C.accent}08` : 'transparent', boxShadow: isTutorial && tutorialStep === 1 ? `inset 3px 0 ${C.accent}` : undefined, padding: 16 }
+        <div className={isGuided ? "order-1 mx-2 mb-2 flex flex-col md:mr-1" : undefined} style={isGuided
+          ? { background: C.cardBg, border: `1px solid ${C.border}`, borderRadius: 10, boxShadow: isTutorial && tutorialStep === 1 ? `inset 3px 0 ${C.accent}` : undefined, padding: 16 }
           : { ...cardStyle, padding: 14 }}
         >
           {isExecutive
@@ -2946,9 +2859,9 @@ export default function DayMarketSimulator({
             : <Eyebrow>{isGuided ? 'Key risk · Loss protection' : 'First-loss coverage'}</Eyebrow>}
           {isGuided && (
             <>
-              <h2 className="mt-2" style={{ color: C.text, fontFamily: SERIF, fontSize: 22, fontWeight: 400, lineHeight: 1.12 }}>
+              <h3 className="mt-2" style={{ color: C.text, fontFamily: SERIF, fontSize: 18, fontWeight: 600, lineHeight: 1.2 }}>
                 When does ST lose money?
-              </h2>
+              </h3>
               <p className="mt-2" style={{ color: C.muted, fontSize: 11.5, lineHeight: 1.45 }}>
                 JT absorbs losses first; losses beyond that buffer reduce ST.
               </p>
@@ -2993,10 +2906,11 @@ export default function DayMarketSimulator({
                 fontFamily: MONO,
                 fontSize: 9.5,
                 fontWeight: 700,
-                marginTop: 10,
+                marginTop: 'auto',
                 minHeight: 32,
                 padding: '7px 10px',
                 textTransform: 'uppercase',
+                width: 'fit-content',
               }}
               type="button"
             >
@@ -3011,6 +2925,64 @@ export default function DayMarketSimulator({
           )}
         </div>
       </section>}
+
+      {isGuided && endStep && (
+        <section
+          id="day-sim-positions"
+          style={{
+            ...guidedSectionStyle,
+            ...(isTutorial && tutorialStep === 0 ? tutorialHighlightStyle : {}),
+          }}
+        >
+          <DaySectionHeader
+            description={<>{activeMarket.provenance.dataMode === 'published-apy-forward'
+              ? `Modeled from the ${((activeMarket.provenance.publishedApy ?? defaults.sourceApy) * 100).toFixed(1)}% ${activeMarket.provenance.sourceProvider === 'User input' ? 'net' : 'published'} source APY. No historical backtest is running.`
+              : `Modeled from ${view.length} ${activeMarket.provenance.dataCadence} source values, ${startDate} to ${endDate}.`}{' '}Not live performance or a forecast.</>}
+            step={4}
+            title="One source, three different jobs"
+          />
+          <div className="mt-3 overflow-x-auto" style={{ border: `1px solid ${C.border}`, borderRadius: 10 }}>
+            <table className="w-full" style={{ borderCollapse: 'collapse', minWidth: 720, textAlign: 'left' }}>
+              <thead style={{ background: C.pageBg }}>
+                <tr>
+                  {['Position', 'What it does', 'End value', 'Avg / year', 'Worst drop'].map((label) => (
+                    <th
+                      key={label}
+                      style={{
+                        borderBottom: `1px solid ${C.border}`,
+                        color: C.kpiLabel,
+                        fontSize: 8.5,
+                        fontWeight: 700,
+                        letterSpacing: '0.1em',
+                        padding: '8px 10px',
+                        textTransform: 'uppercase',
+                      }}
+                    >
+                      {label}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {[
+                  ['Source', 'Baseline', from100(endStep.strategy), pct(result.strategyApy), drawdownPct(result.strategyMaxDrawdown), C.strategyLine],
+                  ['ST', 'Protected by JT first-loss capital', from100(endStep.senior), pct(result.seniorApy), drawdownPct(result.seniorMaxDrawdown), C.seniorLine],
+                  ['JT', 'Takes first loss; earns risk premium', from100(endStep.junior), pct(result.juniorApy), drawdownPct(result.juniorMaxDrawdown), C.juniorLine],
+                  ['SLP', 'Provides liquidity for ST', from100(endStep.liquidity), pct(result.liquidityApy), drawdownPct(result.liquidityMaxDrawdown), C.olive],
+                ].map(([position, role, ending, apy, drawdown, color], index) => (
+                  <tr key={position} style={{ background: index % 2 === 0 ? C.cardBg : C.pageBg }}>
+                    <td style={{ borderBottom: index < 3 ? `1px solid ${C.border}` : undefined, color, fontFamily: MONO, fontSize: 13, fontWeight: 700, padding: '10px' }}>{position}</td>
+                    <td style={{ borderBottom: index < 3 ? `1px solid ${C.border}` : undefined, color: C.muted, fontSize: 11.5, padding: '10px' }}>{role}</td>
+                    <td style={{ borderBottom: index < 3 ? `1px solid ${C.border}` : undefined, color, fontFamily: MONO, fontSize: 14, fontWeight: 600, padding: '10px' }}>{ending}</td>
+                    <td style={{ borderBottom: index < 3 ? `1px solid ${C.border}` : undefined, color: C.text, fontFamily: MONO, fontSize: 11.5, padding: '10px' }}>{apy}</td>
+                    <td style={{ borderBottom: index < 3 ? `1px solid ${C.border}` : undefined, color: C.text, fontFamily: MONO, fontSize: 11.5, padding: '10px' }}>{drawdown}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
 
       {isExecutive && showSection('observation-period') && sourceHasObservedDrawdown && (
         <section style={{ ...cardStyle, padding: 16 }}>
@@ -3462,6 +3434,19 @@ export default function DayMarketSimulator({
         </p>
       </section>}
 
+      {isGuided && (
+        <DayDeploymentInputs
+          adaptationSpeed={defaults.riskYDM.maxAdaptSpeedPerYear}
+          coveragePct={coveragePct}
+          marketName={activeMarket.identity.marketName}
+          observationDays={observationDays}
+          protectedExitThresholdPct={defaults.exitBufferPct}
+          riskYDM={defaults.riskYDM}
+          selfLiquidationBonus={defaults.selfLiquidationBonus}
+          sourceApyPct={sourceApyPct}
+        />
+      )}
+
       {showSection('disclosure') && <footer
         style={{
           background: isGuided ? C.pageBg : undefined,
@@ -3475,7 +3460,7 @@ export default function DayMarketSimulator({
         <p style={{ borderColor: C.border }}>
           <strong style={{ fontWeight: 600 }}>What this is, and what it is not.</strong>{' '}
           {activeMarket.provenance.dataMode === 'published-apy-forward'
-            ? `The strategy base asset source is ${activeMarket.provenance.source}. This forward test uses the published ${(activeMarket.provenance.publishedApy ?? defaults.sourceApy) * 100}% APY and does not present historical performance.`
+            ? `The strategy base asset source is ${activeMarket.provenance.source}. This forward model uses the ${activeMarket.provenance.sourceProvider === 'User input' ? 'net' : 'published'} ${(activeMarket.provenance.publishedApy ?? defaults.sourceApy) * 100}% APY and does not present historical performance.`
             : `The strategy base asset source is ${activeMarket.provenance.source}, covering ${startDate} through ${endDate}.`}
         </p>
         <p className="mt-1">{activeMarket.copy.disclosure}</p>
