@@ -117,7 +117,7 @@ const bandComparisons = [0.1, 0.05, 0.03, 0.01].map((eclpBandWidth) => {
   return buildDayExplainerMetrics(comparisonConfig, initial);
 });
 check(
-  'tighter E-CLP bands increase the amount of ST sellable at 1% slippage',
+  'tighter E-CLP bands increase the amount of Sr sellable at 1% slippage',
   bandComparisons.every(
     (comparison, index) => index === 0
       || comparison.liquidity.referenceSellShareOfSenior

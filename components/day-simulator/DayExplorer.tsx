@@ -22,13 +22,13 @@ import {
   DAY_SIMULATOR_THEME,
   DAY_SIMULATOR_TYPE,
   DayButton,
-  DayDisclosure,
   DayFieldCaption,
   DayFieldLabel,
   DaySectionHeader,
   DaySegmentedButton,
   DaySegmentedControl,
   DaySurface,
+  DayZoneHeader,
 } from "@/components/day-simulator/DaySimulatorUI";
 
 const COLORS = {
@@ -47,6 +47,7 @@ const MONO = DAY_SIMULATOR_TYPE.mono;
 const SANS = DAY_SIMULATOR_TYPE.sans;
 const MAX_UPLOAD_BYTES = 5 * 1024 * 1024;
 const DRAFT_OPTION = "__draft__";
+const DEFAULT_CUSTOM_SOURCE_APY_PCT = 5;
 
 type ImportedUrlResponse = {
   series: DaySeriesPoint[];
@@ -69,13 +70,31 @@ const fieldStyle = {
   width: "100%",
 } as const;
 
+const SHORT_MONTHS = [
+  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+];
+
+function shortMonthYear(isoDate: string): string {
+  const match = /^(\d{4})-(\d{2})/.exec(isoDate);
+  if (!match) return isoDate;
+  const monthName = SHORT_MONTHS[Number(match[2]) - 1];
+  return monthName ? `${monthName} ${match[1]}` : isoDate;
+}
+
+function coverageLabel(market: DayMarket): string {
+  const { firstDate, lastDate } = market.provenance;
+  if (!firstDate || !lastDate) return "Date range unknown";
+  return `${shortMonthYear(firstDate)} – ${shortMonthYear(lastDate)}`;
+}
+
 function marketLabel(market: DayMarket): string {
   const assetLabel = market.customization.vaultTabs?.label
     ?? market.identity.displayAssetName;
-  const datasetType = market.provenance.dataMode === "published-apy-forward"
-    ? "Published APY sample"
-    : "Historical dataset";
-  return `${assetLabel} · ${datasetType}`;
+  if (market.provenance.dataMode === "published-apy-forward") {
+    return `${assetLabel} · Published APY sample · No dated history`;
+  }
+  return `${assetLabel} · Historical data · ${coverageLabel(market)}`;
 }
 
 function filenameLabel(filename: string): string {
@@ -126,13 +145,16 @@ export default function DayExplorer({
 }) {
   const [selectedMarketId, setSelectedMarketId] = useState(initialMarket.id);
   const [draftSource, setDraftSource] = useState<DayDraftSource | null>(null);
-  const [yieldDraft, setYieldDraft] = useState<DayYieldDraftSource | null>(null);
+  const [yieldDraft, setYieldDraft] = useState<DayYieldDraftSource | null>({
+    label: "Custom yield source",
+    sourceApy: DEFAULT_CUSTOM_SOURCE_APY_PCT / 100,
+  });
   const [draftVersion, setDraftVersion] = useState(0);
-  const [sourceMode, setSourceMode] = useState<"yield" | "history">(
-    initialMarket.provenance.dataMode === "published-apy-forward" ? "yield" : "history",
-  );
+  const [sourceMode, setSourceMode] = useState<"yield" | "history">("yield");
   const [yieldLabel, setYieldLabel] = useState("Custom yield source");
-  const [yieldApyPct, setYieldApyPct] = useState(initialMarket.defaults.sourceApy * 100);
+  // A custom yield source starts from a neutral 5% net APY rather than the
+  // loaded sample's APY, so the typed input is not anchored to another market.
+  const [yieldApyPct, setYieldApyPct] = useState(DEFAULT_CUSTOM_SOURCE_APY_PCT);
   const [sourceUrl, setSourceUrl] = useState("");
   const [importingUrl, setImportingUrl] = useState(false);
   const [showImport, setShowImport] = useState(false);
@@ -155,6 +177,9 @@ export default function DayExplorer({
     : activeMarket.id;
   const isDraft = draftMarket !== null || yieldDraftMarket !== null;
   const isYieldDraft = yieldDraftMarket !== null;
+  const yieldModelIsCurrent = isYieldDraft
+    && yieldDraft?.label === yieldLabel
+    && Math.abs((yieldDraft?.sourceApy ?? 0) - yieldApyPct / 100) < 1e-9;
 
   const selectMarket = (marketId: string) => {
     if (marketId === DRAFT_OPTION && draftSource) return;
@@ -193,6 +218,13 @@ export default function DayExplorer({
     setDraftSource(null);
     setDraftVersion((current) => current + 1);
     setError("");
+    // The outcomes this run produces are further down the page; without this the
+    // click appears to do nothing at all.
+    window.requestAnimationFrame(() => {
+      document
+        .getElementById("day-sim-live-outcomes")
+        ?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
     const nextUrl = new URL(window.location.href);
     nextUrl.pathname = routePath;
     nextUrl.search = "";
@@ -289,40 +321,48 @@ export default function DayExplorer({
                 {experience === "learning" ? "Step 1 · Source input" : "Royco Day simulator"}
               </span>
             </div>
+            {/* The hero states the mechanism as a claim and sets the position
+                vocabulary before any control appears, rather than explaining
+                the page to the reader. */}
             <h1
-              className="mt-2"
+              className="mt-3"
               style={{
                 color: COLORS.text,
                 fontFamily: SANS,
-                fontSize: "clamp(22px,2vw,28px)",
+                fontSize: experience === "learning"
+                  ? "clamp(22px,2vw,28px)"
+                  : "clamp(32px,4.4vw,58px)",
                 fontWeight: 500,
-                letterSpacing: "-0.035em",
-                lineHeight: 1.08,
+                letterSpacing: "-0.04em",
+                lineHeight: 1.02,
                 marginBottom: 0,
+                textWrap: "balance",
               }}
             >
-              {experience === "learning"
-                ? "Choose a yield source"
-                : "Explore Royco Day"}
+              {experience === "learning" ? "Choose a yield source" : (
+                <>
+                  One yield source.
+                  <br />
+                  <span style={{ color: COLORS.muted }}>Three different risks.</span>
+                </>
+              )}
             </h1>
             {experience === "learning" ? (
-              <p className="mt-1.5" style={{ color: COLORS.muted, fontSize: 12.5, lineHeight: 1.5 }}>
+              <p className="mt-1.5" style={{ color: COLORS.muted, fontSize: 13, lineHeight: 1.5 }}>
                 {activeMarket.identity.displayAssetName} is loaded. Keep it, choose another example, or import your own history.
               </p>
             ) : (
               <p
-                className="mt-3"
+                className="mt-4"
                 style={{
                   color: COLORS.muted,
-                  fontSize: "clamp(14px,1.15vw,16px)",
-                  lineHeight: 1.5,
-                  maxWidth: 900,
+                  fontSize: "clamp(14px,1.15vw,16.5px)",
+                  lineHeight: 1.55,
+                  maxWidth: "62ch",
                 }}
               >
-                <strong style={{ color: COLORS.text, fontWeight: 600 }}>
-                  Royco Day is a mechanism that splits one yield source into positions with distinct risk, return, and liquidity profiles.
-                </strong>{" "}
-                Use this simulator to adjust the yield split, first-loss protection, and liquidity assumptions, then see how each configuration changes the tradeoffs across positions.
+                Royco Day is a mechanism that splits one yield source into positions with distinct risk, return, and liquidity profiles.
+                Set the terms below and watch what each position earns, and what it stands to lose.
               </p>
             )}
           </div>
@@ -341,23 +381,69 @@ export default function DayExplorer({
         </div>
 
         {experience !== "learning" && (
-          <div className="mt-3">
-            <DayDisclosure>
-              <strong style={{ color: COLORS.text, fontWeight: 600 }}>Educational simulator only.</strong>{" "}
-              No securities are offered or available through this page. Sample datasets provide source inputs only and do not imply issuer participation, endorsement, or proposed market terms. All simulation assumptions are illustrative and user-adjustable.
-            </DayDisclosure>
-          </div>
-        )}
+          <>
+            {/* Names the three positions and their colours up front, so the
+                chart, tables, and diagrams below arrive already legible. */}
+            <div
+              className="mt-6 grid grid-cols-1 sm:grid-cols-3"
+              style={{ borderTop: `1px solid ${COLORS.border}`, gap: 0 }}
+            >
+              {[
+                { color: DAY_SIMULATOR_THEME.seniorLine, name: "Sr", role: "Senior — protected, and can sell early" },
+                { color: DAY_SIMULATOR_THEME.juniorLine, name: "Jr", role: "Junior — absorbs losses first, paid for it" },
+                { color: DAY_SIMULATOR_THEME.olive, name: "SLP", role: "Liquidity — supplies the pool Sr sells into" },
+              ].map((position) => (
+                <div
+                  key={position.name}
+                  style={{
+                    borderTop: `2px solid ${position.color}`,
+                    marginTop: -1,
+                    paddingRight: 16,
+                    paddingTop: 10,
+                  }}
+                >
+                  <span
+                    style={{
+                      color: position.color,
+                      fontFamily: MONO,
+                      fontSize: 15,
+                      fontWeight: 700,
+                      letterSpacing: "-0.01em",
+                    }}
+                  >
+                    {position.name}
+                  </span>
+                  <p className="mt-1" style={{ color: COLORS.muted, fontSize: 11.5, lineHeight: 1.45 }}>
+                    {position.role}
+                  </p>
+                </div>
+              ))}
+            </div>
 
-        <div className="mt-4">
+            <p
+              className="mt-5"
+              style={{ color: DAY_SIMULATOR_THEME.kpiLabel, fontSize: 10, lineHeight: 1.5, maxWidth: "88ch" }}
+            >
+              <strong style={{ color: COLORS.muted, fontWeight: 600 }}>Educational simulator only.</strong>{" "}
+              No securities are offered or available through this page. Sample datasets provide source inputs only and do not imply issuer participation, endorsement, or proposed market terms. All simulation assumptions are illustrative and user-adjustable.
+            </p>
+          </>
+        )}
+      </DaySurface>
+
+      {experience !== "learning" && (
+        <DayZoneHeader label="Design" zone="input" />
+      )}
+
+      <DaySurface
+        padding="spacious"
+        tone={experience === "learning" ? "output" : "input"}
+      >
+        <div>
           {experience === "learning" ? (
             <DayFieldCaption>Input · Yield source</DayFieldCaption>
           ) : (
-            <DaySectionHeader
-              description="Start with one net APY or a dated source history."
-              step={1}
-              title="Choose a source model"
-            />
+            <DaySectionHeader title="Yield source" />
           )}
           <div className="mt-2">
             <DaySegmentedControl label="Source model">
@@ -366,7 +452,7 @@ export default function DayExplorer({
                 onClick={() => setSourceMode("yield")}
               >
                 <strong style={{ display: "block" }}>Expected yield only</strong>
-                <span style={{ color: COLORS.muted, display: "block", fontSize: 10.5, marginTop: 2 }}>One net APY · No historical backtest</span>
+                <span style={{ color: COLORS.muted, display: "block", fontSize: 10, marginTop: 2 }}>One net APY · No historical backtest</span>
               </DaySegmentedButton>
               <DaySegmentedButton
                 active={sourceMode === "history"}
@@ -376,7 +462,7 @@ export default function DayExplorer({
                 }}
               >
                 <strong style={{ display: "block" }}>Historical data</strong>
-                <span style={{ color: COLORS.muted, display: "block", fontSize: 10.5, marginTop: 2 }}>Sample or imported dated values</span>
+                <span style={{ color: COLORS.muted, display: "block", fontSize: 10, marginTop: 2 }}>Sample or imported dated values</span>
               </DaySegmentedButton>
             </DaySegmentedControl>
           </div>
@@ -392,14 +478,28 @@ export default function DayExplorer({
               <DayFieldCaption>Net APY</DayFieldCaption>
               <input aria-label="Net source APY" inputMode="decimal" min="-99.99" onChange={(event) => setYieldApyPct(Number(event.target.value))} step="0.1" style={fieldStyle} type="number" value={yieldApyPct} />
             </DayFieldLabel>
-            <DayButton onClick={activateYieldDraft} style={{ minHeight: 44, whiteSpace: "nowrap" }} variant="primary">Run yield model</DayButton>
+            <DayButton
+              disabled={yieldModelIsCurrent}
+              onClick={activateYieldDraft}
+              style={{
+                cursor: yieldModelIsCurrent ? "default" : "pointer",
+                minHeight: 44,
+                whiteSpace: "nowrap",
+              }}
+              variant={yieldModelIsCurrent ? "secondary" : "primary"}
+            >
+              {yieldModelIsCurrent ? "Model applied ✓" : "Run yield model"}
+            </DayButton>
           </div>
         ) : (
           <>
-            <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
-              <DayFieldLabel>
+            <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-[minmax(0,max-content)_max-content]">
+              {/* minWidth:0 on both the grid item and the select lets the
+                  control shrink below its widest option instead of forcing the
+                  page to scroll horizontally on narrow viewports. */}
+              <DayFieldLabel style={{ minWidth: 0 }}>
                 <DayFieldCaption>Sample yield source</DayFieldCaption>
-                <select aria-label="Explore a yield source" onChange={(event) => selectMarket(event.target.value)} style={fieldStyle} value={draftSource ? DRAFT_OPTION : selectedMarket.id}>
+                <select aria-label="Explore a yield source" onChange={(event) => selectMarket(event.target.value)} style={{ ...fieldStyle, maxWidth: "100%", minWidth: 0, width: "auto" }} value={draftSource ? DRAFT_OPTION : selectedMarket.id}>
                   {draftSource && <option value={DRAFT_OPTION}>{draftSource.label} · Draft</option>}
                   <optgroup label="Sample yield sources">
                     {markets.map((market) => <option key={market.id} value={market.id}>{marketLabel(market)}</option>)}
@@ -415,14 +515,14 @@ export default function DayExplorer({
               <div className="mt-3" style={{ background: COLORS.soft, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: 12 }}>
                 <DayFieldCaption>Import dated values</DayFieldCaption>
                 <div className="mt-2 grid grid-cols-1 gap-2 sm:grid-cols-[auto_minmax(0,1fr)_auto]">
-                  <label style={{ alignItems: "center", background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 8, color: COLORS.text, cursor: "pointer", display: "flex", fontSize: 12, fontWeight: 600, justifyContent: "center", minHeight: 44, padding: "10px 12px", whiteSpace: "nowrap" }}>
+                  <label style={{ alignItems: "center", background: COLORS.card, border: `1px solid ${COLORS.border}`, borderRadius: 8, color: COLORS.text, cursor: "pointer", display: "flex", fontSize: 13, fontWeight: 600, justifyContent: "center", minHeight: 44, padding: "10px 12px", whiteSpace: "nowrap" }}>
                     <input accept=".csv,.tsv,.txt,.json,.html,.htm,text/csv,text/tab-separated-values,application/json,text/html" aria-label="Upload dated NAV or price history" className="sr-only" onChange={(event) => { void importFile(event.target.files?.[0]); event.target.value = ""; }} type="file" />
                     Upload file
                   </label>
                   <input aria-label="Public yield source URL" onChange={(event) => setSourceUrl(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); void importUrl(); } }} placeholder="Paste a CSV, Google Sheet, JSON, or HTML table URL" style={fieldStyle} type="url" value={sourceUrl} />
                   <DayButton disabled={importingUrl} onClick={() => void importUrl()} style={{ cursor: importingUrl ? "wait" : "pointer", minHeight: 44, opacity: importingUrl ? 0.65 : 1, whiteSpace: "nowrap" }} variant="primary">{importingUrl ? "Importing…" : "Import link"}</DayButton>
                 </div>
-                <p className="mt-2" style={{ color: COLORS.muted, fontSize: 10.5 }}>CSV, JSON, Google Sheet, or public HTML table. Imports stay private and unverified.</p>
+                <p className="mt-2" style={{ color: COLORS.muted, fontSize: 10 }}>CSV, JSON, Google Sheet, or public HTML table. Imports stay private and unverified.</p>
               </div>
             )}
 
@@ -430,7 +530,7 @@ export default function DayExplorer({
               <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2" style={{ background: COLORS.soft, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: 12 }}>
                 <DayFieldLabel><DayFieldCaption>Source name</DayFieldCaption><input aria-label="Imported source name" onChange={(event) => updateDraft({ label: event.target.value || "Imported yield source" })} style={fieldStyle} value={draftSource.label} /></DayFieldLabel>
                 <DayFieldLabel><DayFieldCaption>Value type</DayFieldCaption><select aria-label="Imported data value type" onChange={(event) => updateDraft({ priceType: event.target.value as DayDraftSource["priceType"] })} style={fieldStyle} value={draftSource.priceType}><option value="unknown">Not specified</option><option value="nav">NAV — accounting value</option><option value="price">Price — tradable market value</option><option value="total-return-index">Total-return index</option></select></DayFieldLabel>
-                <p className="sm:col-span-2" style={{ color: COLORS.muted, fontSize: 10.5 }}>Imported values are treated as net of source-level fees.</p>
+                <p className="sm:col-span-2" style={{ color: COLORS.muted, fontSize: 10 }}>Imported values are treated as net of source-level fees.</p>
               </div>
             )}
           </>
@@ -440,31 +540,31 @@ export default function DayExplorer({
           <p
             className="mt-3"
             role="alert"
-            style={{ color: COLORS.warning, fontSize: 12, lineHeight: 1.45 }}
+            style={{ color: COLORS.warning, fontSize: 13, lineHeight: 1.45 }}
           >
             {error}
           </p>
         )}
 
-        <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1" style={{ color: COLORS.muted, fontSize: 10.5 }}>
+        <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1" style={{ color: COLORS.muted, fontSize: 10 }}>
           {sourceMode === "yield" && !isYieldDraft ? (
             <span>Enter a net APY and run the yield model to replace the current sample.</span>
           ) : (
             <>
-          <strong style={{ color: isDraft ? COLORS.warning : COLORS.olive, fontWeight: 600 }}>
-            {isYieldDraft ? "Yield-only model" : isDraft ? "Unverified upload" : "Sample dataset"}
-          </strong>
+          {isDraft && (
+            <strong style={{ color: COLORS.warning, fontWeight: 600 }}>
+              {isYieldDraft ? "Yield-only model" : "Unverified upload"}
+            </strong>
+          )}
           {isYieldDraft ? (
-            <>
-              <span>·</span><span>{yieldApyPct.toFixed(1)}% net APY</span><span>·</span><span>No historical backtest</span>
-            </>
+            <span>{yieldApyPct.toFixed(1)}% net APY · No historical backtest</span>
           ) : (
-            <>
-              <span>·</span><span>{activeMarket.provenance.observationCount} {describeCadence(activeMarket.provenance.dataCadence)} values</span><span>·</span><span>{activeMarket.provenance.firstDate} to {activeMarket.provenance.lastDate}</span><span>·</span><span>{describePriceType(activeMarket.provenance.priceType)} · {describeFees(activeMarket.provenance.feesIncluded)}</span>
-            </>
+            <span>
+              {activeMarket.provenance.observationCount} {describeCadence(activeMarket.provenance.dataCadence)} values · {describePriceType(activeMarket.provenance.priceType)} · {describeFees(activeMarket.provenance.feesIncluded)}
+            </span>
           )}
           {draftSource && (
-            <p className="basis-full" style={{ color: COLORS.muted, fontSize: 10.5 }}>
+            <p className="basis-full" style={{ color: COLORS.muted, fontSize: 10 }}>
               Confirm the value type and source before publishing.
             </p>
           )}

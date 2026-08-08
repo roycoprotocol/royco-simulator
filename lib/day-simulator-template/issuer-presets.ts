@@ -18,51 +18,59 @@ export type DayIssuerPreset = {
   values: DayIssuerPresetValues;
 };
 
+// Single source of truth for how a requirement prices its premium. Each tranche
+// is paid in proportion to what it supplies: Jr at 1x the coverage requirement,
+// SLP at 0.5x the liquidity requirement. The shipped market defaults, the preset
+// buttons in the simulator, and the issuer presets below all derive from these,
+// so the three cannot drift apart.
+export const DAY_JR_PREMIUM_PER_COVERAGE = 1;
+export const DAY_SLP_PREMIUM_PER_LIQUIDITY = 0.5;
+
 export const DAY_ISSUER_PRESETS: readonly DayIssuerPreset[] = [
   {
     id: 'st-stability',
-    label: 'Lower ST volatility',
-    caption: 'Deep JT buffer, tight peg band, long recovery window',
+    label: 'Lower Sr volatility',
+    caption: 'Deep Jr buffer, tight peg band, long recovery window',
     rationale:
-      'A 25% minimum coverage requirement sizes the largest JT first-loss buffer the market allows, a 1% E-CLP band keeps modeled pool prices close to $1, and a 90-day Observation Period gives the source time to recover before a covered loss is finalized.',
+      'A 25% minimum coverage requirement sizes the largest Jr first-loss buffer the market allows, a 1% E-CLP band keeps modeled pool prices close to $1, and a 90-day Observation Period gives the source time to recover before a covered loss is finalized. Jr is paid 25% of Sr yield and SLP 10%, in proportion to what each supplies.',
     values: {
       coveragePct: 25,
       minLiquidityPct: 20,
       eclpBandWidthPct: 1,
-      riskSharePct: 50,
-      liqSharePct: 20,
+      riskSharePct: 25,
+      liqSharePct: 10,
       observationDays: 90,
       maintainCoverage: true,
     },
   },
   {
     id: 'st-yield',
-    label: 'Maximize ST yield',
-    caption: 'Thin buffers, minimal premiums paid out of ST yield',
+    label: 'Maximize Sr yield',
+    caption: 'Thin buffers, minimal premiums paid out of Sr yield',
     rationale:
-      'ST keeps the source yield left after premiums, so a 10% coverage requirement and a 5% SLP pool floor keep the paid-out risk and liquidity premiums (12% and 5% of ST yield) as small as the structure allows.',
+      'Sr keeps the source yield left after premiums, so a 10% coverage requirement and a 5% SLP pool floor keep the paid-out risk and liquidity premiums (10% and 2.5% of Sr yield) as small as the structure allows.',
     values: {
       coveragePct: 10,
       minLiquidityPct: 5,
       eclpBandWidthPct: 10,
-      riskSharePct: 12,
-      liqSharePct: 5,
+      riskSharePct: 10,
+      liqSharePct: 2.5,
       observationDays: 60,
       maintainCoverage: true,
     },
   },
   {
     id: 'st-liquidity',
-    label: 'Maximize ST liquidity',
+    label: 'Maximize Sr liquidity',
     caption: 'Deep SLP pool, wide band, short observation lockups',
     rationale:
-      'A 25% SLP pool floor and a 10% downside band let a larger share of ST sell in one transaction, paid for with a 45% liquidity premium, and a 14-day Observation Period keeps fixed-term lockups short.',
+      'A 25% SLP pool floor and a 10% downside band let a larger share of Sr sell in one transaction, paid for with a 12.5% liquidity premium, and a 14-day Observation Period keeps fixed-term lockups short.',
     values: {
       coveragePct: 15,
       minLiquidityPct: 25,
       eclpBandWidthPct: 10,
-      riskSharePct: 20,
-      liqSharePct: 45,
+      riskSharePct: 15,
+      liqSharePct: 12.5,
       observationDays: 14,
       maintainCoverage: true,
     },

@@ -14,8 +14,8 @@ import { JBBB_SAMPLE_MARKET } from "@/lib/day-sample-sources/jbbb/market";
 import type { DayMarket } from "@/lib/day-simulator-template/market";
 
 export const DAY_MARKETS: readonly DayMarket[] = [
-  PARETO_FALCONX_DAY_MARKET,
   JBBB_SAMPLE_MARKET,
+  PARETO_FALCONX_DAY_MARKET,
   SUSDAI_MARKET,
   REUSDE_MARKET,
   INFINIFI_MARKET,
@@ -29,4 +29,10 @@ export const DAY_MARKETS: readonly DayMarket[] = [
   MUGA_MARKET,
 ];
 
-export const DEFAULT_DAY_EXPLORER_MARKET = PARETO_FALCONX_DAY_MARKET;
+// The explorer opens on JBBB because it is the only sample whose real history
+// contains a drawdown deep enough (~10.8% over 1,144 observations) to push past
+// the Jr buffer, so the coverage waterfall, Observation Periods, and Sr loss
+// marks are all visible without a hypothetical shock. Every other sample draws
+// down under 1% and leaves the mechanism dormant. Swap this back to
+// PARETO_FALCONX_DAY_MARKET to restore the previous landing dataset.
+export const DEFAULT_DAY_EXPLORER_MARKET = JBBB_SAMPLE_MARKET;

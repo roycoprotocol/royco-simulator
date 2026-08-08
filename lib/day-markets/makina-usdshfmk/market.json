@@ -12,8 +12,8 @@
   },
   "defaults": {
     "sourceApy": 0.0474,
-    "coverage": 0.1,
-    "minLiquidity": 0.1,
+    "coverage": 0.05,
+    "minLiquidity": 0.05,
     "liquidationUtilization": 100,
     "observationDays": 7,
     "exitBufferPct": 1,
@@ -21,15 +21,15 @@
     "maintainCoverage": true,
     "riskYDM": {
       "mode": "static",
-      "y0": 0.06,
-      "yTarget": 0.073,
-      "y100": 0.18
+      "y0": 0.037,
+      "yTarget": 0.05,
+      "y100": 0.15
     },
     "liqYDM": {
       "mode": "static",
-      "y0": 0.034,
-      "yTarget": 0.034,
-      "y100": 0.2
+      "y0": 0.025,
+      "yTarget": 0.025,
+      "y100": 0.075
     },
     "selfLiquidationBonus": 0.01,
     "stProtocolFee": 0,
@@ -39,17 +39,17 @@
     "stableYield": 0.035,
     "swapFeeBps": 10,
     "poolTurnoverPerYear": 8,
-    "eclpBandWidth": 0.1,
+    "eclpBandWidth": 0.01,
     "reinvestLiquidityPremium": true,
     "initialST": 1000,
-    "initialJT": 125,
-    "initialLT": 111.11111111111111
+    "initialJT": 58.82352941176471,
+    "initialLT": 55.55555555555556
   },
   "targets": {
-    "seniorApyMin": 0.0422,
-    "seniorApyMax": 0.0424,
-    "juniorApyMin": 0.0754,
-    "juniorApyMax": 0.0757
+    "seniorApyMin": 0.0413,
+    "seniorApyMax": 0.0463,
+    "juniorApyMin": 0.0783,
+    "juniorApyMax": 0.0983
   },
   "certification": {
     "intakeConfirmed": true

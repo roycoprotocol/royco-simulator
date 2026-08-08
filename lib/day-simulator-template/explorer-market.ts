@@ -20,15 +20,18 @@ export const DAY_EXPLORER_TEMPLATE_MANIFEST: DayMarketManifest = {
   },
   defaults: {
     sourceApy: 0.12,
+    // Drafts cover JBBB and every user import. JBBB's real history draws down
+    // 10.8%, and an imported source's risk is unknown, so both want a deep Jr
+    // buffer. Premiums follow Variant B: Jr = 1x coverage, SLP = 0.5x liquidity.
     coverage: 0.2,
-    minLiquidity: 0.12,
+    minLiquidity: 0.1,
     liquidationUtilization: 1.5,
     observationDays: 30,
     exitBufferPct: 66.67,
     linkJuniorToFirstLoss: true,
     maintainCoverage: true,
-    riskYDM: { mode: "static", y0: 0.25, yTarget: 0.35, y100: 0.55 },
-    liqYDM: { mode: "static", y0: 0.08, yTarget: 0.12, y100: 0.2 },
+    riskYDM: { mode: "static", y0: 0.1, yTarget: 0.2, y100: 0.6 },
+    liqYDM: { mode: "static", y0: 0.01, yTarget: 0.05, y100: 0.15 },
     selfLiquidationBonus: 0.02,
     stProtocolFee: 0,
     jtProtocolFee: 0,
@@ -37,11 +40,11 @@ export const DAY_EXPLORER_TEMPLATE_MANIFEST: DayMarketManifest = {
     stableYield: 0.035,
     swapFeeBps: 10,
     poolTurnoverPerYear: 8,
-    eclpBandWidth: 0.1,
+    eclpBandWidth: 0.01,
     reinvestLiquidityPremium: true,
     initialST: 40_000_000,
-    initialJT: 10_000_000,
-    initialLT: 6_000_000,
+    initialJT: 40_000_000 * (0.2 / (0.9 - 0.2)),
+    initialLT: 40_000_000 * (0.1 / 0.9),
   },
   targets: {
     seniorApyMin: 0,
@@ -164,6 +167,15 @@ export function buildDayYieldDraftMarket(source: DayYieldDraftSource): DayMarket
     },
     defaults: {
       ...DAY_EXPLORER_TEMPLATE_MANIFEST.defaults,
+      // A yield-only model has no risk history to justify a deep buffer, so it
+      // opens on the minimal structure. Historical drafts and imports keep the
+      // conservative template defaults, where the risk is simply unknown.
+      coverage: 0.05,
+      minLiquidity: 0.1,
+      initialJT: DAY_EXPLORER_TEMPLATE_MANIFEST.defaults.initialST * (0.05 / (0.9 - 0.05)),
+      initialLT: DAY_EXPLORER_TEMPLATE_MANIFEST.defaults.initialST * (0.1 / 0.9),
+      riskYDM: { mode: "static", y0: 0.02, yTarget: 0.05, y100: 0.15 },
+      liqYDM: { mode: "static", y0: 0.01, yTarget: 0.05, y100: 0.15 },
       sourceApy: source.sourceApy,
     },
     certification: {

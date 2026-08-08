@@ -37,6 +37,7 @@ const input: DayConfigExportInput = {
     exitBufferPct: 1,
     selfLiquidationBonusPct: 1,
   },
+  scenario: { sourceStressPct: 0 },
   modeled: {
     seniorApy: 0.0725,
     juniorApy: 0.2676,
@@ -54,7 +55,17 @@ const input: DayConfigExportInput = {
 };
 
 const payload = buildDayConfigExport(input);
-assert.equal(payload.schemaVersion, 1);
+assert.equal(payload.schemaVersion, 2);
+// A shock must travel with the export, or `modeled` misattributes shocked
+// outcomes to unshocked terms.
+assert.equal(payload.scenario.sourceStressApplied, false);
+assert.equal(payload.scenario.sourceStressPct, 0);
+assert.match(payload.scenario.note, /no hypothetical shock/);
+const stressed = buildDayConfigExport({ ...input, scenario: { sourceStressPct: 12 } });
+assert.equal(stressed.scenario.sourceStressApplied, true);
+assert.equal(stressed.scenario.sourceStressPct, 12);
+assert.match(stressed.scenario.note, /hypothetical 12% source drawdown/);
+assert.ok(!("sourceStressPct" in stressed.terms), "a shock is not a market term");
 assert.equal(payload.source, "day-simulator");
 assert.equal(payload.exportedAt, "2026-08-06T12:34:56.000Z");
 assert.deepEqual(payload.market, input.market);

@@ -7,7 +7,7 @@ import {
 
 export const metadata: Metadata = {
   title: "Royco Day Explorer",
-  description: "Model Senior Tranche (ST), Junior Tranche (JT), and Senior Liquidity Provider (SLP) positions from any yield source.",
+  description: "Model Senior Tranche (Sr), Junior Tranche (Jr), and Senior Liquidity Provider (SLP) positions from any yield source.",
 };
 
 export default async function DaySimulatorPage({

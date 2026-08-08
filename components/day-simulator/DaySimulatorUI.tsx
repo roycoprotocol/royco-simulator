@@ -45,6 +45,77 @@ export const DAY_SIMULATOR_RADIUS = {
   surface: 12,
 } as const;
 
+// Two surface treatments give the page a grammar: controls are recessed into
+// the page, results sit on top of it. Everything the reader can change uses
+// `input`; everything the accountant returns uses `output`.
+export const DAY_SIMULATOR_SURFACE = {
+  input: {
+    background: "#EDEAE1",
+    borderColor: "#D8D4C9",
+    borderStyle: "solid",
+    borderWidth: 1,
+    boxShadow: "inset 0 1px 2px rgba(29,28,25,.06)",
+  },
+  output: {
+    background: DAY_SIMULATOR_THEME.cardBg,
+    borderColor: DAY_SIMULATOR_THEME.border,
+    borderStyle: "solid",
+    borderWidth: 1,
+    boxShadow: "0 1px 2px rgba(29,28,25,.035)",
+  },
+} as const;
+
+// Panels nested inside a recessed input surface need to sit above it, not
+// deeper, or the whole zone reads as one flat block.
+export const DAY_INPUT_PANEL = {
+  background: DAY_SIMULATOR_THEME.cardBg,
+  borderColor: DAY_SIMULATOR_THEME.border,
+  borderRadius: DAY_SIMULATOR_RADIUS.panel,
+  borderStyle: "solid",
+  borderWidth: 1,
+} as const;
+
+export function DayZoneHeader({
+  label,
+  zone = "input",
+}: {
+  label: string;
+  zone?: "input" | "output";
+}) {
+  const accent = zone === "input"
+    ? DAY_SIMULATOR_THEME.eyebrow
+    : DAY_SIMULATOR_THEME.accent;
+  return (
+    <div className="flex items-baseline gap-3" style={{ padding: "2px 4px" }}>
+      <span
+        style={{
+          background: accent,
+          borderRadius: 9999,
+          flex: "0 0 auto",
+          height: 5,
+          width: 5,
+        }}
+      />
+      <span
+        style={{
+          color: DAY_SIMULATOR_THEME.text,
+          fontFamily: DAY_SIMULATOR_TYPE.mono,
+          fontSize: 10,
+          fontWeight: 700,
+          letterSpacing: "0.18em",
+          textTransform: "uppercase",
+        }}
+      >
+        {label}
+      </span>
+      <span
+        aria-hidden
+        style={{ background: DAY_SIMULATOR_THEME.border, flex: "1 1 auto", height: 1 }}
+      />
+    </div>
+  );
+}
+
 const surfacePadding = {
   none: 0,
   compact: DAY_SIMULATOR_SPACE.md,
@@ -57,19 +128,19 @@ export function DaySurface({
   className,
   padding = "normal",
   style,
+  tone = "output",
   ...props
 }: HTMLAttributes<HTMLElement> & {
   children: ReactNode;
   padding?: keyof typeof surfacePadding;
+  tone?: keyof typeof DAY_SIMULATOR_SURFACE;
 }) {
   return (
     <section
       className={className}
       style={{
-        background: DAY_SIMULATOR_THEME.cardBg,
-        border: `1px solid ${DAY_SIMULATOR_THEME.border}`,
+        ...DAY_SIMULATOR_SURFACE[tone],
         borderRadius: DAY_SIMULATOR_RADIUS.surface,
-        boxShadow: "0 1px 2px rgba(29,28,25,.04)",
         padding: surfacePadding[padding],
         ...style,
       }}
@@ -86,7 +157,7 @@ export function DayEyebrow({ children, style }: { children: ReactNode; style?: C
       style={{
         color: DAY_SIMULATOR_THEME.eyebrow,
         fontFamily: DAY_SIMULATOR_TYPE.mono,
-        fontSize: 9.5,
+        fontSize: 9,
         fontWeight: 600,
         letterSpacing: "0.14em",
         textTransform: "uppercase",
@@ -112,8 +183,8 @@ export function DaySectionHeader({
   title: ReactNode;
 }) {
   return (
-    <div className="flex flex-wrap items-start justify-between gap-3">
-      <div className={step ? "flex items-start gap-3" : undefined}>
+    <div className="flex items-start justify-between gap-4">
+      <div className={step ? "flex min-w-0 items-start gap-3" : "min-w-0"}>
         {step && (
           <span
             aria-hidden
@@ -149,14 +220,14 @@ export function DaySectionHeader({
           {description && (
             <p
               className="mt-1"
-              style={{ color: DAY_SIMULATOR_THEME.muted, fontSize: 11.5, lineHeight: 1.45 }}
+              style={{ color: DAY_SIMULATOR_THEME.muted, fontSize: 11, lineHeight: 1.45, maxWidth: '92ch' }}
             >
               {description}
             </p>
           )}
         </div>
       </div>
-      {action}
+      <div style={{ flex: '0 0 auto' }}>{action}</div>
     </div>
   );
 }
@@ -196,7 +267,7 @@ export function DayButton({
         borderRadius: DAY_SIMULATOR_RADIUS.control,
         color: colors.color,
         fontFamily: DAY_SIMULATOR_TYPE.sans,
-        fontSize: 12,
+        fontSize: 13,
         fontWeight: 600,
         minHeight: 40,
         padding: "9px 13px",
@@ -274,7 +345,7 @@ export function DaySegmentedButton({
         boxShadow: active ? "0 1px 2px rgba(29,28,25,.05)" : "none",
         color: active ? DAY_SIMULATOR_THEME.text : DAY_SIMULATOR_THEME.muted,
         fontFamily: DAY_SIMULATOR_TYPE.sans,
-        fontSize: 12,
+        fontSize: 13,
         fontWeight: active ? 600 : 500,
         minHeight: 42,
         padding: "9px 12px",
@@ -299,7 +370,7 @@ export function DayDisclosure({ children }: { children: ReactNode }) {
         borderLeft: `3px solid ${DAY_SIMULATOR_THEME.accent}`,
         borderRadius: DAY_SIMULATOR_RADIUS.control,
         color: DAY_SIMULATOR_THEME.muted,
-        fontSize: 11,
+        fontSize: 11.5,
         lineHeight: 1.5,
         padding: "10px 12px",
       }}
@@ -331,10 +402,10 @@ export function DayValueTile({
       }}
     >
       <DayEyebrow>{label}</DayEyebrow>
-      <p className="mt-1" style={{ color: tone, fontFamily: DAY_SIMULATOR_TYPE.mono, fontSize: 16, fontWeight: 600 }}>
+      <p className="mt-1" style={{ color: tone, fontFamily: DAY_SIMULATOR_TYPE.mono, fontSize: 15, fontWeight: 600 }}>
         {value}
       </p>
-      {note && <p className="mt-1" style={{ color: DAY_SIMULATOR_THEME.muted, fontSize: 10.5, lineHeight: 1.35 }}>{note}</p>}
+      {note && <p className="mt-1" style={{ color: DAY_SIMULATOR_THEME.muted, fontSize: 10, lineHeight: 1.35 }}>{note}</p>}
     </div>
   );
 }

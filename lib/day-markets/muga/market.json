@@ -23,13 +23,13 @@
       "mode": "static",
       "y0": 0.014,
       "yTarget": 0.014,
-      "y100": 0.3
+      "y100": 0.042
     },
     "liqYDM": {
       "mode": "static",
       "y0": 0.08,
       "yTarget": 0.119,
-      "y100": 0.25
+      "y100": 0.357
     },
     "selfLiquidationBonus": 0.01,
     "stProtocolFee": 0,
@@ -39,7 +39,7 @@
     "stableYield": 0.035,
     "swapFeeBps": 10,
     "poolTurnoverPerYear": 8,
-    "eclpBandWidth": 0.1,
+    "eclpBandWidth": 0.01,
     "reinvestLiquidityPremium": true,
     "initialST": 1250000,
     "initialJT": 99999.99999999999,

@@ -201,7 +201,7 @@ export function DayTimeframeBrush({
         style={{ color: C.kpiLabel, fontSize: 10, fontWeight: 600, letterSpacing: '0.16em', textTransform: 'uppercase' }}
       >
         <span>{isForward ? 'Forward test window' : 'Backtest window'}</span>
-        <span style={{ color: C.text, fontFamily: MONO, fontSize: 10.5, fontWeight: 500, letterSpacing: 0, textTransform: 'none' }}>
+        <span style={{ color: C.text, fontFamily: MONO, fontSize: 10, fontWeight: 500, letterSpacing: 0, textTransform: 'none' }}>
           {isFull ? (isForward ? 'Full scenario' : 'Full history') : `${dateLabel(dates[view.a])} → ${dateLabel(dates[view.b])}`}
         </span>
       </div>
@@ -296,8 +296,8 @@ export function DayTimeframeBrush({
                 xPct={hoverPct}
                 rows={[
                   { label: 'Source', value: series.strategy[hoverIndex]?.toFixed(1) ?? '—', color: C.strategyLine },
-                  { label: 'ST', value: series.senior[hoverIndex]?.toFixed(1) ?? '—', color: C.seniorLine },
-                  { label: 'JT', value: series.junior[hoverIndex]?.toFixed(1) ?? '—', color: C.juniorLine },
+                  { label: 'Sr', value: series.senior[hoverIndex]?.toFixed(1) ?? '—', color: C.seniorLine },
+                  { label: 'Jr', value: series.junior[hoverIndex]?.toFixed(1) ?? '—', color: C.juniorLine },
                   { label: 'SLP', value: series.liquidity[hoverIndex]?.toFixed(1) ?? '—', color: C.liquidityLine },
                 ]}
               />
@@ -350,7 +350,7 @@ export function DayTimeframeBrush({
                 top: 1,
                 left: `${year.pct}%`,
                 transform: 'translateX(-50%)',
-                fontSize: 9.5,
+                fontSize: 9,
                 color: C.kpiLabel,
                 fontFamily: MONO,
                 whiteSpace: 'nowrap',

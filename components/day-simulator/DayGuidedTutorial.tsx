@@ -22,8 +22,8 @@ const SANS = "var(--font-inter), Inter, -apple-system, BlinkMacSystemFont, 'Sego
 
 const STEPS = [
   { short: "Positions", title: "Meet the three positions" },
-  { short: "Coverage", title: "When does ST lose money?" },
-  { short: "Liquidity", title: "See how the ST pool works" },
+  { short: "Coverage", title: "When does Sr lose money?" },
+  { short: "Liquidity", title: "See how the Sr pool works" },
   { short: "Impact", title: "Connect each definition to an outcome" },
 ] as const;
 
@@ -46,7 +46,7 @@ export type DayGuidedTutorialProps = {
 
 function Eyebrow({ children }: { children: React.ReactNode }) {
   return (
-    <p style={{ color: C.faint, fontFamily: MONO, fontSize: 9.5, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase" }}>
+    <p style={{ color: C.faint, fontFamily: MONO, fontSize: 9, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase" }}>
       {children}
     </p>
   );
@@ -116,7 +116,7 @@ function OutcomeCard({
       <p className="mt-3" style={{ color: tone, fontFamily: MONO, fontSize: "clamp(24px,3vw,34px)", fontWeight: 700, letterSpacing: "-0.05em", lineHeight: 1 }}>
         {value}
       </p>
-      <p className="mt-2" style={{ color: C.text, fontSize: 12.5, fontWeight: 600 }}>{label}</p>
+      <p className="mt-2" style={{ color: C.text, fontSize: 13, fontWeight: 600 }}>{label}</p>
       <p className="mt-3" style={{ color: C.muted, fontSize: 11.5, lineHeight: 1.5 }}>{explanation}</p>
     </div>
   );
@@ -137,17 +137,17 @@ function Relationship({
     <div className="grid grid-cols-1 items-stretch md:grid-cols-[1fr_28px_1fr_28px_1.15fr]" style={{ gap: 8 }}>
       <div style={{ background: C.page, borderLeft: `3px solid ${tone}`, borderRadius: 8, padding: 12 }}>
         <Eyebrow>Assumption</Eyebrow>
-        <p className="mt-2" style={{ color: C.text, fontSize: 12.5, fontWeight: 650 }}>{input}</p>
+        <p className="mt-2" style={{ color: C.text, fontSize: 13, fontWeight: 650 }}>{input}</p>
       </div>
       <div className="hidden items-center justify-center md:flex" aria-hidden="true" style={{ color: C.faint, fontFamily: MONO }}>→</div>
       <div style={{ background: C.page, borderRadius: 8, padding: 12 }}>
         <Eyebrow>Mechanism</Eyebrow>
-        <p className="mt-2" style={{ color: C.text, fontSize: 12.5, fontWeight: 650 }}>{mechanism}</p>
+        <p className="mt-2" style={{ color: C.text, fontSize: 13, fontWeight: 650 }}>{mechanism}</p>
       </div>
       <div className="hidden items-center justify-center md:flex" aria-hidden="true" style={{ color: C.faint, fontFamily: MONO }}>→</div>
       <div style={{ background: C.greenSoft, borderRadius: 8, padding: 12 }}>
         <Eyebrow>Modeled consequence</Eyebrow>
-        <p className="mt-2" style={{ color: C.green, fontSize: 12.5, fontWeight: 700 }}>{outcome}</p>
+        <p className="mt-2" style={{ color: C.green, fontSize: 13, fontWeight: 700 }}>{outcome}</p>
       </div>
     </div>
   );
@@ -233,7 +233,7 @@ export default function DayGuidedTutorial({
                   color: active ? C.rust : complete ? C.green : C.muted,
                   display: "flex",
                   fontFamily: MONO,
-                  fontSize: 9.5,
+                  fontSize: 9,
                   fontWeight: 750,
                   gap: 7,
                   minHeight: 36,
@@ -254,29 +254,29 @@ export default function DayGuidedTutorial({
       <div style={{ padding: 16 }}>
         {step === 0 && (
           <div>
-            <p style={{ color: C.muted, fontSize: 12.5, lineHeight: 1.5, maxWidth: 760 }}>
+            <p style={{ color: C.muted, fontSize: 13, lineHeight: 1.5, maxWidth: 760 }}>
               Royco Day splits the same yield source into three positions. Each position performs a different job and receives a different share of the modeled economics.
             </p>
             <div className="mt-4 grid grid-cols-1 md:grid-cols-3" style={{ gap: 8 }}>
               {[
                 {
-                  symbol: "ST",
+                  symbol: "Sr",
                   name: "Senior Tranche",
                   job: "Prioritizes first-loss protection and access to secondary liquidity.",
-                  relationship: "Keeps source yield after paying JT and SLP premiums.",
+                  relationship: "Keeps source yield after paying Jr and SLP premiums.",
                   color: C.senior,
                 },
                 {
-                  symbol: "JT",
+                  symbol: "Jr",
                   name: "Junior Tranche",
-                  job: "Takes first loss before ST and provides the protection buffer.",
+                  job: "Takes first loss before Sr and provides the protection buffer.",
                   relationship: "Earns a risk premium for putting its capital first in the loss waterfall.",
                   color: C.junior,
                 },
                 {
                   symbol: "SLP",
                   name: "Senior Liquidity Provider",
-                  job: "Supplies the pool used for secondary ST sales.",
+                  job: "Supplies the pool used for secondary Sr sales.",
                   relationship: "Earns a liquidity premium and modeled pool economics for that role.",
                   color: C.green,
                 },
@@ -284,14 +284,14 @@ export default function DayGuidedTutorial({
                 <div key={position.symbol} style={{ background: C.page, border: `1px solid ${position.color}`, borderRadius: 10, padding: 14 }}>
                   <p style={{ color: position.color, fontFamily: MONO, fontSize: 22, fontWeight: 800 }}>{position.symbol}</p>
                   <p className="mt-1" style={{ color: C.text, fontSize: 13, fontWeight: 700 }}>{position.name}</p>
-                  <p className="mt-3" style={{ color: C.text, fontSize: 12, lineHeight: 1.45 }}>{position.job}</p>
+                  <p className="mt-3" style={{ color: C.text, fontSize: 13, lineHeight: 1.45 }}>{position.job}</p>
                   <p className="mt-3" style={{ borderTop: `1px solid ${C.border}`, color: C.muted, fontSize: 11.5, lineHeight: 1.45, paddingTop: 10 }}>{position.relationship}</p>
                 </div>
               ))}
             </div>
             <div className="mt-3" style={{ background: C.rustSoft, borderLeft: `3px solid ${C.rust}`, borderRadius: 8, color: C.muted, fontSize: 11.5, lineHeight: 1.5, padding: "10px 12px" }}>
               <strong style={{ color: C.text }}>One source, three jobs.</strong>{" "}
-              ST pays part of its yield to JT for first-loss protection and to SLP for pool liquidity.
+              Sr pays part of its yield to Jr for first-loss protection and to SLP for pool liquidity.
             </div>
           </div>
         )}
@@ -300,15 +300,15 @@ export default function DayGuidedTutorial({
           <div className="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_minmax(280px,.82fr)]" style={{ gap: 10 }}>
             <div style={{ background: C.page, border: `1px solid ${C.border}`, borderRadius: 12, padding: 16 }}>
               <Eyebrow>Definition → try it</Eyebrow>
-              <h3 className="mt-2" style={{ color: C.text, fontSize: 18, fontWeight: 650 }}>Set ST&apos;s first-loss protection</h3>
-              <p className="mt-2" style={{ color: C.muted, fontSize: 12, lineHeight: 1.5 }}>
-                JT Coverage is the minimum protection setting the accountant uses to determine how much first-loss JT capital supports ST.
+              <h3 className="mt-2" style={{ color: C.text, fontSize: 18, fontWeight: 650 }}>Set Sr&apos;s first-loss protection</h3>
+              <p className="mt-2" style={{ color: C.muted, fontSize: 13, lineHeight: 1.5 }}>
+                Jr Coverage is the minimum protection setting the accountant uses to determine how much first-loss Jr capital supports Sr.
               </p>
               <div className="mt-4" style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 10, padding: 14 }}>
                 <RangeControl
-                  description="Move the requirement and watch the accountant-derived ST loss threshold change."
+                  description="Move the requirement and watch the accountant-derived Sr loss threshold change."
                   display={`${coveragePct.toFixed(0)}%`}
-                  label="JT Coverage"
+                  label="Jr Coverage"
                   max={25}
                   min={3}
                   onChange={onCoverageChange}
@@ -318,13 +318,13 @@ export default function DayGuidedTutorial({
                 />
               </div>
               <p className="mt-3" style={{ color: C.muted, fontSize: 11.5, lineHeight: 1.5 }}>
-                JT Coverage is a buffer setting—not ST&apos;s loss limit. The model&apos;s 90% utilization target makes the displayed loss threshold slightly higher.
+                Jr Coverage is a buffer setting—not Sr&apos;s loss limit. The model&apos;s 90% utilization target makes the displayed loss threshold slightly higher.
               </p>
             </div>
             <OutcomeCard
-              eyebrow="ST loss threshold"
-              explanation="JT absorbs source losses first. Once the available JT buffer is used, further source loss reduces ST. Coverage is a buffer, not a guarantee."
-              label="of modeled source loss before ST falls below $100"
+              eyebrow="Sr loss threshold"
+              explanation="Jr absorbs source losses first. Once the available Jr buffer is used, further source loss reduces Sr. Coverage is a buffer, not a guarantee."
+              label="of modeled source loss before Sr falls below $100"
               tone={C.green}
               value={`${coverageLimit.toFixed(1)}% source loss`}
             />
@@ -337,8 +337,8 @@ export default function DayGuidedTutorial({
               <div style={{ background: C.page, border: `1px solid ${C.border}`, borderRadius: 12, padding: 16 }}>
                 <Eyebrow>Definition → try it</Eyebrow>
                 <h3 className="mt-2" style={{ color: C.text, fontSize: 18, fontWeight: 650 }}>What is SLP Liquidity?</h3>
-                <p className="mt-2" style={{ color: C.muted, fontSize: 12, lineHeight: 1.5 }}>
-                  SLP Liquidity is the minimum SLP capital required relative to ST. It supplies the pool used for secondary ST sales.
+                <p className="mt-2" style={{ color: C.muted, fontSize: 13, lineHeight: 1.5 }}>
+                  SLP Liquidity is the minimum SLP capital required relative to Sr. It supplies the pool used for secondary Sr sales.
                 </p>
                 <div className="mt-4">
                   <RangeControl
@@ -356,7 +356,7 @@ export default function DayGuidedTutorial({
               </div>
               <div style={{ background: C.page, border: `1px solid ${C.border}`, borderRadius: 12, padding: 16 }}>
                 <h3 style={{ color: C.text, fontSize: 18, fontWeight: 650 }}>What is the Pool Band?</h3>
-                <p className="mt-2" style={{ color: C.muted, fontSize: 12, lineHeight: 1.5 }}>
+                <p className="mt-2" style={{ color: C.muted, fontSize: 13, lineHeight: 1.5 }}>
                   The Pool Band sets how far the modeled pool price can move below $1. It changes where liquidity is concentrated and the tradeoff between sale size and price impact.
                 </p>
                 <div className="mt-4">
@@ -377,16 +377,16 @@ export default function DayGuidedTutorial({
             <div className="flex flex-col" style={{ gap: 8 }}>
               <OutcomeCard
                 eyebrow="Selling close to $1"
-                explanation={`Price impact means the model's average sale price is about ${nearParSlippage.toFixed(1)}% below ST's $1 reference value. Actual sales may differ.`}
+                explanation={`Price impact means the model's average sale price is about ${nearParSlippage.toFixed(1)}% below Sr's $1 reference value. Actual sales may differ.`}
                 label={`can be sold at once with about ${nearParSlippage.toFixed(1)}% average price impact`}
-                value={`${nearParShare.toFixed(1)}% of ST`}
+                value={`${nearParShare.toFixed(1)}% of Sr`}
               />
               <OutcomeCard
                 eyebrow="Largest one-time sale"
                 explanation="At this size, the sale reaches the pool's current limit. Selling more would require multiple sales or waiting for liquidity to return."
                 label={`can be sold in one transaction, with about ${boundarySlippage.toFixed(1)}% average price impact`}
                 tone={C.senior}
-                value={`${boundaryShare.toFixed(1)}% of ST`}
+                value={`${boundaryShare.toFixed(1)}% of Sr`}
               />
             </div>
           </div>
@@ -394,33 +394,33 @@ export default function DayGuidedTutorial({
 
         {step === 3 && (
           <div>
-            <p style={{ color: C.muted, fontSize: 12.5, lineHeight: 1.5, maxWidth: 760 }}>
+            <p style={{ color: C.muted, fontSize: 13, lineHeight: 1.5, maxWidth: 760 }}>
               The definitions are useful because they map directly to observable simulator outputs. These outcomes use the current {assetName} sample and assumptions.
             </p>
             <div className="mt-4 flex flex-col" style={{ gap: 8 }}>
               <Relationship
-                input={`JT Coverage · ${coveragePct.toFixed(0)}%`}
-                mechanism="JT capital enters the loss waterfall before ST"
-                outcome={`ST begins declining after about ${coverageLimit.toFixed(1)}% modeled source loss`}
+                input={`Jr Coverage · ${coveragePct.toFixed(0)}%`}
+                mechanism="Jr capital enters the loss waterfall before Sr"
+                outcome={`Sr begins declining after about ${coverageLimit.toFixed(1)}% modeled source loss`}
                 tone={C.junior}
               />
               <Relationship
                 input={`SLP Liquidity · ${minLiquidityPct.toFixed(0)}%`}
-                mechanism="SLP capital supplies the pool used for ST sales"
-                outcome={`${nearParShare.toFixed(1)}% of ST can sell at once with about ${nearParSlippage.toFixed(1)}% average price impact`}
+                mechanism="SLP capital supplies the pool used for Sr sales"
+                outcome={`${nearParShare.toFixed(1)}% of Sr can sell at once with about ${nearParSlippage.toFixed(1)}% average price impact`}
                 tone={C.green}
               />
               <Relationship
                 input={`Pool Band · ${formatBand(eclpBandWidthPct)}%`}
                 mechanism={`The pool price can move between $${poolFloor.toFixed(3)} and $1`}
-                outcome={`${boundaryShare.toFixed(1)}% of ST is the largest modeled one-time sale`}
+                outcome={`${boundaryShare.toFixed(1)}% of Sr is the largest modeled one-time sale`}
                 tone={C.green}
               />
             </div>
             <div className="mt-4 flex flex-wrap gap-2">
               <button
                 onClick={onExit}
-                style={{ background: C.rust, border: `1px solid ${C.rust}`, borderRadius: 8, color: C.card, fontSize: 12, fontWeight: 700, minHeight: 40, padding: "9px 14px" }}
+                style={{ background: C.rust, border: `1px solid ${C.rust}`, borderRadius: 8, color: C.card, fontSize: 13, fontWeight: 700, minHeight: 40, padding: "9px 14px" }}
                 type="button"
               >
                 Continue without tutorial
@@ -430,7 +430,7 @@ export default function DayGuidedTutorial({
                   onReset();
                   onStepChange(0);
                 }}
-                style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 8, color: C.muted, fontSize: 12, fontWeight: 650, minHeight: 40, padding: "9px 14px" }}
+                style={{ background: C.card, border: `1px solid ${C.border}`, borderRadius: 8, color: C.muted, fontSize: 13, fontWeight: 650, minHeight: 40, padding: "9px 14px" }}
                 type="button"
               >
                 Restart tutorial

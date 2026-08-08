@@ -83,7 +83,7 @@ export function StrictDaySimulatorPageShell({
                   color: selected ? "#1D1C19" : "#68665F",
                   cursor: "pointer",
                   fontFamily: "var(--font-inter), Inter, sans-serif",
-                  fontSize: 12,
+                  fontSize: 13,
                   fontWeight: selected ? 600 : 500,
                   padding: "7px 13px",
                 }}

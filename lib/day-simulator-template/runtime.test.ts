@@ -119,8 +119,8 @@ assert.deepEqual(describeDayMarketCustomizations(forwardCustomization), [
   "hide section: junior-funding",
   "finite forward test: 90 days with good/normal/bad scenarios",
   "omit initial zero-return period from forward chart and monthly table",
-    "reverse market: Muga-funded JT capped at 100000",
-    "ST cap: 1400000",
+    "reverse market: Muga-funded Jr capped at 100000",
+    "Sr cap: 1400000",
 ]);
 assert.ok(validateDayMarketCustomization({
   ...forwardCustomization,
@@ -176,7 +176,7 @@ assert.equal(copy.eyebrow, "ROYCO DAY · PARETO FALCONX MARKET");
 assert.equal(copy.title, "Pareto FalconX Day Simulator");
 assert.equal(
   copy.description,
-  "Explore a hypothetical three-tranche Royco Day market built on AA_FalconXUSDC. JT provides first-loss coverage for ST, while a 15% minimum liquidity requirement supports ST sales through the SLP pool.",
+  "Explore a hypothetical three-tranche Royco Day market built on AA_FalconXUSDC. Jr provides first-loss coverage for Sr, while a 10% minimum liquidity requirement supports Sr sales through the SLP pool.",
 );
 assert.equal(
   copy.disclosure,
@@ -215,8 +215,8 @@ assert.equal(
 
 const initial = buildDayInitialBalances(market.defaults, terms);
 assert.equal(initial.st, 1000);
-assert.ok(Math.abs(initial.jt - 34.48275862068966) < 1e-12);
-assert.ok(Math.abs(initial.lt - 166.66666666666666) < 1e-12);
+assert.ok(Math.abs(initial.jt - 58.82352941176471) < 1e-12);
+assert.ok(Math.abs(initial.lt - 111.11111111111111) < 1e-12);
 
 const config = buildDayMarketConfig(market.defaults, terms);
 assert.equal(config.targetUtilization, 0.9);
@@ -235,9 +235,9 @@ const tighterBandConfig = buildDayMarketConfig(market.defaults, {
 assert.equal(tighterBandConfig.eclpBandWidth, 0.05);
 
 const yields = runDayTargetScenario(market.defaults);
-assert.ok(Math.abs(yields.seniorApy - 0.07249497552408601) < 1e-12);
-assert.ok(Math.abs(yields.juniorApy - 0.2675612623571568) < 1e-12);
-assert.ok(Math.abs(yields.liquidityApy - 0.17409854245399936) < 1e-12);
+assert.ok(Math.abs(yields.seniorApy - 0.0890991205100371) < 1e-12);
+assert.ok(Math.abs(yields.juniorApy - 0.18744522546727427) < 1e-12);
+assert.ok(Math.abs(yields.liquidityApy - 0.09562064039802576) < 1e-12);
 
 const forwardSeries = buildDayForwardSeries(0.114, market.defaults.stableYield, "2026-07-20");
 assert.equal(forwardSeries.length, 13);

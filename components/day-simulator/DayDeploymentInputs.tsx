@@ -8,6 +8,7 @@ import type { YDMConfig } from "@/lib/day/engine/types";
 import {
   DAY_SIMULATOR_THEME,
   DAY_SIMULATOR_TYPE,
+  DayButton,
   DaySectionHeader,
 } from "@/components/day-simulator/DaySimulatorUI";
 
@@ -51,7 +52,7 @@ function DeploymentGroup({
         style={{
           color: DAY_SIMULATOR_THEME.eyebrow,
           fontFamily: DAY_SIMULATOR_TYPE.mono,
-          fontSize: 9.5,
+          fontSize: 9,
           fontWeight: 600,
           letterSpacing: "0.12em",
           textTransform: "uppercase",
@@ -72,7 +73,7 @@ function DeploymentGroup({
             }}
           >
             <div>
-              <p style={{ color: DAY_SIMULATOR_THEME.text, fontSize: 12, fontWeight: 500 }}>{input.label}</p>
+              <p style={{ color: DAY_SIMULATOR_THEME.text, fontSize: 13, fontWeight: 500 }}>{input.label}</p>
               {input.state && (
                 <p className="mt-0.5" style={{ color: DAY_SIMULATOR_THEME.kpiLabel, fontSize: 10 }}>
                   {input.state === "required"
@@ -141,29 +142,31 @@ export default function DayDeploymentInputs({
   children,
   coveragePct,
   deploymentInputs,
+  expanded,
   marketName,
   observationDays,
   onDeploymentInputChange,
+  onToggleExpanded,
   protectedExitThresholdPct,
   riskSharePct,
   riskYDM,
   selfLiquidationBonus,
   sourceApyPct,
-  step,
 }: {
   adaptationSpeed?: number;
   children?: ReactNode;
   coveragePct: number;
   deploymentInputs: DayDeploymentFieldValues;
+  expanded: boolean;
   marketName?: string;
   observationDays: number;
   onDeploymentInputChange: (id: DayDeploymentFieldId, value: string) => void;
+  onToggleExpanded: () => void;
   protectedExitThresholdPct: number;
   riskSharePct: number;
   riskYDM: YDMConfig;
   selfLiquidationBonus: number;
   sourceApyPct: number;
-  step?: number;
 }) {
   const entered = (id: DayDeploymentFieldId): DeploymentInput["state"] =>
     deploymentInputs[id].trim() ? "provided" : "required";
@@ -183,10 +186,20 @@ export default function DayDeploymentInputs({
       }}
     >
       <DaySectionHeader
-        description="The educational simulator can run with fewer inputs. A deployable market requires the complete configuration below."
-        step={step}
-        title="Every input needed to define the market"
+        action={<DayButton
+          aria-expanded={expanded}
+          aria-label={expanded ? "Collapse" : "Expand"}
+          onClick={onToggleExpanded}
+          style={{ minHeight: 32, padding: "6px 10px" }}
+          variant="quiet"
+        >
+          {expanded ? "Hide configuration" : "Show configuration"}
+        </DayButton>}
+        description="Every input required to deploy a real market. The simulator above runs on a subset."
+        title="Full market configuration"
       />
+      {expanded && (
+      <>
       <div className="mt-4 grid grid-cols-1 gap-x-6 gap-y-5 md:grid-cols-2 xl:grid-cols-4">
         <DeploymentGroup
           inputs={[
@@ -255,6 +268,8 @@ export default function DayDeploymentInputs({
         />
       </div>
       {children}
+      </>
+      )}
     </section>
   );
 }

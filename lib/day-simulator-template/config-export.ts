@@ -1,7 +1,7 @@
 import type { DayIssuerPresetId } from '@/lib/day-simulator-template/issuer-presets';
 import { DAY_ISSUER_PRESETS } from '@/lib/day-simulator-template/issuer-presets';
 
-export const DAY_CONFIG_EXPORT_SCHEMA_VERSION = 1;
+export const DAY_CONFIG_EXPORT_SCHEMA_VERSION = 2;
 
 export const DAY_DEPLOYMENT_INPUT_IDS = [
   'tokenContractSource',
@@ -87,6 +87,13 @@ export type DayConfigExportInput = {
     exitBufferPct: number;
     selfLiquidationBonusPct: number;
   };
+  // Conditions the modeled outcomes were produced under. Kept out of `terms`
+  // because a hypothetical shock is not a deployable market parameter — but it
+  // must travel with the export, or `modeled` misattributes shocked results to
+  // unshocked terms.
+  scenario: {
+    sourceStressPct: number;
+  };
   modeled: {
     seniorApy: number;
     juniorApy: number;
@@ -130,6 +137,11 @@ export type DayConfigExportPayload = {
     exitBufferPct: number;
     selfLiquidationBonusPct: number;
   };
+  scenario: {
+    sourceStressPct: number;
+    sourceStressApplied: boolean;
+    note: string;
+  };
   modeled: DayConfigExportInput['modeled'];
   deploymentInputs: DayDeploymentInputValues;
 };
@@ -167,6 +179,13 @@ export function buildDayConfigExport(input: DayConfigExportInput): DayConfigExpo
       y100SharePct: input.terms.y100SharePct,
       exitBufferPct: input.terms.exitBufferPct,
       selfLiquidationBonusPct: input.terms.selfLiquidationBonusPct,
+    },
+    scenario: {
+      sourceStressPct: input.scenario.sourceStressPct,
+      sourceStressApplied: input.scenario.sourceStressPct > 0,
+      note: input.scenario.sourceStressPct > 0
+        ? `Modeled outcomes include a hypothetical ${input.scenario.sourceStressPct}% source drawdown and recovery overlaid on the source history. This shock is not part of the source data and is not a market term.`
+        : 'Modeled outcomes use the source history as-is, with no hypothetical shock.',
     },
     modeled: { ...input.modeled },
     deploymentInputs: { ...input.deploymentInputs },
