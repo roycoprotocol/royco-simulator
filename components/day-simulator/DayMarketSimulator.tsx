@@ -2752,13 +2752,11 @@ export default function DayMarketSimulator({
       return {
         contributions: [
           { label: 'Gross source yield', pct: gross },
-          { label: `Risk premium paid to Jr (${shownRiskSharePct.toFixed(0)}% of Sr yield)`, pct: toJunior },
-          { label: `Liquidity premium paid to SLP (${shownLiqSharePct.toFixed(0)}% of Sr yield)`, pct: toLiquidity },
+          { label: 'Risk premium to Jr', note: `${shownRiskSharePct.toFixed(0)}% of Sr yield`, pct: toJunior },
+          { label: 'Liquidity premium to SLP', note: `${shownLiqSharePct.toFixed(0)}% of Sr yield`, pct: toLiquidity },
           {
-            label: juniorIsFunded
-              ? 'Loss absorption and pool effects, including Jr capital earning alongside Sr'
-              : 'Sr absorbing source losses itself, and pool effects',
-            note: 'The balance to the accountant\u2019s reported result, not a separately reported figure.',
+            label: juniorIsFunded ? 'Loss absorption and pool effects' : 'Sr absorbing losses itself',
+            note: 'Balance to the reported result, not separately reported.',
             pct: balance,
           },
         ],
@@ -2768,15 +2766,15 @@ export default function DayMarketSimulator({
           { label: 'Sr sellable in one transaction', value: `${(result.explainer.liquidity.referenceSellShareOfSenior * 100).toFixed(1)}% at ${(result.explainer.liquidity.referenceQuote.slippage * 100).toFixed(1)}% slippage` },
         ],
         caveat: juniorIsFunded
-          ? 'Only the first three lines are reported directly. The fourth is whatever remains between that arithmetic and the accountant\u2019s result \u2014 Jr\u2019s capital earning and absorbing losses, plus pool effects \u2014 not a figure the accountant separates.'
-          : 'With coverage at 0% there is no Jr capital, so Sr absorbs source losses itself. The fourth line is whatever remains between the premium arithmetic and the accountant\u2019s result, not a figure the accountant separates.',
+          ? 'The first three lines are reported directly. The fourth is the remainder between that arithmetic and the accountant\u2019s result.'
+          : 'With coverage at 0% there is no Jr capital, so Sr absorbs source losses itself. The fourth line is the remainder between the arithmetic and the accountant\u2019s result.',
       };
     }
     if (position === 'Jr') {
       return {
         contributions: [
           { label: 'Source exposure on Jr capital', note: 'Jr holds the same base asset as Sr.', pct: gross },
-          { label: 'Risk premium received from Sr, net of losses absorbed', pct: result.juniorApy - gross },
+          { label: 'Risk premium received', note: 'Net of losses absorbed.', pct: result.juniorApy - gross },
         ],
         net: { label: 'Net Jr APY', pct: result.juniorApy },
         assumptions: [
@@ -2805,11 +2803,11 @@ export default function DayMarketSimulator({
       const balance = result.liquidityApy - (premiumOnPool + tradingFees + stableLeg + srLeg);
       return {
         contributions: [
-          { label: `Liquidity premium paid by Sr (${shownLiqSharePct.toFixed(0)}% of Sr yield, on a smaller pool)`, pct: premiumOnPool },
-          { label: `Pool trading fees (${defaults.swapFeeBps} bps on ${defaults.poolTurnoverPerYear}\u00d7 turnover)`, pct: tradingFees },
-          { label: `Stable leg yield (${(stableShareOfPool * 100).toFixed(0)}% of the pool)`, pct: stableLeg },
-          { label: `Sr held inside the pool (${(srShareOfPool * 100).toFixed(0)}% of the pool)`, pct: srLeg },
-          { label: 'Impermanent loss and interaction between legs', note: 'The balance to the accountant\u2019s reported total.', pct: balance },
+          { label: 'Liquidity premium from Sr', note: `${shownLiqSharePct.toFixed(0)}% of Sr yield, earned on a smaller pool`, pct: premiumOnPool },
+          { label: 'Pool trading fees', note: `${defaults.swapFeeBps} bps on ${defaults.poolTurnoverPerYear}\u00d7 turnover`, pct: tradingFees },
+          { label: 'Stable leg yield', note: `${(stableShareOfPool * 100).toFixed(0)}% of the pool`, pct: stableLeg },
+          { label: 'Sr held inside the pool', note: `${(srShareOfPool * 100).toFixed(0)}% of the pool`, pct: srLeg },
+          { label: 'Impermanent loss and leg interaction', note: 'Balance to the reported total.', pct: balance },
         ],
         net: { label: 'Net SLP APY', pct: result.liquidityApy },
         assumptions: [
@@ -2819,7 +2817,7 @@ export default function DayMarketSimulator({
           { label: 'Pool band below $1', value: `${formatEclpBandPercent(eclpBandWidthPct)}%` },
           { label: 'Liquidity premium reinvested into the pool', value: defaults.reinvestLiquidityPremium ? 'Yes' : 'No' },
         ],
-        caveat: 'The total is the accountant\u2019s. The four drivers above it are a modeled attribution \u2014 end-of-run pool composition times each leg\u2019s configured rate \u2014 not figures the accountant emits separately, so treat the split as indicative and the total as exact.',
+        caveat: 'The total is the accountant\u2019s and exact. The four drivers are a modeled attribution \u2014 pool composition times each leg\u2019s rate \u2014 so treat the split as indicative.',
       };
     }
     return {
@@ -3920,27 +3918,32 @@ export default function DayMarketSimulator({
                           <td style={{ background: C.pageBg }} />
                           <td colSpan={4} style={eyebrow}>Where the return comes from</td>
                         </tr>
-                        {b.contributions.map((c) => (
-                          <tr key={c.label} style={{ background: C.pageBg }}>
-                            <td style={{ background: C.pageBg }} />
-                            <td style={label}>
-                              {c.label}
-                              {c.note && (
-                                <span style={{ color: C.kpiLabel, display: 'block', fontSize: 10, marginTop: 2 }}>{c.note}</span>
-                              )}
-                            </td>
-                            <td style={cell} />
-                            <td style={amount}>{pctSigned(c.pct)}</td>
-                            <td style={cell} />
-                          </tr>
-                        ))}
+                        {b.contributions.map((c) => {
+                          const negative = c.pct < 0;
+                          return (
+                            <tr key={c.label} style={{ background: C.pageBg }}>
+                              <td style={{ background: C.pageBg }} />
+                              <td style={label}>
+                                {c.label}
+                                {c.note && (
+                                  <span style={{ color: C.kpiLabel, display: 'block', fontSize: 10, marginTop: 2 }}>{c.note}</span>
+                                )}
+                              </td>
+                              <td style={cell} />
+                              <td style={{ ...amount, color: negative ? C.danger : C.text, fontWeight: 600 }}>
+                                {pctSigned(c.pct)}
+                              </td>
+                              <td style={cell} />
+                            </tr>
+                          );
+                        })}
                         <tr style={{ background: C.pageBg }}>
                           <td style={{ background: C.pageBg }} />
                           <td style={{ ...label, borderTop: `1px solid ${C.text}`, fontSize: 12, fontWeight: 600 }}>
                             {b.net.label}
                           </td>
                           <td style={{ ...cell, borderTop: `1px solid ${C.text}` }} />
-                          <td style={{ ...amount, borderTop: `1px solid ${C.text}`, color, fontSize: 12.5, fontWeight: 700 }}>
+                          <td style={{ ...amount, borderTop: `1px solid ${C.text}`, color, fontSize: 14, fontWeight: 700 }}>
                             {pctSigned(b.net.pct)}
                           </td>
                           <td style={{ ...cell, borderTop: `1px solid ${C.text}` }} />
