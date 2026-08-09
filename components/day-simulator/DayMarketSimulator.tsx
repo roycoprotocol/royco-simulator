@@ -37,6 +37,10 @@ import {
 } from '@/lib/day-simulator-template/erasure';
 import { applySourceStress, calibrateSeriesApy, hasObservedDrawdown } from '@/lib/day-simulator-template/series';
 import { ydmShare } from '@/lib/day/engine/ydm';
+import {
+  decodeDayDesign,
+  encodeDayDesign,
+} from '@/lib/day-simulator-template/permalink';
 // A preset that moved only the requirement left the premium behind: at target
 // utilization the YDM share is yTarget regardless of pool size, so raising SLP
 // liquidity changed the pool without changing what Sr paid for it.
@@ -1934,6 +1938,12 @@ export default function DayMarketSimulator({
   const heroDescription = activeMarket.customization.copyOverrides.heroDescription
     ?? 'Royco Day splits one strategy base asset into three positions. Sr pays Jr a risk premium for first-loss coverage and SLP a liquidity premium for secondary liquidity.';
   const marketDefaults = activeMarket.defaults;
+  // A shared link wins over the market default, but only for the fields it
+  // carries. Read once at mount so later edits are not fought by the URL.
+  const linkedDesign = useMemo(
+    () => typeof window === 'undefined' ? {} : decodeDayDesign(window.location.search),
+    [],
+  );
   const [deploymentInputs, setDeploymentInputs] = useState<DayDeploymentFieldValues>(
     EMPTY_DAY_DEPLOYMENT_FIELDS,
   );
@@ -1971,8 +1981,8 @@ export default function DayMarketSimulator({
   const omitInitialZeroReturnPeriod = forwardTest?.omitInitialZeroReturnPeriod === true;
   const returnUnit = backtestDisplay?.returnUnit ?? 'USD';
   const isNativeReturnUnit = returnUnit !== 'USD';
-  const [sourceApyPct, setSourceApyPct] = useState(defaults.sourceApy * 100);
-  const [observationDays, setObservationDays] = useState(defaults.observationDays);
+  const [sourceApyPct, setSourceApyPct] = useState(linkedDesign.sourceApyPct ?? defaults.sourceApy * 100);
+  const [observationDays, setObservationDays] = useState(linkedDesign.observationDays ?? defaults.observationDays);
   const [forwardScenario, setForwardScenario] = useState<DayForwardScenarioId>(
     forwardTest?.defaultScenario ?? forwardTest?.scenarios[0]?.id ?? 'normal',
   );
@@ -2009,7 +2019,7 @@ export default function DayMarketSimulator({
   // while the value still happens to equal a preset. Picking a preset clears it.
   const [coverageIsCustom, setCoverageIsCustom] = useState(false);
   const [liquidityIsCustom, setLiquidityIsCustom] = useState(false);
-  const [stressDepthPct, setStressDepthPct] = useState(0);
+  const [stressDepthPct, setStressDepthPct] = useState(linkedDesign.stressDepthPct ?? 0);
   // Read-only exploration of the yield-share curves; utilization is an outcome
   // of deposits and redemptions, so this scrubs the curves without changing the
   // configuration the accountant runs. Coverage and liquidity utilization are
@@ -2024,12 +2034,12 @@ export default function DayMarketSimulator({
   const [hoverDate, setHoverDate] = useState<string | null>(null);
   const chartContainerRef = useRef<HTMLDivElement>(null);
   const [chartTickCount, setChartTickCount] = useState(7);
-  const [coveragePct, setCoveragePct] = useState(defaults.coverage * 100);
-  const [minLiquidityPct, setMinLiquidityPct] = useState(defaults.minLiquidity * 100);
-  const [eclpBandWidthPct, setEclpBandWidthPct] = useState(defaults.eclpBandWidth * 100);
-  const [riskSharePct, setRiskSharePct] = useState(defaults.riskYDM.yTarget * 100);
-  const [liqSharePct, setLiqSharePct] = useState(defaults.liqYDM.yTarget * 100);
-  const [maintainCoverage, setMaintainCoverage] = useState(defaults.maintainCoverage);
+  const [coveragePct, setCoveragePct] = useState(linkedDesign.coveragePct ?? defaults.coverage * 100);
+  const [minLiquidityPct, setMinLiquidityPct] = useState(linkedDesign.minLiquidityPct ?? defaults.minLiquidity * 100);
+  const [eclpBandWidthPct, setEclpBandWidthPct] = useState(linkedDesign.eclpBandWidthPct ?? defaults.eclpBandWidth * 100);
+  const [riskSharePct, setRiskSharePct] = useState(linkedDesign.riskSharePct ?? defaults.riskYDM.yTarget * 100);
+  const [liqSharePct, setLiqSharePct] = useState(linkedDesign.liqSharePct ?? defaults.liqYDM.yTarget * 100);
+  const [maintainCoverage, setMaintainCoverage] = useState(linkedDesign.maintainCoverage ?? defaults.maintainCoverage);
   const [seniorCapitalUsd, setSeniorCapitalUsd] = useState(10_000_000);
   // Tranche capital implied by the coverage and liquidity ratios at the 90%
   // utilization the simulator seeds. Derived once and reused everywhere it is
@@ -2107,6 +2117,37 @@ export default function DayMarketSimulator({
     observer.observe(chartContainer);
     return () => observer.disconnect();
   }, []);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !isGuided) return;
+    const next = new URL(window.location.href);
+    const design = encodeDayDesign({
+      coveragePct,
+      minLiquidityPct,
+      eclpBandWidthPct,
+      riskSharePct,
+      liqSharePct,
+      observationDays,
+      sourceApyPct,
+      stressDepthPct,
+      maintainCoverage,
+    });
+    design.forEach((value, key) => next.searchParams.set(key, value));
+    if (next.href !== window.location.href) {
+      window.history.replaceState(null, '', next);
+    }
+  }, [
+    coveragePct,
+    eclpBandWidthPct,
+    isGuided,
+    liqSharePct,
+    maintainCoverage,
+    minLiquidityPct,
+    observationDays,
+    riskSharePct,
+    sourceApyPct,
+    stressDepthPct,
+  ]);
 
   const maxIndex = Math.max(0, simulationSeries.length - 1);
   const viewRange = useMemo(
@@ -3600,8 +3641,90 @@ export default function DayMarketSimulator({
             />
           )}
         <div className="grid grid-cols-1 md:grid-cols-2" style={{ gap: 10, marginTop: 12 }}>
+        <div className={isGuided ? "flex flex-col" : undefined} style={isGuided
+          ? { background: C.pageBg, border: `1px solid ${C.border}`, borderRadius: 10, boxShadow: isTutorial && tutorialStep === 1 ? `inset 3px 0 ${C.accent}` : undefined, padding: 14 }
+          : { background: C.pageBg, border: `1px solid ${C.border}`, borderRadius: 10, padding: 14 }}
+        >
+          {isExecutive
+            ? <Eyebrow>Loss waterfall</Eyebrow>
+            : <Eyebrow>{isGuided ? 'Key risk · Loss protection' : 'First-loss coverage'}</Eyebrow>}
+          {isGuided && (
+            <>
+              <PanelTitle className="mt-2">
+                When does Sr lose money?
+              </PanelTitle>
+              <p className="mt-2" style={{ color: C.muted, fontSize: 11.5, lineHeight: 1.45 }}>
+                Jr absorbs losses first; losses beyond that buffer reduce Sr.
+              </p>
+              <div className="mt-3">
+                <p style={{ color: juniorIsFunded ? C.olive : C.danger, fontFamily: MONO, fontSize: 28, fontWeight: 600, letterSpacing: '-0.05em' }}>
+                  {juniorIsFunded
+                    ? `${(result.explainer.coverage.coverageLossLimit * 100).toFixed(1)}% source loss`
+                    : 'No buffer'}
+                </p>
+                <p style={{ color: C.text, fontSize: 11.5 }}>
+                  {juniorIsFunded ? 'before Sr starts falling' : 'Sr takes the first loss itself'}
+                </p>
+                <div
+                  aria-label={`Sr is covered through ${(result.explainer.coverage.coverageLossLimit * 100).toFixed(1)} percent source loss on the displayed ${(result.explainer.coverage.displayMaxLoss * 100).toFixed(1)} percent loss range`}
+                  className="mt-3 flex"
+                  role="img"
+                  style={{ background: `${C.danger}18`, borderRadius: 9999, height: 9, overflow: 'hidden' }}
+                >
+                  <div style={{ background: C.olive, width: `${Math.min(100, result.explainer.coverage.coverageLossLimit / result.explainer.coverage.displayMaxLoss * 100)}%` }} />
+                </div>
+                <p className="mt-2" style={{ color: C.muted, fontSize: 10, lineHeight: 1.4 }}>
+                  {juniorIsFunded
+                    ? <>If the source loses {(result.explainer.coverage.displayMaxLoss * 100).toFixed(1)}%, <strong style={{ color: C.danger, fontWeight: 600 }}>$100 of Sr falls to ${result.explainer.coverage.endingSeniorBalancePer100.toFixed(0)}</strong>.</>
+                    : <span style={{ color: C.danger }}>Raise Jr coverage above 0% to give Sr a buffer.</span>}
+                </p>
+              </div>
+            </>
+          )}
+          {isExecutive && (
+            <>
+              <PanelTitle className="mt-2">
+                Jr absorbs losses before Sr.
+              </PanelTitle>
+              <p className="mt-2" style={{ color: C.muted, fontSize: 11.5, lineHeight: 1.45 }}>
+                The minimum coverage requirement sets the Jr buffer, but does not guarantee Sr principal against losses beyond that buffer.
+              </p>
+            </>
+          )}
+          {isGuided && (
+            <button
+              aria-expanded={showCoverageDetail}
+              onClick={() => setShowCoverageDetail((value) => !value)}
+              style={{
+                background: 'transparent',
+                border: `1px solid ${C.border}`,
+                borderRadius: 8,
+                color: C.accent,
+                fontFamily: MONO,
+                fontSize: 10,
+                fontWeight: 700,
+                letterSpacing: '0.06em',
+                marginTop: 'auto',
+                minHeight: 38,
+                padding: '10px 16px',
+                textTransform: 'uppercase',
+                width: 'fit-content',
+              }}
+              type="button"
+            >
+              {showCoverageDetail ? 'Hide curve' : 'See loss curve'}
+            </button>
+          )}
+          {(!isGuided || showCoverageDetail) && <CoverageLossDiagram metrics={result.explainer.coverage} />}
+          {(isGuided || isExecutive) && (
+            <p style={{ color: C.muted, fontSize: 11.5, lineHeight: 1.45 }}>
+              Coverage is a buffer, not a guarantee. Sr declines after about {(result.explainer.coverage.coverageLossLimit * 100).toFixed(1)}% of base-asset loss.
+            </p>
+          )}
+        </div>
+
         <div
-          className={isGuided ? "order-2 flex flex-col" : undefined}
+          className={isGuided ? "flex flex-col" : undefined}
           style={isGuided
             ? { background: C.pageBg, border: `1px solid ${C.border}`, borderRadius: 10, boxShadow: isTutorial && tutorialStep === 2 ? `inset 3px 0 ${C.accent}` : undefined, padding: 14 }
             : { background: C.pageBg, border: `1px solid ${C.border}`, borderRadius: 10, padding: 14 }}
@@ -3686,88 +3809,6 @@ export default function DayMarketSimulator({
             </p>
           )}
         </div>
-
-        <div className={isGuided ? "order-1 flex flex-col" : undefined} style={isGuided
-          ? { background: C.pageBg, border: `1px solid ${C.border}`, borderRadius: 10, boxShadow: isTutorial && tutorialStep === 1 ? `inset 3px 0 ${C.accent}` : undefined, padding: 14 }
-          : { background: C.pageBg, border: `1px solid ${C.border}`, borderRadius: 10, padding: 14 }}
-        >
-          {isExecutive
-            ? <Eyebrow>Loss waterfall</Eyebrow>
-            : <Eyebrow>{isGuided ? 'Key risk · Loss protection' : 'First-loss coverage'}</Eyebrow>}
-          {isGuided && (
-            <>
-              <PanelTitle className="mt-2">
-                When does Sr lose money?
-              </PanelTitle>
-              <p className="mt-2" style={{ color: C.muted, fontSize: 11.5, lineHeight: 1.45 }}>
-                Jr absorbs losses first; losses beyond that buffer reduce Sr.
-              </p>
-              <div className="mt-3">
-                <p style={{ color: juniorIsFunded ? C.olive : C.danger, fontFamily: MONO, fontSize: 28, fontWeight: 600, letterSpacing: '-0.05em' }}>
-                  {juniorIsFunded
-                    ? `${(result.explainer.coverage.coverageLossLimit * 100).toFixed(1)}% source loss`
-                    : 'No buffer'}
-                </p>
-                <p style={{ color: C.text, fontSize: 11.5 }}>
-                  {juniorIsFunded ? 'before Sr starts falling' : 'Sr takes the first loss itself'}
-                </p>
-                <div
-                  aria-label={`Sr is covered through ${(result.explainer.coverage.coverageLossLimit * 100).toFixed(1)} percent source loss on the displayed ${(result.explainer.coverage.displayMaxLoss * 100).toFixed(1)} percent loss range`}
-                  className="mt-3 flex"
-                  role="img"
-                  style={{ background: `${C.danger}18`, borderRadius: 9999, height: 9, overflow: 'hidden' }}
-                >
-                  <div style={{ background: C.olive, width: `${Math.min(100, result.explainer.coverage.coverageLossLimit / result.explainer.coverage.displayMaxLoss * 100)}%` }} />
-                </div>
-                <p className="mt-2" style={{ color: C.muted, fontSize: 10, lineHeight: 1.4 }}>
-                  {juniorIsFunded
-                    ? <>If the source loses {(result.explainer.coverage.displayMaxLoss * 100).toFixed(1)}%, <strong style={{ color: C.danger, fontWeight: 600 }}>$100 of Sr falls to ${result.explainer.coverage.endingSeniorBalancePer100.toFixed(0)}</strong>.</>
-                    : <span style={{ color: C.danger }}>Raise Jr coverage above 0% to give Sr a buffer.</span>}
-                </p>
-              </div>
-            </>
-          )}
-          {isExecutive && (
-            <>
-              <PanelTitle className="mt-2">
-                Jr absorbs losses before Sr.
-              </PanelTitle>
-              <p className="mt-2" style={{ color: C.muted, fontSize: 11.5, lineHeight: 1.45 }}>
-                The minimum coverage requirement sets the Jr buffer, but does not guarantee Sr principal against losses beyond that buffer.
-              </p>
-            </>
-          )}
-          {isGuided && (
-            <button
-              aria-expanded={showCoverageDetail}
-              onClick={() => setShowCoverageDetail((value) => !value)}
-              style={{
-                background: 'transparent',
-                border: `1px solid ${C.border}`,
-                borderRadius: 8,
-                color: C.accent,
-                fontFamily: MONO,
-                fontSize: 10,
-                fontWeight: 700,
-                letterSpacing: '0.06em',
-                marginTop: 'auto',
-                minHeight: 38,
-                padding: '10px 16px',
-                textTransform: 'uppercase',
-                width: 'fit-content',
-              }}
-              type="button"
-            >
-              {showCoverageDetail ? 'Hide curve' : 'See loss curve'}
-            </button>
-          )}
-          {(!isGuided || showCoverageDetail) && <CoverageLossDiagram metrics={result.explainer.coverage} />}
-          {(isGuided || isExecutive) && (
-            <p style={{ color: C.muted, fontSize: 11.5, lineHeight: 1.45 }}>
-              Coverage is a buffer, not a guarantee. Sr declines after about {(result.explainer.coverage.coverageLossLimit * 100).toFixed(1)}% of base-asset loss.
-            </p>
-          )}
-        </div>
         </div>
       </section>}
 
@@ -3826,7 +3867,6 @@ export default function DayMarketSimulator({
                   return (
                   <Fragment key={position as string}>
                   <tr
-                    aria-expanded={open}
                     onClick={() => setOpenPositionRow(open ? null : (position as string))}
                     style={{ background: index % 2 === 0 ? C.cardBg : C.pageBg, cursor: 'pointer' }}
                   >
@@ -3839,12 +3879,27 @@ export default function DayMarketSimulator({
                     <td style={{ borderBottom: rule, color: C.text, fontFamily: MONO, fontSize: 11.5, padding: '10px' }}>
                       <span className="flex items-baseline justify-between gap-3">
                         <span>{drawdown}</span>
-                        <span
-                          aria-hidden
-                          style={{ color: open ? C.accent : C.muted, fontSize: 13, lineHeight: 1 }}
+                        <button
+                          aria-controls={`day-sim-position-${position}`}
+                          aria-expanded={open}
+                          aria-label={`${open ? 'Hide' : 'Show'} where ${position}'s return comes from`}
+                          onClick={(event) => {
+                            event.stopPropagation();
+                            setOpenPositionRow(open ? null : (position as string));
+                          }}
+                          style={{
+                            background: 'transparent',
+                            border: 'none',
+                            color: open ? C.accent : C.muted,
+                            cursor: 'pointer',
+                            fontSize: 13,
+                            lineHeight: 1,
+                            padding: '2px 4px',
+                          }}
+                          type="button"
                         >
                           {open ? '▾' : '▸'}
-                        </span>
+                        </button>
                       </span>
                     </td>
                   </tr>
@@ -3861,7 +3916,7 @@ export default function DayMarketSimulator({
                     // figure under "Avg / year" — the column adds up in place.
                     return (
                       <>
-                        <tr style={{ background: C.pageBg }}>
+                        <tr id={`day-sim-position-${position}`} style={{ background: C.pageBg }}>
                           <td style={{ background: C.pageBg }} />
                           <td colSpan={4} style={eyebrow}>Where the return comes from</td>
                         </tr>

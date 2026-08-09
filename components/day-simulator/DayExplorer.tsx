@@ -143,14 +143,21 @@ export default function DayExplorer({
   experience?: "guided" | "learning";
   routePath?: string;
 }) {
+  const requestedMarket = typeof window === "undefined"
+    ? false
+    : new URLSearchParams(window.location.search).has("market");
   const [selectedMarketId, setSelectedMarketId] = useState(initialMarket.id);
   const [draftSource, setDraftSource] = useState<DayDraftSource | null>(null);
-  const [yieldDraft, setYieldDraft] = useState<DayYieldDraftSource | null>({
-    label: "Custom yield source",
-    sourceApy: DEFAULT_CUSTOM_SOURCE_APY_PCT / 100,
-  });
+  const [yieldDraft, setYieldDraft] = useState<DayYieldDraftSource | null>(
+    requestedMarket ? null : {
+      label: "Custom yield source",
+      sourceApy: DEFAULT_CUSTOM_SOURCE_APY_PCT / 100,
+    },
+  );
   const [draftVersion, setDraftVersion] = useState(0);
-  const [sourceMode, setSourceMode] = useState<"yield" | "history">("yield");
+  const [sourceMode, setSourceMode] = useState<"yield" | "history">(
+    requestedMarket ? "history" : "yield",
+  );
   const [yieldLabel, setYieldLabel] = useState("Custom yield source");
   // A custom yield source starts from a neutral 5% net APY rather than the
   // loaded sample's APY, so the typed input is not anchored to another market.
@@ -190,7 +197,6 @@ export default function DayExplorer({
     setError("");
     const nextUrl = new URL(window.location.href);
     nextUrl.pathname = routePath;
-    nextUrl.search = "";
     nextUrl.searchParams.set("market", marketId);
     window.history.replaceState(null, "", nextUrl);
   };
@@ -295,9 +301,10 @@ export default function DayExplorer({
   return (
     <div className="flex flex-col" style={{ gap: 12 }}>
       <DaySurface id="day-sim-source" padding="spacious" style={{ scrollMarginTop: 16 }}>
-        <div className={experience === "learning" ? undefined : "grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(0,1fr)_auto]"}>
+        <div>
           <div>
-            <div className="flex items-center gap-2">
+            <div className="flex items-center justify-between gap-3">
+              <span className="flex items-center gap-2">
               <span
                 aria-hidden
                 style={{
@@ -320,6 +327,18 @@ export default function DayExplorer({
               >
                 {experience === "learning" ? "Step 1 · Source input" : "Royco Day simulator"}
               </span>
+              </span>
+              {experience !== "learning" && (
+                <DayButton
+                  aria-label={showTutorial ? "Close tutorial" : "New to Royco?"}
+                  aria-pressed={showTutorial}
+                  onClick={() => setShowTutorial((value) => !value)}
+                  style={{ flex: '0 0 auto', minHeight: 34, padding: '7px 12px' }}
+                  variant={showTutorial ? "quiet" : "secondary"}
+                >
+                  {showTutorial ? "Close tutorial" : "New to Royco?"}
+                </DayButton>
+              )}
             </div>
             {/* The hero states the mechanism as a claim and sets the position
                 vocabulary before any control appears, rather than explaining
@@ -367,40 +386,22 @@ export default function DayExplorer({
             )}
           </div>
 
-          {experience !== "learning" && (
-            <DayButton
-              aria-label={showTutorial ? "Close tutorial" : "New to Royco?"}
-              aria-pressed={showTutorial}
-              className="justify-self-start lg:justify-self-end"
-              onClick={() => setShowTutorial((value) => !value)}
-              variant={showTutorial ? "quiet" : "primary"}
-            >
-              {showTutorial ? "Close tutorial" : "New to Royco?"}
-            </DayButton>
-          )}
         </div>
 
         {experience !== "learning" && (
           <>
             {/* Names the three positions and their colours up front, so the
                 chart, tables, and diagrams below arrive already legible. */}
-            <div
-              className="mt-6 grid grid-cols-1 sm:grid-cols-3"
-              style={{ borderTop: `1px solid ${COLORS.border}`, gap: 0 }}
-            >
+            <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3 sm:gap-0">
               {[
                 { color: DAY_SIMULATOR_THEME.seniorLine, name: "Sr", role: "Senior — protected, and can sell early" },
                 { color: DAY_SIMULATOR_THEME.juniorLine, name: "Jr", role: "Junior — absorbs losses first, paid for it" },
                 { color: DAY_SIMULATOR_THEME.olive, name: "SLP", role: "Liquidity — supplies the pool Sr sells into" },
               ].map((position) => (
                 <div
+                  className="border-l-2 pt-0 pl-3 sm:border-l-0 sm:border-t-2 sm:pl-0 sm:pr-4 sm:pt-2.5"
                   key={position.name}
-                  style={{
-                    borderTop: `2px solid ${position.color}`,
-                    marginTop: -1,
-                    paddingRight: 16,
-                    paddingTop: 10,
-                  }}
+                  style={{ borderColor: position.color }}
                 >
                   <span
                     style={{

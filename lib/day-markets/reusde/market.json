@@ -46,8 +46,8 @@
     "initialLT": 111.11111111111111
   },
   "targets": {
-    "seniorApyMin": 0.1236,
-    "seniorApyMax": 0.1286,
+    "seniorApyMin": 0.1233,
+    "seniorApyMax": 0.1283,
     "juniorApyMin": 0.2553,
     "juniorApyMax": 0.2753
   },

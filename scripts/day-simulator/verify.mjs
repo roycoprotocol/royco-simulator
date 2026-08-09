@@ -725,7 +725,7 @@ for (const invariant of [
   'buildDayInitialBalances(defaults, { coverage, minLiquidity })',
   'buildDayMarketConfig(defaults, {',
   'const eclpBandWidth = enginePremiumInputs.eclpBandWidthPct / 100',
-  'const [maintainCoverage, setMaintainCoverage] = useState(defaults.maintainCoverage)',
+  'const [maintainCoverage, setMaintainCoverage] = useState(linkedDesign.maintainCoverage ?? defaults.maintainCoverage)',
   "op: { type: 'jtDeposit', amount: refill }",
   'previousSnapshot.state === MarketState.FIXED_TERM',
   'postReturn.state === MarketState.PERPETUAL',
@@ -951,7 +951,11 @@ if (marketId) {
     if (market.targets?.juniorApyMin > market.targets?.juniorApyMax) failures.push("Jr APY target range is reversed");
     if (market.targets?.liquidityApyMin > market.targets?.liquidityApyMax) failures.push("SLP APY target range is reversed");
     if (!(market.defaults?.minLiquidity > 0 && market.defaults.minLiquidity < 1)) failures.push("Day market SLP liquidity ratio must be a fraction between 0 and 1");
-    if (!(market.defaults?.coverage > 0 && market.defaults.coverage < 0.9)) failures.push("Day market coverage must be a fraction between 0 and 90%");
+    if (!(market.defaults?.coverage >= 0 && market.defaults.coverage < 0.9)) failures.push("Day market coverage must be a fraction between 0 and 90%");
+    if (market.defaults?.coverage === 0) {
+      if (market.defaults?.initialJT !== 0) failures.push("Day market without a Jr tranche must hold no Jr capital");
+      if (market.defaults?.riskYDM?.yTarget !== 0) failures.push("Day market without a Jr tranche may not charge Sr a risk premium");
+    }
     if (!(market.defaults?.sourceApy > -1 && Number.isFinite(market.defaults.sourceApy))) failures.push("Day market sourceApy must be finite and greater than -100%");
     if (!(market.defaults?.observationDays >= 7 && market.defaults.observationDays <= 194)) failures.push("Day market observationDays must preserve the 7–194 day range");
     if (!(market.defaults?.exitBufferPct >= 1 && market.defaults.exitBufferPct <= 99.91)) failures.push("Day market exitBufferPct must preserve the 1–99.91% range");

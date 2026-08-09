@@ -4,11 +4,11 @@
   "app/internal/day-lab/page.tsx": "cc24297496366142511b0d660d8bac73f24530bff3375e431e0ba8e931d13cab",
   "app/api/day-explorer/import/route.ts": "569fd3bf24d5f1ab633af6096a2228d6215e3f87da5ce178138666397db6892a",
   "components/simulator/SimulatorPageShell.tsx": "8fa75de54bab9fa6690ccd715f35c3a904639514bb94ffc6e608b525843e29ee",
-  "components/day-simulator/DayExplorer.tsx": "6d9f87c638c512e6cb6f4c190ac98968e5fcc7a11f8783380660832789be3d05",
+  "components/day-simulator/DayExplorer.tsx": "933db8163ec5e16ef1432e6ce638a3dc98694c94a3039ed9220434cb0ec2db1d",
   "components/day-simulator/DayChartTooltip.tsx": "47ae74fa0c3c43ac67ed7d9014ea1def5d9be2edc195687c2547c714b0b91063",
   "components/day-simulator/DayGuidedTutorial.tsx": "e35817f55028857cc053d8f97b87dc66bbf57795b2b50a180d8be825d658b29a",
   "components/day-simulator/DayLearningExperience.tsx": "43aec1f80ebb2e391c85c4148815981e6178653f54e28917285378bf5f3548a7",
-  "components/day-simulator/DayMarketSimulator.tsx": "fbaafb68d60792a5a08a20374843f158b1871a18ad91b10835cacb1b5a0e5710",
+  "components/day-simulator/DayMarketSimulator.tsx": "8e3a812aa49c13b9df60dbd4f236937049ffaf0237345a133a048afadbe0e808",
   "components/day-simulator/DaySimulatorUI.tsx": "90c84455d30a3004d60d9d819af5c9ed406d6cd3b4bac397b01a346351f3bc68",
   "components/day-simulator/DayDeploymentInputs.tsx": "74c3883af51cb903513d9a9eef92b15366e37c95636cfdc13260fa4c4cdbf854",
   "components/day-simulator/DaySimulatorPageShell.tsx": "eb49a4fb13a26951b7d9664aeb4d32c925a5a24bbbdce495a690bb512a225ed8",
@@ -23,6 +23,8 @@
   "lib/day-simulator-template/locked-copy.ts": "7787cfd02cae831e9d3705ee5375a9b9673b1c0840e43121fa0f1439ff0838e4",
   "lib/day-simulator-template/manifest.ts": "94958dd8dd0ea600da56bc9bf5f9d7915bb98bce0f157251943238b1ca359c8c",
   "lib/day-simulator-template/market.ts": "57ca75559f22f5f4e99ae5a5a37475f670b6ac60ff64770aa493dac7e9bf66b6",
+  "lib/day-simulator-template/permalink.ts": "776525c1a9928ebaf876b45d197e19b2ef12a7f51114d94ab03defd0caf5b1e0",
+  "lib/day-simulator-template/permalink.test.ts": "13fe4d22f7f49c1a96677e31f882068270f9943be00edc5493a64f2b12e620b2",
   "lib/day-simulator-template/refill.ts": "bb41d8ef450523aa9006fe1f9f2ed422ae0640053d44c3709151fe2bd2ada20d",
   "lib/day-simulator-template/runtime.test.ts": "75e0cd50f3bf2720965f506a1573f03d1584efdce4eacdb97cca25b786752b05",
   "lib/day-simulator-template/runtime.ts": "43a905fc3fca1a3de06687722162feb2bdee17ac5cf1c3dc0c6cb7a136d9ceab",
@@ -52,7 +54,7 @@
   "scripts/day-simulator/generate-day-vectors.mjs": "ed5d1911b5f645bbac3892ae52c94e17252d6cde3c23b0ce10d407fa7ef1a4cd",
   "scripts/day-simulator/preview.mjs": "9cdfe3c04fb07c3b78434459cb43ec7cb713a1d9012775140c892665af2fc4af",
   "scripts/day-simulator/verify-runtime.ts": "2d797bcd7cf976c71889d74c5ece3dc84d5bce94d6ea3766b272f08f5b1610c4",
-  "scripts/day-simulator/verify.mjs": "3cf2553d8321c46b6a3e97f36e9b9b3c0b6bb042b0e0498459b6fa197198f4cf",
+  "scripts/day-simulator/verify.mjs": "fd9bc953e6629c9cef84926060e0d2c58d7ec6ee9290ba0c614826599ddd3dbb",
   "docs/NEW_DAY_SIMULATOR.md": "794dd8eedc97b3dbc87b1149b409ab9d5d36a9b453e4817c19f82183d5a090b7",
-  "package.json": "b95689f76d63e8685f91159950a1b85104130de0a59941cbc3f7c5aead8209c9"
+  "package.json": "5b0bde7c95fdea4a7099dd2c4039435c69b9ae75ea35df66237e228c0238132d"
 }
