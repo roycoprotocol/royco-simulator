@@ -65,9 +65,9 @@ export default function DayV2Chart({ data }: { data: DayV2Point[] }) {
           <Legend iconType="plainline" wrapperStyle={{ fontSize: 11, paddingTop: 4 }} />
           {(
             [
-              ["senior", "Senior"],
-              ["junior", "Junior"],
-              ["liquidity", "Senior LP"],
+              ["senior", "Sr"],
+              ["junior", "Jr"],
+              ["liquidity", "SLP"],
             ] as const
           ).map(([key, label]) => (
             <Line

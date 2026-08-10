@@ -8,7 +8,7 @@
   "components/day-simulator/DayChartTooltip.tsx": "47ae74fa0c3c43ac67ed7d9014ea1def5d9be2edc195687c2547c714b0b91063",
   "components/day-simulator/DayGuidedTutorial.tsx": "e35817f55028857cc053d8f97b87dc66bbf57795b2b50a180d8be825d658b29a",
   "components/day-simulator/DayLearningExperience.tsx": "43aec1f80ebb2e391c85c4148815981e6178653f54e28917285378bf5f3548a7",
-  "components/day-simulator/DayMarketSimulator.tsx": "95a8b3b68104964f38158a9a6521eb9971516337136676df3a6397fb1fe9c0ce",
+  "components/day-simulator/DayMarketSimulator.tsx": "8a2a1fa41da48214f2a7879e30b56950a93c2bd21974a2d3807373448b5edc80",
   "components/day-simulator/DaySimulatorUI.tsx": "7839147eacd5f285fd4c3d961651ce0d381f057d3659eb7931189a39d2b348d1",
   "components/day-simulator/DayDeploymentInputs.tsx": "19f030bdba7c277ca96f0294bc090343540938a124eb0ae349d010ff64dbbee1",
   "components/day-simulator/DaySimulatorPageShell.tsx": "eb49a4fb13a26951b7d9664aeb4d32c925a5a24bbbdce495a690bb512a225ed8",
@@ -54,7 +54,8 @@
   "scripts/day-simulator/generate-day-vectors.mjs": "ed5d1911b5f645bbac3892ae52c94e17252d6cde3c23b0ce10d407fa7ef1a4cd",
   "scripts/day-simulator/preview.mjs": "9cdfe3c04fb07c3b78434459cb43ec7cb713a1d9012775140c892665af2fc4af",
   "scripts/day-simulator/verify-runtime.ts": "2d797bcd7cf976c71889d74c5ece3dc84d5bce94d6ea3766b272f08f5b1610c4",
-  "scripts/day-simulator/verify.mjs": "f51a3ed452bb78f48c35a3e0a0ad2e85f5e84b32730bfca25d6cbb427f9aa002",
+  "scripts/day-simulator/verify.mjs": "d85b10098723c21787af0e8739f1f9d73eaec1fde60932a4a1b615971392117e",
   "docs/NEW_DAY_SIMULATOR.md": "794dd8eedc97b3dbc87b1149b409ab9d5d36a9b453e4817c19f82183d5a090b7",
-  "package.json": "952aa92e8f2119eb9c3a25bcd82a5a47cdae4429b30cb97170c7a60a2442f83e"
+  "package.json": "952aa92e8f2119eb9c3a25bcd82a5a47cdae4429b30cb97170c7a60a2442f83e",
+  "lib/day-simulator-template/backtest.ts": "95f7d93ed9a67b0a5ed48934df2e09e190d4719d738836b61c1419e2c689c0da"
 }

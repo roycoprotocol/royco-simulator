@@ -15,8 +15,6 @@ import {
   usePlotArea,
 } from 'recharts';
 
-import { Sim } from '@/lib/day/engine/runner';
-import { MarketState } from '@/lib/day/engine/types';
 import { DAY_LOCKED_COPY } from '@/lib/day-simulator-template/locked-copy';
 import {
   buildDayExplainerMetrics,
@@ -31,7 +29,6 @@ import type {
 } from '@/lib/day-simulator-template/market';
 import { isDaySectionVisible } from '@/lib/day-simulator-template/market';
 import {
-  buildDayErasureEvent,
   formatDayErasureLabel,
   type DayErasureEvent,
 } from '@/lib/day-simulator-template/erasure';
@@ -62,14 +59,16 @@ import {
   type DayDeploymentFieldValues,
   type DayDeploymentInputValues,
 } from '@/lib/day-simulator-template/config-export';
-import { shouldRefillJunior } from '@/lib/day-simulator-template/refill';
 import {
   buildDayFiniteForwardSeries,
-  buildDayInitialBalances,
-  buildDayMarketConfig,
   buildDayForwardSeries,
   DAY_TARGET_UTILIZATION,
 } from '@/lib/day-simulator-template/runtime';
+import {
+  runDayHistoricalBacktest,
+  type DayObservationPeriod,
+  type DaySeniorLossEvent,
+} from '@/lib/day-simulator-template/backtest';
 import {
   DayChartTooltip,
   useDayChartHover,
@@ -99,7 +98,6 @@ const C = DAY_SIMULATOR_THEME;
 
 const SERIF = DAY_SIMULATOR_TYPE.sans;
 const MONO = DAY_SIMULATOR_TYPE.mono;
-const DAY = 86_400;
 const MONTH_NAMES = [
   'Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun',
   'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec',
@@ -122,22 +120,6 @@ const formatEclpFloor = (bandPct: number): string => {
   return bandPct < 1
     ? floor.toFixed(4).replace(/0+$/, '').replace(/\.$/, '')
     : floor.toFixed(2);
-};
-
-type DayObservationPeriod = {
-  aIndex: number;
-  bIndex: number;
-  startDate: string;
-  endDate: string;
-  days: number;
-  targetDays: number;
-  expired: boolean;
-};
-
-type DaySeniorLossEvent = {
-  index: number;
-  date: string;
-  lossIndexPts: number;
 };
 
 const cardStyle = {
@@ -1898,10 +1880,6 @@ function AssumptionSummaryTile({
   );
 }
 
-const annualized = (end: number, start: number, days: number) =>
-  days > 0 && start > 0 && end >= 0
-    ? end === 0 ? -1 : Math.pow(end / start, 365 / days) - 1
-    : 0;
 const pctSigned = (value: number): string =>
   `${value < 0 ? '\u2212' : '+'}${Math.abs(value * 100).toFixed(2)}%`;
 
@@ -2183,262 +2161,17 @@ export default function DayMarketSimulator({
   );
 
   const { result, fullResult } = useMemo(() => {
-    const run = (series: DaySeriesPoint[]) => {
-    const coverage = enginePremiumInputs.coveragePct / 100;
-    const minLiquidity = enginePremiumInputs.minLiquidityPct / 100;
-    const eclpBandWidth = enginePremiumInputs.eclpBandWidthPct / 100;
-    const riskTarget = effectivePremium(
-      enginePremiumInputs.riskSharePct,
-      enginePremiumInputs.coveragePct > 0,
-    ) / 100;
-    const liqTarget = effectivePremium(
-      enginePremiumInputs.liqSharePct,
-      enginePremiumInputs.minLiquidityPct > 0,
-    ) / 100;
-    const initial = buildDayInitialBalances(defaults, { coverage, minLiquidity });
-    const cfg = buildDayMarketConfig(defaults, {
-      coverage,
-      minLiquidity,
-      eclpBandWidth,
-      observationDays: enginePremiumInputs.observationDays,
-      riskYieldShare: riskTarget,
-      liquidityYieldShare: liqTarget,
+    // The run itself lives in `lib/day-simulator-template/backtest.ts` so this
+    // page and /v2 share one implementation of the historical accounting
+    // instead of two that agree until they quietly stop agreeing.
+    const run = (series: DaySeriesPoint[]) => runDayHistoricalBacktest({
+      defaults,
+      series,
+      terms: enginePremiumInputs,
+      maintainCoverage,
+      omitInitialZeroReturnPeriod,
+      monthlyBaselineDate: modeledSeries[0]?.date,
     });
-    const sim = new Sim(cfg, initial);
-    const snapshots = [sim.last()];
-    const firstSnapshot = snapshots[0];
-    const erasureEvents: DayErasureEvent[] = [];
-    let juniorCapitalInjected = 0;
-    for (let index = 1; index < series.length; index += 1) {
-      const previous = series[index - 1];
-      const current = series[index];
-      const elapsedDays = Math.max(
-        1,
-        Math.round((Date.parse(current.date) - Date.parse(previous.date)) / 86_400_000),
-      );
-      const sourceReturn = current.price / previous.price - 1;
-      const eventStart = sim.events.length;
-      const previousSnapshot = snapshots[snapshots.length - 1];
-      sim.step({ dtSec: elapsedDays * DAY, stReturn: sourceReturn, jtReturn: sourceReturn });
-      const postReturn = sim.last();
-      const stepEvents = sim.events.slice(eventStart);
-      const erasureEvent = stepEvents.find((event) => event.kind === 'jt-il-erased');
-      if (erasureEvent?.amountNAV !== undefined) {
-        const exitEvent = stepEvents.find((event) => event.kind === 'exit-fixed-term');
-        const reason = exitEvent?.observationExitReason === 'period-ended'
-          ? 'Observation Period ended'
-          : exitEvent?.observationExitReason === 'protected-exit'
-            ? 'Protected Exit opened'
-            : exitEvent?.observationExitReason === 'st-impairment'
-              ? 'Sr impairment'
-              : 'Jr recovery claim reset';
-        const currentJuniorIndex = firstSnapshot.jtPrice > 0
-          ? (postReturn.jtPrice / firstSnapshot.jtPrice) * 100
-          : 0;
-        const preRefillJuniorNAV = postReturn.jtEffectiveNAV > 1e-12
-          ? postReturn.jtEffectiveNAV
-          : previousSnapshot.jtEffectiveNAV;
-        const navPerIndexPoint = firstSnapshot.jtPrice > 0
-          ? (sim.state.jtShares * firstSnapshot.jtPrice) / 100
-          : 0;
-        erasureEvents.push(
-          buildDayErasureEvent({
-            index,
-            date: current.date,
-            currentJuniorIndex,
-            erasedAmount: erasureEvent.amountNAV,
-            preRefillJuniorNAV,
-            navPerIndexPoint,
-            reason,
-          }),
-        );
-      }
-      const observationClosed =
-        previousSnapshot.state === MarketState.FIXED_TERM &&
-        postReturn.state === MarketState.PERPETUAL;
-      if (
-        observationClosed &&
-        shouldRefillJunior(maintainCoverage, previousSnapshot.state, postReturn.state)
-      ) {
-        const numerator =
-          coverage * (sim.state.stRawNAV + sim.state.jtRawNAV * cfg.beta) -
-          cfg.targetUtilization * sim.state.jtEffectiveNAV;
-        const denominator = cfg.targetUtilization - coverage * cfg.beta;
-        const refill = denominator > 0 ? numerator / denominator : 0;
-        if (refill > cfg.dustTolerance) {
-          sim.step({
-            dtSec: 0,
-            stReturn: 0,
-            jtReturn: 0,
-            op: { type: 'jtDeposit', amount: refill },
-          });
-          juniorCapitalInjected += refill;
-        }
-      }
-      snapshots.push(sim.last());
-    }
-    const chart = series.map((point, index) => {
-      const snapshot = snapshots[index];
-      return {
-        date: point.date,
-        t: snapshot.t,
-        senior: (snapshot.stPrice / firstSnapshot.stPrice) * 100,
-        junior: (snapshot.jtPrice / firstSnapshot.jtPrice) * 100,
-        liquidity: (snapshot.ltPrice / firstSnapshot.ltPrice) * 100,
-        strategy: (point.price / series[0].price) * 100,
-        state: snapshot.state,
-        stIL: snapshot.stIL,
-        jtIL: snapshot.jtIL,
-        ltRawNAV: snapshot.ltRawNAV,
-        accruedLiquidityPremium: snapshot.accruedLiquidityPremium,
-        poolPctST: snapshot.poolPctST,
-        utilization: snapshot.utilization,
-        liquidityUtilization: snapshot.liquidityUtilization,
-        seniorEffectiveNAV: snapshot.stEffectiveNAV,
-        juniorEffectiveNAV: snapshot.jtEffectiveNAV,
-      };
-    });
-    const first = chart[0];
-    const last = chart[chart.length - 1];
-    const days = Math.max(
-      1,
-      (Date.parse(series[series.length - 1].date) - Date.parse(series[0].date)) / 86_400_000,
-    );
-    const makePeriod = (
-      aIndex: number,
-      bIndex: number,
-      expired: boolean,
-    ): DayObservationPeriod => ({
-      aIndex,
-      bIndex,
-      startDate: chart[aIndex].date,
-      endDate: chart[bIndex].date,
-      days: Math.round((Date.parse(chart[bIndex].date) - Date.parse(chart[aIndex].date)) / 86_400_000),
-      targetDays: enginePremiumInputs.observationDays,
-      expired,
-    });
-    const observationPeriods: DayObservationPeriod[] = [];
-    for (let index = 0; index < chart.length; index += 1) {
-      if (chart[index].state !== MarketState.FIXED_TERM) continue;
-      if (index > 0 && chart[index - 1].state === MarketState.FIXED_TERM) continue;
-      let closeIndex = index + 1;
-      while (closeIndex < chart.length && chart[closeIndex].state === MarketState.FIXED_TERM) {
-        closeIndex += 1;
-      }
-      if (closeIndex >= chart.length) {
-        observationPeriods.push(makePeriod(index, chart.length - 1, false));
-      } else {
-        const exitEvent = sim.events.find(
-          (event) => event.t === chart[closeIndex].t && event.kind === 'exit-fixed-term',
-        );
-        observationPeriods.push(
-          makePeriod(index, closeIndex, exitEvent?.observationExitReason === 'period-ended'),
-        );
-      }
-    }
-    const nonObservationPeriods: DayObservationPeriod[] = [];
-    let nonObservationStart = 0;
-    for (const period of observationPeriods) {
-      if (period.aIndex > nonObservationStart) {
-        nonObservationPeriods.push(makePeriod(nonObservationStart, period.aIndex, false));
-      }
-      nonObservationStart = period.bIndex;
-    }
-    if (chart.length - 1 > nonObservationStart) {
-      nonObservationPeriods.push(makePeriod(nonObservationStart, chart.length - 1, false));
-    }
-    const observationBands = observationPeriods.map((period) => ({
-      start: period.startDate,
-      end: period.endDate,
-    }));
-    const observationEvents = observationPeriods.length;
-    const maxObservedObservationDays = observationPeriods.reduce(
-      (maximum, period) => Math.max(maximum, period.days),
-      0,
-    );
-    const totalObservedDays = Math.max(
-      0,
-      (Date.parse(chart[chart.length - 1].date) - Date.parse(chart[0].date)) / 86_400_000,
-    );
-    const outsideObservationPct = totalObservedDays > 0
-      ? ((totalObservedDays - observationPeriods.reduce((sum, period) => sum + period.days, 0)) /
-          totalObservedDays) *
-        100
-      : 0;
-    const maxDrawdown = (key: 'strategy' | 'senior' | 'junior' | 'liquidity') => {
-      let peak = chart[0][key];
-      let worst = 0;
-      for (const point of chart) {
-        peak = Math.max(peak, point[key]);
-        worst = Math.max(worst, peak > 0 ? 1 - point[key] / peak : 0);
-      }
-      return worst;
-    };
-    const seniorLossEventDetails: DaySeniorLossEvent[] = chart.flatMap((point, index) => {
-      if (index === 0 || point.stIL <= chart[index - 1].stIL + 1e-9) return [];
-      const lossIndexPts = Math.max(0, chart[index - 1].senior - point.senior);
-      return lossIndexPts > 1e-9 ? [{ index, date: point.date, lossIndexPts }] : [];
-    });
-    const monthEnds = new Map<string, (typeof chart)[number]>();
-    for (const point of chart) monthEnds.set(point.date.slice(0, 7), point);
-    let previousStrategy = 100;
-    let previousJunior = 100;
-    let previousSenior = 100;
-    let previousLiquidity = 100;
-    const monthlyRows = Array.from(monthEnds.entries()).map(([month, monthEnd]) => {
-      const strategyReturn = monthEnd.strategy / previousStrategy - 1;
-      const juniorReturn = monthEnd.junior / previousJunior - 1;
-      const seniorReturn = monthEnd.senior / previousSenior - 1;
-      const liquidityReturn = monthEnd.liquidity / previousLiquidity - 1;
-      previousStrategy = monthEnd.strategy;
-      previousJunior = monthEnd.junior;
-      previousSenior = monthEnd.senior;
-      previousLiquidity = monthEnd.liquidity;
-      return {
-        month,
-        strategyReturn,
-        juniorReturn,
-        seniorReturn,
-        liquidityReturn,
-      };
-    });
-    const monthly = omitInitialZeroReturnPeriod
-      && chart[0]?.date === modeledSeries[0]?.date
-      && monthlyRows.length > 1
-      ? monthlyRows.slice(1)
-      : monthlyRows;
-    const final = sim.last();
-    return {
-      cfg,
-      initial,
-      sim,
-      chart,
-      seniorApy: annualized(last.senior, first.senior, days),
-      juniorApy: annualized(last.junior, first.junior, days),
-      liquidityApy: annualized(last.liquidity, first.liquidity, days),
-      strategyApy: annualized(last.strategy, first.strategy, days),
-      final,
-      observationPeriods,
-      nonObservationPeriods,
-      observationBands,
-      observationEvents,
-      outsideObservationPct,
-      maxObservedObservationDays,
-      erasureEvents,
-      seniorLossEventDetails,
-      erasedRecoveryClaims: erasureEvents.length,
-      seniorLossEvents: seniorLossEventDetails.length,
-      juniorCapitalInjected,
-      juniorCapitalInjectedShareOfStart: initial.jt > 0
-        ? juniorCapitalInjected / initial.jt
-        : 0,
-      strategyMaxDrawdown: maxDrawdown('strategy'),
-      seniorMaxDrawdown: maxDrawdown('senior'),
-      juniorMaxDrawdown: maxDrawdown('junior'),
-      liquidityMaxDrawdown: maxDrawdown('liquidity'),
-      monthly,
-    };
-    };
     const result = run(view);
     const fullResult = isFullRange(viewRange, maxIndex) ? result : run(modeledSeries);
     const explainer = buildDayExplainerMetrics(result.cfg, result.initial);
