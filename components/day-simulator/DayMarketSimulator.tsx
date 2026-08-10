@@ -53,12 +53,14 @@ import {
 } from '@/lib/day-simulator-template/issuer-presets';
 import {
   buildDayConfigExport,
+  DAY_DEPLOYMENT_INPUT_IDS,
   DAY_DEPLOYMENT_TERM_BOUNDS,
   dayConfigExportFilename,
   EMPTY_DAY_DEPLOYMENT_FIELDS,
   parseDayDeploymentTerm,
   type DayDeploymentFieldId,
   type DayDeploymentFieldValues,
+  type DayDeploymentInputValues,
 } from '@/lib/day-simulator-template/config-export';
 import { shouldRefillJunior } from '@/lib/day-simulator-template/refill';
 import {
@@ -1703,9 +1705,10 @@ function SourceSplitDiagram({
               {leg.name}
             </text>
             <text
-              fill={leg.funded ? C.text : C.danger}
+              fill={leg.funded ? (leg.apy < 0 ? C.danger : C.text) : C.danger}
               fontFamily={MONO}
               fontSize="13"
+              fontWeight={leg.funded && leg.apy < 0 ? 700 : 400}
               x="404"
               y={leg.y - 3}
             >
@@ -1803,7 +1806,7 @@ function PresetRow({
         style={cellStyle(otherActive)}
         type="button"
       >
-        Show advanced
+        Custom
       </button>
     </div>
   );
@@ -1911,10 +1914,14 @@ const signColor = (value: number) => (value < 0 ? C.danger : C.text);
 
 export default function DayMarketSimulator({
   market,
+  depth = 'advanced',
   variant = 'standard',
   onExitTutorial,
 }: {
   market?: DayMarket;
+  // How much of the mechanism to expose. Simple answers "what would I earn";
+  // Advanced adds the backtest and the venue parameters a deployer needs.
+  depth?: 'simple' | 'advanced';
   variant?: 'standard' | 'guided' | 'executive' | 'learning' | 'tutorial';
   onExitTutorial?: () => void;
 }) {
@@ -1933,6 +1940,10 @@ export default function DayMarketSimulator({
     : activeMarket.provenance.priceType.replaceAll('-', ' ');
   const showSection = (section: (typeof activeMarket.customization.hiddenSections)[number]) =>
     isDaySectionVisible(activeMarket.customization, section);
+  // Simple keeps the source, the tranching design, and the outcomes. Everything
+  // that answers a deployment question rather than an ownership question waits
+  // for Advanced. The tutorial always runs at full depth so its steps resolve.
+  const isSimple = depth === 'simple' && !isTutorial;
   const heroTitle = activeMarket.customization.copyOverrides.heroTitle
     ?? 'Make illiquid yield easier to own.';
   const heroDescription = activeMarket.customization.copyOverrides.heroDescription
@@ -2446,6 +2457,11 @@ export default function DayMarketSimulator({
     maxIndex,
   ]);
 
+  // The largest single sale in dollars, so the bps cost carries a concrete
+  // amount the way the deploy flow states exit cost.
+  const boundaryExitUsd =
+    seniorCapitalUsd * result.explainer.liquidity.boundarySellShareOfSenior;
+
   const displaySeriesOffset = omitInitialZeroReturnPeriod && modeledSeries.length > 1 ? 1 : 0;
   const displayChart = useMemo(
     () => displaySeriesOffset > 0 && result.chart[0]?.date === modeledSeries[0]?.date
@@ -2639,8 +2655,8 @@ export default function DayMarketSimulator({
   );
   const from100 = (value: number) =>
     isNativeReturnUnit
-      ? `100 → ${value.toFixed(0)}`
-      : `$100 → $${value.toFixed(0)}`;
+      ? `100 to ${value.toFixed(0)}`
+      : `$100 to $${value.toFixed(0)}`;
   const matchedPresetId = useMemo(
     () => matchDayIssuerPreset({
       coveragePct,
@@ -2697,12 +2713,9 @@ export default function DayMarketSimulator({
         referenceSellShareOfSenior: result.explainer.liquidity.referenceSellShareOfSenior,
         boundarySellShareOfSenior: result.explainer.liquidity.boundarySellShareOfSenior,
       },
-      deploymentInputs: {
-        tokenContractSource: deploymentInputs.tokenContractSource,
-        tokenContractAddress: deploymentInputs.tokenContractAddress,
-        chain: deploymentInputs.chain,
-        adaptationSpeed: deploymentInputs.adaptationSpeed,
-      },
+      deploymentInputs: Object.fromEntries(
+        DAY_DEPLOYMENT_INPUT_IDS.map((id) => [id, deploymentInputs[id]]),
+      ) as DayDeploymentInputValues,
     });
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -3187,13 +3200,13 @@ export default function DayMarketSimulator({
       >
         <DaySectionHeader
           action={<div className="flex items-center gap-2">
-            <DayButton
+            {!isSimple && <DayButton
               onClick={exportConfiguration}
               style={{ minHeight: 32, padding: '6px 10px' }}
               variant="quiet"
             >
               Export JSON
-            </DayButton>
+            </DayButton>}
             <DayButton
             onClick={() => setShowInputs((value) => !value)}
             aria-label={showInputs ? 'Collapse market inputs' : 'Expand market inputs'}
@@ -3204,7 +3217,6 @@ export default function DayMarketSimulator({
             {isGuided ? (showInputs ? 'Done' : 'Edit') : (showInputs ? '−' : '+')}
           </DayButton>
           </div>}
-          description={isGuided ? 'Every outcome below is derived from these values.' : undefined}
           eyebrow={isGuided ? undefined : 'Market inputs'}
           title={isGuided ? 'Tranching design' : 'Market inputs'}
         />
@@ -3320,7 +3332,7 @@ export default function DayMarketSimulator({
             <div style={{ ...DAY_INPUT_PANEL, padding: 12 }}>
               <p style={{ color: C.eyebrow, fontSize: 11.5, fontWeight: 600, letterSpacing: 1, textTransform: 'uppercase' }}>Capital</p>
               <p className="mt-1" style={{ color: C.muted, fontSize: 11.5, lineHeight: 1.4 }}>
-                What the coverage and liquidity settings above mean in dollars for each tranche. Sized at the 90% target utilization the simulator seeds — slightly above the bare minimum the protocol would accept.
+                What the coverage and liquidity settings above mean in dollars for each tranche. Sized at the 90% target utilization the simulator seeds, slightly above the bare minimum the protocol would accept.
               </p>
               <div className="mt-3 grid grid-cols-1 sm:grid-cols-3" style={{ gap: 10 }}>
                 <div>
@@ -3418,7 +3430,7 @@ export default function DayMarketSimulator({
                   onChange={setSourceApyPct}
                 />
               </div>
-              {isGuided && !forwardTest && (
+              {isGuided && !forwardTest && !isSimple && (
                 <div>
                   <SliderControl
                     label="Hypothetical source drawdown (%)"
@@ -3467,7 +3479,7 @@ export default function DayMarketSimulator({
                   }}
                 />
               </div>
-              <div>
+              {!isSimple && <div>
                 <SliderControl
                   label="Observation Period duration (days)"
                   value={observationDays}
@@ -3478,7 +3490,7 @@ export default function DayMarketSimulator({
                   description={isGuided ? "How long the source has to recover before a covered Jr loss is finalized." : ""}
                   onChange={setObservationDays}
                 />
-              </div>
+              </div>}
               {isGuided && (
                 <label
                   className="flex cursor-pointer items-start gap-3"
@@ -3531,7 +3543,7 @@ export default function DayMarketSimulator({
                   }}
                 />
               </div>
-              {isGuided && (
+              {isGuided && !isSimple && (
               <div className="md:col-span-2">
                 <SliderControl
                   label="E-CLP downside band (%)"
@@ -3590,6 +3602,41 @@ export default function DayMarketSimulator({
         <DayZoneHeader label="Outcomes" zone="output" />
       )}
 
+      {/* A shock has to announce itself next to the numbers it moves. Simple
+          hides the control outright, and in Advanced the panel holding it is
+          collapsed by default, so neither mode can be trusted to disclose this
+          on its own. Shown whenever a shock is active, so there is no case where
+          the returns read as the base case while a decline drives them. */}
+      {stressDepthPct > 0 && (
+        <div
+          className="flex flex-wrap items-center gap-x-2 gap-y-1"
+          role="status"
+          style={{
+            background: '#FDF3E7',
+            border: `1px solid ${C.accent}`,
+            borderRadius: 8,
+            color: C.text,
+            fontSize: 11.5,
+            lineHeight: 1.45,
+            padding: '8px 12px',
+          }}
+        >
+          <strong style={{ fontWeight: 600 }}>
+            Hypothetical {stressDepthPct.toFixed(0)}% source drawdown is applied.
+          </strong>
+          <span style={{ color: C.muted }}>
+            Every return below reflects it, not the source data on its own.
+          </span>
+          <DayButton
+            onClick={() => setStressDepthPct(0)}
+            style={{ flex: '0 0 auto', minHeight: 26, padding: '3px 9px' }}
+            variant="quiet"
+          >
+            Remove
+          </DayButton>
+        </div>
+      )}
+
       {isGuided && (
         <section style={sectionCardStyle}>
           <DaySectionHeader title="One source, three positions" />
@@ -3640,7 +3687,7 @@ export default function DayMarketSimulator({
           )}
         <div className="grid grid-cols-1 md:grid-cols-2" style={{ gap: 10, marginTop: 12 }}>
         <div className={isGuided ? "flex flex-col" : undefined} style={isGuided
-          ? { background: C.pageBg, border: `1px solid ${C.border}`, borderRadius: 10, boxShadow: isTutorial && tutorialStep === 1 ? `inset 3px 0 ${C.accent}` : undefined, padding: 14 }
+          ? { background: C.pageBg, border: `1px solid ${C.border}`, borderLeft: `3px solid ${C.seniorLine}`, borderRadius: 10, boxShadow: isTutorial && tutorialStep === 1 ? `inset 3px 0 ${C.accent}` : undefined, padding: 14 }
           : { background: C.pageBg, border: `1px solid ${C.border}`, borderRadius: 10, padding: 14 }}
         >
           {isExecutive
@@ -3652,10 +3699,9 @@ export default function DayMarketSimulator({
                 When does Sr lose money?
               </PanelTitle>
               <p className="mt-2" style={{ color: C.muted, fontSize: 11.5, lineHeight: 1.45 }}>
-                Jr absorbs losses first; losses beyond that buffer reduce Sr.
               </p>
               <div className="mt-3">
-                <p style={{ color: juniorIsFunded ? C.olive : C.danger, fontFamily: MONO, fontSize: 28, fontWeight: 600, letterSpacing: '-0.05em' }}>
+                <p style={{ color: juniorIsFunded ? C.seniorLine : C.danger, fontFamily: MONO, fontSize: 28, fontWeight: 600, letterSpacing: '-0.05em' }}>
                   {juniorIsFunded
                     ? `${(result.explainer.coverage.coverageLossLimit * 100).toFixed(1)}% source loss`
                     : 'No buffer'}
@@ -3663,13 +3709,20 @@ export default function DayMarketSimulator({
                 <p style={{ color: C.text, fontSize: 11.5 }}>
                   {juniorIsFunded ? 'before Sr starts falling' : 'Sr takes the first loss itself'}
                 </p>
-                <div
-                  aria-label={`Sr is covered through ${(result.explainer.coverage.coverageLossLimit * 100).toFixed(1)} percent source loss on the displayed ${(result.explainer.coverage.displayMaxLoss * 100).toFixed(1)} percent loss range`}
-                  className="mt-3 flex"
-                  role="img"
-                  style={{ background: `${C.danger}18`, borderRadius: 9999, height: 9, overflow: 'hidden' }}
-                >
-                  <div style={{ background: C.olive, width: `${Math.min(100, result.explainer.coverage.coverageLossLimit / result.explainer.coverage.displayMaxLoss * 100)}%` }} />
+                <div className="mt-3">
+                  <div
+                    aria-label={`Sr is covered through ${(result.explainer.coverage.coverageLossLimit * 100).toFixed(1)} percent source loss, on a scale to ${(result.explainer.coverage.displayMaxLoss * 100).toFixed(0)} percent`}
+                    className="flex"
+                    role="img"
+                    style={{ background: `${C.danger}18`, borderRadius: 9999, height: 9, overflow: 'hidden' }}
+                  >
+                    <div style={{ background: C.seniorLine, width: `${Math.min(100, result.explainer.coverage.coverageLossLimit / result.explainer.coverage.displayMaxLoss * 100)}%` }} />
+                  </div>
+                  <div className="mt-1 flex items-baseline justify-between" style={{ color: C.kpiLabel, fontFamily: MONO, fontSize: 9 }}>
+                    <span>0% source loss</span>
+                    <span style={{ color: C.seniorLine }}>Jr absorbs</span>
+                    <span>{(result.explainer.coverage.displayMaxLoss * 100).toFixed(0)}%</span>
+                  </div>
                 </div>
                 <p className="mt-2" style={{ color: C.muted, fontSize: 10, lineHeight: 1.4 }}>
                   {juniorIsFunded
@@ -3715,7 +3768,7 @@ export default function DayMarketSimulator({
           )}
           {(!isGuided || showCoverageDetail) && <CoverageLossDiagram metrics={result.explainer.coverage} />}
           {(isGuided || isExecutive) && (
-            <p style={{ color: C.muted, fontSize: 11.5, lineHeight: 1.45 }}>
+            <p style={{ color: C.kpiLabel, fontSize: 10, lineHeight: 1.4, marginTop: 'auto', paddingTop: 8 }}>
               Coverage is a buffer, not a guarantee. Sr declines after about {(result.explainer.coverage.coverageLossLimit * 100).toFixed(1)}% of base-asset loss.
             </p>
           )}
@@ -3724,7 +3777,7 @@ export default function DayMarketSimulator({
         <div
           className={isGuided ? "flex flex-col" : undefined}
           style={isGuided
-            ? { background: C.pageBg, border: `1px solid ${C.border}`, borderRadius: 10, boxShadow: isTutorial && tutorialStep === 2 ? `inset 3px 0 ${C.accent}` : undefined, padding: 14 }
+            ? { background: C.pageBg, border: `1px solid ${C.border}`, borderLeft: `3px solid ${C.olive}`, borderRadius: 10, boxShadow: isTutorial && tutorialStep === 2 ? `inset 3px 0 ${C.accent}` : undefined, padding: 14 }
             : { background: C.pageBg, border: `1px solid ${C.border}`, borderRadius: 10, padding: 14 }}
         >
           {isExecutive
@@ -3750,19 +3803,56 @@ export default function DayMarketSimulator({
                     : 'Sr can only exit through primary redemption'}
                 </p>
                 <div
-                  aria-label={`${(result.explainer.liquidity.referenceSellShareOfSenior * 100).toFixed(1)} percent near-par capacity and ${(result.explainer.liquidity.boundarySellShareOfSenior * 100).toFixed(1)} percent maximum atomic capacity`}
+                  aria-label={`${(result.explainer.liquidity.referenceSellShareOfSenior * 100).toFixed(1)} percent near-par capacity and ${(result.explainer.liquidity.boundarySellShareOfSenior * 100).toFixed(1)} percent maximum atomic capacity, on a scale to 100 percent of Sr`}
                   className="mt-3"
                   role="img"
                   style={{ background: C.pageBg, borderRadius: 9999, height: 9, overflow: 'hidden', position: 'relative' }}
                 >
-                  <div style={{ background: `${C.seniorLine}35`, height: '100%', width: `${Math.min(100, result.explainer.liquidity.boundarySellShareOfSenior * 100)}%` }} />
+                  <div style={{ background: `${C.olive}35`, height: '100%', width: `${Math.min(100, result.explainer.liquidity.boundarySellShareOfSenior * 100)}%` }} />
                   <div style={{ background: C.olive, height: '100%', left: 0, position: 'absolute', top: 0, width: `${Math.min(100, result.explainer.liquidity.referenceSellShareOfSenior * 100)}%` }} />
                 </div>
-                <p className="mt-2" style={{ color: C.muted, fontSize: 10, lineHeight: 1.4 }}>
-                  {liquidityIsFunded
-                    ? <>Largest one-time sale: <strong style={{ color: C.seniorLine, fontWeight: 600 }}>{(result.explainer.liquidity.boundarySellShareOfSenior * 100).toFixed(1)}%</strong> of Sr, at {(result.explainer.liquidity.boundaryQuote.slippage * 100).toFixed(1)}% below marked value.</>
-                    : <span style={{ color: C.danger }}>Raise SLP liquidity above 0% to open a secondary market.</span>}
-                </p>
+                <div className="mt-1 flex items-baseline justify-between" style={{ color: C.kpiLabel, fontFamily: MONO, fontSize: 9 }}>
+                  <span>0</span>
+                  <span>
+                    <span style={{ color: C.olive }}>near par</span>
+                    {' · '}
+                    <span style={{ color: C.olive, opacity: 0.55 }}>at the boundary</span>
+                  </span>
+                  <span>100% of Sr</span>
+                </div>
+                {liquidityIsFunded ? (
+                  <div
+                    className="mt-3 grid grid-cols-2"
+                    style={{ borderTop: `1px solid ${C.border}`, gap: 10, paddingTop: 10 }}
+                  >
+                    <div>
+                      <p style={{ color: C.eyebrow, fontFamily: MONO, fontSize: 9, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+                        Largest one-time sale
+                      </p>
+                      <p className="mt-1" style={{ color: C.text, fontFamily: MONO, fontSize: 15, fontWeight: 700 }}>
+                        {usd0(boundaryExitUsd)}
+                      </p>
+                      <p style={{ color: C.kpiLabel, fontSize: 10, lineHeight: 1.4 }}>
+                        in a single trade
+                      </p>
+                    </div>
+                    <div>
+                      <p style={{ color: C.eyebrow, fontFamily: MONO, fontSize: 9, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+                        Cost at that size
+                      </p>
+                      <p className="mt-1" style={{ color: C.text, fontFamily: MONO, fontSize: 15, fontWeight: 700 }}>
+                        {usd0(result.explainer.liquidity.boundaryQuote.slippage * boundaryExitUsd)}
+                      </p>
+                      <p style={{ color: C.kpiLabel, fontSize: 10, lineHeight: 1.4 }}>
+                        {(result.explainer.liquidity.boundaryQuote.slippage * 10_000).toFixed(0)} bps of price impact
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="mt-2" style={{ color: C.danger, fontSize: 10, lineHeight: 1.4 }}>
+                    Raise SLP liquidity above 0% to open a secondary market.
+                  </p>
+                )}
               </div>
             </>
           )}
@@ -3802,7 +3892,7 @@ export default function DayMarketSimulator({
           )}
           {(!isGuided || showLiquidityDetail) && <LiquidityExecutionDiagram metrics={result.explainer.liquidity} />}
           {(isGuided || isExecutive) && (
-            <p style={{ color: C.muted, fontSize: 11.5, lineHeight: 1.45 }}>
+            <p style={{ color: C.kpiLabel, fontSize: 10, lineHeight: 1.4, marginTop: 'auto', paddingTop: 8 }}>
               Modeled quotes only. The sequence does not guarantee arbitrage timing, total fill, or realized price.
             </p>
           )}
@@ -3819,17 +3909,40 @@ export default function DayMarketSimulator({
           }}
         >
           <DaySectionHeader title="Position comparison" />
+          {/* Once the top-up exceeds Jr's own starting capital, Sr's result is
+              mostly funded from outside the market rather than by the source, so
+              the note is promoted from a footnote to a caution. Below that, a
+              footnote is proportionate. */}
           {isGuided && result.juniorCapitalInjectedShareOfStart > 0.001 && (
-            <p className="mt-3" style={{ color: C.muted, fontSize: 11.5, lineHeight: 1.5 }}>
-              <strong style={{ color: C.text, fontWeight: 600 }}>Jr was recapitalized during this run.</strong>{' '}
-              Finalized losses were followed by fresh Jr capital equal to{' '}
-              <strong style={{ color: C.juniorLine, fontFamily: MONO, fontWeight: 700 }}>
-                {(result.juniorCapitalInjectedShareOfStart * 100).toFixed(0)}%
-              </strong>{' '}
-              of Jr&apos;s starting capital, so part of Sr&apos;s result is paid for by that
-              top-up rather than by the source. Turn off &ldquo;Restore Jr after finalized
-              losses&rdquo; to see the run without it.
-            </p>
+            result.juniorCapitalInjectedShareOfStart > 1 ? (
+              <div
+                className="mt-2"
+                role="status"
+                style={{
+                  background: '#FDF3E7',
+                  border: `1px solid ${C.accent}`,
+                  borderRadius: 8,
+                  color: C.text,
+                  fontSize: 11.5,
+                  lineHeight: 1.45,
+                  padding: '8px 12px',
+                }}
+              >
+                <strong style={{ fontWeight: 600 }}>
+                  Sr&apos;s return below is not funded by the source alone.
+                </strong>{' '}
+                Jr was topped up by{' '}
+                {(result.juniorCapitalInjectedShareOfStart * 100).toFixed(0)}% of its starting
+                capital to hold coverage, and that outside capital is what pays for most of
+                Sr&apos;s result. Turn off coverage restoration to see Sr without it.
+              </div>
+            ) : (
+              <p className="mt-2" style={{ color: C.kpiLabel, fontSize: 10.5, lineHeight: 1.45 }}>
+                <strong style={{ color: C.juniorLine, fontWeight: 700 }}>Jr was recapitalized</strong>{' '}
+                by {(result.juniorCapitalInjectedShareOfStart * 100).toFixed(0)}% of its starting capital
+                during this run, so part of Sr&apos;s result is paid for by that top-up. Open the Jr row for detail.
+              </p>
+            )
           )}
           <div className="mt-3 overflow-x-auto" style={{ border: `1px solid ${C.border}`, borderRadius: 10 }}>
             <table className="w-full" style={{ borderCollapse: 'collapse', minWidth: 720, textAlign: 'left' }}>
@@ -3855,11 +3968,11 @@ export default function DayMarketSimulator({
               </thead>
               <tbody>
                 {[
-                  ['Source', 'Baseline', from100(endStep.strategy), pct(result.strategyApy), drawdownPct(result.strategyMaxDrawdown), C.strategyLine],
-                  ['Sr', 'Protected by Jr, and can exit early into the SLP pool; pays both a premium for it', from100(endStep.senior), pct(result.seniorApy), drawdownPct(result.seniorMaxDrawdown), C.seniorLine],
-                  ['Jr', 'Takes first loss; earns risk premium', from100(endStep.junior), pct(result.juniorApy), drawdownPct(result.juniorMaxDrawdown), C.juniorLine],
-                  ['SLP', 'Supplies the pool Sr sells into; earns liquidity premium', from100(endStep.liquidity), pct(result.liquidityApy), drawdownPct(result.liquidityMaxDrawdown), C.olive],
-                ].map(([position, role, ending, apy, drawdown, color], index) => {
+                  ['Source', 'Baseline', from100(endStep.strategy), pct(result.strategyApy), drawdownPct(result.strategyMaxDrawdown), C.strategyLine, result.strategyApy, result.strategyMaxDrawdown],
+                  ['Sr', 'Protected by Jr, and can exit early into the SLP pool; pays both a premium for it', from100(endStep.senior), pct(result.seniorApy), drawdownPct(result.seniorMaxDrawdown), C.seniorLine, result.seniorApy, result.seniorMaxDrawdown],
+                  ['Jr', 'Takes first loss; earns risk premium', from100(endStep.junior), pct(result.juniorApy), drawdownPct(result.juniorMaxDrawdown), C.juniorLine, result.juniorApy, result.juniorMaxDrawdown],
+                  ['SLP', 'Supplies the pool Sr sells into; earns liquidity premium', from100(endStep.liquidity), pct(result.liquidityApy), drawdownPct(result.liquidityMaxDrawdown), C.olive, result.liquidityApy, result.liquidityMaxDrawdown],
+                ].map(([position, role, ending, apy, drawdown, color, apyValue, drawdownValue], index) => {
                   const open = openPositionRow === position;
                   const rule = index < 3 || open ? `1px solid ${C.border}` : undefined;
                   return (
@@ -3868,15 +3981,15 @@ export default function DayMarketSimulator({
                     onClick={() => setOpenPositionRow(open ? null : (position as string))}
                     style={{ background: index % 2 === 0 ? C.cardBg : C.pageBg, cursor: 'pointer' }}
                   >
-                    <td style={{ borderBottom: rule, color, fontFamily: MONO, fontSize: 13, fontWeight: 700, padding: '10px' }}>
+                    <td style={{ borderBottom: rule, borderLeft: `3px solid ${color as string}`, color: color as string, fontFamily: MONO, fontSize: 13, fontWeight: 700, padding: '10px 10px 10px 12px' }}>
                       {position}
                     </td>
                     <td style={{ borderBottom: rule, color: C.muted, fontSize: 11.5, padding: '10px' }}>{role}</td>
-                    <td style={{ borderBottom: rule, color, fontFamily: MONO, fontSize: 15, fontWeight: 600, padding: '10px' }}>{ending}</td>
-                    <td style={{ borderBottom: rule, color: C.text, fontFamily: MONO, fontSize: 11.5, padding: '10px' }}>{apy}</td>
+                    <td style={{ borderBottom: rule, color: color as string, fontFamily: MONO, fontSize: 15, fontWeight: 600, padding: '10px' }}>{ending}</td>
+                    <td style={{ borderBottom: rule, color: signColor(apyValue as number), fontFamily: MONO, fontSize: 13, fontWeight: 700, padding: '10px' }}>{apy}</td>
                     <td style={{ borderBottom: rule, color: C.text, fontFamily: MONO, fontSize: 11.5, padding: '10px' }}>
                       <span className="flex items-baseline justify-between gap-3">
-                        <span>{drawdown}</span>
+                        <span style={{ color: (drawdownValue as number) > 0 ? C.danger : C.kpiLabel }}>{drawdown}</span>
                         <button
                           aria-controls={`day-sim-position-${position}`}
                           aria-expanded={open}
@@ -3943,7 +4056,7 @@ export default function DayMarketSimulator({
                             {b.net.label}
                           </td>
                           <td style={{ ...cell, borderTop: `1px solid ${C.text}` }} />
-                          <td style={{ ...amount, borderTop: `1px solid ${C.text}`, color, fontSize: 14, fontWeight: 700 }}>
+                          <td style={{ ...amount, borderTop: `1px solid ${C.text}`, color: color as string, fontSize: 14, fontWeight: 700 }}>
                             {pctSigned(b.net.pct)}
                           </td>
                           <td style={{ ...cell, borderTop: `1px solid ${C.text}` }} />
@@ -4000,7 +4113,7 @@ export default function DayMarketSimulator({
         </section>
       )}
 
-      {showSection('backtest') && <section style={sectionCardStyle}>
+      {showSection('backtest') && !isSimple && <section style={sectionCardStyle}>
         <DaySectionHeader
           action={<DayButton
             aria-expanded={showReview}
@@ -4379,8 +4492,8 @@ export default function DayMarketSimulator({
                     ))}
                     <th className="text-right" style={{ borderBottom: `1px solid ${C.border}`, padding: '6px 7px', whiteSpace: 'nowrap' }}>
                       {isNativeReturnUnit
-                        ? `end index → avg/yr (${returnUnit})`
-                        : 'end $100 → avg/yr'}
+                        ? `end index to avg/yr (${returnUnit})`
+                        : 'end $100 to avg/yr'}
                     </th>
                   </tr>
                 </thead>
@@ -4396,7 +4509,7 @@ export default function DayMarketSimulator({
         )}
       </section>}
 
-      {showSection('junior-funding') && !isGuided && <section style={{ ...sectionCardStyle, borderLeft: `3px solid ${C.accent}` }}>
+      {showSection('junior-funding') && !isGuided && !isSimple && <section style={{ ...sectionCardStyle, borderLeft: `3px solid ${C.accent}` }}>
         <div className="flex items-start justify-between gap-4 flex-wrap">
           <div>
             <Eyebrow>{isGuided ? 'Model assumption' : 'Jr funding assumption'}</Eyebrow>
@@ -4426,7 +4539,7 @@ export default function DayMarketSimulator({
         </p>
       </section>}
 
-      {isGuided && (
+      {isGuided && !isSimple && (
         <section style={sectionCardStyle}>
           <DaySectionHeader
             action={<DayButton
@@ -4438,7 +4551,7 @@ export default function DayMarketSimulator({
             >
               {showUtilizationCurves ? 'Hide curves' : 'Show curves'}
             </DayButton>}
-            description="Each premium is a curve in its own utilization, and the two move independently: Jr's tracks coverage utilization, SLP's tracks liquidity utilization. Utilization moves with deposits and redemptions — it is set by the market, not by the issuer."
+            description="Each premium is a curve in its own utilization, and the two move independently: Jr's tracks coverage utilization, SLP's tracks liquidity utilization. Utilization moves with deposits and redemptions. It is set by the market, not by the issuer."
             title="How the premiums move with utilization"
           />
           {showUtilizationCurves && <div className="mt-4 grid grid-cols-1 md:grid-cols-2" style={{ gap: 16 }}>
@@ -4492,7 +4605,7 @@ export default function DayMarketSimulator({
                     </strong>{' '}
                     of {pane.capitalNoun} behind{' '}
                     <strong style={{ color: C.text, fontFamily: MONO, fontWeight: 600 }}>{usd0(seniorCapitalUsd)}</strong>{' '}
-                    of Sr — versus{' '}
+                    of Sr, versus{' '}
                     <strong style={{ color: C.text, fontFamily: MONO, fontWeight: 600 }}>
                       {usd0(pane.capitalAt(DAY_TARGET_UTILIZATION))}
                     </strong>{' '}
@@ -4518,14 +4631,14 @@ export default function DayMarketSimulator({
         </section>
       )}
 
-      {isGuided && (
+      {isGuided && !isSimple && (
         <hr
           aria-hidden
           style={{ border: 'none', borderTop: `1px solid ${C.border}`, margin: '4px 0' }}
         />
       )}
 
-      {isGuided && (
+      {isGuided && !isSimple && (
         <DayDeploymentInputs
           adaptationSpeed={defaults.riskYDM.maxAdaptSpeedPerYear}
           coveragePct={coveragePct}

@@ -245,6 +245,23 @@ export default function DayDeploymentInputs({
         />
         <DeploymentGroup
           inputs={[
+            { inputId: "exitAsset", label: "Exit asset", value: "", state: entered("exitAsset") },
+            { inputId: "exitAssetStatic", label: "Exit asset priced flat", placeholder: "yes / no", value: "", state: entered("exitAssetStatic") },
+            { inputId: "exitLiquidity", label: "Exit liquidity", placeholder: "$", value: "", state: entered("exitLiquidity") },
+            { inputId: "navUpdateCadence", label: "NAV update cadence", unit: "days", value: "", state: entered("navUpdateCadence") },
+            { inputId: "redemptionDelay", label: "Redemption delay", unit: "days", value: "", state: entered("redemptionDelay") },
+            { inputId: "restockHurdle", label: "Restock hurdle", unit: "bps", value: "", state: entered("restockHurdle") },
+            { inputId: "maximumDiscount", label: "Maximum discount", unit: "bps", value: "", state: entered("maximumDiscount") },
+            { inputId: "maximumPremium", label: "Maximum premium", unit: "bps", value: "", state: entered("maximumPremium") },
+            { inputId: "depthAtNav", label: "Depth at NAV", value: "", state: entered("depthAtNav") },
+            { inputId: "reinvestmentSlippageTolerance", label: "Reinvestment slippage tolerance", unit: "bps", value: "", state: entered("reinvestmentSlippageTolerance") },
+          ]}
+          onInputChange={onDeploymentInputChange}
+          title="Liquidity venue"
+          values={deploymentInputs}
+        />
+        <DeploymentGroup
+          inputs={[
             {
               inputId: "protectedExitThreshold",
               label: "Protected exit threshold",

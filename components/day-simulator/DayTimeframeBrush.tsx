@@ -202,7 +202,7 @@ export function DayTimeframeBrush({
       >
         <span>{isForward ? 'Forward test window' : 'Backtest window'}</span>
         <span style={{ color: C.text, fontFamily: MONO, fontSize: 10, fontWeight: 500, letterSpacing: 0, textTransform: 'none' }}>
-          {isFull ? (isForward ? 'Full scenario' : 'Full history') : `${dateLabel(dates[view.a])} → ${dateLabel(dates[view.b])}`}
+          {isFull ? (isForward ? 'Full scenario' : 'Full history') : `${dateLabel(dates[view.a])} to ${dateLabel(dates[view.b])}`}
         </span>
       </div>
 

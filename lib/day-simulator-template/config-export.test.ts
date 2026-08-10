@@ -47,6 +47,7 @@ const input: DayConfigExportInput = {
     boundarySellShareOfSenior: 0.118,
   },
   deploymentInputs: {
+    ...EMPTY_DAY_DEPLOYMENT_INPUTS,
     tokenContractSource: "https://example.com/token",
     tokenContractAddress: "0x0000000000000000000000000000000000000001",
     chain: "Ethereum",
@@ -103,8 +104,13 @@ assert.deepEqual(payload.deploymentInputs, input.deploymentInputs);
 assert.deepEqual(Object.keys(payload.deploymentInputs).sort(), [...DAY_DEPLOYMENT_INPUT_IDS].sort());
 assert.deepEqual(
   buildDayConfigExport({ ...input, deploymentInputs: EMPTY_DAY_DEPLOYMENT_INPUTS }).deploymentInputs,
-  { tokenContractSource: "", tokenContractAddress: "", chain: "", adaptationSpeed: "" },
+  EMPTY_DAY_DEPLOYMENT_INPUTS,
 );
+for (const value of Object.values(
+  buildDayConfigExport({ ...input, deploymentInputs: EMPTY_DAY_DEPLOYMENT_INPUTS }).deploymentInputs,
+)) {
+  assert.equal(value, "", "an undeclared deployment input must export as empty, not undefined");
+}
 
 // The payload is JSON-serializable without loss.
 assert.deepEqual(JSON.parse(JSON.stringify(payload)), payload);

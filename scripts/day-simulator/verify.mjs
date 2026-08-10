@@ -255,7 +255,6 @@ for (const tutorialIntegrationContract of [
   "onShowInSimulator={showTutorialSection}",
   "Current modeled effect: Sr remains at $100 through about",
   "Current modeled effect:",
-  "Every outcome below is derived from these values.",
   "How it works:",
   "Current result:",
   "More Jr Coverage increases the first-loss buffer protecting Senior (Sr).",

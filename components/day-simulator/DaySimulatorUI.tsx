@@ -86,23 +86,23 @@ export function DayZoneHeader({
     ? DAY_SIMULATOR_THEME.eyebrow
     : DAY_SIMULATOR_THEME.accent;
   return (
-    <div className="flex items-baseline gap-3" style={{ padding: "2px 4px" }}>
+    <div className="flex items-center gap-3" style={{ padding: "12px 2px 4px" }}>
       <span
         style={{
           background: accent,
           borderRadius: 9999,
           flex: "0 0 auto",
-          height: 5,
-          width: 5,
+          height: 7,
+          width: 7,
         }}
       />
       <span
         style={{
           color: DAY_SIMULATOR_THEME.text,
           fontFamily: DAY_SIMULATOR_TYPE.mono,
-          fontSize: 10,
+          fontSize: 12,
           fontWeight: 700,
-          letterSpacing: "0.18em",
+          letterSpacing: "0.2em",
           textTransform: "uppercase",
         }}
       >
@@ -305,22 +305,24 @@ export function DayFieldCaption({ children }: { children: ReactNode }) {
 
 export function DaySegmentedControl({
   children,
+  compact = false,
   label,
 }: {
   children: ReactNode;
+  compact?: boolean;
   label: string;
 }) {
   return (
     <div
       aria-label={label}
-      className="grid grid-cols-1 sm:grid-cols-2"
+      className={compact ? "flex items-stretch" : "grid grid-cols-1 sm:grid-cols-2"}
       role="group"
       style={{
         background: DAY_SIMULATOR_THEME.pageBg,
         border: `1px solid ${DAY_SIMULATOR_THEME.border}`,
         borderRadius: DAY_SIMULATOR_RADIUS.panel,
         gap: 4,
-        padding: 4,
+        padding: compact ? 3 : 4,
       }}
     >
       {children}
@@ -331,9 +333,11 @@ export function DaySegmentedControl({
 export function DaySegmentedButton({
   active,
   children,
+  compact = false,
   ...props
 }: ButtonHTMLAttributes<HTMLButtonElement> & {
   active: boolean;
+  compact?: boolean;
 }) {
   return (
     <button
@@ -345,11 +349,13 @@ export function DaySegmentedButton({
         boxShadow: active ? "0 1px 2px rgba(29,28,25,.05)" : "none",
         color: active ? DAY_SIMULATOR_THEME.text : DAY_SIMULATOR_THEME.muted,
         fontFamily: DAY_SIMULATOR_TYPE.sans,
-        fontSize: 13,
+        fontSize: compact ? 11 : 13,
         fontWeight: active ? 600 : 500,
-        minHeight: 42,
-        padding: "9px 12px",
-        textAlign: "left",
+        letterSpacing: compact ? "0.04em" : undefined,
+        minHeight: compact ? 28 : 42,
+        padding: compact ? "5px 11px" : "9px 12px",
+        textAlign: compact ? "center" : "left",
+        whiteSpace: compact ? "nowrap" : undefined,
       }}
       type="button"
       {...props}

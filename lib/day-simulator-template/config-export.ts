@@ -8,6 +8,17 @@ export const DAY_DEPLOYMENT_INPUT_IDS = [
   'tokenContractAddress',
   'chain',
   'adaptationSpeed',
+  // Liquidity venue — required by the deploy flow, not modeled by the accountant.
+  'exitAsset',
+  'exitAssetStatic',
+  'exitLiquidity',
+  'navUpdateCadence',
+  'redemptionDelay',
+  'restockHurdle',
+  'maximumDiscount',
+  'maximumPremium',
+  'depthAtNav',
+  'reinvestmentSlippageTolerance',
 ] as const;
 
 export const DAY_DEPLOYMENT_TERM_IDS = [
@@ -31,6 +42,16 @@ export const EMPTY_DAY_DEPLOYMENT_INPUTS: DayDeploymentInputValues = {
   tokenContractAddress: '',
   chain: '',
   adaptationSpeed: '',
+  exitAsset: '',
+  exitAssetStatic: '',
+  exitLiquidity: '',
+  navUpdateCadence: '',
+  redemptionDelay: '',
+  restockHurdle: '',
+  maximumDiscount: '',
+  maximumPremium: '',
+  depthAtNav: '',
+  reinvestmentSlippageTolerance: '',
 };
 
 export const EMPTY_DAY_DEPLOYMENT_FIELDS: DayDeploymentFieldValues = {

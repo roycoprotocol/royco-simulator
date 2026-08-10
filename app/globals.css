@@ -166,3 +166,73 @@ body {
   --danger: #f87171;
   --font-inter: var(--font-geist-sans), -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
 }
+
+/* Keyboard focus for the Day simulator. The page is built from inline styles
+   with no class layer, so it inherited the browser default ring, which reads as
+   a foreign blue against the warm palette. Scoped to [data-day-sim] so the
+   legacy simulator keeps its own focus treatment. Uses :focus-visible, so a
+   mouse click never draws a ring but Tab always does. */
+[data-day-sim] :is(button, select, input, a, [tabindex]):focus-visible {
+  outline: 2px solid #a65b20;
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+
+/* Royco app token layer, ported from royco-rwa-frontend app/globals.css so the
+   /v2 route reads as the same product. Scoped to .royco-v2 rather than :root
+   because this repo's other simulators depend on their own --background and
+   --card values, and overwriting those would restyle every existing page. */
+.royco-v2 {
+  --foundation: #f3f1eb;
+  --background: #fcfbf8;
+  --foreground: #17191f;
+  --card: #f5f3ee;
+  --primary: #17191f;
+  --secondary: #4b5260;
+  --tertiary: #596270;
+  --border-subtle: #e4e0d6;
+  --theme-gold: #feb901;
+  --theme-green: #01c555;
+  --theme-red: #f14a01;
+  --theme-navy: #1d4987;
+  --theme-brown: #8c5f3d;
+  --gold-emphasis: #7a5800;
+  --green-emphasis: #0a3d3a;
+  --red-emphasis: #7a2400;
+  --navy-emphasis: #0a1e3e;
+
+  background: var(--background);
+  color: var(--foreground);
+}
+
+/* The v2 range control, themed to the app tokens rather than the browser default. */
+.royco-v2 .day-v2-range {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 100%;
+  height: 4px;
+  border-radius: 9999px;
+  background: color-mix(in srgb, var(--foreground) 14%, transparent);
+  cursor: pointer;
+}
+.royco-v2 .day-v2-range::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 15px;
+  height: 15px;
+  border-radius: 9999px;
+  background: var(--foreground);
+  border: 2px solid var(--card);
+  box-shadow: 0 1px 3px rgba(23, 25, 31, 0.28);
+}
+.royco-v2 .day-v2-range::-moz-range-thumb {
+  width: 15px;
+  height: 15px;
+  border: 2px solid var(--card);
+  border-radius: 9999px;
+  background: var(--foreground);
+}
+.royco-v2 .day-v2-range:focus-visible {
+  outline: 2px solid var(--theme-gold);
+  outline-offset: 3px;
+}
