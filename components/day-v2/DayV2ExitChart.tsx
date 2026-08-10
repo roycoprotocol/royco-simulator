@@ -1,5 +1,7 @@
 "use client";
 
+import { memo } from "react";
+
 import {
   Area,
   AreaChart,
@@ -20,7 +22,7 @@ export type DayV2ExitPoint = {
 
 const GREEN = "#0a3d3a";
 
-export default function DayV2ExitChart({
+function DayV2ExitChart({
   compactUsd,
   marker,
   points,
@@ -88,3 +90,5 @@ export default function DayV2ExitChart({
     </div>
   );
 }
+
+export default memo(DayV2ExitChart);

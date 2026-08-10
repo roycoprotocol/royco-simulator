@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { memo, useDeferredValue, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -25,11 +25,11 @@ type Field =
   | { kind: "fixed"; label: string; value: string }
   | { kind: "declared"; label: string; id: DayDeploymentFieldId; unit?: string; placeholder?: string };
 
-export default function DayV2Deployment({
+function DayV2Deployment({
   defaults,
   market,
-  modeled,
-  terms,
+  modeled: modeledInput,
+  terms: termsInput,
 }: {
   defaults: DaySimulatorDefaults;
   market: { id: string; name: string; asset: string; variant: string };
@@ -51,6 +51,11 @@ export default function DayV2Deployment({
     sourceApyPct: number;
   };
 }) {
+  // The modeled figures and terms are read-only here, so they can lag a frame
+  // behind a slider without anyone noticing. The declared fields are local
+  // state and stay instant.
+  const modeled = useDeferredValue(modeledInput);
+  const terms = useDeferredValue(termsInput);
   const [values, setValues] = useState<DayDeploymentFieldValues>(EMPTY_DAY_DEPLOYMENT_FIELDS);
   const set = (id: DayDeploymentFieldId, value: string) =>
     setValues((current) => ({ ...current, [id]: value }));
@@ -277,3 +282,5 @@ export default function DayV2Deployment({
     </Card>
   );
 }
+
+export default memo(DayV2Deployment);

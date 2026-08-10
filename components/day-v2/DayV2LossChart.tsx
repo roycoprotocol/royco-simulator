@@ -1,5 +1,7 @@
 "use client";
 
+import { memo } from "react";
+
 import {
   Area,
   AreaChart,
@@ -26,7 +28,7 @@ export type DayV2LossPoint = {
 const JUNIOR = "#8c5f3d";
 const SENIOR = "#1d4987";
 
-export default function DayV2LossChart({
+function DayV2LossChart({
   limit,
   marker,
   maxLoss,
@@ -126,3 +128,5 @@ export default function DayV2LossChart({
     </div>
   );
 }
+
+export default memo(DayV2LossChart);

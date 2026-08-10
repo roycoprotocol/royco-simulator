@@ -17,7 +17,6 @@ import {
 import { runDayHistoricalBacktest } from "@/lib/day-simulator-template/backtest";
 import type { DayMarket } from "@/lib/day-simulator-template/market";
 import { calibrateSeriesApy } from "@/lib/day-simulator-template/series";
-import { dayV2EffectiveShares } from "@/components/day-v2/terms";
 
 // The run is `runDayHistoricalBacktest`, the same shared module the root route
 // steps its history through. This file chooses a window and lays the result
@@ -34,14 +33,24 @@ const signed = (value: number) =>
   `${value < 0 ? "-" : "+"}${Math.abs(value * 100).toFixed(2)}%`;
 
 function DayV2Backtest({
+  bandPct: bandInput,
   coveragePct: coverageInput,
+  liqSharePct: liqShareInput,
   liquidityPct: liquidityInput,
+  maintainCoverage,
   market,
+  observationDays: observationInput,
+  riskSharePct: riskShareInput,
   sourceApyPct: sourceInput,
 }: {
+  bandPct: number;
   coveragePct: number;
+  liqSharePct: number;
   liquidityPct: number;
+  maintainCoverage: boolean;
   market: DayMarket;
+  observationDays: number;
+  riskSharePct: number;
   sourceApyPct: number;
 }) {
   const defaults = market.defaults;
@@ -49,6 +58,7 @@ function DayV2Backtest({
   // Declared on the market, the same two fields the root route reads.
   const footnote = market.customization.backtestDisplay?.footnote;
   const returnUnit = market.customization.backtestDisplay?.returnUnit ?? "USD";
+  const tailRisk = market.customization.forwardTest?.tailRiskDisclosure;
 
   // This section is the expensive one on the page: a few hundred engine steps,
   // four charted series over the whole history, and a row per month. Deferring
@@ -56,11 +66,15 @@ function DayV2Backtest({
   // slider is still moving, and this catches up a beat later. Measured, not
   // assumed: it is the render rather than the arithmetic that costs here.
   const deferred = useDeferredValue({
+    bandPct: bandInput,
     coveragePct: coverageInput,
+    liqSharePct: liqShareInput,
     liquidityPct: liquidityInput,
+    observationDays: observationInput,
+    riskSharePct: riskShareInput,
     sourceApyPct: sourceInput,
   });
-  const { coveragePct, liquidityPct, sourceApyPct } = deferred;
+  const { bandPct, coveragePct, liqSharePct, liquidityPct, observationDays, riskSharePct, sourceApyPct } = deferred;
 
   // The market's real price path, rescaled so its annualized yield matches the
   // source-yield control. This is what the root route models too: the shape of
@@ -108,16 +122,15 @@ function DayV2Backtest({
       terms: {
         coveragePct,
         minLiquidityPct: liquidityPct,
-        eclpBandWidthPct: defaults.eclpBandWidth * 100,
-        // Same rule as the sections above, or the history would be run at a
-        // different price for cover than the projection it sits under.
-        riskSharePct:
-          dayV2EffectiveShares(defaults, coveragePct / 100, liquidityPct / 100).riskYieldShare * 100,
-        liqSharePct:
-          dayV2EffectiveShares(defaults, coveragePct / 100, liquidityPct / 100).liquidityYieldShare * 100,
-        observationDays: defaults.observationDays,
+        // Handed down already resolved, rather than derived a second time here.
+        // Two places computing the same terms is two places to disagree, and
+        // the history has to run on the same market as the projection above it.
+        eclpBandWidthPct: bandPct,
+        riskSharePct,
+        liqSharePct,
+        observationDays,
       },
-      maintainCoverage: defaults.maintainCoverage,
+      maintainCoverage,
       // Read off the market the way the root route reads it. Only the
       // forward-modeled markets declare it, and there the opening period is
       // zero by construction. Hardcoding it to true instead dropped a real
@@ -129,7 +142,7 @@ function DayV2Backtest({
       // the opening period even when a market does declare the flag.
       monthlyBaselineDate: series[0]?.date,
     });
-  }, [coveragePct, defaults, liquidityPct, market, series, view]);
+  }, [bandPct, coveragePct, defaults, liqSharePct, liquidityPct, maintainCoverage, market, observationDays, riskSharePct, series, view]);
 
   const chartData = useMemo<DayV2BacktestPoint[]>(
     () =>
@@ -161,6 +174,21 @@ function DayV2Backtest({
             published yield instead, so every figure on this page is a forward
             projection at the stated terms rather than something that happened.
           </p>
+          {/* The markets without history are the forward-modeled ones, which is
+              exactly where this disclosure lives. Dropping it on this branch
+              would hide it on every market that declares one. */}
+          {tailRisk ? (
+            <p
+              className="mt-3 rounded-lg border px-3.5 py-2.5 text-[11.5px] leading-relaxed"
+              style={{
+                background: "color-mix(in srgb, var(--theme-red) 8%, transparent)",
+                borderColor: "color-mix(in srgb, var(--theme-red) 40%, transparent)",
+                color: "var(--red-emphasis)",
+              }}
+            >
+              {tailRisk}
+            </p>
+          ) : null}
         </CardContent>
       </Card>
     );
@@ -173,6 +201,12 @@ function DayV2Backtest({
   const ahead = result.seniorApy - result.strategyApy;
   const protectionPaid = ahead > 0.0001;
   const protectionCost = ahead < -0.0001;
+  // Coverage restoration refills Jr from outside the market. Where that ran,
+  // Sr's result is not funded by the source alone, and saying Jr "took the
+  // falls" without saying who paid to put it back is the misleading half of a
+  // true sentence. On the default market this is 99% of Jr's starting capital.
+  const toppedUp = result.juniorCapitalInjectedShareOfStart ?? 0;
+  const outsideCapitalMatters = toppedUp >= 0.005;
 
   return (
     <Card data-accountant-source="runDayHistoricalBacktest">
@@ -199,6 +233,7 @@ function DayV2Backtest({
             <>
               Sr ended {pct(Math.abs(ahead))} a year ahead of the source, because
               Jr took the falls in its place and ended at {pct(result.juniorApy)}.
+              {outsideCapitalMatters ? " Read that with the note below." : ""}
             </>
           ) : protectionCost ? (
             <>
@@ -305,6 +340,28 @@ function DayV2Backtest({
           </div>
         </div>
 
+        {/* Not a footnote. Where coverage was restored, this is the difference
+            between Sr's headline being a property of the mechanism and being a
+            property of someone else's money, so it sits with the figures. */}
+        {outsideCapitalMatters ? (
+          <p
+            className="rounded-lg border px-3.5 py-2.5 text-[11.5px] leading-relaxed"
+            style={{
+              background: "color-mix(in srgb, var(--theme-gold) 12%, transparent)",
+              borderColor: "color-mix(in srgb, var(--theme-gold) 45%, transparent)",
+              color: "var(--gold-emphasis)",
+            }}
+          >
+            <strong className="font-semibold">
+              Sr&apos;s return here is not funded by the source alone.
+            </strong>{" "}
+            Holding coverage through this history took{" "}
+            <strong className="font-mono font-bold tabular-nums">{pct(toppedUp)}</strong> of
+            Jr&apos;s starting capital in fresh money, and that outside capital pays for much of
+            Sr&apos;s result. Turn coverage restoration off in the deploy flow to see Sr without it.
+          </p>
+        ) : null}
+
         {/* The market's own disclosure about its history. It is declared on the
             market rather than written here, and the root route surfaces it, so
             dropping it would quietly publish the series without the caveat it
@@ -312,6 +369,19 @@ function DayV2Backtest({
         {footnote ? (
           <p className="rounded-lg border border-[var(--border-subtle)] bg-[var(--foundation)] px-3 py-2 text-[10.5px] leading-relaxed text-[var(--secondary)]">
             {footnote}
+          </p>
+        ) : null}
+
+        {tailRisk ? (
+          <p
+            className="rounded-lg border px-3.5 py-2.5 text-[11.5px] leading-relaxed"
+            style={{
+              background: "color-mix(in srgb, var(--theme-red) 8%, transparent)",
+              borderColor: "color-mix(in srgb, var(--theme-red) 40%, transparent)",
+              color: "var(--red-emphasis)",
+            }}
+          >
+            {tailRisk}
           </p>
         ) : null}
 

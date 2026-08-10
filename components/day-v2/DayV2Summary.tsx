@@ -1,6 +1,6 @@
 "use client";
 
-import { useDeferredValue, useMemo, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import DayV2Chart, { type DayV2Point } from "@/components/day-v2/DayV2Chart";
@@ -8,12 +8,19 @@ import DayV2Comparison, { DayV2ToneDot, type DayV2PositionBreakdown } from "@/co
 import DayV2Backtest from "@/components/day-v2/DayV2Backtest";
 import DayV2Deploy from "@/components/day-v2/DayV2Deploy";
 import DayV2Deployment from "@/components/day-v2/DayV2Deployment";
+import DayV2Parameters from "@/components/day-v2/DayV2Parameters";
+import DayV2Presets from "@/components/day-v2/DayV2Presets";
 import DayV2ExitCost from "@/components/day-v2/DayV2ExitCost";
 import DayV2LossWaterfall from "@/components/day-v2/DayV2LossWaterfall";
 import DayV2Source from "@/components/day-v2/DayV2Source";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { stake100 } from "@/components/day-v2/format";
 import { dayV2EffectiveShares } from "@/components/day-v2/terms";
+import { buildDayV2Query, type DayV2UrlState } from "@/components/day-v2/url-state";
+import {
+  matchDayIssuerPreset,
+  type DayIssuerPreset,
+} from "@/lib/day-simulator-template/issuer-presets";
 import { buildDayExplainerMetrics } from "@/lib/day-simulator-template/explainer";
 import type { DayMarket } from "@/lib/day-simulator-template/market";
 import {
@@ -26,7 +33,13 @@ import {
 // The accountant is not reimplemented here. Every number on this page comes from
 // `runDayTargetScenario`, the same target-scenario entry point the interactive
 // simulator uses, so v2 and /day-sim can never disagree.
+/** The two jobs this page does. Simulate answers what a position pays and
+ *  what it stands to lose. Deploy is for someone who has to set every
+ *  parameter a real market takes and hand it to the deploy flow. */
+type DayV2Mode = "simulate" | "deploy";
+
 const pct = (value: number) => `${(value * 100).toFixed(1)}%`;
+const DAY_TARGET_UTILIZATION = 0.9;
 
 function Slider({
   label,
@@ -71,16 +84,22 @@ function Slider({
 
 export default function DayV2Summary({
   initialMarket,
+  initialState,
   markets,
 }: {
   initialMarket: DayMarket;
+  initialState?: DayV2UrlState;
   markets: readonly DayMarket[];
 }) {
+  // Anything the link did not carry falls back to the market's own default, so
+  // a partial or hand-edited link still describes a real market.
+  const linked = initialState;
   // How much of the mechanism to show. Simple answers "what would I earn, and
-  // what would I lose". Advanced adds the history, the venue parameters and the
-  // deployer's checklist, which are questions you only ask once you have an
-  // answer to the first one.
-  const [advanced, setAdvanced] = useState(false);
+  // what would I lose", and stops there. Deploy is the other job: someone who
+  // has decided and now has to set every parameter a real market takes. The two
+  // share one model, so the figures never disagree between them.
+  const [mode, setMode] = useState<DayV2Mode>(linked?.mode ?? "simulate");
+  const deploying = mode === "deploy";
   const [marketId, setMarketId] = useState(initialMarket.id);
   // An imported source outranks the registry selection while it is loaded, so
   // every section below runs on the reader's own history.
@@ -91,9 +110,18 @@ export default function DayV2Summary({
   // A few markets report in their own asset rather than dollars. Declared on
   // the market, so it follows an imported draft too.
   const returnUnit = market.customization.backtestDisplay?.returnUnit ?? "USD";
-  const [coveragePct, setCoveragePct] = useState(defaults.coverage * 100);
-  const [liquidityPct, setLiquidityPct] = useState(defaults.minLiquidity * 100);
-  const [sourceApyPct, setSourceApyPct] = useState(defaults.sourceApy * 100);
+  const [coveragePct, setCoveragePct] = useState(linked?.coveragePct ?? defaults.coverage * 100);
+  const [liquidityPct, setLiquidityPct] = useState(linked?.liquidityPct ?? defaults.minLiquidity * 100);
+  const [sourceApyPct, setSourceApyPct] = useState(linked?.sourceApyPct ?? defaults.sourceApy * 100);
+  // The rest of the market's terms. They are real inputs to the engine and were
+  // previously pinned at the market default with no way to see or move them.
+  const [observationDays, setObservationDays] = useState(linked?.observationDays ?? defaults.observationDays);
+  const [bandPct, setBandPct] = useState(linked?.bandPct ?? defaults.eclpBandWidth * 100);
+  const [maintainCoverage, setMaintainCoverage] = useState(linked?.maintainCoverage ?? defaults.maintainCoverage);
+  // Null means "follow the requirement", which is the rule in `terms.ts`. A
+  // number means the deployer has priced the tranche themselves.
+  const [riskShareOverride, setRiskShareOverride] = useState<number | null>(linked?.riskSharePct ?? null);
+  const [liqShareOverride, setLiqShareOverride] = useState<number | null>(linked?.liqSharePct ?? null);
 
   // Switching market adopts that market's own terms, so the sliders describe the
   // market on screen rather than carrying the previous one's numbers over.
@@ -101,6 +129,28 @@ export default function DayV2Summary({
     setCoveragePct(next.defaults.coverage * 100);
     setLiquidityPct(next.defaults.minLiquidity * 100);
     setSourceApyPct(next.defaults.sourceApy * 100);
+    setObservationDays(next.defaults.observationDays);
+    setBandPct(next.defaults.eclpBandWidth * 100);
+    setMaintainCoverage(next.defaults.maintainCoverage);
+    setRiskShareOverride(null);
+    setLiqShareOverride(null);
+  };
+
+  // An issuer preset is a complete design, not two slider positions, so it sets
+  // the band and the observation period too. Applying only the parts /v2 used
+  // to expose would put a preset's name on a market that is not that preset.
+  const applyPreset = (preset: DayIssuerPreset) => {
+    const values = preset.values;
+    setCoveragePct(values.coveragePct);
+    setLiquidityPct(values.minLiquidityPct);
+    setObservationDays(values.observationDays);
+    setBandPct(values.eclpBandWidthPct);
+    setMaintainCoverage(values.maintainCoverage);
+    // The presets' own shares land exactly on the requirement-derived rule for
+    // every market, so following the rule reproduces them rather than pinning
+    // numbers that would then be stale if a slider moved.
+    setRiskShareOverride(null);
+    setLiqShareOverride(null);
   };
 
   const selectMarket = (nextId: string) => {
@@ -114,23 +164,51 @@ export default function DayV2Summary({
 
   // Keeps the controls responsive while the engine re-runs, the same pattern the
   // main simulator uses after measuring input lag.
-  const inputs = useDeferredValue({ coveragePct, liquidityPct, sourceApyPct });
+  const inputs = useDeferredValue({
+    coveragePct, liquidityPct, sourceApyPct,
+    observationDays, bandPct, maintainCoverage, riskShareOverride, liqShareOverride,
+  });
 
-  const model = useMemo(() => {
+  // One place decides what the engine is actually run with, so the panel that
+  // displays the curve and the run that produces the numbers cannot disagree.
+  const resolved = useMemo(() => {
     const coverage = inputs.coveragePct / 100;
     const minLiquidity = inputs.liquidityPct / 100;
-    // A tranche is paid in proportion to what it is asked to supply, so the
-    // share moves with the requirement rather than staying pinned while the
-    // slider moves. See `dayV2EffectiveShares` for why it scales from each
-    // market's own default instead of applying the flat constant.
-    const shares = dayV2EffectiveShares(defaults, coverage, minLiquidity);
+    const derived = dayV2EffectiveShares(defaults, coverage, minLiquidity);
+    const riskYieldShare = inputs.riskShareOverride === null
+      ? derived.riskYieldShare
+      : inputs.riskShareOverride / 100;
+    const liquidityYieldShare = inputs.liqShareOverride === null
+      ? derived.liquidityYieldShare
+      : inputs.liqShareOverride / 100;
+    // The static curve runs through (0% -> y0, 90% -> yTarget, 100% -> y100).
+    // yTarget is the share being set here, and once it drops below the market's
+    // y0 the curve slopes down into the target, which is not a thing anyone is
+    // choosing. The deployment panel already displayed y0 clamped this way while
+    // the engine was handed the raw value, so the two disagreed below about 10%
+    // coverage. Clamping here makes the modeled curve the displayed one.
+    const y0 = Math.min(defaults.riskYDM.y0, riskYieldShare);
+    const y100 = Math.max(defaults.riskYDM.y100, riskYieldShare);
+    return { coverage, minLiquidity, derived, riskYieldShare, liquidityYieldShare, y0, y100 };
+  }, [defaults, inputs]);
+
+  const model = useMemo(() => {
+    const { coverage, minLiquidity } = resolved;
     const effective = {
       ...defaults,
       coverage,
       minLiquidity,
       sourceApy: inputs.sourceApyPct / 100,
-      riskYDM: { ...defaults.riskYDM, yTarget: shares.riskYieldShare },
-      liqYDM: { ...defaults.liqYDM, yTarget: shares.liquidityYieldShare },
+      observationDays: inputs.observationDays,
+      eclpBandWidth: inputs.bandPct / 100,
+      maintainCoverage: inputs.maintainCoverage,
+      riskYDM: {
+        ...defaults.riskYDM,
+        y0: resolved.y0,
+        yTarget: resolved.riskYieldShare,
+        y100: resolved.y100,
+      },
+      liqYDM: { ...defaults.liqYDM, yTarget: resolved.liquidityYieldShare },
     };
     // The same terms `runDayTargetScenario` assembles for itself. Building them
     // once here means the rates and the loss waterfall are two readings of one
@@ -163,7 +241,7 @@ export default function DayV2Summary({
         buildDayInitialBalances(effective, terms),
       ),
     };
-  }, [defaults, inputs]);
+  }, [defaults, inputs, resolved]);
   const scenario = model.scenario;
 
   const chartData = useMemo<DayV2Point[]>(() => {
@@ -175,6 +253,40 @@ export default function DayV2Summary({
       liquidity: grow(scenario.liquidityApy, month),
     }));
   }, [scenario]);
+
+  const query = buildDayV2Query({
+    market: marketId,
+    mode,
+    coveragePct,
+    liquidityPct,
+    sourceApyPct,
+    observationDays,
+    bandPct,
+    maintainCoverage,
+    riskSharePct: riskShareOverride,
+    liqSharePct: liqShareOverride,
+  });
+  // replaceState rather than a router push: this fires on every slider tick, and
+  // a history entry per pixel of drag would make the back button useless.
+  // replaceState rather than a router push: this fires on every slider tick, and
+  // a history entry per pixel of drag would make the back button useless. It is
+  // also why the link is read on the server instead of in an effect here.
+  useEffect(() => {
+    window.history.replaceState(null, "", `${window.location.pathname}?${query}`);
+  }, [query]);
+
+  // Which named design the current terms are, if any. Tracked by comparison
+  // rather than by remembering what was last clicked, so moving any slider
+  // deselects the preset instead of leaving a stale label on a changed market.
+  const activePresetId = matchDayIssuerPreset({
+    coveragePct: inputs.coveragePct,
+    minLiquidityPct: inputs.liquidityPct,
+    eclpBandWidthPct: inputs.bandPct,
+    riskSharePct: resolved.riskYieldShare * 100,
+    liqSharePct: resolved.liquidityYieldShare * 100,
+    observationDays: inputs.observationDays,
+    maintainCoverage: inputs.maintainCoverage,
+  });
 
   const source = inputs.sourceApyPct / 100;
   const breakdown = (key: "seniorApy" | "juniorApy" | "liquidityApy") => ({
@@ -250,20 +362,20 @@ export default function DayV2Summary({
           </select>
         </label>
         <div
-          aria-label="Detail level"
+          aria-label="What you are here to do"
           className="flex items-center gap-0.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--foundation)] p-0.5"
           role="group"
         >
-          {([["Simple", false], ["Advanced", true]] as const).map(([label, value]) => (
+          {([["Simulate", "simulate"], ["Deploy", "deploy"]] as const).map(([label, value]) => (
             <button
-              aria-pressed={advanced === value}
-              className={`rounded-md px-3 py-1.5 text-[12px] font-semibold ${
-                advanced === value
+              aria-pressed={mode === value}
+              className={`rounded-md px-3.5 py-1.5 text-[12px] font-semibold ${
+                mode === value
                   ? "bg-[var(--foreground)] text-[var(--background)]"
                   : "text-[var(--secondary)]"
               }`}
               key={label}
-              onClick={() => setAdvanced(value)}
+              onClick={() => setMode(value)}
               type="button"
             >
               {label}
@@ -274,10 +386,13 @@ export default function DayV2Summary({
         <h1 className="max-w-[24ch] text-[clamp(28px,3.4vw,44px)] font-semibold leading-[1.05] tracking-[-0.02em]">
           One yield source, split into three risks.
         </h1>
-        <p className="max-w-[62ch] text-[13.5px] leading-relaxed text-[var(--secondary)]">
+        <p className="max-w-[64ch] text-[13.5px] leading-relaxed text-[var(--secondary)]">
           This market earns{" "}
           <strong className="font-semibold text-[var(--foreground)]">{pct(source)}</strong> a year
-          before it is split. Move the terms below and every figure updates.
+          before it is split.{" "}
+          {deploying
+            ? "Set every parameter a real market takes, then hand the design to the deploy flow."
+            : "Move the terms below and every figure updates."}
         </p>
       </header>
 
@@ -337,6 +452,8 @@ export default function DayV2Summary({
           value={liquidityPct}
         />
       </section>
+
+      <DayV2Presets activeId={activePresetId} onSelect={applyPreset} />
 
       {/* Three peers, scanned across: identical slots, so the eye compares the
           rate first and reads detail only if it wants to. */}
@@ -412,59 +529,94 @@ export default function DayV2Summary({
       </div>
 
       {/* Everything above is a projection at the stated terms. This is the one
-          section where the price path actually happened. */}
-      {advanced ? (
-        <>
+          section where the price path actually happened. It belongs to the
+          simulate job: it answers "what would this have done", not "what do I
+          set". */}
+      {/* Shown in both flows. A deployer needs it more than anyone: the coverage
+          restoration toggle lives in the parameters below, and its single most
+          important consequence, that outside capital funded Sr's result, is
+          disclosed here. Splitting a control from its consequence would hide
+          the thing the control is for. */}
       <DayV2Backtest
+        bandPct={inputs.bandPct}
         coveragePct={inputs.coveragePct}
+        liqSharePct={resolved.liquidityYieldShare * 100}
         liquidityPct={inputs.liquidityPct}
+        maintainCoverage={inputs.maintainCoverage}
         market={market}
+        observationDays={inputs.observationDays}
+        riskSharePct={resolved.riskYieldShare * 100}
         sourceApyPct={inputs.sourceApyPct}
       />
 
-      {/* The deepest detail on the page, and the only section that asks the
-          reader for input rather than giving them a number. It goes last. */}
-      <DayV2Deployment
-        defaults={defaults}
-        market={{
-          id: market.id,
-          name: market.identity.marketName,
-          asset: market.identity.displayAssetName,
-          variant: "v2",
-        }}
-        modeled={{
-          seniorApy: scenario.seniorApy,
-          juniorApy: scenario.juniorApy,
-          liquidityApy: scenario.liquidityApy,
-          coverageLossLimit: model.explainer.coverage.coverageLossLimit,
-          referenceSellShareOfSenior: model.explainer.liquidity.referenceSellShareOfSenior,
-          boundarySellShareOfSenior: model.explainer.liquidity.boundarySellShareOfSenior,
-        }}
-        terms={{
-          coveragePct: inputs.coveragePct,
-          minLiquidityPct: inputs.liquidityPct,
-          eclpBandWidthPct: defaults.eclpBandWidth * 100,
-          riskSharePct: dayV2EffectiveShares(defaults, inputs.coveragePct / 100, inputs.liquidityPct / 100).riskYieldShare * 100,
-          liqSharePct: dayV2EffectiveShares(defaults, inputs.coveragePct / 100, inputs.liquidityPct / 100).liquidityYieldShare * 100,
-          observationDays: defaults.observationDays,
-          sourceApyPct: inputs.sourceApyPct,
-        }}
-      />
+      {deploying ? (
+        <>
+          {/* Everything a deployer still has to set. Parameters that move the
+              figures come first, then the checklist that does not. */}
+          <DayV2Parameters
+            bandPct={bandPct}
+            derivedLiqSharePct={resolved.derived.liquidityYieldShare * 100}
+            derivedRiskSharePct={resolved.derived.riskYieldShare * 100}
+            liqSharePct={resolved.liquidityYieldShare * 100}
+            liqShareOverridden={liqShareOverride !== null}
+            maintainCoverage={maintainCoverage}
+            observationDays={observationDays}
+            onBandPct={setBandPct}
+            onLiqSharePct={setLiqShareOverride}
+            onMaintainCoverage={setMaintainCoverage}
+            onObservationDays={setObservationDays}
+            onResetLiqShare={() => setLiqShareOverride(null)}
+            onResetRiskShare={() => setRiskShareOverride(null)}
+            onRiskSharePct={setRiskShareOverride}
+            riskSharePct={resolved.riskYieldShare * 100}
+            riskShareOverridden={riskShareOverride !== null}
+            targetUtilization={DAY_TARGET_UTILIZATION}
+            y0={resolved.y0}
+            y100={resolved.y100}
+          />
+
+          <DayV2Deployment
+            defaults={defaults}
+            market={{
+              id: market.id,
+              name: market.identity.marketName,
+              asset: market.identity.displayAssetName,
+              variant: "v2",
+            }}
+            modeled={{
+              seniorApy: scenario.seniorApy,
+              juniorApy: scenario.juniorApy,
+              liquidityApy: scenario.liquidityApy,
+              coverageLossLimit: model.explainer.coverage.coverageLossLimit,
+              referenceSellShareOfSenior: model.explainer.liquidity.referenceSellShareOfSenior,
+              boundarySellShareOfSenior: model.explainer.liquidity.boundarySellShareOfSenior,
+            }}
+            terms={{
+              coveragePct: inputs.coveragePct,
+              minLiquidityPct: inputs.liquidityPct,
+              eclpBandWidthPct: inputs.bandPct,
+              riskSharePct: resolved.riskYieldShare * 100,
+              liqSharePct: resolved.liquidityYieldShare * 100,
+              observationDays: inputs.observationDays,
+              sourceApyPct: inputs.sourceApyPct,
+            }}
+          />
         </>
       ) : (
         <button
           className="self-start rounded-lg border border-[var(--border-subtle)] bg-[var(--card)] px-3.5 py-2 text-[12px] font-semibold"
-          onClick={() => setAdvanced(true)}
+          onClick={() => setMode("deploy")}
           type="button"
         >
-          Show the history, venue terms, and deployment checklist
+          Set every parameter and get this ready to deploy
         </button>
       )}
 
-      {/* Shown at both depths. A reader who stayed in Simple has still designed
-          a market, and the ask is the same one. */}
+      {/* Shown in both flows. Someone who only simulated has still designed a
+          market, and the ask is the same one. */}
       <DayV2Deploy
         coverage={inputs.coveragePct / 100}
+        query={query}
         liquidity={inputs.liquidityPct / 100}
         seniorApy={scenario.seniorApy}
         sourceApy={source}

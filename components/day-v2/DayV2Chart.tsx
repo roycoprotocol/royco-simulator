@@ -1,5 +1,7 @@
 "use client";
 
+import { memo } from "react";
+
 import {
   CartesianGrid,
   Legend,
@@ -28,7 +30,7 @@ const TONES = {
   liquidity: "#01c555",
 } as const;
 
-export default function DayV2Chart({ data }: { data: DayV2Point[] }) {
+function DayV2Chart({ data }: { data: DayV2Point[] }) {
   return (
     // An explicit height on the container, not the wrapper: inside a flex column
     // ResponsiveContainer resolves a percentage height against a parent that has
@@ -89,3 +91,5 @@ export default function DayV2Chart({ data }: { data: DayV2Point[] }) {
     </div>
   );
 }
+
+export default memo(DayV2Chart);

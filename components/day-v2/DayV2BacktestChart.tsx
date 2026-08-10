@@ -1,5 +1,7 @@
 "use client";
 
+import { memo } from "react";
+
 import {
   CartesianGrid,
   Legend,
@@ -28,7 +30,7 @@ const SERIES = [
   ["liquidity", "SLP", "#01c555"],
 ] as const;
 
-export default function DayV2BacktestChart({ data }: { data: DayV2BacktestPoint[] }) {
+function DayV2BacktestChart({ data }: { data: DayV2BacktestPoint[] }) {
   return (
     <div style={{ width: "100%" }}>
       <ResponsiveContainer height={250} width="100%">
@@ -80,3 +82,5 @@ export default function DayV2BacktestChart({ data }: { data: DayV2BacktestPoint[
     </div>
   );
 }
+
+export default memo(DayV2BacktestChart);

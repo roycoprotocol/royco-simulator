@@ -17,14 +17,20 @@ const DEPLOY_URL = "https://royco.org/deploy-market/";
 export default function DayV2Deploy({
   coverage,
   liquidity,
+  query,
   seniorApy,
   sourceApy,
 }: {
   coverage: number;
   liquidity: number;
+  /** The design, encoded the same way this page's own link is. */
+  query: string;
   seniorApy: number;
   sourceApy: number;
 }) {
+  // Hand the design over rather than dropping the reader on an empty form. The
+  // flow can ignore what it does not recognise, and the link still opens.
+  const href = `${DEPLOY_URL}?${query}`;
   return (
     <section
       aria-label="Deploy this market"
@@ -51,7 +57,7 @@ export default function DayV2Deploy({
             it to a navigation would cost them the whole session. */}
         <a
           className="rounded-lg bg-[var(--theme-gold)] px-6 py-3 text-[14px] font-bold text-[var(--foreground)] whitespace-nowrap"
-          href={DEPLOY_URL}
+          href={href}
           rel="noreferrer"
           target="_blank"
         >
