@@ -80,7 +80,9 @@ function Line({
     <div className="flex items-baseline justify-between gap-3 border-b border-dashed border-[var(--border-subtle)] py-1 last:border-b-0">
       <span className="text-[11.5px] text-[var(--secondary)]">
         {label}
-        {note ? <span className="text-[var(--tertiary)]"> {note}</span> : null}
+        {/* Parenthesised so the label and its gloss do not read as one run-on
+            sentence: "Pool base the stable side plus trading fees on the pool". */}
+        {note ? <span className="text-[var(--tertiary)]"> ({note})</span> : null}
       </span>
       <span className="font-mono text-[11.5px] tabular-nums whitespace-nowrap">{value}</span>
     </div>
@@ -88,14 +90,20 @@ function Line({
 }
 
 export default function DayV2Comparison({
+  poolEconomics,
   positions,
   source,
   unit,
 }: {
+  /** The venue assumptions the pool base rests on, read off the run's config. */
+  poolEconomics: { stableYield: number; swapFeeBps: number; turnoverPerYear: number };
   positions: DayV2PositionBreakdown[];
   source: number;
   unit: DayV2Unit;
 }) {
+  // Stated from the config rather than written into the copy, so the conditions
+  // quoted here are the ones the engine actually ran with.
+  const swapApy = (poolEconomics.turnoverPerYear * poolEconomics.swapFeeBps) / 10_000;
   const [open, setOpen] = useState<string | null>(null);
 
   return (
@@ -191,7 +199,7 @@ export default function DayV2Comparison({
                         ) : (
                           <Line
                             label="Pool base"
-                            note="the stable side plus trading fees on the pool"
+                            note="stable leg plus trading fees"
                             value={exact(position.base)}
                           />
                         )}
@@ -221,6 +229,30 @@ export default function DayV2Comparison({
                             {exact(position.apy)}
                           </span>
                         </div>
+                        {/* The pool base is the one line here that is not a
+                            property of the mechanism. It is three venue
+                            assumptions, and a reader is entitled to know which,
+                            because two of them are someone else's behaviour. */}
+                        {position.holdsSource ? null : (
+                          <p className="mt-1.5 rounded-md border border-dashed border-[var(--border-subtle)] px-2.5 py-2 text-[10px] leading-relaxed text-[var(--secondary)]">
+                            The pool base holds only if all three are true: the stable leg
+                            earns{" "}
+                            <strong className="font-mono font-semibold tabular-nums">
+                              {pct(poolEconomics.stableYield)}
+                            </strong>{" "}
+                            a year, the pool charges{" "}
+                            <strong className="font-mono font-semibold tabular-nums">
+                              {poolEconomics.swapFeeBps} bps
+                            </strong>{" "}
+                            a swap, and it trades{" "}
+                            <strong className="font-mono font-semibold tabular-nums">
+                              {poolEconomics.turnoverPerYear}x
+                            </strong>{" "}
+                            its own value a year, which is worth {pct(swapApy)}. Volume is
+                            assumed, not derived from the depth curve. If nobody trades, that{" "}
+                            {pct(swapApy)} is zero and the base is the stable leg alone.
+                          </p>
+                        )}
                         <p className="pt-1.5 text-[10px] leading-snug text-[var(--tertiary)]">
                           Each line is the change in this position&apos;s rate when that
                           premium is switched on, taken in the order shown, so the lines

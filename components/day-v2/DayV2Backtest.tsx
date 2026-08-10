@@ -39,6 +39,7 @@ function DayV2Backtest({
   liquidityPct: liquidityInput,
   maintainCoverage,
   market,
+  onMaintainCoverage,
   observationDays: observationInput,
   riskSharePct: riskShareInput,
   sourceApyPct: sourceInput,
@@ -49,6 +50,7 @@ function DayV2Backtest({
   liquidityPct: number;
   maintainCoverage: boolean;
   market: DayMarket;
+  onMaintainCoverage: (value: boolean) => void;
   observationDays: number;
   riskSharePct: number;
   sourceApyPct: number;
@@ -249,9 +251,13 @@ function DayV2Backtest({
           )}
         </p>
 
-        {/* Input. The window is the control here. Capped, because a select
-            stretched across the card reads as a banner rather than a control. */}
-        <label className="flex max-w-[420px] flex-col gap-1.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--foundation)] px-4 py-3">
+        {/* Inputs. Both are assumptions about how this run was done rather than
+            terms of the market, which is why coverage restoration lives here and
+            not with the market parameters: it moves nothing in the projection,
+            the loss waterfall or the exit depth. It only changes a history, and
+            the note below is the thing it changes. */}
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
+        <label className="flex flex-1 max-w-[420px] flex-col gap-1.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--foundation)] px-4 py-3">
           <span className="text-[9.5px] font-semibold uppercase tracking-[0.1em] text-[var(--tertiary)]">
             Backtest window
           </span>
@@ -270,6 +276,34 @@ function DayV2Backtest({
             The run restarts from the window&apos;s first day, so each window is its own history
           </span>
         </label>
+
+        <div className="flex flex-1 flex-col gap-1.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--foundation)] px-4 py-3">
+          <span className="text-[9.5px] font-semibold uppercase tracking-[0.1em] text-[var(--tertiary)]">
+            Coverage restoration
+          </span>
+          <div className="flex items-center gap-2">
+            {([["On", true], ["Off", false]] as const).map(([label, value]) => (
+              <button
+                aria-pressed={maintainCoverage === value}
+                className={`rounded-lg border px-3 py-1.5 text-[12px] font-semibold ${
+                  maintainCoverage === value
+                    ? "border-transparent bg-[var(--foreground)] text-[var(--background)]"
+                    : "border-[var(--border-subtle)] bg-[var(--card)] text-[var(--secondary)]"
+                }`}
+                key={label}
+                onClick={() => onMaintainCoverage(value)}
+                type="button"
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <span className="text-[10px] leading-snug text-[var(--tertiary)]">
+            Whether Jr is refilled from outside the market after a finalized loss. It
+            changes this history only
+          </span>
+        </div>
+        </div>
 
         {/* Outputs. Labelled as a group: four figures that only mean anything
             read against each other, and it gives the set a name out of context. */}

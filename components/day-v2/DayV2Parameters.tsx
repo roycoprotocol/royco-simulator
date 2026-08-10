@@ -67,48 +67,57 @@ function Range({
 
 function DayV2Parameters({
   bandPct,
+  ceilingPct,
+  curveOverridden,
+  liqCeilingPct,
   derivedLiqSharePct,
   derivedRiskSharePct,
   liqSharePct,
   liqShareOverridden,
-  maintainCoverage,
   observationDays,
   onBandPct,
   onLiqSharePct,
-  onMaintainCoverage,
   onObservationDays,
-  onResetLiqShare,
-  onResetRiskShare,
+  onResetCurve,
   onRiskSharePct,
+  onY0Pct,
+  onY100Pct,
   riskSharePct,
   riskShareOverridden,
   targetUtilization,
-  y0,
-  y100,
+  y0Pct,
+  y100Pct,
 }: {
   bandPct: number;
+  /** The highest any point of the risk curve may go before the engine rejects
+   *  the config. Set by whatever the liquidity curve already claims. */
+  ceilingPct: number;
+  curveOverridden: boolean;
+  /** What the market's own risk curve leaves for the SLP side. */
+  liqCeilingPct: number;
   derivedLiqSharePct: number;
   derivedRiskSharePct: number;
   liqSharePct: number;
   liqShareOverridden: boolean;
-  maintainCoverage: boolean;
   observationDays: number;
   onBandPct: (value: number) => void;
   onLiqSharePct: (value: number) => void;
-  onMaintainCoverage: (value: boolean) => void;
   onObservationDays: (value: number) => void;
-  onResetLiqShare: () => void;
-  onResetRiskShare: () => void;
+  onResetCurve: () => void;
   onRiskSharePct: (value: number) => void;
+  onY0Pct: (value: number) => void;
+  onY100Pct: (value: number) => void;
   riskSharePct: number;
   riskShareOverridden: boolean;
   targetUtilization: number;
-  y0: number;
-  y100: number;
+  y0Pct: number;
+  y100Pct: number;
 }) {
   // Only the curve is deferred. The sliders keep their own raw values so they
   // stay glued to the pointer.
-  const curve = useDeferredValue({ riskSharePct, targetUtilization, y0, y100 });
+  const curve = useDeferredValue({ riskSharePct, targetUtilization, y0Pct, y100Pct });
+  const shareMax = Math.min(80, Math.round(ceilingPct * 10) / 10);
+  const liqMax = Math.min(80, Math.round(liqCeilingPct * 10) / 10);
   return (
     <Card>
       <CardHeader>
@@ -149,7 +158,7 @@ function DayV2Parameters({
             label="Jr yield share (YT)"
             value={pct(riskSharePct / 100)}
           >
-            <Range max={80} min={0} onChange={onRiskSharePct} step={0.5} value={riskSharePct} />
+            <Range max={shareMax} min={0} onChange={onRiskSharePct} step={0.5} value={Math.min(riskSharePct, shareMax)} />
           </Field>
 
           <Field
@@ -161,47 +170,20 @@ function DayV2Parameters({
             label="SLP yield share"
             value={pct(liqSharePct / 100)}
           >
-            <Range max={80} min={0} onChange={onLiqSharePct} step={0.5} value={liqSharePct} />
+            <Range max={liqMax} min={0} onChange={onLiqSharePct} step={0.5} value={Math.min(liqSharePct, liqMax)} />
           </Field>
 
-          <div className="flex flex-col gap-1.5 sm:col-span-2">
-            <span className="text-[9.5px] font-semibold uppercase tracking-[0.1em] text-[var(--tertiary)]">
-              Coverage restoration
-            </span>
-            <div className="flex flex-wrap items-center gap-2">
-              {([["On", true], ["Off", false]] as const).map(([label, value]) => (
-                <button
-                  aria-pressed={maintainCoverage === value}
-                  className={`rounded-lg border px-3 py-1.5 text-[12px] font-semibold ${
-                    maintainCoverage === value
-                      ? "border-transparent bg-[var(--foreground)] text-[var(--background)]"
-                      : "border-[var(--border-subtle)] bg-[var(--card)] text-[var(--secondary)]"
-                  }`}
-                  key={label}
-                  onClick={() => onMaintainCoverage(value)}
-                  type="button"
-                >
-                  {label}
-                </button>
-              ))}
-              {riskShareOverridden || liqShareOverridden ? (
-                <button
-                  className="ml-auto text-[11.5px] font-semibold underline underline-offset-2"
-                  onClick={() => {
-                    onResetRiskShare();
-                    onResetLiqShare();
-                  }}
-                  type="button"
-                >
-                  Reprice both shares from the requirements
-                </button>
-              ) : null}
+          {curveOverridden ? (
+            <div className="sm:col-span-2">
+              <button
+                className="text-[11.5px] font-semibold underline underline-offset-2"
+                onClick={onResetCurve}
+                type="button"
+              >
+                Reset the curve to this market&apos;s own
+              </button>
             </div>
-            <span className="text-[10px] leading-snug text-[var(--tertiary)]">
-              With it on, Jr is refilled from outside the market to hold coverage after a
-              finalized loss. It is what makes Sr&apos;s backtest result look the way it does.
-            </span>
-          </div>
+          ) : null}
         </div>
 
         {/* How the YDM is set, shown rather than asserted. */}
@@ -211,52 +193,55 @@ function DayV2Parameters({
             <Badge tone="neutral">static</Badge>
           </div>
           <p className="max-w-[70ch] text-[11.5px] leading-relaxed text-[var(--secondary)]">
-            Every market here runs a static yield-share curve: piecewise-linear through
-            three anchors, paying Jr{" "}
-            <strong className="font-mono font-bold tabular-nums">{pct(y0)}</strong> of Sr&apos;s
-            yield at zero utilization,{" "}
-            <strong className="font-mono font-bold tabular-nums">{pct(riskSharePct / 100)}</strong>{" "}
-            at the {pct(targetUtilization)} target, and{" "}
-            <strong className="font-mono font-bold tabular-nums">{pct(y100)}</strong> at full
-            utilization. This page models the market at its target, so the middle anchor is the
-            one that binds and the other two describe what happens either side of it.
+            A static yield-share curve, piecewise-linear through three anchors: what Jr is
+            paid out of Sr&apos;s yield when the market is undrawn, at its{" "}
+            {pct(targetUtilization)} target, and when it is fully drawn. This page models the
+            market at its target, so YT is the anchor that binds and the other two describe
+            what happens either side of it.
           </p>
-          {/* The anchors beside the curve rather than under it. Full width the
-              curve is mostly the flat run from Y0 to the target, which reads as
-              a broken chart instead of the point: the share barely moves until
-              utilization passes the target, then climbs hard. */}
-          <div className="grid grid-cols-1 items-center gap-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--foundation)] px-4 py-3.5 lg:grid-cols-[minmax(0,200px)_minmax(0,1fr)]">
-            <div className="flex gap-5 lg:flex-col lg:gap-3">
-              {([
-                ["Y0", "at 0% used", y0],
-                ["YT", `at the ${pct(targetUtilization)} target`, riskSharePct / 100],
-                ["Y100", "at 100% used", y100],
-              ] as const).map(([anchor, when, value], index) => (
-                <div className="flex flex-col gap-0.5" key={anchor}>
-                  <span className="text-[9.5px] font-semibold uppercase tracking-[0.1em] text-[var(--tertiary)]">
-                    {anchor}
-                  </span>
-                  <span
-                    className="font-mono text-[19px] font-bold leading-none tracking-[-0.02em] tabular-nums"
-                    style={index === 1 ? { color: "var(--navy-emphasis)" } : undefined}
-                  >
-                    {pct(value)}
-                  </span>
-                  <span className="text-[10px] text-[var(--tertiary)]">{when}</span>
-                </div>
-              ))}
+          {/* The anchors are controls, not readouts. A deployer designing a
+              curve sets all three; the target is the one this page models at,
+              so it keeps the emphasis. */}
+          <div className="grid grid-cols-1 items-start gap-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--foundation)] px-4 py-3.5 lg:grid-cols-[minmax(0,230px)_minmax(0,1fr)]">
+            <div className="flex flex-col gap-3">
+              <Field
+                hint="Paid when nothing is drawn"
+                label="Y0 at 0% used"
+                value={pct(y0Pct / 100)}
+              >
+                <Range max={shareMax} min={0} onChange={onY0Pct} step={0.5} value={Math.min(y0Pct, shareMax)} />
+              </Field>
+              <Field
+                hint="The anchor this page models at"
+                label={`YT at the ${pct(targetUtilization)} target`}
+                value={pct(riskSharePct / 100)}
+              >
+                <Range max={shareMax} min={0} onChange={onRiskSharePct} step={0.5} value={Math.min(riskSharePct, shareMax)} />
+              </Field>
+              <Field
+                hint={`Paid when fully drawn. Capped at ${pct(ceilingPct / 100)} by the SLP curve`}
+                label="Y100 at 100% used"
+                value={pct(y100Pct / 100)}
+              >
+                <Range max={shareMax} min={0} onChange={onY100Pct} step={0.5} value={Math.min(y100Pct, shareMax)} />
+              </Field>
             </div>
             <DayV2YieldCurve
               target={curve.targetUtilization}
-              y0={curve.y0}
-              y100={curve.y100}
+              y0={curve.y0Pct / 100}
+              y100={curve.y100Pct / 100}
               yTarget={curve.riskSharePct / 100}
             />
           </div>
+
           <p className="text-[10px] leading-relaxed text-[var(--tertiary)]">
-            Y0 and Y100 come from the market and are clamped so the curve never slopes down
-            into its own target: setting a share below the market&apos;s Y0 lowers Y0 with it.
-            Only an adaptive curve lets the target drift on its own, and no market here uses one.
+            Left alone, Y0 and Y100 follow the market and are clamped so the curve never
+            slopes down into its own target. No point may exceed{" "}
+            <strong className="font-mono font-semibold tabular-nums">{pct(ceilingPct / 100)}</strong>,
+            which is what the SLP curve leaves: the engine reads each contract cap off the
+            highest point of its curve and rejects a config whose two caps exceed 100%
+            together. Only an adaptive curve lets the target drift on its own, and no
+            market here uses one.
           </p>
         </div>
       </CardContent>

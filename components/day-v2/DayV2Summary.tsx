@@ -122,6 +122,11 @@ export default function DayV2Summary({
   // number means the deployer has priced the tranche themselves.
   const [riskShareOverride, setRiskShareOverride] = useState<number | null>(linked?.riskSharePct ?? null);
   const [liqShareOverride, setLiqShareOverride] = useState<number | null>(linked?.liqSharePct ?? null);
+  // The other two anchors of the yield-share curve. Null means "as the market
+  // ships it", which is what every registry market wants until someone is
+  // actually designing a curve.
+  const [y0Override, setY0Override] = useState<number | null>(null);
+  const [y100Override, setY100Override] = useState<number | null>(null);
 
   // Switching market adopts that market's own terms, so the sliders describe the
   // market on screen rather than carrying the previous one's numbers over.
@@ -134,6 +139,8 @@ export default function DayV2Summary({
     setMaintainCoverage(next.defaults.maintainCoverage);
     setRiskShareOverride(null);
     setLiqShareOverride(null);
+    setY0Override(null);
+    setY100Override(null);
   };
 
   // An issuer preset is a complete design, not two slider positions, so it sets
@@ -151,6 +158,8 @@ export default function DayV2Summary({
     // numbers that would then be stale if a slider moved.
     setRiskShareOverride(null);
     setLiqShareOverride(null);
+    setY0Override(null);
+    setY100Override(null);
   };
 
   const selectMarket = (nextId: string) => {
@@ -167,6 +176,7 @@ export default function DayV2Summary({
   const inputs = useDeferredValue({
     coveragePct, liquidityPct, sourceApyPct,
     observationDays, bandPct, maintainCoverage, riskShareOverride, liqShareOverride,
+    y0Override, y100Override,
   });
 
   // One place decides what the engine is actually run with, so the panel that
@@ -178,18 +188,51 @@ export default function DayV2Summary({
     const riskYieldShare = inputs.riskShareOverride === null
       ? derived.riskYieldShare
       : inputs.riskShareOverride / 100;
-    const liquidityYieldShare = inputs.liqShareOverride === null
+    let liquidityYieldShare = inputs.liqShareOverride === null
       ? derived.liquidityYieldShare
       : inputs.liqShareOverride / 100;
+    // The engine derives each contract cap as the highest point of its curve and
+    // throws INVALID_YIELD_SHARE_CONFIG when the two caps exceed 100% together,
+    // which would take the page down on a keystroke. Holding the whole risk
+    // curve under what the liquidity curve leaves makes that unreachable rather
+    // than merely unlikely. On jbbb this ceiling is 85%, on muga 64.3%.
+    // The backtest runner builds its own config from the market's own y0 and
+    // y100 rather than the curve set here, so the liquidity share has to stay
+    // under what *that* curve leaves or the history throws while the projection
+    // is fine. Found by slamming every slider to its maximum, which is the only
+    // corner where it bites.
+    const marketRiskCurveMax = Math.max(defaults.riskYDM.y0, defaults.riskYDM.y100);
+    const liquidityCeiling = Math.max(0, 1 - marketRiskCurveMax);
+    liquidityYieldShare = Math.min(liquidityYieldShare, liquidityCeiling);
+    const maxLiquidityCurve = Math.max(
+      defaults.liqYDM.y0,
+      liquidityYieldShare,
+      defaults.liqYDM.y100,
+    );
+    const riskCeiling = Math.max(0, 1 - maxLiquidityCurve);
+    const cap = (value: number) => Math.min(value, riskCeiling);
     // The static curve runs through (0% -> y0, 90% -> yTarget, 100% -> y100).
-    // yTarget is the share being set here, and once it drops below the market's
-    // y0 the curve slopes down into the target, which is not a thing anyone is
-    // choosing. The deployment panel already displayed y0 clamped this way while
-    // the engine was handed the raw value, so the two disagreed below about 10%
-    // coverage. Clamping here makes the modeled curve the displayed one.
-    const y0 = Math.min(defaults.riskYDM.y0, riskYieldShare);
-    const y100 = Math.max(defaults.riskYDM.y100, riskYieldShare);
-    return { coverage, minLiquidity, derived, riskYieldShare, liquidityYieldShare, y0, y100 };
+    // Left to the market, y0 is clamped so the curve never slopes down into its
+    // own target: the deployment panel already displayed it that way while the
+    // engine was handed the raw value, so the two disagreed below about 10%
+    // coverage. Set deliberately, the reader's number is respected.
+    const y0 = cap(inputs.y0Override === null
+      ? Math.min(defaults.riskYDM.y0, riskYieldShare)
+      : inputs.y0Override / 100);
+    const y100 = cap(inputs.y100Override === null
+      ? Math.max(defaults.riskYDM.y100, riskYieldShare)
+      : inputs.y100Override / 100);
+    return {
+      coverage,
+      minLiquidity,
+      derived,
+      riskYieldShare: cap(riskYieldShare),
+      liquidityYieldShare,
+      y0,
+      y100,
+      riskCeiling,
+      liquidityCeiling,
+    };
   }, [defaults, inputs]);
 
   const model = useMemo(() => {
@@ -232,14 +275,19 @@ export default function DayV2Summary({
       riskYieldShare: terms.riskYieldShare,
       liquidityYieldShare: 0,
     });
+    // Held rather than rebuilt, so the pool economics quoted to the reader are
+    // the ones this run used and cannot drift from them.
+    const cfg = buildDayMarketConfig(effective, terms);
     return {
       scenario: runDayTargetScenario(effective),
       noPremiums,
       riskOnly,
-      explainer: buildDayExplainerMetrics(
-        buildDayMarketConfig(effective, terms),
-        buildDayInitialBalances(effective, terms),
-      ),
+      pool: {
+        stableYield: cfg.stableYield,
+        swapFeeBps: cfg.swapFeeBps,
+        turnoverPerYear: cfg.poolTurnoverPerYear,
+      },
+      explainer: buildDayExplainerMetrics(cfg, buildDayInitialBalances(effective, terms)),
     };
   }, [defaults, inputs, resolved]);
   const scenario = model.scenario;
@@ -287,6 +335,8 @@ export default function DayV2Summary({
     observationDays: inputs.observationDays,
     maintainCoverage: inputs.maintainCoverage,
   });
+
+  const liveDerived = dayV2EffectiveShares(defaults, coveragePct / 100, liquidityPct / 100);
 
   const source = inputs.sourceApyPct / 100;
   const breakdown = (key: "seniorApy" | "juniorApy" | "liquidityApy") => ({
@@ -514,6 +564,7 @@ export default function DayV2Summary({
         </Card>
 
         <DayV2Comparison
+          poolEconomics={model.pool}
           positions={positions as DayV2PositionBreakdown[]}
           source={source}
           unit={returnUnit}
@@ -542,7 +593,8 @@ export default function DayV2Summary({
         coveragePct={inputs.coveragePct}
         liqSharePct={resolved.liquidityYieldShare * 100}
         liquidityPct={inputs.liquidityPct}
-        maintainCoverage={inputs.maintainCoverage}
+        maintainCoverage={maintainCoverage}
+        onMaintainCoverage={setMaintainCoverage}
         market={market}
         observationDays={inputs.observationDays}
         riskSharePct={resolved.riskYieldShare * 100}
@@ -553,26 +605,39 @@ export default function DayV2Summary({
         <>
           {/* Everything a deployer still has to set. Parameters that move the
               figures come first, then the checklist that does not. */}
+          {/* Slider positions come from raw state, never from the deferred
+              model, or the input fights the pointer: the value snaps back to a
+              frame-old number while you are still dragging it. */}
           <DayV2Parameters
             bandPct={bandPct}
+            ceilingPct={resolved.riskCeiling * 100}
+            liqCeilingPct={resolved.liquidityCeiling * 100}
             derivedLiqSharePct={resolved.derived.liquidityYieldShare * 100}
             derivedRiskSharePct={resolved.derived.riskYieldShare * 100}
-            liqSharePct={resolved.liquidityYieldShare * 100}
+            liqSharePct={liqShareOverride ?? liveDerived.liquidityYieldShare * 100}
             liqShareOverridden={liqShareOverride !== null}
-            maintainCoverage={maintainCoverage}
             observationDays={observationDays}
             onBandPct={setBandPct}
             onLiqSharePct={setLiqShareOverride}
-            onMaintainCoverage={setMaintainCoverage}
             onObservationDays={setObservationDays}
-            onResetLiqShare={() => setLiqShareOverride(null)}
-            onResetRiskShare={() => setRiskShareOverride(null)}
+            onResetCurve={() => {
+              setRiskShareOverride(null);
+              setLiqShareOverride(null);
+              setY0Override(null);
+              setY100Override(null);
+            }}
             onRiskSharePct={setRiskShareOverride}
-            riskSharePct={resolved.riskYieldShare * 100}
+            onY0Pct={setY0Override}
+            onY100Pct={setY100Override}
+            riskSharePct={riskShareOverride ?? liveDerived.riskYieldShare * 100}
             riskShareOverridden={riskShareOverride !== null}
             targetUtilization={DAY_TARGET_UTILIZATION}
-            y0={resolved.y0}
-            y100={resolved.y100}
+            y0Pct={y0Override ?? resolved.y0 * 100}
+            y100Pct={y100Override ?? resolved.y100 * 100}
+            curveOverridden={
+              riskShareOverride !== null || liqShareOverride !== null
+              || y0Override !== null || y100Override !== null
+            }
           />
 
           <DayV2Deployment

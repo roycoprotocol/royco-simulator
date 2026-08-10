@@ -95,10 +95,12 @@ export default function DayV2ExitCost({
               <strong className="font-mono text-[17px] font-bold tracking-[-0.01em] tabular-nums">
                 {compactUsd(metrics.boundarySellNAV)}
               </strong>{" "}
-              into the pool, which is {pct(metrics.boundarySellShareOfSenior)} of the
-              position. That empties it, and clearing the whole depth costs{" "}
-              {bps(metrics.boundaryQuote.slippage)}. The pool runs out before the cost
-              reaches {pct(metrics.arbitrageReference)}, so depth binds first, not price.
+              into the pool <strong className="font-semibold">in one trade</strong>,
+              which is {pct(metrics.boundarySellShareOfSenior)} of the position. That
+              empties it, and clearing the whole depth costs{" "}
+              {bps(metrics.boundaryQuote.slippage)}, still under the{" "}
+              {pct(metrics.arbitrageReference)} an arbitrageur needs to step in. Depth
+              binds here, not price.
             </>
           ) : (
             <>
@@ -106,10 +108,11 @@ export default function DayV2ExitCost({
               <strong className="font-mono text-[17px] font-bold tracking-[-0.01em] tabular-nums">
                 {compactUsd(metrics.referenceSellNAV)}
               </strong>{" "}
-              at a cost under {pct(metrics.arbitrageReference)}, which is{" "}
-              {pct(metrics.referenceSellShareOfSenior)} of the position. The pool holds{" "}
-              {compactUsd(metrics.boundarySellNAV)} in total, and clearing all of it
-              costs {bps(metrics.boundaryQuote.slippage)}.
+              <strong className="font-semibold">in one trade</strong> before the cost
+              passes {pct(metrics.arbitrageReference)}, the level at which arbitrage
+              becomes worth doing. That is {pct(metrics.referenceSellShareOfSenior)} of
+              the position. The pool holds {compactUsd(metrics.boundarySellNAV)} in
+              total, and draining all of it costs {bps(metrics.boundaryQuote.slippage)}.
             </>
           )}
         </p>
@@ -210,6 +213,38 @@ export default function DayV2ExitCost({
             ))}
           </TableBody>
         </Table>
+
+        {/* The single most misread thing on this card. Every figure above is one
+            atomic sale into a pool at rest, so a reader who takes the depth
+            number as a lifetime cap is reading it wrong in the expensive
+            direction. The threshold is not decoration: it is the level the
+            engine assumes makes restoring the pool worth someone's while. */}
+        <div
+          className="flex flex-col gap-1.5 rounded-lg border px-3.5 py-3"
+          style={{
+            background: "color-mix(in srgb, var(--theme-green) 7%, transparent)",
+            borderColor: "color-mix(in srgb, var(--theme-green) 35%, transparent)",
+          }}
+        >
+          <span className="text-[9.5px] font-semibold uppercase tracking-[0.1em] text-[var(--green-emphasis)]">
+            Arbitrage reopens this
+          </span>
+          <p className="text-[11.5px] leading-relaxed text-[var(--foreground)]">
+            Every number here is a{" "}
+            <strong className="font-semibold">single sale into a pool at rest</strong>, not
+            a lifetime cap. Selling pushes the pool price below NAV, and once it is{" "}
+            {pct(metrics.arbitrageReference)} below, buying Sr cheap and redeeming it at
+            NAV pays an arbitrageur more than it costs them. Their buying is what puts the
+            stable side back, so capacity returns between sales rather than being spent
+            once. Over time Sr can exit far more than{" "}
+            {compactUsd(metrics.boundarySellNAV)}. What it cannot do is exit more than that{" "}
+            <strong className="font-semibold">at once</strong>.
+          </p>
+          <p className="text-[10px] leading-snug text-[var(--tertiary)]">
+            Modeled quotes only. Nothing here guarantees an arbitrageur shows up, how
+            quickly they do, or the price they take.
+          </p>
+        </div>
           </>
         ) : null}
       </CardContent>
