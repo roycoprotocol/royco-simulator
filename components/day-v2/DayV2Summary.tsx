@@ -5,6 +5,14 @@ import { useDeferredValue, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import DayV2Chart, { type DayV2Point } from "@/components/day-v2/DayV2Chart";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import type { DayMarket } from "@/lib/day-simulator-template/market";
 import { runDayTargetScenario } from "@/lib/day-simulator-template/runtime";
 
@@ -54,11 +62,30 @@ function Slider({
   );
 }
 
-export default function DayV2Summary({ market }: { market: DayMarket }) {
+export default function DayV2Summary({
+  initialMarket,
+  markets,
+}: {
+  initialMarket: DayMarket;
+  markets: readonly DayMarket[];
+}) {
+  const [marketId, setMarketId] = useState(initialMarket.id);
+  const market = markets.find((candidate) => candidate.id === marketId) ?? initialMarket;
   const defaults = market.defaults;
   const [coveragePct, setCoveragePct] = useState(defaults.coverage * 100);
   const [liquidityPct, setLiquidityPct] = useState(defaults.minLiquidity * 100);
   const [sourceApyPct, setSourceApyPct] = useState(defaults.sourceApy * 100);
+
+  // Switching market adopts that market's own terms, so the sliders describe the
+  // market on screen rather than carrying the previous one's numbers over.
+  const selectMarket = (nextId: string) => {
+    const next = markets.find((candidate) => candidate.id === nextId);
+    if (!next) return;
+    setMarketId(nextId);
+    setCoveragePct(next.defaults.coverage * 100);
+    setLiquidityPct(next.defaults.minLiquidity * 100);
+    setSourceApyPct(next.defaults.sourceApy * 100);
+  };
 
   // Keeps the controls responsive while the engine re-runs, the same pattern the
   // main simulator uses after measuring input lag.
@@ -126,9 +153,23 @@ export default function DayV2Summary({ market }: { market: DayMarket }) {
   return (
     <div className="royco-v2 flex flex-col gap-6 px-5 py-8 sm:px-8">
       <header className="flex flex-col gap-3">
-        <span className="text-[10px] font-semibold uppercase tracking-[0.18em] text-[var(--tertiary)]">
-          {market.identity.marketName}
-        </span>
+        <label className="flex flex-col gap-1">
+          <span className="text-[9.5px] font-semibold uppercase tracking-[0.1em] text-[var(--tertiary)]">
+            Yield source
+          </span>
+          <select
+            aria-label="Yield source"
+            className="w-full max-w-[420px] rounded-lg border border-[var(--border-subtle)] bg-[var(--card)] px-3 py-2 text-[13px] font-medium"
+            onChange={(event) => selectMarket(event.target.value)}
+            value={marketId}
+          >
+            {markets.map((candidate) => (
+              <option key={candidate.id} value={candidate.id}>
+                {candidate.identity.marketName}
+              </option>
+            ))}
+          </select>
+        </label>
         <h1 className="max-w-[24ch] text-[clamp(28px,3.4vw,44px)] font-semibold leading-[1.05] tracking-[-0.02em]">
           One yield source, split into three risks.
         </h1>
@@ -221,6 +262,55 @@ export default function DayV2Summary({ market }: { market: DayMarket }) {
         </CardHeader>
         <CardContent>
           <DayV2Chart data={chartData} />
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle>Position comparison</CardTitle>
+          <CardDescription>
+            $100 into each position, held for a year at these terms.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Position</TableHead>
+                <TableHead>What it does</TableHead>
+                <TableHead className="text-right">End value</TableHead>
+                <TableHead className="text-right">Avg / year</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              <TableRow>
+                <TableCell className="font-semibold">Source</TableCell>
+                <TableCell className="text-[var(--secondary)]">
+                  Baseline, before the split
+                </TableCell>
+                <TableCell className="text-right font-mono tabular-nums">
+                  ${(100 * (1 + source)).toFixed(2)}
+                </TableCell>
+                <TableCell className="text-right font-mono tabular-nums">
+                  {pct(source)}
+                </TableCell>
+              </TableRow>
+              {positions.map((position) => (
+                <TableRow key={position.short} className={position.funded ? undefined : "opacity-55"}>
+                  <TableCell className="font-semibold whitespace-nowrap">
+                    {position.name}
+                  </TableCell>
+                  <TableCell className="text-[var(--secondary)]">{position.risk}</TableCell>
+                  <TableCell className="text-right font-mono tabular-nums">
+                    ${(position.funded ? 100 * (1 + position.apy) : 100).toFixed(2)}
+                  </TableCell>
+                  <TableCell className="text-right font-mono tabular-nums">
+                    {position.funded ? pct(position.apy) : "0.0%"}
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         </CardContent>
       </Card>
 
