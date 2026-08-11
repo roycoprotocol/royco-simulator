@@ -19,6 +19,24 @@ export const DAY_DEPLOYMENT_INPUT_IDS = [
   'maximumPremium',
   'depthAtNav',
   'reinvestmentSlippageTolerance',
+  // Accountant economics the flow requires and the simulator did not collect.
+  // The grace period is entered alongside the observation period on the real
+  // flow's coverage step and a market cannot deploy with coverage on without
+  // it (step-4-economics.tsx gates Continue on it).
+  'observationGracePeriod',
+  // The contract derives each cap from the peak of its own curve when omitted,
+  // so a market whose curve peaks above its intended cap is unrepresentable
+  // until both are declared (MarketDeploymentValidationLogic: the two caps must
+  // sum to at most 1e18).
+  'juniorYieldShareCap',
+  'seniorLpYieldShareCap',
+  // EntryPoint settlement queues. Market-level in the real flow: one value each,
+  // applied to Senior, Junior and Senior LP alike.
+  'gateByPriceUpdates',
+  'depositSettlementDelay',
+  'depositExpiry',
+  'withdrawalSettlementDelay',
+  'withdrawalExpiry',
 ] as const;
 
 export const DAY_DEPLOYMENT_TERM_IDS = [
@@ -52,6 +70,14 @@ export const EMPTY_DAY_DEPLOYMENT_INPUTS: DayDeploymentInputValues = {
   maximumPremium: '',
   depthAtNav: '',
   reinvestmentSlippageTolerance: '',
+  observationGracePeriod: '',
+  juniorYieldShareCap: '',
+  seniorLpYieldShareCap: '',
+  gateByPriceUpdates: '',
+  depositSettlementDelay: '',
+  depositExpiry: '',
+  withdrawalSettlementDelay: '',
+  withdrawalExpiry: '',
 };
 
 export const EMPTY_DAY_DEPLOYMENT_FIELDS: DayDeploymentFieldValues = {

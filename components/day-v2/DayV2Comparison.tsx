@@ -107,15 +107,13 @@ export default function DayV2Comparison({
   const [open, setOpen] = useState<string | null>(null);
 
   return (
-    <Card>
+    <Card weight="quiet">
       <CardHeader>
-        <div className="flex items-center justify-between gap-2">
-          <CardTitle>Position comparison</CardTitle>
-          <Badge tone="neutral">{stake100(unit)} for a year</Badge>
-        </div>
+        <CardTitle>Position comparison</CardTitle>
+        {/* A basis is prose, not status. Badges are for state. */}
         <CardDescription>
-          What each position pays, and which part of the mechanism pays it. Open a row
-          to see the build-up.
+          What each position pays on {stake100(unit)} over a year, and which part of the
+          mechanism pays it. Open a row to see the build-up.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -151,7 +149,6 @@ export default function DayV2Comparison({
               const drag = position.base - source;
               return [
                 <TableRow
-                  className={position.funded ? undefined : "opacity-55"}
                   key={position.short}
                 >
                   <TableCell className="font-semibold whitespace-nowrap">

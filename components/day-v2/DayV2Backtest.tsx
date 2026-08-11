@@ -165,7 +165,7 @@ function DayV2Backtest({
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between gap-2">
-            <CardTitle>Historical backtest</CardTitle>
+            <CardTitle className="text-[17px]">Historical backtest</CardTitle>
             <Badge tone="caution">no history</Badge>
           </div>
           <CardDescription>What these terms would have done over the real price path.</CardDescription>
@@ -214,7 +214,7 @@ function DayV2Backtest({
     <Card data-accountant-source="runDayHistoricalBacktest">
       <CardHeader>
         <div className="flex items-center justify-between gap-2">
-          <CardTitle>Historical backtest</CardTitle>
+          <CardTitle className="text-[17px]">Historical backtest</CardTitle>
           <Badge tone="neutral">
             {result.chart[0].date} to {result.chart[result.chart.length - 1].date}
           </Badge>
@@ -227,7 +227,7 @@ function DayV2Backtest({
       <CardContent className="flex flex-col gap-4">
         <p className="max-w-[68ch] text-[14.5px] leading-relaxed text-[var(--foreground)]">
           On this market&apos;s real path the source fell{" "}
-          <strong className="font-mono text-[17px] font-bold tabular-nums">
+          <strong className="font-mono text-[16px] font-bold tabular-nums">
             {pct(result.strategyMaxDrawdown)}
           </strong>{" "}
           at its worst, and Sr fell {pct(result.seniorMaxDrawdown)}.{" "}
@@ -322,7 +322,7 @@ function DayV2Backtest({
               <span className="text-[9.5px] font-semibold uppercase tracking-[0.1em] text-[var(--tertiary)]">
                 {label}
               </span>
-              <span className="font-mono text-[22px] font-bold leading-none tracking-[-0.02em] tabular-nums">
+              <span className="font-mono text-[24px] font-bold leading-none tracking-[-0.02em] tabular-nums">
                 {pct(apy)}
               </span>
               <span className="text-[10.5px] text-[var(--tertiary)]">

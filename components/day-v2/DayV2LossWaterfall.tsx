@@ -84,7 +84,7 @@ export default function DayV2LossWaterfall({
     <Card data-accountant-source="buildDayExplainerMetrics.coverage">
       <CardHeader>
         <div className="flex items-center justify-between gap-2">
-          <CardTitle>Loss waterfall</CardTitle>
+          <CardTitle className="text-[17px]">Loss waterfall</CardTitle>
           <Badge tone={coverageFunded ? "junior" : "caution"}>
             {coverageFunded ? "Jr first" : "no cover"}
           </Badge>
@@ -101,7 +101,7 @@ export default function DayV2LossWaterfall({
           {coverageFunded ? (
             <>
               Sr keeps every dollar through a{" "}
-              <strong className="font-mono text-[17px] font-bold tracking-[-0.01em] tabular-nums text-[var(--foreground)]">
+              <strong className="font-mono text-[16px] font-bold tracking-[-0.01em] tabular-nums text-[var(--foreground)]">
                 {pct(limit)}
               </strong>{" "}
               fall in the source. Past that, Jr is gone and every further dollar

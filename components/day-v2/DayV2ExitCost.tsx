@@ -2,7 +2,6 @@
 
 import { useMemo, useState } from "react";
 
-import { Badge } from "@/components/ui/badge";
 import DayV2ExitChart, { type DayV2ExitPoint } from "@/components/day-v2/DayV2ExitChart";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { bps, compactUsd, pct } from "@/components/day-v2/format";
@@ -73,8 +72,7 @@ export default function DayV2ExitCost({
     <Card data-accountant-source="buildDayExplainerMetrics.liquidity">
       <CardHeader>
         <div className="flex items-center justify-between gap-2">
-          <CardTitle>Exit cost and depth</CardTitle>
-          <Badge tone="liquidity">SLP pool</Badge>
+          <CardTitle className="text-[17px]">Exit cost and depth</CardTitle>
         </div>
         <CardDescription>
           How much Sr can sell into the pool, and what leaving early costs.
@@ -92,7 +90,7 @@ export default function DayV2ExitCost({
           ) : depthBindsFirst ? (
             <>
               Sr can sell{" "}
-              <strong className="font-mono text-[17px] font-bold tracking-[-0.01em] tabular-nums">
+              <strong className="font-mono text-[16px] font-bold tracking-[-0.01em] tabular-nums">
                 {compactUsd(metrics.boundarySellNAV)}
               </strong>{" "}
               into the pool <strong className="font-semibold">in one trade</strong>,
@@ -105,7 +103,7 @@ export default function DayV2ExitCost({
           ) : (
             <>
               Sr can sell{" "}
-              <strong className="font-mono text-[17px] font-bold tracking-[-0.01em] tabular-nums">
+              <strong className="font-mono text-[16px] font-bold tracking-[-0.01em] tabular-nums">
                 {compactUsd(metrics.referenceSellNAV)}
               </strong>{" "}
               <strong className="font-semibold">in one trade</strong> before the cost

@@ -2,13 +2,30 @@ import type { HTMLAttributes } from "react";
 
 import { cn } from "@/lib/utils";
 
-/** Ported from royco-rwa-frontend components/ui/card.tsx. */
-export function Card({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
+/**
+ * Ported from royco-rwa-frontend components/ui/card.tsx, plus a weight.
+ *
+ * Nine cards built from one object give a page no hierarchy: rank ends up
+ * decided by area, so the largest section wins and the answer loses. Weight is
+ * the rank. The rule it buys is that exactly two things carry a shadow, the
+ * answer and the control, and everything else recedes.
+ */
+const CARD_WEIGHTS = {
+  primary: "border-[var(--border-subtle)] bg-[var(--card)] shadow-[0_2px_10px_-4px_rgba(23,25,31,0.18)]",
+  default: "border-[var(--border-subtle)] bg-[var(--card)]",
+  quiet: "border-[var(--border-subtle)] bg-transparent",
+} as const;
+
+export function Card({
+  className,
+  weight = "default",
+  ...props
+}: HTMLAttributes<HTMLDivElement> & { weight?: keyof typeof CARD_WEIGHTS }) {
   return (
     <div
       className={cn(
-        "rounded-xl border bg-[var(--card)] text-[var(--foreground)]",
-        "border-[var(--border-subtle)]",
+        "rounded-xl border text-[var(--foreground)]",
+        CARD_WEIGHTS[weight],
         className,
       )}
       {...props}

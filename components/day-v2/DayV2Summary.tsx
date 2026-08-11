@@ -4,7 +4,10 @@ import { useDeferredValue, useEffect, useMemo, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import DayV2Chart, { type DayV2Point } from "@/components/day-v2/DayV2Chart";
-import DayV2Comparison, { DayV2ToneDot, type DayV2PositionBreakdown } from "@/components/day-v2/DayV2Comparison";
+import DayV2Comparison, {
+  DAY_V2_TONE_DOT,
+  type DayV2PositionBreakdown,
+} from "@/components/day-v2/DayV2Comparison";
 import DayV2Backtest from "@/components/day-v2/DayV2Backtest";
 import DayV2Deploy from "@/components/day-v2/DayV2Deploy";
 import DayV2Deployment from "@/components/day-v2/DayV2Deployment";
@@ -14,7 +17,6 @@ import DayV2ExitCost from "@/components/day-v2/DayV2ExitCost";
 import DayV2LossWaterfall from "@/components/day-v2/DayV2LossWaterfall";
 import DayV2Source from "@/components/day-v2/DayV2Source";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { stake100 } from "@/components/day-v2/format";
 import { dayV2EffectiveShares } from "@/components/day-v2/terms";
 import { buildDayV2Query, type DayV2UrlState } from "@/components/day-v2/url-state";
 import {
@@ -388,7 +390,7 @@ export default function DayV2Summary({
   return (
     // Capped rather than full-bleed. Past about 1400px the cards stop gaining
     // anything and the prose lines just get harder to track back to.
-    <div className="royco-v2 mx-auto flex w-full max-w-[1440px] flex-col gap-5 px-5 py-8 sm:px-8">
+    <div className="royco-v2 mx-auto flex w-full max-w-[1440px] flex-col gap-8 px-5 py-8 sm:px-8">
       <header className="flex flex-col gap-3">
         <div className="flex flex-wrap items-end justify-between gap-3">
         <label className="flex flex-col gap-1">
@@ -433,7 +435,7 @@ export default function DayV2Summary({
           ))}
         </div>
         </div>
-        <h1 className="max-w-[24ch] text-[clamp(28px,3.4vw,44px)] font-semibold leading-[1.05] tracking-[-0.02em]">
+        <h1 className="max-w-[26ch] text-[clamp(26px,2.6vw,36px)] font-semibold leading-[1.06] tracking-[-0.02em]">
           One yield source, split into three risks.
         </h1>
         <p className="max-w-[64ch] text-[13.5px] leading-relaxed text-[var(--secondary)]">
@@ -503,108 +505,10 @@ export default function DayV2Summary({
         />
       </section>
 
-      <DayV2Presets activeId={activePresetId} onSelect={applyPreset} />
-
-      {/* Three peers, scanned across: identical slots, so the eye compares the
-          rate first and reads detail only if it wants to. */}
-      <section
-        aria-labelledby="day-v2-positions-heading"
-        className="grid grid-cols-1 gap-3 md:grid-cols-3"
-      >
-        <h2 className="sr-only" id="day-v2-positions-heading">
-          Positions
-        </h2>
-        {positions.map((position) => (
-          <Card
-            key={position.short}
-            className={position.funded ? undefined : "opacity-55"}
-            style={position.funded ? undefined : { borderStyle: "dashed" }}
-          >
-            <CardHeader>
-              <div className="flex items-center justify-between gap-2">
-                <CardTitle className="flex items-center gap-2" level={3}>
-                  <DayV2ToneDot tone={position.tone} />
-                  {position.name}
-                </CardTitle>
-                {position.funded ? null : <Badge tone="neutral">not funded</Badge>}
-              </div>
-              <CardDescription>{position.holds}</CardDescription>
-            </CardHeader>
-            <CardContent className="flex flex-col gap-2">
-              <div className="flex items-baseline gap-1.5">
-                <span className="font-mono text-[30px] font-bold leading-none tracking-[-0.02em] tabular-nums">
-                  {position.funded ? pct(position.apy) : "0.0%"}
-                </span>
-                <span className="text-[11px] text-[var(--tertiary)]">a year</span>
-              </div>
-              <p className="border-t border-[var(--border-subtle)] pt-2 text-[11.5px] leading-relaxed text-[var(--secondary)]">
-                {position.risk}
-              </p>
-            </CardContent>
-          </Card>
-        ))}
-      </section>
-
-      {/* What the terms pay, from two angles: the shape over a year, and the
-          split that produces it. Neither needs the full width, and read side by
-          side the reader can check the curve against the table it comes from. */}
-      <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-2">
-        <Card>
-          <CardHeader>
-            <CardTitle>{stake100(returnUnit)} in each position, over a year</CardTitle>
-            <CardDescription>
-              Each line compounds that position&apos;s rate above. It shows what the
-              terms pay, not what a bad year does to them: there is no drawdown in
-              this projection.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <DayV2Chart data={chartData} />
-          </CardContent>
-        </Card>
-
-        <DayV2Comparison
-          poolEconomics={model.pool}
-          positions={positions as DayV2PositionBreakdown[]}
-          source={source}
-          unit={returnUnit}
-        />
-      </div>
-
-      {/* Losing money and getting out are the two ways a position goes wrong,
-          and the projection above deliberately contains neither. They read
-          better next to each other than either does alone. */}
-      <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-2">
-        <DayV2LossWaterfall metrics={model.explainer.coverage} unit={returnUnit} />
-        <DayV2ExitCost metrics={model.explainer.liquidity} />
-      </div>
-
-      {/* Everything above is a projection at the stated terms. This is the one
-          section where the price path actually happened. It belongs to the
-          simulate job: it answers "what would this have done", not "what do I
-          set". */}
-      {/* Shown in both flows. A deployer needs it more than anyone: the coverage
-          restoration toggle lives in the parameters below, and its single most
-          important consequence, that outside capital funded Sr's result, is
-          disclosed here. Splitting a control from its consequence would hide
-          the thing the control is for. */}
-      <DayV2Backtest
-        bandPct={inputs.bandPct}
-        coveragePct={inputs.coveragePct}
-        liqSharePct={resolved.liquidityYieldShare * 100}
-        liquidityPct={inputs.liquidityPct}
-        maintainCoverage={maintainCoverage}
-        onMaintainCoverage={setMaintainCoverage}
-        market={market}
-        observationDays={inputs.observationDays}
-        riskSharePct={resolved.riskYieldShare * 100}
-        sourceApyPct={inputs.sourceApyPct}
-      />
-
       {deploying ? (
         <>
-          {/* Everything a deployer still has to set. Parameters that move the
-              figures come first, then the checklist that does not. */}
+          {/* First, not last. A deployer is here to set these, and they were
+              rendering roughly three thousand pixels below the fold. */}
           {/* Slider positions come from raw state, never from the deferred
               model, or the input fights the pointer: the value snaps back to a
               frame-old number while you are still dragging it. */}
@@ -640,6 +544,151 @@ export default function DayV2Summary({
             }
           />
 
+        </>
+      ) : null}
+
+      <DayV2Presets activeId={activePresetId} onSelect={applyPreset} />
+
+      {/* Three peers, scanned across: identical slots, so the eye compares the
+          rate first and reads detail only if it wants to. */}
+      <section
+        aria-labelledby="day-v2-positions-heading"
+        className="grid grid-cols-1 gap-3 md:grid-cols-3"
+      >
+        <h2 className="sr-only" id="day-v2-positions-heading">
+          Positions
+        </h2>
+        {positions.map((position) => (
+          <Card
+            className="overflow-hidden px-0"
+            key={position.short}
+            style={position.funded ? undefined : { borderStyle: "dashed" }}
+            weight={position.funded ? "primary" : "default"}
+          >
+            {/* The tone as a rule across the top rather than a dot beside the
+                name. It is the only chroma above the fold and it binds the
+                three cards into one object the eye reads as a set. */}
+            <div
+              aria-hidden="true"
+              style={{
+                background: position.funded
+                  ? DAY_V2_TONE_DOT[position.tone]
+                  : `color-mix(in srgb, ${DAY_V2_TONE_DOT[position.tone]} 30%, transparent)`,
+                height: 3,
+              }}
+            />
+            <CardHeader className="px-6">
+              <div className="flex items-center justify-between gap-2">
+                {/* An eyebrow, not a title. The rate is the title here. */}
+                <CardTitle
+                  className="text-[11px] font-semibold uppercase tracking-[0.1em] text-[var(--tertiary)]"
+                  level={3}
+                >
+                  {position.name}
+                </CardTitle>
+                {position.funded ? null : <Badge tone="neutral">not funded</Badge>}
+              </div>
+              <CardDescription>{position.holds}</CardDescription>
+            </CardHeader>
+            <CardContent className="flex flex-col gap-2 px-6">
+              <div className="flex items-baseline gap-1.5">
+                {/* Never faded. An unfunded position sets the rate in tertiary
+                    rather than dropping the whole card to 55% opacity, which
+                    took a 44px number to about 2.5:1 against the page. */}
+                <span
+                  className="font-mono text-[clamp(34px,3.2vw,44px)] font-bold leading-[0.92] tracking-[-0.03em] tabular-nums"
+                  style={position.funded ? undefined : { color: "var(--tertiary)" }}
+                >
+                  {position.funded ? pct(position.apy) : "0.0%"}
+                </span>
+                <span className="text-[11px] text-[var(--tertiary)]">a year</span>
+              </div>
+              <p className="border-t border-[var(--border-subtle)] pt-2 text-[12px] leading-relaxed text-[var(--secondary)]">
+                {position.risk}
+              </p>
+            </CardContent>
+          </Card>
+        ))}
+      </section>
+
+      <h2
+        className="-mb-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--tertiary)]"
+        id="day-v2-risk-heading"
+      >
+        What can go wrong
+      </h2>
+      {/* Losing money and getting out are the two ways a position goes wrong,
+          and the projection above deliberately contains neither. They read
+          better next to each other than either does alone. */}
+      <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-2">
+        <DayV2LossWaterfall metrics={model.explainer.coverage} unit={returnUnit} />
+        <DayV2ExitCost metrics={model.explainer.liquidity} />
+      </div>
+
+      {/* Everything above is a projection at the stated terms. This is the one
+          section where the price path actually happened. It belongs to the
+          simulate job: it answers "what would this have done", not "what do I
+          set". */}
+      <h2
+        className="-mb-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--tertiary)]"
+        id="day-v2-pays-heading"
+      >
+        Where the rates come from
+      </h2>
+      {/* What the terms pay, from two angles: the shape over a year, and the
+          split that produces it. Neither needs the full width, and read side by
+          side the reader can check the curve against the table it comes from. */}
+      <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
+        <Card weight="quiet">
+          <CardHeader>
+            <CardTitle>Growth over a year</CardTitle>
+            <CardDescription>
+              Each line compounds that position&apos;s rate above. It shows what the
+              terms pay, not what a bad year does to them: there is no drawdown in
+              this projection.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <DayV2Chart data={chartData} />
+          </CardContent>
+        </Card>
+
+        <DayV2Comparison
+          poolEconomics={model.pool}
+          positions={positions as DayV2PositionBreakdown[]}
+          source={source}
+          unit={returnUnit}
+        />
+      </div>
+
+      <h2
+        className="-mb-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--tertiary)]"
+        id="day-v2-history-heading"
+      >
+        What actually happened
+      </h2>
+      {/* Shown in both flows. A deployer needs it more than anyone: the coverage
+          restoration toggle lives in the parameters below, and its single most
+          important consequence, that outside capital funded Sr's result, is
+          disclosed here. Splitting a control from its consequence would hide
+          the thing the control is for. */}
+      <DayV2Backtest
+        bandPct={inputs.bandPct}
+        coveragePct={inputs.coveragePct}
+        liqSharePct={resolved.liquidityYieldShare * 100}
+        liquidityPct={inputs.liquidityPct}
+        maintainCoverage={maintainCoverage}
+        onMaintainCoverage={setMaintainCoverage}
+        market={market}
+        observationDays={inputs.observationDays}
+        riskSharePct={resolved.riskYieldShare * 100}
+        sourceApyPct={inputs.sourceApyPct}
+      />
+
+      {deploying ? (
+        <>
+          {/* Everything a deployer still has to set. Parameters that move the
+              figures come first, then the checklist that does not. */}
           <DayV2Deployment
             defaults={defaults}
             market={{
@@ -664,6 +713,13 @@ export default function DayV2Summary({
               liqSharePct: resolved.liquidityYieldShare * 100,
               observationDays: inputs.observationDays,
               sourceApyPct: inputs.sourceApyPct,
+              // The export was sending market defaults for these three rather
+              // than what the page ran: toggling coverage restoration produced
+              // a file saying the opposite, and the yield-share cap ignored the
+              // ceiling clamp the engine actually applied.
+              maintainCoverage: inputs.maintainCoverage,
+              y100SharePct: resolved.y100 * 100,
+              presetId: activePresetId,
             }}
           />
         </>
