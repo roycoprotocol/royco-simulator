@@ -36,3 +36,21 @@ export const stake100 = (unit: DayV2Unit) => (isUsdUnit(unit) ? "$100" : "100");
 /** An exact per-100 figure in the market's own unit. */
 export const unitAmount = (value: number, unit: DayV2Unit) =>
   isUsdUnit(unit) ? `$${value.toFixed(2)}` : value.toFixed(2);
+
+/**
+ * A position-sized figure in the market's own unit. `initialST` is a count of
+ * the market's own asset, not dollars, so the two ETH and one BTC market would
+ * otherwise have their tranche sizes labelled with a currency nobody quoted
+ * them in.
+ */
+export const compactAmount = (value: number, unit: DayV2Unit) =>
+  isUsdUnit(unit) ? compactUsd(value) : compactUsd(value).slice(1);
+
+/**
+ * A chart axis tick for a per-100 value. Every chart on the page hardcoded a
+ * `$` here while the tables beside them already honoured the market's declared
+ * unit, so a market quoted in ETH had a dollar axis over a table that carefully
+ * refused to name a currency.
+ */
+export const unitTick = (value: number, unit: DayV2Unit) =>
+  isUsdUnit(unit) ? `$${value.toFixed(0)}` : value.toFixed(0);

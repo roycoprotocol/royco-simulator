@@ -15,7 +15,7 @@ import {
   YAxis,
 } from "recharts";
 
-import { stake100, unitAmount, type DayV2Unit } from "@/components/day-v2/format";
+import { stake100, unitAmount, unitTick, type DayV2Unit } from "@/components/day-v2/format";
 
 // Recharts, matching the core app's charting convention. Every point plotted
 // here is a `buildDayExplainerMetrics` output, so this file only positions
@@ -67,7 +67,7 @@ function DayV2LossChart({
             domain={[floor, 100]}
             stroke="#596270"
             tick={{ fontSize: 10 }}
-            tickFormatter={(value: number) => `$${value.toFixed(0)}`}
+            tickFormatter={(value: number) => unitTick(value, unit)}
             tickLine={false}
             width={52}
           />

@@ -9,6 +9,7 @@ import DayV2Comparison, {
   type DayV2PositionBreakdown,
 } from "@/components/day-v2/DayV2Comparison";
 import DayV2Backtest from "@/components/day-v2/DayV2Backtest";
+import DayV2CapitalStack from "@/components/day-v2/DayV2CapitalStack";
 import DayV2Deploy from "@/components/day-v2/DayV2Deploy";
 import DayV2Deployment from "@/components/day-v2/DayV2Deployment";
 import DayV2Parameters from "@/components/day-v2/DayV2Parameters";
@@ -403,16 +404,20 @@ export default function DayV2Summary({
     // Held rather than rebuilt, so the pool economics quoted to the reader are
     // the ones this run used and cannot drift from them.
     const cfg = buildDayMarketConfig(effective, terms);
+    // Hoisted out of the explainer call so the capital stack the issuer is asked
+    // to raise and the rates they are quoted are the same market, seeded once.
+    const balances = buildDayInitialBalances(effective, terms);
     return {
       scenario: runDayTargetScenario(effective),
       noPremiums,
       riskOnly,
+      balances,
       pool: {
         stableYield: cfg.stableYield,
         swapFeeBps: cfg.swapFeeBps,
         turnoverPerYear: cfg.poolTurnoverPerYear,
       },
-      explainer: buildDayExplainerMetrics(cfg, buildDayInitialBalances(effective, terms)),
+      explainer: buildDayExplainerMetrics(cfg, balances),
     };
   }, [defaults, inputs, resolved]);
   const scenario = model.scenario;
@@ -747,7 +752,10 @@ export default function DayV2Summary({
               maxLabel="25%"
               min={0}
               minLabel="0%"
-              note="Jr per unit of Sr"
+              // Not "Jr per unit of Sr", which it never was: the Junior capital
+              // that meets a 20% requirement at the target is 28.6% of Senior.
+              // An issuer sizing a raise off the old caption came up 43% short.
+              note="first-loss requirement"
               onChange={setCoveragePct}
               step={0.5}
               value={coveragePct}
@@ -759,7 +767,9 @@ export default function DayV2Summary({
               maxLabel="25%"
               min={0}
               minLabel="0%"
-              note="pool depth for Sr"
+              // Same correction: a 10% liquidity requirement is met by a pool
+              // worth 11.1% of Senior, not 10%.
+              note="exit-pool requirement"
               onChange={setLiquidityPct}
               step={0.5}
               value={liquidityPct}
@@ -940,6 +950,19 @@ export default function DayV2Summary({
         ))}
       </section>
 
+      {/* The other half of the answer, and the half an issuer needs first. The
+          page priced three legs without ever saying how much capital had to
+          stand at each one, which is the question that decides whether a design
+          can be raised at all. */}
+      <DayV2CapitalStack
+        balances={model.balances}
+        coverage={resolved.coverage}
+        coverageLossLimit={model.explainer.coverage.coverageLossLimit}
+        minLiquidity={resolved.minLiquidity}
+        targetUtilization={DAY_TARGET_UTILIZATION}
+        unit={returnUnit}
+      />
+
       <h2
         className="-mb-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--tertiary)]"
         id="day-v2-risk-heading"
@@ -951,7 +974,7 @@ export default function DayV2Summary({
           better next to each other than either does alone. */}
       <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-2">
         <DayV2LossWaterfall metrics={model.explainer.coverage} unit={returnUnit} />
-        <DayV2ExitCost metrics={model.explainer.liquidity} />
+        <DayV2ExitCost metrics={model.explainer.liquidity} unit={returnUnit} />
       </div>
 
       {/* Everything above is a projection at the stated terms. This is the one
@@ -981,7 +1004,7 @@ export default function DayV2Summary({
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <DayV2Chart data={chartData} />
+            <DayV2Chart data={chartData} unit={returnUnit} />
           </CardContent>
         </Card>
 

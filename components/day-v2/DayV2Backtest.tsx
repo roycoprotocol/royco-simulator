@@ -336,7 +336,7 @@ function DayV2Backtest({
             five numeric columns stretched across the whole card and the table
             pushed the chart a screen away from the rows explaining it. */}
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
-          <DayV2BacktestChart data={chartData} />
+          <DayV2BacktestChart data={chartData} unit={returnUnit} />
 
           {/* Detail, visible by default rather than behind a toggle. */}
           <div className="max-h-[360px] overflow-y-auto rounded-lg border border-[var(--border-subtle)]">

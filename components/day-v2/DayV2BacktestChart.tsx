@@ -2,6 +2,7 @@
 
 import { memo } from "react";
 
+import { unitAmount, unitTick, type DayV2Unit } from "@/components/day-v2/format";
 import {
   CartesianGrid,
   Legend,
@@ -30,7 +31,13 @@ const SERIES = [
   ["liquidity", "SLP", "#01c555"],
 ] as const;
 
-function DayV2BacktestChart({ data }: { data: DayV2BacktestPoint[] }) {
+function DayV2BacktestChart({
+  data,
+  unit,
+}: {
+  data: DayV2BacktestPoint[];
+  unit: DayV2Unit;
+}) {
   return (
     <div style={{ width: "100%" }}>
       <ResponsiveContainer height={250} width="100%">
@@ -48,7 +55,7 @@ function DayV2BacktestChart({ data }: { data: DayV2BacktestPoint[] }) {
             domain={["auto", "auto"]}
             stroke="#596270"
             tick={{ fontSize: 10 }}
-            tickFormatter={(value: number) => `$${value.toFixed(0)}`}
+            tickFormatter={(value: number) => unitTick(value, unit)}
             tickLine={false}
             width={52}
           />
@@ -59,7 +66,7 @@ function DayV2BacktestChart({ data }: { data: DayV2BacktestPoint[] }) {
               borderRadius: 8,
               fontSize: 11,
             }}
-            formatter={(value: number, name: string) => [`$${value.toFixed(2)}`, name]}
+            formatter={(value: number, name: string) => [unitAmount(value, unit), name]}
           />
           <Legend iconType="plainline" wrapperStyle={{ fontSize: 11, paddingTop: 4 }} />
           {SERIES.map(([key, label, color]) => (

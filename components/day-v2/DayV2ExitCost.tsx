@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 
 import DayV2ExitChart, { type DayV2ExitPoint } from "@/components/day-v2/DayV2ExitChart";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { bps, compactUsd, pct } from "@/components/day-v2/format";
+import { bps, compactAmount, isUsdUnit, pct, type DayV2Unit } from "@/components/day-v2/format";
 import { dayV2RangeStyle } from "@/components/day-v2/range";
 import {
   Table,
@@ -25,9 +25,16 @@ import type { DayExplainerMetrics } from "@/lib/day-simulator-template/explainer
 // definition of those fields, not a formula invented in the UI.
 export default function DayV2ExitCost({
   metrics,
+  unit,
 }: {
   metrics: DayExplainerMetrics["liquidity"];
+  unit: DayV2Unit;
 }) {
+  // Two of the thirteen markets are quoted in ETH and one in BTC, and every
+  // figure here was printed with a hard "$". The same defect was found and
+  // fixed once already in the backtest: the rule is to drop the symbol rather
+  // than assert a currency nobody quoted the market in.
+  const amount = (value: number) => compactAmount(value, unit);
   const points = useMemo<DayV2ExitPoint[]>(
     () => metrics.curve.map((point) => ({ sellNAV: point.sellNAV, bps: point.slippage * 10_000 })),
     [metrics],
@@ -94,7 +101,7 @@ export default function DayV2ExitCost({
             <>
               Sr can sell{" "}
               <strong className="font-mono text-[16px] font-bold tracking-[-0.01em] tabular-nums">
-                {compactUsd(metrics.boundarySellNAV)}
+                {amount(metrics.boundarySellNAV)}
               </strong>{" "}
               into the pool <strong className="font-semibold">in one trade</strong>,
               which is {pct(metrics.boundarySellShareOfSenior)} of the position. That
@@ -107,12 +114,12 @@ export default function DayV2ExitCost({
             <>
               Sr can sell{" "}
               <strong className="font-mono text-[16px] font-bold tracking-[-0.01em] tabular-nums">
-                {compactUsd(metrics.referenceSellNAV)}
+                {amount(metrics.referenceSellNAV)}
               </strong>{" "}
               <strong className="font-semibold">in one trade</strong> before the cost
               passes {pct(metrics.arbitrageReference)}, the level at which arbitrage
               becomes worth doing. That is {pct(metrics.referenceSellShareOfSenior)} of
-              the position. The pool holds {compactUsd(metrics.boundarySellNAV)} in
+              the position. The pool holds {amount(metrics.boundarySellNAV)} in
               total, and draining all of it costs {bps(metrics.boundaryQuote.slippage)}.
             </>
           )}
@@ -127,7 +134,7 @@ export default function DayV2ExitCost({
               Sr sells
             </span>
             <span className="font-mono text-[15px] font-bold tabular-nums">
-              {compactUsd(sellNAV)}
+              {amount(sellNAV)}
             </span>
           </span>
           <input
@@ -164,7 +171,7 @@ export default function DayV2ExitCost({
               className="font-mono text-[24px] font-bold leading-none tracking-[-0.02em] tabular-nums"
               style={{ color: costUSD > 0 ? "var(--red-emphasis)" : undefined }}
             >
-              {compactUsd(costUSD)}
+              {amount(costUSD)}
             </span>
             <span className="text-[10.5px] text-[var(--tertiary)]">the cost of leaving now</span>
           </div>
@@ -173,15 +180,18 @@ export default function DayV2ExitCost({
               Received
             </span>
             <span className="font-mono text-[24px] font-bold leading-none tracking-[-0.02em] tabular-nums">
-              {compactUsd(proceeds)}
+              {amount(proceeds)}
             </span>
             <span className="text-[10.5px] text-[var(--tertiary)]">
-              stable, at {selected.executionPrice.toFixed(4)} on the dollar
+              {/* "on the dollar" is the same assertion as the symbol. A market
+                  quoted in ETH is paid out at a price per unit, not per dollar. */}
+              stable, at {selected.executionPrice.toFixed(4)}{" "}
+              {isUsdUnit(unit) ? "on the dollar" : "per unit"}
             </span>
           </div>
         </div>
 
-        <DayV2ExitChart compactUsd={compactUsd} marker={points[index]} points={points} />
+        <DayV2ExitChart compactUsd={amount} marker={points[index]} points={points} />
 
         <Table>
           <TableHeader>
@@ -197,7 +207,7 @@ export default function DayV2ExitCost({
             {rows.map((row) => (
               <TableRow key={row.sellNAV}>
                 <TableCell className="font-mono font-semibold tabular-nums">
-                  {compactUsd(row.sellNAV)}
+                  {amount(row.sellNAV)}
                 </TableCell>
                 <TableCell className="text-right font-mono tabular-nums text-[var(--secondary)]">
                   {pct(seniorNAV > 0 ? row.sellNAV / seniorNAV : 0)}
@@ -206,10 +216,10 @@ export default function DayV2ExitCost({
                   {bps(row.slippage)}
                 </TableCell>
                 <TableCell className="text-right font-mono tabular-nums">
-                  {compactUsd(row.sellNAV * row.slippage)}
+                  {amount(row.sellNAV * row.slippage)}
                 </TableCell>
                 <TableCell className="text-right font-mono tabular-nums">
-                  {compactUsd(row.sellNAV * row.executionPrice)}
+                  {amount(row.sellNAV * row.executionPrice)}
                 </TableCell>
               </TableRow>
             ))}
@@ -239,7 +249,7 @@ export default function DayV2ExitCost({
             NAV pays an arbitrageur more than it costs them. Their buying is what puts the
             stable side back, so capacity returns between sales rather than being spent
             once. Over time Sr can exit far more than{" "}
-            {compactUsd(metrics.boundarySellNAV)}. What it cannot do is exit more than that{" "}
+            {amount(metrics.boundarySellNAV)}. What it cannot do is exit more than that{" "}
             <strong className="font-semibold">at once</strong>.
           </p>
           <p className="text-[10px] leading-snug text-[var(--tertiary)]">

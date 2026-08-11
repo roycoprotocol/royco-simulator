@@ -2,6 +2,7 @@
 
 import { memo } from "react";
 
+import { unitAmount, unitTick, type DayV2Unit } from "@/components/day-v2/format";
 import {
   CartesianGrid,
   Legend,
@@ -30,7 +31,7 @@ const TONES = {
   liquidity: "#01c555",
 } as const;
 
-function DayV2Chart({ data }: { data: DayV2Point[] }) {
+function DayV2Chart({ data, unit }: { data: DayV2Point[]; unit: DayV2Unit }) {
   return (
     // An explicit height on the container, not the wrapper: inside a flex column
     // ResponsiveContainer resolves a percentage height against a parent that has
@@ -50,7 +51,7 @@ function DayV2Chart({ data }: { data: DayV2Point[] }) {
             domain={["auto", "auto"]}
             stroke="#596270"
             tick={{ fontSize: 10 }}
-            tickFormatter={(value: number) => `$${value.toFixed(0)}`}
+            tickFormatter={(value: number) => unitTick(value, unit)}
             tickLine={false}
             width={52}
           />
@@ -61,7 +62,7 @@ function DayV2Chart({ data }: { data: DayV2Point[] }) {
               borderRadius: 8,
               fontSize: 11,
             }}
-            formatter={(value: number, name: string) => [`$${value.toFixed(2)}`, name]}
+            formatter={(value: number, name: string) => [unitAmount(value, unit), name]}
             labelFormatter={(month: number) => (month === 0 ? "Today" : `Month ${month}`)}
           />
           <Legend iconType="plainline" wrapperStyle={{ fontSize: 11, paddingTop: 4 }} />
