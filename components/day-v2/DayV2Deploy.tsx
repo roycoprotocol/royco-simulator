@@ -28,8 +28,12 @@ export default function DayV2Deploy({
   seniorApy: number;
   sourceApy: number;
 }) {
-  // Hand the design over rather than dropping the reader on an empty form. The
-  // flow can ignore what it does not recognise, and the link still opens.
+  // The query is carried on the honest understanding that the flow does not
+  // read it: /deploy-market restores from a Jotai store in localStorage
+  // (royco:deploy-market:draft:v1) and has no searchParams path at all, and a
+  // different origin cannot write that key anyway. It costs nothing and becomes
+  // useful the day the flow accepts a link, but the reader must not be told
+  // their design travels with it, because it does not.
   const href = `${DEPLOY_URL}?${query}`;
   return (
     <section
@@ -47,8 +51,8 @@ export default function DayV2Deploy({
             {pct(seniorApy)}
           </strong>{" "}
           a year from a source at {pct(sourceApy)}, with {pct(coverage)} coverage and{" "}
-          {pct(liquidity)} liquidity behind it. Take it to the deploy flow and it
-          becomes a market other people can enter.
+          {pct(liquidity)} liquidity behind it. The flow starts from a blank draft, so
+          export the config first and set these terms against it.
         </p>
       </div>
 
@@ -63,8 +67,8 @@ export default function DayV2Deploy({
         >
           Deploy this market
         </a>
-        <span className="text-[10.5px] leading-snug text-[#9b978d]">
-          Opens royco.org in a new tab
+        <span className="max-w-[24ch] text-[10.5px] leading-snug text-[#9b978d] lg:text-right">
+          Opens royco.org in a new tab. It will not carry these terms across.
         </span>
       </div>
     </section>
