@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import DayV2YieldCurve from "@/components/day-v2/DayV2YieldCurve";
 import { pct } from "@/components/day-v2/format";
+import { dayV2RangeStyle } from "@/components/day-v2/range";
 
 /**
  * Every remaining term a real market takes. These were pinned at the market
@@ -59,6 +60,7 @@ function Range({
       min={min}
       onChange={(event) => onChange(Number(event.target.value))}
       step={step}
+      style={dayV2RangeStyle(value, min, max)}
       type="range"
       value={value}
     />

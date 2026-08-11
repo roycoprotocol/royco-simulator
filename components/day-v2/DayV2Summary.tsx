@@ -17,6 +17,7 @@ import DayV2ExitCost from "@/components/day-v2/DayV2ExitCost";
 import DayV2LossWaterfall from "@/components/day-v2/DayV2LossWaterfall";
 import DayV2Source from "@/components/day-v2/DayV2Source";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { dayV2RangeStyle } from "@/components/day-v2/range";
 import { dayV2EffectiveShares } from "@/components/day-v2/terms";
 import { buildDayV2Query, type DayV2UrlState } from "@/components/day-v2/url-state";
 import {
@@ -43,11 +44,27 @@ type DayV2Mode = "simulate" | "deploy";
 const pct = (value: number) => `${(value * 100).toFixed(1)}%`;
 const DAY_TARGET_UTILIZATION = 0.9;
 
+/**
+ * A term the reader sets, drawn so it cannot be mistaken for a readout.
+ *
+ * The old control was a hairline track under a 15px number, which read as a
+ * label with a rule under it. Three things fix that and all three are about
+ * affordance rather than decoration: its own raised cell, so it is an object
+ * you act on rather than a line of text; a filled track, so the handle has a
+ * visible travelled distance behind it; and the endpoints spelled out, so the
+ * range it can move through is on screen instead of implied.
+ *
+ * The fill treatment is shared with every other range on the page, so the deploy
+ * parameters and the two exploration sliders inside the result cards read as the
+ * same kind of object as these three.
+ */
 function Slider({
   label,
   display,
   max,
+  maxLabel,
   min,
+  minLabel,
   onChange,
   note,
   step,
@@ -56,30 +73,49 @@ function Slider({
   label: string;
   display: string;
   max: number;
+  maxLabel: string;
   min: number;
+  minLabel: string;
   onChange: (value: number) => void;
   note: string;
   step: number;
   value: number;
 }) {
   return (
-    <label className="flex flex-col gap-1.5">
-      <span className="flex items-baseline justify-between gap-2">
-        <span className="text-[9.5px] font-semibold uppercase tracking-[0.1em] text-[var(--tertiary)]">
+    <label className="flex cursor-pointer flex-col gap-2.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--card)] px-4 py-3 transition-[border-color,box-shadow] hover:border-[var(--secondary)] focus-within:border-[var(--foreground)] focus-within:shadow-[0_2px_10px_-4px_rgba(23,25,31,0.24)]">
+      <span className="flex items-baseline justify-between gap-3">
+        <span className="min-w-0 truncate text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--tertiary)]">
           {label}
+          {/* Dropped only in the band where the three cells are side by side but
+              still narrow, roughly 640 to 1024, where the note is what gets
+              clipped. Stacked below that and wide above it, there is room. */}
+          <span className="inline font-normal normal-case tracking-normal sm:hidden lg:inline">
+            {" · "}
+            {note}
+          </span>
         </span>
-        <span className="font-mono text-[15px] font-bold tabular-nums">{display}</span>
+        <span className="shrink-0 font-mono text-[22px] font-bold leading-none tracking-[-0.02em] tabular-nums">
+          {display}
+        </span>
       </span>
-      <input
-        className="day-v2-range"
-        max={max}
-        min={min}
-        onChange={(event) => onChange(Number(event.target.value))}
-        step={step}
-        type="range"
-        value={value}
-      />
-      <span className="text-[10px] leading-snug text-[var(--tertiary)]">{note}</span>
+      <span className="flex items-center gap-2.5">
+        <span className="w-7 shrink-0 text-right font-mono text-[9.5px] tabular-nums text-[var(--tertiary)]">
+          {minLabel}
+        </span>
+        <input
+          className="day-v2-range"
+          max={max}
+          min={min}
+          onChange={(event) => onChange(Number(event.target.value))}
+          step={step}
+          style={dayV2RangeStyle(value, min, max)}
+          type="range"
+          value={value}
+        />
+        <span className="w-7 shrink-0 font-mono text-[9.5px] tabular-nums text-[var(--tertiary)]">
+          {maxLabel}
+        </span>
+      </span>
     </label>
   );
 }
@@ -110,6 +146,9 @@ export default function DayV2Summary({
   // An imported source outranks the registry selection while it is loaded, so
   // every section below runs on the reader's own history.
   const [draftMarket, setDraftMarket] = useState<DayMarket | null>(null);
+  // The importer is opened from the source console rather than from a band of
+  // its own, so the state that used to live inside it is lifted here.
+  const [sourceOpen, setSourceOpen] = useState(false);
   const selectedMarket = markets.find((candidate) => candidate.id === marketId) ?? initialMarket;
   const market = draftMarket ?? selectedMarket;
   const defaults = market.defaults;
@@ -429,28 +468,13 @@ export default function DayV2Summary({
     // Capped rather than full-bleed. Past about 1400px the cards stop gaining
     // anything and the prose lines just get harder to track back to.
     <div className="royco-v2 mx-auto flex w-full max-w-[1440px] flex-col gap-8 px-5 py-8 sm:px-8">
-      <header className="flex flex-col gap-3">
-        <div className="flex flex-wrap items-end justify-between gap-3">
-        <label className="flex flex-col gap-1">
-          <span className="text-[9.5px] font-semibold uppercase tracking-[0.1em] text-[var(--tertiary)]">
-            Yield source
-          </span>
-          <select
-            aria-label="Yield source"
-            className="w-full max-w-[460px] rounded-lg border border-[var(--border-subtle)] bg-[var(--card)] px-3 py-2 text-[14px] font-semibold"
-            onChange={(event) => selectMarket(event.target.value)}
-            value={draftMarket ? "__draft" : marketId}
-          >
-            {draftMarket ? (
-              <option value="__draft">{draftMarket.identity.marketName} (imported)</option>
-            ) : null}
-            {markets.map((candidate) => (
-              <option key={candidate.id} value={candidate.id}>
-                {candidate.identity.marketName}
-              </option>
-            ))}
-          </select>
-        </label>
+      {/* The page's own rail: what this is, and which of the two jobs you are
+          doing. Kept off the hero grid so the switch cannot be mistaken for one
+          of the inputs beneath it. */}
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--tertiary)]">
+          Royco Day · Market simulator
+        </span>
         <div
           aria-label="What you are here to do"
           className="flex items-center gap-0.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--foundation)] p-0.5"
@@ -459,7 +483,7 @@ export default function DayV2Summary({
           {([["Simulate", "simulate"], ["Deploy", "deploy"]] as const).map(([label, value]) => (
             <button
               aria-pressed={mode === value}
-              className={`rounded-md px-3.5 py-1.5 text-[12px] font-semibold ${
+              className={`cursor-pointer rounded-md px-3.5 py-1.5 text-[12px] font-semibold ${
                 mode === value
                   ? "bg-[var(--foreground)] text-[var(--background)]"
                   : "text-[var(--secondary)]"
@@ -472,133 +496,241 @@ export default function DayV2Summary({
             </button>
           ))}
         </div>
-        </div>
-        <h1 className="max-w-[26ch] text-[clamp(26px,2.6vw,36px)] font-semibold leading-[1.06] tracking-[-0.02em]">
-          One yield source, split into three risks.
-        </h1>
-        <p className="max-w-[68ch] text-[13.5px] leading-relaxed text-[var(--secondary)]">
-          <strong className="font-semibold text-[var(--foreground)]">
-            {market.identity.marketName}
-          </strong>{" "}
-          earns{" "}
-          <strong className="font-semibold text-[var(--foreground)]">{pct(source)}</strong> a year
-          before it is split.{" "}
-          {deploying
-            ? "Set every parameter a real market takes, then hand the design to the deploy flow."
-            : "Move the terms below and every figure updates."}
-        </p>
-      </header>
+      </div>
 
-      {/* The source, said out loud. It used to be a small label in the corner
-          and readers only worked out the page was about a particular asset when
-          they reached the backtest. */}
-      <section
-        aria-label="Yield source"
-        className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--card)] px-5 py-3.5"
-      >
-        <div className="flex flex-col gap-0.5">
-          <span className="text-[9.5px] font-semibold uppercase tracking-[0.1em] text-[var(--tertiary)]">
-            Modeling
-          </span>
-          <span className="text-[14px] font-semibold">{market.identity.marketName}</span>
-          <span className="text-[11px] text-[var(--tertiary)]">
-            {market.series.length >= 3
-              ? `${market.series.length} dated observations, ${market.series[0].date} to ${market.series[market.series.length - 1].date}`
-              : "Published yield, no dated history"}
-          </span>
+      {/* The hero, and the first half of the input console, side by side at equal
+          width. Reading order is the page's own argument: the left says what the
+          page does and draws the line between what you set and what it answers,
+          and the right is the first thing you set, sitting on `--foundation`
+          because on this page that fill already means "you can move this and the
+          page answers". */}
+      <header className="grid grid-cols-1 items-start gap-5 lg:grid-cols-2">
+        <div className="flex flex-col gap-4">
+          {/* Balanced rather than max-width capped: at 48px a character count
+              that reads well at 1440px strands "risks." on a line of its own at
+              1280px. */}
+          <h1 className="text-balance text-[clamp(30px,3.5vw,48px)] font-semibold leading-[1.02] tracking-[-0.03em]">
+            One yield source, split into three risks.
+          </h1>
+          <p className="max-w-[52ch] text-[14px] leading-relaxed text-[var(--secondary)]">
+            <strong className="font-semibold text-[var(--foreground)]">
+              {market.identity.marketName}
+            </strong>{" "}
+            earns{" "}
+            <strong className="font-semibold text-[var(--foreground)]">{pct(source)}</strong> a
+            year before it is split.{" "}
+            {deploying
+              ? "Set every parameter a real market takes, then hand the design to the deploy flow."
+              : "Nothing on this page is fixed copy: change an input and every figure below is recomputed."}
+          </p>
+          {/* The boundary, stated rather than left to be inferred from styling.
+              Six words each, because a reader who needs this reads it once. */}
+          <dl className="grid grid-cols-1 gap-x-5 gap-y-2.5 border-t border-[var(--border-subtle)] pt-4 sm:grid-cols-2">
+            <div className="flex flex-col gap-0.5">
+              <dt className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--tertiary)]">
+                You set
+              </dt>
+              <dd className="text-[12.5px] leading-snug text-[var(--secondary)]">
+                A yield source, the rate it earns, and how much cover and liquidity
+                stand behind it.
+              </dd>
+            </div>
+            <div className="flex flex-col gap-0.5">
+              <dt className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--tertiary)]">
+                The model answers
+              </dt>
+              <dd className="text-[12.5px] leading-snug text-[var(--secondary)]">
+                What Sr, Jr and SLP each earn, and what each stands to lose.
+              </dd>
+            </div>
+          </dl>
         </div>
 
-        {market.series.length >= 3 ? (
-          <label className="flex items-center gap-2.5">
-            <span className="flex flex-col gap-0.5">
-              <span className="text-[9.5px] font-semibold uppercase tracking-[0.1em] text-[var(--tertiary)]">
-                Its price history
-              </span>
-              <span className="max-w-[34ch] text-[11px] leading-snug text-[var(--tertiary)]">
-                Off, the page is a forward projection at the rate you set and the backtest
-                comes off
-              </span>
-            </span>
-            <span
-              aria-label="Run this source's price history"
-              className="flex items-center gap-0.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--foundation)] p-0.5"
-              role="group"
+        {/* Everything about the source in one box, instead of a select in the
+            corner, the same market name repeated in a card below it, and the
+            import on a third band. The name used to appear three times above the
+            fold and none of the three looked like the control. */}
+        <section
+          aria-labelledby="day-v2-source-heading"
+          className="flex flex-col gap-3.5 rounded-2xl border border-[var(--border-subtle)] bg-[var(--foundation)] px-5 py-4 shadow-[0_6px_22px_-14px_rgba(23,25,31,0.4)]"
+        >
+          <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
+            <h2
+              className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--tertiary)]"
+              id="day-v2-source-heading"
             >
-              {([["Run it", true], ["Ignore", false]] as const).map(([label, value]) => (
-                <button
-                  aria-pressed={useHistory === value}
-                  className={`rounded-md px-2.5 py-1 text-[11.5px] font-semibold ${
-                    useHistory === value
-                      ? "bg-[var(--foreground)] text-[var(--background)]"
-                      : "text-[var(--secondary)]"
-                  }`}
-                  key={label}
-                  onClick={() => setUseHistory(value)}
-                  type="button"
-                >
-                  {label}
-                </button>
+              Input 1 · What you are modeling
+            </h2>
+            {draftMarket ? <Badge tone="caution">unverified import</Badge> : null}
+          </div>
+
+          <label className="flex cursor-pointer flex-col gap-1.5">
+            <span className="text-[11.5px] font-semibold text-[var(--secondary)]">
+              Yield source
+            </span>
+            <select
+              aria-label="Yield source"
+              className="w-full cursor-pointer rounded-xl border border-[var(--border-subtle)] bg-[var(--card)] px-3.5 py-2.5 text-[15px] font-semibold"
+              onChange={(event) => selectMarket(event.target.value)}
+              value={draftMarket ? "__draft" : marketId}
+            >
+              {draftMarket ? (
+                <option value="__draft">{draftMarket.identity.marketName} (imported)</option>
+              ) : null}
+              {markets.map((candidate) => (
+                <option key={candidate.id} value={candidate.id}>
+                  {candidate.identity.marketName}
+                </option>
               ))}
+            </select>
+            {/* Grouped with an explicit locale: the count is rendered on the
+                server too, and a locale-dependent separator would differ
+                between the two and fail hydration. */}
+            <span className="font-mono text-[11px] leading-snug tabular-nums text-[var(--tertiary)]">
+              {market.series.length >= 3
+                ? `${market.series.length.toLocaleString("en-US")} dated observations · ${market.series[0].date} to ${market.series[market.series.length - 1].date}`
+                : "Published yield · no dated history"}
             </span>
           </label>
-        ) : null}
-      </section>
+
+          {market.series.length >= 3 ? (
+            <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-t border-[var(--border-subtle)] pt-3.5">
+              <span className="flex flex-col gap-0.5">
+                <span className="text-[11.5px] font-semibold text-[var(--secondary)]">
+                  Run its price history
+                </span>
+                <span className="max-w-[36ch] text-[10.5px] leading-snug text-[var(--tertiary)]">
+                  Ignored, the page is a forward projection at the rate you set and the
+                  backtest comes off
+                </span>
+              </span>
+              <span
+                aria-label="Run this source's price history"
+                className="flex items-center gap-0.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--card)] p-0.5"
+                role="group"
+              >
+                {([["Run it", true], ["Ignore", false]] as const).map(([label, value]) => (
+                  <button
+                    aria-pressed={useHistory === value}
+                    className={`cursor-pointer rounded-md px-2.5 py-1 text-[11.5px] font-semibold ${
+                      useHistory === value
+                        ? "bg-[var(--foreground)] text-[var(--background)]"
+                        : "text-[var(--secondary)]"
+                    }`}
+                    key={label}
+                    onClick={() => setUseHistory(value)}
+                    type="button"
+                  >
+                    {label}
+                  </button>
+                ))}
+              </span>
+            </div>
+          ) : null}
+
+          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-t border-[var(--border-subtle)] pt-3.5">
+            <span className="text-[11.5px] text-[var(--tertiary)]">
+              {draftMarket
+                ? "Running your own imported history."
+                : "Or run this mechanism over your own dated price history."}
+            </span>
+            <span className="flex items-center gap-3">
+              {draftMarket ? (
+                <button
+                  className="cursor-pointer text-[11.5px] font-semibold text-[var(--tertiary)] underline underline-offset-2"
+                  onClick={() => {
+                    setDraftMarket(null);
+                    setSourceOpen(false);
+                    adoptTerms(selectedMarket);
+                  }}
+                  type="button"
+                >
+                  Remove
+                </button>
+              ) : null}
+              <button
+                aria-expanded={sourceOpen}
+                className="cursor-pointer rounded-lg border border-[var(--border-subtle)] bg-[var(--card)] px-3 py-1.5 text-[11.5px] font-semibold"
+                onClick={() => setSourceOpen((value) => !value)}
+                type="button"
+              >
+                {sourceOpen ? "Close" : draftMarket ? "Replace source" : "Import a source"}
+              </button>
+            </span>
+          </div>
+        </section>
+      </header>
 
       <DayV2Source
-        activeDraft={draftMarket}
-        onClear={() => {
-          setDraftMarket(null);
-          adoptTerms(selectedMarket);
-        }}
         onImport={(next) => {
           setDraftMarket(next);
           adoptTerms(next);
         }}
+        onOpenChange={setSourceOpen}
+        open={sourceOpen}
       />
 
-      {/* Controls first, because this is a simulator: the reader should meet the
-          thing they can change before the numbers it changes. And they stay:
-          stuck to the top, coverage can be moved while reading the backtest or
-          the waterfall, which is the whole point of the page. Only from `sm`,
-          where the three sliders are one row rather than a stack tall enough to
-          swallow a phone screen. */}
+      {/* The other half of the console, and the half that is moved constantly.
+          It carries its own heading now: three unlabelled tracks in a cream bar
+          were the page's real controls and nothing said so. It stays on screen,
+          so coverage can be moved while reading the backtest 2600px down. Only
+          from `sm`, where the three sliders are one row rather than a stack tall
+          enough to swallow a phone screen. */}
       <section
         aria-labelledby="day-v2-terms-heading"
-        className="z-20 grid grid-cols-1 gap-x-6 gap-y-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--foundation)] px-5 py-4 shadow-[0_1px_2px_rgba(23,25,31,0.04)] sm:sticky sm:top-3 sm:grid-cols-3 sm:shadow-[0_6px_20px_-8px_rgba(23,25,31,0.28)]"
+        className="z-20 flex flex-col gap-3 rounded-2xl border border-[var(--border-subtle)] bg-[var(--foundation)] px-4 py-4 shadow-[0_1px_2px_rgba(23,25,31,0.04)] sm:sticky sm:top-3 sm:shadow-[0_8px_24px_-10px_rgba(23,25,31,0.32)]"
       >
-        <h2 className="sr-only" id="day-v2-terms-heading">
-          Terms
-        </h2>
-        <Slider
-          display={pct(sourceApyPct / 100)}
-          label="Source yield"
-          max={30}
-          min={0}
-          note="Before the split"
-          onChange={setSourceApyPct}
-          step={0.1}
-          value={sourceApyPct}
-        />
-        <Slider
-          display={pct(coveragePct / 100)}
-          label="Coverage"
-          max={25}
-          min={0}
-          note="Jr per unit of Sr"
-          onChange={setCoveragePct}
-          step={0.5}
-          value={coveragePct}
-        />
-        <Slider
-          display={pct(liquidityPct / 100)}
-          label="Liquidity"
-          max={25}
-          min={0}
-          note="Pool depth for Sr"
-          onChange={setLiquidityPct}
-          step={0.5}
-          value={liquidityPct}
-        />
+        {/* Adjacent, not pushed to opposite ends of a 1400px bar: they are one
+            sentence and the reader should not have to travel to finish it. */}
+        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 px-1">
+          <h2
+            className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--tertiary)]"
+            id="day-v2-terms-heading"
+          >
+            Input 2 · The terms you set
+          </h2>
+          <p className="text-[11px] text-[var(--tertiary)]">
+            Drag any of the three. Every figure below is recomputed from them.
+          </p>
+        </div>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <Slider
+            display={pct(sourceApyPct / 100)}
+            label="Source yield"
+            max={30}
+            maxLabel="30%"
+            min={0}
+            minLabel="0%"
+            note="before the split"
+            onChange={setSourceApyPct}
+            step={0.1}
+            value={sourceApyPct}
+          />
+          <Slider
+            display={pct(coveragePct / 100)}
+            label="Coverage"
+            max={25}
+            maxLabel="25%"
+            min={0}
+            minLabel="0%"
+            note="Jr per unit of Sr"
+            onChange={setCoveragePct}
+            step={0.5}
+            value={coveragePct}
+          />
+          <Slider
+            display={pct(liquidityPct / 100)}
+            label="Liquidity"
+            max={25}
+            maxLabel="25%"
+            min={0}
+            minLabel="0%"
+            note="pool depth for Sr"
+            onChange={setLiquidityPct}
+            step={0.5}
+            value={liquidityPct}
+          />
+        </div>
       </section>
 
       {deploying ? (
@@ -653,15 +785,21 @@ export default function DayV2Summary({
 
       <DayV2Presets activeId={activePresetId} onSelect={applyPreset} />
 
+      {/* The first thing the inputs answer, and the first thing that is not an
+          input. It was unlabelled, which left no visible line between the cream
+          controls above and the results below. */}
+      <h2
+        className="-mb-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--tertiary)]"
+        id="day-v2-positions-heading"
+      >
+        What each position earns at these terms
+      </h2>
       {/* Three peers, scanned across: identical slots, so the eye compares the
           rate first and reads detail only if it wants to. */}
       <section
         aria-labelledby="day-v2-positions-heading"
         className="grid grid-cols-1 gap-3 md:grid-cols-3"
       >
-        <h2 className="sr-only" id="day-v2-positions-heading">
-          Positions
-        </h2>
         {positions.map((position) => (
           <Card
             className="overflow-hidden px-0"
@@ -741,8 +879,11 @@ export default function DayV2Summary({
       </h2>
       {/* What the terms pay, from two angles: the shape over a year, and the
           split that produces it. Neither needs the full width, and read side by
-          side the reader can check the curve against the table it comes from. */}
-      <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)]">
+          side the reader can check the curve against the table it comes from.
+          Equal columns, like the pair above it and like the hero: one grid used
+          consistently is what makes the page read as a system rather than as a
+          stack of differently proportioned slabs. */}
+      <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-2">
         <Card weight="quiet">
           <CardHeader>
             <CardTitle>Growth over a year</CardTitle>

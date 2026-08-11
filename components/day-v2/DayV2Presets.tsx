@@ -17,11 +17,15 @@ export default function DayV2Presets({
 }) {
   return (
     <section aria-labelledby="day-v2-presets-heading" className="flex flex-col gap-2">
+      {/* The last of the input zone, and still an input: pressing one of these
+          moves the terms above. Its heading matches the two consoles' scale so
+          the reader sees one band of things they set, not three unrelated
+          strips. */}
       <h2
-        className="text-[9.5px] font-semibold uppercase tracking-[0.1em] text-[var(--tertiary)]"
+        className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--tertiary)]"
         id="day-v2-presets-heading"
       >
-        Start from a design, then adjust
+        Or start from a named design, then adjust
       </h2>
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
         {DAY_ISSUER_PRESETS.map((preset) => {

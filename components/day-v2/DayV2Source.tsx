@@ -2,9 +2,7 @@
 
 import { useRef, useState } from "react";
 
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { pct } from "@/components/day-v2/format";
 import { buildDayDraftMarket } from "@/lib/day-simulator-template/explorer-market";
 import type { DayMarket } from "@/lib/day-simulator-template/market";
 import { inferCadence, parseSourceText } from "@/lib/day-simulator-template/source-parser.mjs";
@@ -27,15 +25,14 @@ const errorMessage = (cause: unknown) =>
   cause instanceof Error ? cause.message : "The source could not be imported.";
 
 export default function DayV2Source({
-  activeDraft,
-  onClear,
   onImport,
+  onOpenChange,
+  open,
 }: {
-  activeDraft: DayMarket | null;
-  onClear: () => void;
   onImport: (market: DayMarket) => void;
+  onOpenChange: (open: boolean) => void;
+  open: boolean;
 }) {
-  const [open, setOpen] = useState(false);
   const [url, setUrl] = useState("");
   const [busy, setBusy] = useState<"file" | "url" | null>(null);
   const [error, setError] = useState("");
@@ -47,7 +44,7 @@ export default function DayV2Source({
     const market = buildDayDraftMarket(source);
     onImport(market);
     setError("");
-    setOpen(false);
+    onOpenChange(false);
   };
 
   const importFile = async (file: File) => {
@@ -114,136 +111,88 @@ export default function DayV2Source({
     }
   };
 
-  const series = activeDraft?.series ?? [];
-
-  // Closed, with nothing imported, this section has one thing to offer: a way
-  // in. A full card with a title and a description spent a band of the page
-  // above the fold on a secondary action, so it collapses to a single line
-  // until it actually has something to show.
-  if (!open && !activeDraft) {
-    return (
-      <div
-        className="flex flex-wrap items-center justify-between gap-x-3 gap-y-1.5 rounded-xl border border-dashed border-[var(--border-subtle)] px-4 py-2.5"
-        data-day-v2-section="source"
-      >
-        <span className="text-[12px] text-[var(--secondary)]">
-          Run this mechanism over your own dated price history instead.
-        </span>
-        <button
-          className="text-[12px] font-semibold underline underline-offset-2"
-          onClick={() => setOpen(true)}
-          type="button"
-        >
-          Import a source
-        </button>
-      </div>
-    );
-  }
+  // The console above owns the trigger, the name of whatever is loaded, and the
+  // way back out, so this component is now only the importer itself and renders
+  // nothing until it is asked for. It used to hold a collapsed band of its own,
+  // which put a fourth input-looking box in a top section that already had too
+  // many for anyone to tell which of them were inputs.
+  if (!open) return null;
 
   return (
     <Card data-day-v2-section="source">
+      {/* No dismiss of its own. The console's button is the toggle, sits a
+          hundred pixels above this and already reads "Close" while this is
+          open, and two identical Close buttons that close the same thing is a
+          question the reader should not have to answer. */}
       <CardHeader>
-        <div className="flex items-center justify-between gap-2">
-          <CardTitle>Your own source</CardTitle>
-          <div className="flex items-center gap-2">
-            {activeDraft ? <Badge tone="caution">unverified import</Badge> : null}
-            <button
-              className="rounded-lg border border-[var(--border-subtle)] bg-[var(--card)] px-3 py-1.5 text-[12px] font-semibold"
-              onClick={() => setOpen((value) => !value)}
-              type="button"
-            >
-              {open ? "Close" : activeDraft ? "Replace source" : "Import a source"}
-            </button>
-          </div>
-        </div>
+        <CardTitle>Your own source</CardTitle>
         <CardDescription>
           Run this market&apos;s mechanism over your own dated price history.
         </CardDescription>
       </CardHeader>
 
       <CardContent className="flex flex-col gap-3">
-        {activeDraft ? (
-          <div className="flex flex-wrap items-baseline gap-x-5 gap-y-1.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--foundation)] px-4 py-3">
-            <span className="text-[13px] font-semibold">{activeDraft.identity.marketName}</span>
-            <span className="font-mono text-[11.5px] tabular-nums text-[var(--secondary)]">
-              {series.length} observations, {series[0]?.date} to {series[series.length - 1]?.date}
+        <div className="flex flex-col gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--foundation)] px-4 py-3.5">
+          <label className="flex flex-col gap-1.5">
+            <span className="text-[9.5px] font-semibold uppercase tracking-[0.1em] text-[var(--tertiary)]">
+              Upload a file
             </span>
-            <span className="font-mono text-[11.5px] tabular-nums text-[var(--secondary)]">
-              {pct(activeDraft.defaults.sourceApy)} a year implied
+            <input
+              accept={ACCEPT}
+              className="text-[12px] file:mr-3 file:rounded-md file:border file:border-[var(--border-subtle)] file:bg-[var(--card)] file:px-2.5 file:py-1 file:text-[12px] file:font-semibold"
+              disabled={busy !== null}
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (file) void importFile(file);
+              }}
+              ref={fileRef}
+              type="file"
+            />
+            <span className="text-[10px] leading-snug text-[var(--tertiary)]">
+              CSV, TSV, JSON, or an HTML table, up to 5 MB. It needs a date column and
+              one of NAV, price, close, value, or index. Parsed in your browser, never uploaded.
             </span>
-            <button
-              className="ml-auto text-[11.5px] font-semibold underline underline-offset-2"
-              onClick={onClear}
-              type="button"
-            >
-              Remove
-            </button>
-          </div>
-        ) : null}
+          </label>
 
-        {open ? (
-          <div className="flex flex-col gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--foundation)] px-4 py-3.5">
-            <label className="flex flex-col gap-1.5">
-              <span className="text-[9.5px] font-semibold uppercase tracking-[0.1em] text-[var(--tertiary)]">
-                Upload a file
-              </span>
+          <label className="flex flex-col gap-1.5 border-t border-[var(--border-subtle)] pt-3">
+            <span className="text-[9.5px] font-semibold uppercase tracking-[0.1em] text-[var(--tertiary)]">
+              Or import a public URL
+            </span>
+            <span className="flex flex-wrap gap-2">
               <input
-                accept={ACCEPT}
-                className="text-[12px] file:mr-3 file:rounded-md file:border file:border-[var(--border-subtle)] file:bg-[var(--card)] file:px-2.5 file:py-1 file:text-[12px] file:font-semibold"
+                className="min-w-[240px] flex-1 rounded-md border border-[var(--border-subtle)] bg-[var(--card)] px-2.5 py-1.5 text-[12px]"
                 disabled={busy !== null}
-                onChange={(event) => {
-                  const file = event.target.files?.[0];
-                  if (file) void importFile(file);
+                onChange={(event) => setUrl(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    void importUrl();
+                  }
                 }}
-                ref={fileRef}
-                type="file"
+                placeholder="https://example.com/nav-history.csv"
+                value={url}
               />
-              <span className="text-[10px] leading-snug text-[var(--tertiary)]">
-                CSV, TSV, JSON, or an HTML table, up to 5 MB. It needs a date column and
-                one of NAV, price, close, value, or index. Parsed in your browser, never uploaded.
-              </span>
-            </label>
+              <button
+                className="cursor-pointer rounded-md border border-[var(--foreground)] bg-[var(--foreground)] px-3 py-1.5 text-[12px] font-semibold text-[var(--background)] disabled:opacity-50"
+                disabled={busy !== null}
+                onClick={() => void importUrl()}
+                type="button"
+              >
+                {busy === "url" ? "Importing" : "Import"}
+              </button>
+            </span>
+            <span className="text-[10px] leading-snug text-[var(--tertiary)]">
+              Public http and https only. Private hosts, credentials in the URL, and
+              anything over 5 MB are refused. Google Sheets links are converted for you.
+            </span>
+          </label>
 
-            <label className="flex flex-col gap-1.5 border-t border-[var(--border-subtle)] pt-3">
-              <span className="text-[9.5px] font-semibold uppercase tracking-[0.1em] text-[var(--tertiary)]">
-                Or import a public URL
-              </span>
-              <span className="flex flex-wrap gap-2">
-                <input
-                  className="min-w-[240px] flex-1 rounded-md border border-[var(--border-subtle)] bg-[var(--card)] px-2.5 py-1.5 text-[12px]"
-                  disabled={busy !== null}
-                  onChange={(event) => setUrl(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") {
-                      event.preventDefault();
-                      void importUrl();
-                    }
-                  }}
-                  placeholder="https://example.com/nav-history.csv"
-                  value={url}
-                />
-                <button
-                  className="rounded-md border border-[var(--foreground)] bg-[var(--foreground)] px-3 py-1.5 text-[12px] font-semibold text-[var(--background)] disabled:opacity-50"
-                  disabled={busy !== null}
-                  onClick={() => void importUrl()}
-                  type="button"
-                >
-                  {busy === "url" ? "Importing" : "Import"}
-                </button>
-              </span>
-              <span className="text-[10px] leading-snug text-[var(--tertiary)]">
-                Public http and https only. Private hosts, credentials in the URL, and
-                anything over 5 MB are refused. Google Sheets links are converted for you.
-              </span>
-            </label>
-
-            <p className="text-[10px] leading-snug text-[var(--tertiary)]">
-              Rows without a readable date and a positive price are skipped rather than
-              rejected, so check the observation count above matches what you expected.
-              Percent values are not prices and will not be read.
-            </p>
-          </div>
-        ) : null}
+          <p className="text-[10px] leading-snug text-[var(--tertiary)]">
+            Rows without a readable date and a positive price are skipped rather than
+            rejected, so check the observation count in the console above matches what
+            you expected. Percent values are not prices and will not be read.
+          </p>
+        </div>
 
         {error ? (
           <p

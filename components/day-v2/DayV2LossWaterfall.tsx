@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import DayV2LossChart, { type DayV2LossPoint } from "@/components/day-v2/DayV2LossChart";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { pct, stake100, unitAmount, type DayV2Unit } from "@/components/day-v2/format";
+import { dayV2RangeStyle } from "@/components/day-v2/range";
 import {
   Table,
   TableBody,
@@ -163,6 +164,7 @@ export default function DayV2LossWaterfall({
             min={0}
             onChange={(event) => setRawIndex(Number(event.target.value))}
             step={1}
+            style={dayV2RangeStyle(index, 0, points.length - 1)}
             type="range"
             value={index}
           />

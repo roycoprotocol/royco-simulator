@@ -5,6 +5,7 @@ import { useMemo, useState } from "react";
 import DayV2ExitChart, { type DayV2ExitPoint } from "@/components/day-v2/DayV2ExitChart";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { bps, compactUsd, pct } from "@/components/day-v2/format";
+import { dayV2RangeStyle } from "@/components/day-v2/range";
 import {
   Table,
   TableBody,
@@ -135,6 +136,7 @@ export default function DayV2ExitCost({
             min={0}
             onChange={(event) => setRawIndex(Number(event.target.value))}
             step={1}
+            style={dayV2RangeStyle(index, 0, metrics.curve.length - 1)}
             type="range"
             value={index}
           />
