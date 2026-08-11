@@ -21,6 +21,11 @@ export type DayV2UrlState = {
   maintainCoverage: boolean | null;
   riskSharePct: number | null;
   liqSharePct: number | null;
+  // The rest of both curves. Absent means "as the market ships it".
+  y0Pct: number | null;
+  y100Pct: number | null;
+  liqY0Pct: number | null;
+  liqY100Pct: number | null;
 };
 
 const number = (raw: string | null, min: number, max: number): number | null => {
@@ -47,6 +52,10 @@ export function readDayV2UrlState(search: string): DayV2UrlState {
     // page's own rule, so a link only carries them when they were overridden.
     riskSharePct: number(params.get("jr"), 0, 80),
     liqSharePct: number(params.get("slp"), 0, 80),
+    y0Pct: number(params.get("jr0"), 0, 100),
+    y100Pct: number(params.get("jr100"), 0, 100),
+    liqY0Pct: number(params.get("slp0"), 0, 100),
+    liqY100Pct: number(params.get("slp100"), 0, 100),
   };
 }
 
@@ -61,6 +70,10 @@ export function buildDayV2Query(state: {
   maintainCoverage: boolean;
   riskSharePct: number | null;
   liqSharePct: number | null;
+  y0Pct: number | null;
+  y100Pct: number | null;
+  liqY0Pct: number | null;
+  liqY100Pct: number | null;
 }): string {
   const params = new URLSearchParams();
   params.set("m", state.market);
@@ -73,6 +86,12 @@ export function buildDayV2Query(state: {
   params.set("restore", state.maintainCoverage ? "1" : "0");
   if (state.riskSharePct !== null) params.set("jr", String(round(state.riskSharePct)));
   if (state.liqSharePct !== null) params.set("slp", String(round(state.liqSharePct)));
+  // A curve is four numbers, not one. Carrying only the target anchor dropped
+  // the shape a reader had just set, on a shared link and on the deploy handoff.
+  if (state.y0Pct !== null) params.set("jr0", String(round(state.y0Pct)));
+  if (state.y100Pct !== null) params.set("jr100", String(round(state.y100Pct)));
+  if (state.liqY0Pct !== null) params.set("slp0", String(round(state.liqY0Pct)));
+  if (state.liqY100Pct !== null) params.set("slp100", String(round(state.liqY100Pct)));
   return params.toString();
 }
 

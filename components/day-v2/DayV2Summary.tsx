@@ -127,12 +127,12 @@ export default function DayV2Summary({
   // The other two anchors of the yield-share curve. Null means "as the market
   // ships it", which is what every registry market wants until someone is
   // actually designing a curve.
-  const [y0Override, setY0Override] = useState<number | null>(null);
-  const [y100Override, setY100Override] = useState<number | null>(null);
+  const [y0Override, setY0Override] = useState<number | null>(linked?.y0Pct ?? null);
+  const [y100Override, setY100Override] = useState<number | null>(linked?.y100Pct ?? null);
   // The liquidity side has a curve of its own, keyed on a different
   // utilization. Only its target anchor was ever settable here.
-  const [liqY0Override, setLiqY0Override] = useState<number | null>(null);
-  const [liqY100Override, setLiqY100Override] = useState<number | null>(null);
+  const [liqY0Override, setLiqY0Override] = useState<number | null>(linked?.liqY0Pct ?? null);
+  const [liqY100Override, setLiqY100Override] = useState<number | null>(linked?.liqY100Pct ?? null);
 
   // Switching market adopts that market's own terms, so the sliders describe the
   // market on screen rather than carrying the previous one's numbers over.
@@ -195,12 +195,22 @@ export default function DayV2Summary({
     const coverage = inputs.coveragePct / 100;
     const minLiquidity = inputs.liquidityPct / 100;
     const derived = dayV2EffectiveShares(defaults, coverage, minLiquidity);
-    const riskYieldShare = inputs.riskShareOverride === null
-      ? derived.riskYieldShare
-      : inputs.riskShareOverride / 100;
-    let liquidityYieldShare = inputs.liqShareOverride === null
-      ? derived.liquidityYieldShare
-      : inputs.liqShareOverride / 100;
+    // A requirement of zero pays zero, and that has to hold for a hand-priced
+    // share too. `dayV2EffectiveShares` zeroes the derived path, but the
+    // override bypassed it: at 0% coverage with the Jr share priced by hand,
+    // the engine charged Sr 1.185pp for cover that does not exist and paid it
+    // to nobody, because there is no Jr capital to receive it. Measured on
+    // jbbb: Sr 5.529% correctly zeroed, 4.344% with the leak.
+    const riskYieldShare = coverage <= 0
+      ? 0
+      : inputs.riskShareOverride === null
+        ? derived.riskYieldShare
+        : inputs.riskShareOverride / 100;
+    let liquidityYieldShare = minLiquidity <= 0
+      ? 0
+      : inputs.liqShareOverride === null
+        ? derived.liquidityYieldShare
+        : inputs.liqShareOverride / 100;
     // The engine derives each contract cap as the highest point of its curve and
     // throws INVALID_YIELD_SHARE_CONFIG when the two caps exceed 100% together,
     // which would take the page down on a keystroke. Holding the whole risk
@@ -214,10 +224,10 @@ export default function DayV2Summary({
     const marketRiskCurveMax = Math.max(defaults.riskYDM.y0, defaults.riskYDM.y100);
     const liquidityCeiling = Math.max(0, 1 - marketRiskCurveMax);
     liquidityYieldShare = Math.min(liquidityYieldShare, liquidityCeiling);
-    const liqY0 = inputs.liqY0Override === null
+    const liqY0 = minLiquidity <= 0 ? 0 : inputs.liqY0Override === null
       ? Math.min(defaults.liqYDM.y0, liquidityYieldShare)
       : inputs.liqY0Override / 100;
-    const liqY100 = inputs.liqY100Override === null
+    const liqY100 = minLiquidity <= 0 ? 0 : inputs.liqY100Override === null
       ? Math.max(defaults.liqYDM.y100, liquidityYieldShare)
       : inputs.liqY100Override / 100;
     // Each contract cap is the peak of its own curve, so the peak is what has
@@ -230,10 +240,10 @@ export default function DayV2Summary({
     // own target: the deployment panel already displayed it that way while the
     // engine was handed the raw value, so the two disagreed below about 10%
     // coverage. Set deliberately, the reader's number is respected.
-    const y0 = cap(inputs.y0Override === null
+    const y0 = coverage <= 0 ? 0 : cap(inputs.y0Override === null
       ? Math.min(defaults.riskYDM.y0, riskYieldShare)
       : inputs.y0Override / 100);
-    const y100 = cap(inputs.y100Override === null
+    const y100 = coverage <= 0 ? 0 : cap(inputs.y100Override === null
       ? Math.max(defaults.riskYDM.y100, riskYieldShare)
       : inputs.y100Override / 100);
     return {
@@ -334,6 +344,10 @@ export default function DayV2Summary({
     maintainCoverage,
     riskSharePct: riskShareOverride,
     liqSharePct: liqShareOverride,
+    y0Pct: y0Override,
+    y100Pct: y100Override,
+    liqY0Pct: liqY0Override,
+    liqY100Pct: liqY100Override,
   });
   // replaceState rather than a router push: this fires on every slider tick, and
   // a history entry per pixel of drag would make the back button useless.
