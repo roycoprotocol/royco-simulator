@@ -1,6 +1,6 @@
 "use client";
 
-import { useDeferredValue, useEffect, useMemo, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import DayV2Chart, { type DayV2Point } from "@/components/day-v2/DayV2Chart";
@@ -120,6 +120,51 @@ function Slider({
   );
 }
 
+/**
+ * The same three terms, sized for the bar that takes over once the input panel
+ * has scrolled away. No note, no endpoints and a short label: it exists so a
+ * figure 3000px down can be moved without scrolling back, not to teach anyone
+ * what the control is, which the full panel already did.
+ */
+function CompactSlider({
+  display,
+  label,
+  max,
+  min,
+  onChange,
+  step,
+  value,
+}: {
+  display: string;
+  label: string;
+  max: number;
+  min: number;
+  onChange: (value: number) => void;
+  step: number;
+  value: number;
+}) {
+  return (
+    <label className="flex min-w-0 flex-1 cursor-pointer items-center gap-2.5">
+      <span className="shrink-0 text-[9.5px] font-semibold uppercase tracking-[0.1em] text-[var(--tertiary)]">
+        {label}
+      </span>
+      <input
+        className="day-v2-range"
+        max={max}
+        min={min}
+        onChange={(event) => onChange(Number(event.target.value))}
+        step={step}
+        style={dayV2RangeStyle(value, min, max)}
+        type="range"
+        value={value}
+      />
+      <span className="w-[46px] shrink-0 text-right font-mono text-[13px] font-bold tabular-nums">
+        {display}
+      </span>
+    </label>
+  );
+}
+
 export default function DayV2Summary({
   initialMarket,
   initialState,
@@ -146,9 +191,15 @@ export default function DayV2Summary({
   // An imported source outranks the registry selection while it is loaded, so
   // every section below runs on the reader's own history.
   const [draftMarket, setDraftMarket] = useState<DayMarket | null>(null);
-  // The importer is opened from the source console rather than from a band of
-  // its own, so the state that used to live inside it is lifted here.
+  // The importer is opened from the input panel rather than from a band of its
+  // own, so the state that used to live inside it is lifted here.
   const [sourceOpen, setSourceOpen] = useState(false);
+  // Whether the slim terms bar has taken over. Driven by a sentinel sitting
+  // right below the three sliders rather than by the panel itself: on the deploy
+  // tab the panel runs well past a viewport, so watching the whole thing would
+  // leave the terms off screen and the bar still hidden.
+  const termsEndRef = useRef<HTMLDivElement>(null);
+  const [termsPinned, setTermsPinned] = useState(false);
   const selectedMarket = markets.find((candidate) => candidate.id === marketId) ?? initialMarket;
   const market = draftMarket ?? selectedMarket;
   const defaults = market.defaults;
@@ -402,6 +453,21 @@ export default function DayV2Summary({
     window.history.replaceState(null, "", `${window.location.pathname}?${query}`);
   }, [query]);
 
+  // `isIntersecting` alone would raise the bar when the sentinel is below the
+  // fold too, i.e. before the reader has scrolled at all, so the sign of the
+  // sentinel's own top is what decides it: above the viewport means the terms
+  // are behind you.
+  useEffect(() => {
+    const node = termsEndRef.current;
+    if (!node) return;
+    const observer = new IntersectionObserver(
+      ([entry]) => setTermsPinned(!entry.isIntersecting && entry.boundingClientRect.top < 0),
+      { threshold: 0 },
+    );
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, []);
+
   // Which named design the current terms are, if any. Tracked by comparison
   // rather than by remembering what was last clicked, so moving any slider
   // deselects the preset instead of leaving a stale label on a changed market.
@@ -498,21 +564,18 @@ export default function DayV2Summary({
         </div>
       </div>
 
-      {/* The hero, and the first half of the input console, side by side at equal
-          width. Reading order is the page's own argument: the left says what the
-          page does and draws the line between what you set and what it answers,
-          and the right is the first thing you set, sitting on `--foundation`
-          because on this page that fill already means "you can move this and the
-          page answers". */}
-      <header className="grid grid-cols-1 items-start gap-5 lg:grid-cols-2">
-        <div className="flex flex-col gap-4">
-          {/* Balanced rather than max-width capped: at 48px a character count
-              that reads well at 1440px strands "risks." on a line of its own at
-              1280px. */}
-          <h1 className="text-balance text-[clamp(30px,3.5vw,48px)] font-semibold leading-[1.02] tracking-[-0.03em]">
-            One yield source, split into three risks.
-          </h1>
-          <p className="max-w-[52ch] text-[14px] leading-relaxed text-[var(--secondary)]">
+      {/* The hero. Full width, and deliberately holding nothing you can set:
+          everything that takes an input is in the one panel below it, so the
+          reader never has to work out which band is which. */}
+      <header className="grid grid-cols-1 items-start gap-x-8 gap-y-4 lg:grid-cols-2">
+        {/* Balanced rather than max-width capped: at 48px a character count
+            that reads well at 1440px strands "risks." on a line of its own at
+            1280px. */}
+        <h1 className="text-balance text-[clamp(30px,3.5vw,48px)] font-semibold leading-[1.02] tracking-[-0.03em]">
+          One yield source, split into three risks.
+        </h1>
+        <div className="flex flex-col gap-3 lg:pt-1">
+          <p className="max-w-[56ch] text-[14px] leading-relaxed text-[var(--secondary)]">
             <strong className="font-semibold text-[var(--foreground)]">
               {market.identity.marketName}
             </strong>{" "}
@@ -523,223 +586,196 @@ export default function DayV2Summary({
               ? "Set every parameter a real market takes, then hand the design to the deploy flow."
               : "Nothing on this page is fixed copy: change an input and every figure below is recomputed."}
           </p>
-          {/* The boundary, stated rather than left to be inferred from styling.
-              Six words each, because a reader who needs this reads it once. */}
-          <dl className="grid grid-cols-1 gap-x-5 gap-y-2.5 border-t border-[var(--border-subtle)] pt-4 sm:grid-cols-2">
-            <div className="flex flex-col gap-0.5">
-              <dt className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--tertiary)]">
-                You set
-              </dt>
-              <dd className="text-[12.5px] leading-snug text-[var(--secondary)]">
-                A yield source, the rate it earns, and how much cover and liquidity
-                stand behind it.
-              </dd>
-            </div>
-            <div className="flex flex-col gap-0.5">
-              <dt className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--tertiary)]">
-                The model answers
-              </dt>
-              <dd className="text-[12.5px] leading-snug text-[var(--secondary)]">
-                What Sr, Jr and SLP each earn, and what each stands to lose.
-              </dd>
-            </div>
-          </dl>
-        </div>
-
-        {/* Everything about the source in one box, instead of a select in the
-            corner, the same market name repeated in a card below it, and the
-            import on a third band. The name used to appear three times above the
-            fold and none of the three looked like the control. */}
-        <section
-          aria-labelledby="day-v2-source-heading"
-          className="flex flex-col gap-3.5 rounded-2xl border border-[var(--border-subtle)] bg-[var(--foundation)] px-5 py-4 shadow-[0_6px_22px_-14px_rgba(23,25,31,0.4)]"
-        >
-          <div className="flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-            <h2
-              className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--tertiary)]"
-              id="day-v2-source-heading"
-            >
-              Input 1 · What you are modeling
-            </h2>
-            {draftMarket ? <Badge tone="caution">unverified import</Badge> : null}
-          </div>
-
-          <label className="flex cursor-pointer flex-col gap-1.5">
-            <span className="text-[11.5px] font-semibold text-[var(--secondary)]">
-              Yield source
-            </span>
-            <select
-              aria-label="Yield source"
-              className="w-full cursor-pointer rounded-xl border border-[var(--border-subtle)] bg-[var(--card)] px-3.5 py-2.5 text-[15px] font-semibold"
-              onChange={(event) => selectMarket(event.target.value)}
-              value={draftMarket ? "__draft" : marketId}
-            >
-              {draftMarket ? (
-                <option value="__draft">{draftMarket.identity.marketName} (imported)</option>
-              ) : null}
-              {markets.map((candidate) => (
-                <option key={candidate.id} value={candidate.id}>
-                  {candidate.identity.marketName}
-                </option>
-              ))}
-            </select>
-            {/* Grouped with an explicit locale: the count is rendered on the
-                server too, and a locale-dependent separator would differ
-                between the two and fail hydration. */}
-            <span className="font-mono text-[11px] leading-snug tabular-nums text-[var(--tertiary)]">
-              {market.series.length >= 3
-                ? `${market.series.length.toLocaleString("en-US")} dated observations · ${market.series[0].date} to ${market.series[market.series.length - 1].date}`
-                : "Published yield · no dated history"}
-            </span>
-          </label>
-
-          {market.series.length >= 3 ? (
-            <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-t border-[var(--border-subtle)] pt-3.5">
-              <span className="flex flex-col gap-0.5">
-                <span className="text-[11.5px] font-semibold text-[var(--secondary)]">
-                  Run its price history
-                </span>
-                <span className="max-w-[36ch] text-[10.5px] leading-snug text-[var(--tertiary)]">
-                  Ignored, the page is a forward projection at the rate you set and the
-                  backtest comes off
-                </span>
-              </span>
-              <span
-                aria-label="Run this source's price history"
-                className="flex items-center gap-0.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--card)] p-0.5"
-                role="group"
-              >
-                {([["Run it", true], ["Ignore", false]] as const).map(([label, value]) => (
-                  <button
-                    aria-pressed={useHistory === value}
-                    className={`cursor-pointer rounded-md px-2.5 py-1 text-[11.5px] font-semibold ${
-                      useHistory === value
-                        ? "bg-[var(--foreground)] text-[var(--background)]"
-                        : "text-[var(--secondary)]"
-                    }`}
-                    key={label}
-                    onClick={() => setUseHistory(value)}
-                    type="button"
-                  >
-                    {label}
-                  </button>
-                ))}
-              </span>
-            </div>
-          ) : null}
-
-          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-t border-[var(--border-subtle)] pt-3.5">
-            <span className="text-[11.5px] text-[var(--tertiary)]">
-              {draftMarket
-                ? "Running your own imported history."
-                : "Or run this mechanism over your own dated price history."}
-            </span>
-            <span className="flex items-center gap-3">
-              {draftMarket ? (
-                <button
-                  className="cursor-pointer text-[11.5px] font-semibold text-[var(--tertiary)] underline underline-offset-2"
-                  onClick={() => {
-                    setDraftMarket(null);
-                    setSourceOpen(false);
-                    adoptTerms(selectedMarket);
-                  }}
-                  type="button"
-                >
-                  Remove
-                </button>
-              ) : null}
-              <button
-                aria-expanded={sourceOpen}
-                className="cursor-pointer rounded-lg border border-[var(--border-subtle)] bg-[var(--card)] px-3 py-1.5 text-[11.5px] font-semibold"
-                onClick={() => setSourceOpen((value) => !value)}
-                type="button"
-              >
-                {sourceOpen ? "Close" : draftMarket ? "Replace source" : "Import a source"}
-              </button>
-            </span>
-          </div>
-        </section>
-      </header>
-
-      <DayV2Source
-        onImport={(next) => {
-          setDraftMarket(next);
-          adoptTerms(next);
-        }}
-        onOpenChange={setSourceOpen}
-        open={sourceOpen}
-      />
-
-      {/* The other half of the console, and the half that is moved constantly.
-          It carries its own heading now: three unlabelled tracks in a cream bar
-          were the page's real controls and nothing said so. It stays on screen,
-          so coverage can be moved while reading the backtest 2600px down. Only
-          from `sm`, where the three sliders are one row rather than a stack tall
-          enough to swallow a phone screen. */}
-      <section
-        aria-labelledby="day-v2-terms-heading"
-        className="z-20 flex flex-col gap-3 rounded-2xl border border-[var(--border-subtle)] bg-[var(--foundation)] px-4 py-4 shadow-[0_1px_2px_rgba(23,25,31,0.04)] sm:sticky sm:top-3 sm:shadow-[0_8px_24px_-10px_rgba(23,25,31,0.32)]"
-      >
-        {/* Adjacent, not pushed to opposite ends of a 1400px bar: they are one
-            sentence and the reader should not have to travel to finish it. */}
-        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 px-1">
-          <h2
-            className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--tertiary)]"
-            id="day-v2-terms-heading"
-          >
-            Input 2 · The terms you set
-          </h2>
-          <p className="text-[11px] text-[var(--tertiary)]">
-            Drag any of the three. Every figure below is recomputed from them.
+          {/* The boundary, stated rather than left to be inferred from styling. */}
+          <p className="max-w-[56ch] border-t border-[var(--border-subtle)] pt-3 text-[12.5px] leading-relaxed text-[var(--tertiary)]">
+            <strong className="font-semibold text-[var(--secondary)]">You set</strong> one panel
+            of inputs.{" "}
+            <strong className="font-semibold text-[var(--secondary)]">The model answers</strong>{" "}
+            with what Sr, Jr and SLP each earn, and what each stands to lose.
           </p>
         </div>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <Slider
-            display={pct(sourceApyPct / 100)}
-            label="Source yield"
-            max={30}
-            maxLabel="30%"
-            min={0}
-            minLabel="0%"
-            note="before the split"
-            onChange={setSourceApyPct}
-            step={0.1}
-            value={sourceApyPct}
-          />
-          <Slider
-            display={pct(coveragePct / 100)}
-            label="Coverage"
-            max={25}
-            maxLabel="25%"
-            min={0}
-            minLabel="0%"
-            note="Jr per unit of Sr"
-            onChange={setCoveragePct}
-            step={0.5}
-            value={coveragePct}
-          />
-          <Slider
-            display={pct(liquidityPct / 100)}
-            label="Liquidity"
-            max={25}
-            maxLabel="25%"
-            min={0}
-            minLabel="0%"
-            note="pool depth for Sr"
-            onChange={setLiquidityPct}
-            step={0.5}
-            value={liquidityPct}
-          />
-        </div>
-      </section>
+      </header>
 
-      {deploying ? (
-        <>
-          {/* First, not last. A deployer is here to set these, and they were
-              rendering roughly three thousand pixels below the fold. */}
-          {/* Slider positions come from raw state, never from the deferred
-              model, or the input fights the pointer: the value snaps back to a
-              frame-old number while you are still dragging it. */}
+      {/* One panel. Every input on the page is in here, on both tabs: the
+          source, the three terms, the named designs, and on Deploy the rest of
+          the market's parameters. It used to be five separate bands and a card
+          three thousand pixels down, and a reader had no way to tell which of
+          them the page would answer to. `--foundation` is the fill that already
+          meant "you can move this", so the panel is the boundary: everything in
+          it is an input, everything outside it is an answer. */}
+      <section
+        aria-labelledby="day-v2-inputs-heading"
+        className="flex flex-col gap-4 rounded-2xl border border-[var(--border-subtle)] bg-[var(--foundation)] px-5 py-4 shadow-[0_6px_22px_-14px_rgba(23,25,31,0.4)]"
+      >
+        <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+            <h2
+              className="text-[11px] font-semibold uppercase tracking-[0.14em]"
+              id="day-v2-inputs-heading"
+            >
+              Your inputs
+            </h2>
+            <p className="text-[11px] text-[var(--tertiary)]">
+              Everything outside this panel is computed from what is inside it.
+            </p>
+          </div>
+          {draftMarket ? <Badge tone="caution">unverified import</Badge> : null}
+        </div>
+
+        <div className="grid grid-cols-1 items-start gap-x-6 gap-y-4 lg:grid-cols-2">
+          {/* Left: what is being modelled. */}
+          <div className="flex flex-col gap-3">
+            <label className="flex cursor-pointer flex-col gap-1.5">
+              <span className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--tertiary)]">
+                Yield source
+              </span>
+              <select
+                aria-label="Yield source"
+                className="w-full cursor-pointer rounded-xl border border-[var(--border-subtle)] bg-[var(--card)] px-3.5 py-2.5 text-[15px] font-semibold"
+                onChange={(event) => selectMarket(event.target.value)}
+                value={draftMarket ? "__draft" : marketId}
+              >
+                {draftMarket ? (
+                  <option value="__draft">{draftMarket.identity.marketName} (imported)</option>
+                ) : null}
+                {markets.map((candidate) => (
+                  <option key={candidate.id} value={candidate.id}>
+                    {candidate.identity.marketName}
+                  </option>
+                ))}
+              </select>
+              {/* Grouped with an explicit locale: the count is rendered on the
+                  server too, and a locale-dependent separator would differ
+                  between the two and fail hydration. */}
+              <span className="font-mono text-[11px] leading-snug tabular-nums text-[var(--tertiary)]">
+                {market.series.length >= 3
+                  ? `${market.series.length.toLocaleString("en-US")} dated observations · ${market.series[0].date} to ${market.series[market.series.length - 1].date}`
+                  : "Published yield · no dated history"}
+              </span>
+            </label>
+
+            {market.series.length >= 3 ? (
+              <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--card)] px-3.5 py-2.5">
+                <span className="flex flex-col gap-0.5">
+                  <span className="text-[11.5px] font-semibold">Run its price history</span>
+                  <span className="max-w-[38ch] text-[10.5px] leading-snug text-[var(--tertiary)]">
+                    Ignore it and the page is a pure forward projection at the rate you
+                    set, with no backtest
+                  </span>
+                </span>
+                <span
+                  aria-label="Run this source's price history"
+                  className="flex items-center gap-0.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--foundation)] p-0.5"
+                  role="group"
+                >
+                  {([["Run it", true], ["Ignore", false]] as const).map(([label, value]) => (
+                    <button
+                      aria-pressed={useHistory === value}
+                      className={`cursor-pointer rounded-md px-2.5 py-1 text-[11.5px] font-semibold ${
+                        useHistory === value
+                          ? "bg-[var(--foreground)] text-[var(--background)]"
+                          : "text-[var(--secondary)]"
+                      }`}
+                      key={label}
+                      onClick={() => setUseHistory(value)}
+                      type="button"
+                    >
+                      {label}
+                    </button>
+                  ))}
+                </span>
+              </div>
+            ) : null}
+
+            {/* Said outright, because the import button next to it reads as a
+                prerequisite otherwise. Bringing your own data is the option, not
+                the path: the terms beside this run against whichever source is
+                selected, and against no history at all if you switch it off. */}
+            <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-t border-[var(--border-subtle)] pt-3">
+              <span className="max-w-[46ch] text-[11.5px] leading-snug text-[var(--tertiary)]">
+                {draftMarket
+                  ? "Running your own imported history. Every term beside this still applies to it."
+                  : "You do not need your own data. Pick any source above and set the terms yourself. Import one only if you want the backtest run on your own price history."}
+              </span>
+              <span className="flex shrink-0 items-center gap-3">
+                {draftMarket ? (
+                  <button
+                    className="cursor-pointer text-[11.5px] font-semibold text-[var(--tertiary)] underline underline-offset-2"
+                    onClick={() => {
+                      setDraftMarket(null);
+                      setSourceOpen(false);
+                      adoptTerms(selectedMarket);
+                    }}
+                    type="button"
+                  >
+                    Remove
+                  </button>
+                ) : null}
+                <button
+                  aria-expanded={sourceOpen}
+                  className="cursor-pointer rounded-lg border border-[var(--border-subtle)] bg-[var(--card)] px-3 py-1.5 text-[11.5px] font-semibold"
+                  onClick={() => setSourceOpen((value) => !value)}
+                  type="button"
+                >
+                  {sourceOpen ? "Close" : draftMarket ? "Replace source" : "Import a source"}
+                </button>
+              </span>
+            </div>
+          </div>
+
+          {/* Right: the terms it is split on. Slider positions come from raw
+              state, never from the deferred model, or the input fights the
+              pointer: the value snaps back to a frame-old number while you are
+              still dragging it. */}
+          <div className="flex flex-col gap-2.5">
+            <Slider
+              display={pct(sourceApyPct / 100)}
+              label="Source yield"
+              max={30}
+              maxLabel="30%"
+              min={0}
+              minLabel="0%"
+              note="before the split"
+              onChange={setSourceApyPct}
+              step={0.1}
+              value={sourceApyPct}
+            />
+            <Slider
+              display={pct(coveragePct / 100)}
+              label="Coverage"
+              max={25}
+              maxLabel="25%"
+              min={0}
+              minLabel="0%"
+              note="Jr per unit of Sr"
+              onChange={setCoveragePct}
+              step={0.5}
+              value={coveragePct}
+            />
+            <Slider
+              display={pct(liquidityPct / 100)}
+              label="Liquidity"
+              max={25}
+              maxLabel="25%"
+              min={0}
+              minLabel="0%"
+              note="pool depth for Sr"
+              onChange={setLiquidityPct}
+              step={0.5}
+              value={liquidityPct}
+            />
+          </div>
+        </div>
+
+        {/* Watched, not stuck. The panel is far too tall to pin to the top, so a
+            slim bar takes over once this scrolls away. */}
+        <div aria-hidden="true" ref={termsEndRef} />
+
+        <div className="border-t border-[var(--border-subtle)] pt-4">
+          <DayV2Presets activeId={activePresetId} onSelect={applyPreset} />
+        </div>
+
+        {deploying ? (
           <DayV2Parameters
             bandPct={bandPct}
             ceilingPct={resolved.riskCeiling * 100}
@@ -779,11 +815,62 @@ export default function DayV2Summary({
               || liqY0Override !== null || liqY100Override !== null
             }
           />
+        ) : null}
+      </section>
 
-        </>
-      ) : null}
+      <DayV2Source
+        onImport={(next) => {
+          setDraftMarket(next);
+          adoptTerms(next);
+        }}
+        onOpenChange={setSourceOpen}
+        open={sourceOpen}
+      />
 
-      <DayV2Presets activeId={activePresetId} onSelect={applyPreset} />
+      {/* The three terms, still reachable from anywhere on a 4000px page. The
+          panel above cannot be sticky at 400px tall, let alone 1400 on the
+          deploy tab, and the previous 150px sticky slab covered whatever it was
+          parked over. This appears only once the panel has scrolled past, and
+          drives the same state, so the two can never disagree. Hidden below
+          `sm`, where it would swallow a phone viewport. */}
+      <div
+        className={`fixed inset-x-0 top-0 z-40 hidden border-b border-[var(--border-subtle)] bg-[color-mix(in_srgb,var(--foundation)_92%,transparent)] shadow-[0_6px_20px_-12px_rgba(23,25,31,0.4)] backdrop-blur transition-[opacity,transform] duration-150 sm:block ${
+          termsPinned ? "visible translate-y-0 opacity-100" : "invisible -translate-y-2 opacity-0"
+        }`}
+      >
+        <div className="mx-auto flex w-full max-w-[1440px] items-center gap-4 px-5 py-2 sm:px-8">
+          <span className="hidden max-w-[22ch] shrink-0 truncate text-[11px] font-semibold text-[var(--secondary)] lg:block">
+            {market.identity.marketName}
+          </span>
+          <CompactSlider
+            display={pct(sourceApyPct / 100)}
+            label="Yield"
+            max={30}
+            min={0}
+            onChange={setSourceApyPct}
+            step={0.1}
+            value={sourceApyPct}
+          />
+          <CompactSlider
+            display={pct(coveragePct / 100)}
+            label="Cover"
+            max={25}
+            min={0}
+            onChange={setCoveragePct}
+            step={0.5}
+            value={coveragePct}
+          />
+          <CompactSlider
+            display={pct(liquidityPct / 100)}
+            label="Liq"
+            max={25}
+            min={0}
+            onChange={setLiquidityPct}
+            step={0.5}
+            value={liquidityPct}
+          />
+        </div>
+      </div>
 
       {/* The first thing the inputs answer, and the first thing that is not an
           input. It was unlabelled, which left no visible line between the cream
