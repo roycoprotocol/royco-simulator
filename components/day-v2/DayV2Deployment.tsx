@@ -23,14 +23,21 @@ import type { DaySimulatorDefaults } from "@/lib/day-simulator-template/market";
 // hand, so the file this page writes is the file the flow expects.
 type Field =
   // Set by a control in Market parameters above; moving it changes every figure.
-  | { kind: "live"; label: string; value: string }
+  | { kind: "live"; label: string; value: string; hint?: string }
   // Fixed by the template or the mechanism, not a choice.
-  | { kind: "fixed"; label: string; value: string }
+  | { kind: "fixed"; label: string; value: string; hint?: string }
   // Required at launch, does not move the modeled figures, so it is collected
   // here rather than simulated.
-  | { kind: "declared"; label: string; id: DayDeploymentFieldId; unit?: string; placeholder?: string }
+  | {
+    kind: "declared";
+    label: string;
+    id: DayDeploymentFieldId;
+    unit?: string;
+    placeholder?: string;
+    hint?: string;
+  }
   // The deploy flow reads, probes or computes it and a simulator cannot.
-  | { kind: "flow"; label: string; note: string };
+  | { kind: "flow"; label: string; note: string; hint?: string };
 
 function DayV2Deployment({
   defaults,
@@ -75,45 +82,41 @@ function DayV2Deployment({
   // Verified against royco-rwa-frontend lib/deploy-market/constants.ts
   // (DEPLOY_STEPS). There is deliberately no "Recovery" group: the flow puts
   // the protected exit fields on its coverage step.
+  // What a deployer actually has to decide, and nothing else. The contract
+  // address, chain and token metadata are entered in the deploy flow against a
+  // live chain, so collecting them here is busywork that cannot be validated.
+  // Defaults are the reference values the real pool step ships, so nobody
+  // starts from an empty box (royco-rwa-frontend lib/deploy-market/pool-controls.ts).
   const groups: { title: string; caption: string; fields: Field[] }[] = [
     {
-      title: "Yield source",
-      caption: "The asset being tranched.",
-      fields: [
-        { kind: "live", label: "Market name", value: market.name },
-        { kind: "live", label: "Net underlying APY", value: `${terms.sourceApyPct.toFixed(1)}%` },
-        { kind: "declared", label: "Token contract source", id: "tokenContractSource" },
-        { kind: "declared", label: "Token contract address", id: "tokenContractAddress" },
-        { kind: "declared", label: "Chain", id: "chain" },
-        {
-          kind: "flow",
-          label: "Senior, Junior and Senior LP token names",
-          note: "Suggested from the asset, editable in the flow",
-        },
-      ],
-    },
-    {
-      title: "Pricing",
-      caption: "How the market values the asset. Probed on chain, so none of it can be settled here.",
-      fields: [
-        { kind: "flow", label: "Market denomination", note: "USD, BTC or ETH" },
-        { kind: "flow", label: "Price oracle", note: "Deployed or reused, then validated on chain" },
-        { kind: "flow", label: "Pricing route", note: "Detected from the asset contract" },
-        { kind: "flow", label: "Max time between price updates", note: "Set against the oracle you use" },
-      ],
-    },
-    {
       title: "Coverage and liquidity",
-      caption: "The accountant terms. Every one of these moves the figures above.",
+      caption: "The accountant terms. These move every figure on this page.",
       fields: [
-        { kind: "live", label: "Minimum coverage", value: `${terms.coveragePct.toFixed(1)}%` },
-        { kind: "live", label: "Minimum liquidity", value: `${terms.minLiquidityPct.toFixed(1)}%` },
-        { kind: "live", label: "Observation period", value: `${terms.observationDays} days` },
+        {
+          kind: "live",
+          label: "Minimum coverage",
+          value: `${terms.coveragePct.toFixed(1)}%`,
+          hint: "The Jr capital the market requires per unit of Sr. Coverage utilization is this requirement divided by the Jr actually there.",
+        },
+        {
+          kind: "live",
+          label: "Minimum liquidity",
+          value: `${terms.minLiquidityPct.toFixed(1)}%`,
+          hint: "The pool depth the market requires per unit of Sr, and the base of the SLP premium.",
+        },
+        {
+          kind: "live",
+          label: "Observation period",
+          value: `${terms.observationDays} days`,
+          hint: "How long a loss has to persist before it is finalized against Jr. A fall that recovers inside the window never becomes a realized loss. Capped at about 194 days by the contract's uint24 seconds field.",
+        },
         {
           kind: "declared",
           label: "Observation grace period",
           id: "observationGracePeriod",
           unit: "days",
+          placeholder: "7",
+          hint: "Extra time after the observation period before the loss is finalized. The deploy flow will not let you continue without it whenever coverage is on.",
         },
         {
           kind: "declared",
@@ -121,6 +124,7 @@ function DayV2Deployment({
           id: "protectedExitThreshold",
           placeholder: defaults.exitBufferPct.toFixed(2).replace(/\.00$/, ""),
           unit: "%",
+          hint: "How little coverage may remain before Sr can self-liquidate at a bonus. The flow derives the on-chain utilization multiple from this, so it is entered as a share, never as the raw multiple.",
         },
         {
           kind: "declared",
@@ -128,114 +132,205 @@ function DayV2Deployment({
           id: "selfLiquidationBonus",
           placeholder: (defaults.selfLiquidationBonus * 100).toFixed(0),
           unit: "%",
+          hint: "What Sr is paid on top for self-liquidating once the threshold is crossed. Must be below 100%, and the flow wants it at or under the threshold so the advertised rate is actually payable.",
         },
       ],
     },
     {
       title: "Yield split",
-      caption: "What Junior and Senior LP are paid, and the ceiling on each.",
+      caption: "Set by the two curves above. Shown here so the whole design reads in one place.",
       fields: [
-        { kind: "fixed", label: "Risk pricing model", value: "Static curve" },
         {
           kind: "live",
-          label: "Junior share at 0% utilization (Y0)",
-          value: pct(Math.min(defaults.riskYDM.y0, terms.riskSharePct / 100)),
-        },
-        {
-          kind: "live",
-          label: "Junior share at target (YT)",
+          label: "Jr share at target (YT)",
           value: pct(terms.riskSharePct / 100),
+          hint: "The share of Sr's yield Jr is paid at the 90% target, which is where this page reads the coverage curve.",
         },
         {
           kind: "live",
-          label: "Junior share at 100% utilization (Y100)",
+          label: "SLP share at target",
+          value: pct(terms.liqSharePct / 100),
+          hint: "The share of Sr's yield SLP is paid at the 90% target on the liquidity curve.",
+        },
+        {
+          kind: "live",
+          label: "Jr cap (curve peak)",
           value: pct(terms.y100SharePct / 100),
+          hint: "The contract reads each cap off the highest point of its own curve, and rejects a market whose two caps exceed 100% together.",
         },
-        { kind: "live", label: "Senior LP share at target", value: pct(terms.liqSharePct / 100) },
-        { kind: "fixed", label: "Target utilization", value: "90%" },
-        {
-          kind: "declared",
-          label: "Junior yield share cap",
-          id: "juniorYieldShareCap",
-          placeholder: (Math.max(defaults.riskYDM.y0, defaults.riskYDM.y100) * 100).toFixed(0),
-          unit: "%",
-        },
-        {
-          kind: "declared",
-          label: "Senior LP yield share cap",
-          id: "seniorLpYieldShareCap",
-          placeholder: (Math.max(defaults.liqYDM.y0, defaults.liqYDM.y100) * 100).toFixed(0),
-          unit: "%",
-        },
-        // Adaptive-only. Every registry market runs a static curve, so with a
-        // static model selected there is nothing to declare and showing the row
-        // only adds a permanently blank box to the count.
-        ...(defaults.riskYDM.mode === "adaptive"
-          ? [{
-            kind: "declared" as const,
-            label: "Adaptation speed",
-            id: "adaptationSpeed" as const,
-          }]
-          : []),
+        { kind: "fixed", label: "Target utilization", value: "90%", hint: "Both curves are read here. Fixed by the mechanism." },
       ],
     },
     {
-      title: "Liquidity venue",
-      caption: "The pool Senior exits into. Sized here, deployed with the market.",
+      title: "Exit pool",
+      caption:
+        "The Balancer E-CLP Sr exits into, weighted 90% exit asset to 10% Sr shares at the peg. The band is modeled here, the rest size the pool and travel to the flow.",
       fields: [
-        { kind: "live", label: "Pool band", value: pct(terms.eclpBandWidthPct / 100) },
-        { kind: "declared", label: "Exit asset", id: "exitAsset" },
-        { kind: "declared", label: "Exit asset priced flat", id: "exitAssetStatic", placeholder: "yes / no" },
-        { kind: "declared", label: "Exit liquidity", id: "exitLiquidity", placeholder: "$" },
-        { kind: "declared", label: "NAV update cadence", id: "navUpdateCadence", unit: "days" },
-        { kind: "declared", label: "Redemption delay", id: "redemptionDelay", unit: "days" },
-        { kind: "declared", label: "Restock hurdle", id: "restockHurdle", unit: "bps" },
-        { kind: "declared", label: "Maximum discount", id: "maximumDiscount", unit: "bps" },
-        { kind: "declared", label: "Maximum premium", id: "maximumPremium", unit: "bps" },
-        { kind: "declared", label: "Depth at NAV", id: "depthAtNav" },
+        {
+          kind: "live",
+          label: "Asset yield",
+          value: `${terms.sourceApyPct.toFixed(1)}%`,
+          hint: "What the source pays before the split. The real flow collects this on its pool step as Asset Yield, and it is the base every position's rate is carved out of.",
+        },
+        {
+          kind: "live",
+          label: "Pool band",
+          value: pct(terms.eclpBandWidthPct / 100),
+          hint: "How far the pool price may move from NAV before the stable side is exhausted. This sets the E-CLP's lower price bound directly.",
+        },
+        {
+          kind: "declared",
+          label: "Exit liquidity",
+          id: "exitLiquidity",
+          placeholder: "10,000,000",
+          unit: "$",
+          hint: "Total exit asset funded into the pool. The reference range is $1M to $50M.",
+        },
+        {
+          kind: "declared",
+          label: "Concentration (lambda)",
+          id: "poolLambda",
+          placeholder: "300",
+          hint: "How tightly the E-CLP concentrates liquidity around the peg. Reference range 100 to 1000, default 300. This page's own pool math runs a fixed concentration, so changing it here does not move the figures above.",
+        },
+        {
+          kind: "declared",
+          label: "Maximum discount",
+          id: "maximumDiscount",
+          unit: "bps",
+          placeholder: "200",
+          hint: "The furthest below NAV the pool will quote Sr. Reference range 50 to 500 bps.",
+        },
+        {
+          kind: "declared",
+          label: "Maximum premium",
+          id: "maximumPremium",
+          unit: "bps",
+          placeholder: "50",
+          hint: "The furthest above NAV the pool will quote Sr. Reference range 0 to 50 bps.",
+        },
+        {
+          kind: "declared",
+          label: "Exit asset yield",
+          id: "exitAssetYield",
+          unit: "%",
+          placeholder: "3",
+          hint: "What the stable leg of the pool earns. One of the three inputs behind the SLP rate, alongside trading fees and the Sr leg.",
+        },
+        {
+          kind: "declared",
+          label: "Redemption delay",
+          id: "redemptionDelay",
+          unit: "days",
+          placeholder: "14",
+          hint: "How long a market maker is stuck in the asset's redemption queue. It is what sets the restock hurdle.",
+        },
+        {
+          kind: "declared",
+          label: "Restock hurdle",
+          id: "restockHurdle",
+          unit: "bps",
+          placeholder: "10",
+          hint: "What a market maker must clear before restocking the pool is worth doing. Roughly fee plus gas plus about 0.8 bps per day of redemption delay.",
+        },
+        {
+          kind: "declared",
+          label: "NAV update cadence",
+          id: "navUpdateCadence",
+          unit: "days",
+          placeholder: "30",
+          hint: "How often the asset publishes a new NAV. Keep the oracle's staleness bound looser than this or the market fails shut between routine updates.",
+        },
         {
           kind: "declared",
           label: "Reinvestment slippage tolerance",
           id: "reinvestmentSlippageTolerance",
           unit: "bps",
+          placeholder: "50",
+          hint: "How much slippage the venue will accept when redeploying the liquidity premium. Must be below 100%.",
         },
         { kind: "flow", label: "Swap fee", note: "Template policy, read from the chain" },
+        { kind: "flow", label: "Exit asset", note: "Chosen against a live chain in the flow" },
       ],
     },
     {
       title: "Settlement",
-      caption:
-        "The deposit and withdrawal queues. One set of values, applied to Senior, Junior and Senior LP alike.",
+      caption: "The deposit and withdrawal queues. One set of values for Sr, Jr and SLP alike.",
       fields: [
-        { kind: "fixed", label: "Settlement queues", value: "Always on" },
         {
           kind: "declared",
-          label: "Gate deposits and withdrawals by price updates",
-          id: "gateByPriceUpdates",
-          placeholder: "yes / no",
+          label: "Deposit settlement delay",
+          id: "depositSettlementDelay",
+          unit: "days",
+          placeholder: "1",
+          hint: "How long a deposit waits before it settles.",
         },
-        { kind: "declared", label: "Deposit settlement delay", id: "depositSettlementDelay", unit: "days" },
-        { kind: "declared", label: "Deposit expiry", id: "depositExpiry", unit: "days" },
         {
           kind: "declared",
           label: "Withdrawal settlement delay",
           id: "withdrawalSettlementDelay",
           unit: "days",
+          placeholder: "1",
+          hint: "How long a withdrawal waits. Royco mandates a minimum of 24 hours, the T+1 floor.",
         },
-        { kind: "declared", label: "Withdrawal expiry", id: "withdrawalExpiry", unit: "days" },
+        {
+          kind: "declared",
+          label: "Deposit expiry",
+          id: "depositExpiry",
+          unit: "days",
+          placeholder: "37",
+          hint: "How long an unsettled deposit stays valid. The flow derives this as the longer of the NAV staleness bound and the observation period, plus a week.",
+        },
+        {
+          kind: "declared",
+          label: "Withdrawal expiry",
+          id: "withdrawalExpiry",
+          unit: "days",
+          placeholder: "37",
+          hint: "Same derivation as the deposit expiry.",
+        },
+        {
+          kind: "declared",
+          label: "Gate by price updates",
+          id: "gateByPriceUpdates",
+          placeholder: "yes / no",
+          hint: "Whether deposits and withdrawals only settle against a fresh price.",
+        },
       ],
     },
     {
-      title: "Review and deploy",
-      caption: "Resolved when you get there. Nothing here can be settled in a simulator.",
+      title: "Settled when you deploy",
+      caption:
+        "Entered in the deploy flow against a live chain, so there is nothing useful to decide here.",
       fields: [
-        { kind: "flow", label: "Market ID", note: "Mined so the Senior address sorts below the exit asset" },
-        { kind: "flow", label: "Genesis seed", note: "Funded in the flow, in the exit asset" },
-        { kind: "flow", label: "Predicted addresses", note: "Derived from the mined ID" },
+        { kind: "flow", label: "Asset contract and chain", note: "Validated on chain" },
+        { kind: "flow", label: "Price oracle and route", note: "Detected from the asset" },
+        { kind: "flow", label: "Market denomination", note: "USD, BTC or ETH" },
+        { kind: "flow", label: "Sr, Jr and SLP token names", note: "Suggested from the asset" },
+        { kind: "flow", label: "Market ID and addresses", note: "Mined at the end of the flow" },
+        { kind: "flow", label: "Genesis seed", note: "Funded in the exit asset" },
       ],
     },
   ];
 
+  const isDeclared = (field: Field): field is Extract<Field, { kind: "declared" }> =>
+    field.kind === "declared";
+  // Per group, not per field. A flat list of sixteen labels is a wall, and the
+  // useful question is not "which sixteen" but "where do I go next".
+  const outstanding = groups
+    .map((group) => ({
+      title: group.title,
+      count: group.fields
+        .filter(isDeclared)
+        .filter((field) => field.placeholder === undefined && values[field.id].trim() === "")
+        .length,
+    }))
+    .filter((group) => group.count > 0);
+  const blockingCount = outstanding.reduce((total, group) => total + group.count, 0);
+  const ready = blockingCount === 0;
+  const exportSummary = ready
+    ? "ready to open the flow"
+    : `${blockingCount} still to decide`;
 
   const download = () => {
     const exportedAt = new Date().toISOString();
@@ -275,29 +370,6 @@ function DayV2Deployment({
     URL.revokeObjectURL(url);
   };
 
-  // A raw count of blank boxes is not readiness: it weights a field with a sane
-  // default the same as one with none, so it always reads as blocked and tells
-  // a reader nothing about what to do next. Only the fields with no default can
-  // actually stop a deployment, so only those are named.
-  const isDeclared = (field: Field): field is Extract<Field, { kind: "declared" }> =>
-    field.kind === "declared";
-  // Per group, not per field. A flat list of sixteen labels is a wall, and the
-  // useful question is not "which sixteen" but "where do I go next".
-  const outstanding = groups
-    .map((group) => ({
-      title: group.title,
-      count: group.fields
-        .filter(isDeclared)
-        .filter((field) => field.placeholder === undefined && values[field.id].trim() === "")
-        .length,
-    }))
-    .filter((group) => group.count > 0);
-  const blockingCount = outstanding.reduce((total, group) => total + group.count, 0);
-  const ready = blockingCount === 0;
-  const exportSummary = ready
-    ? "ready to open the flow"
-    : `${blockingCount} still to decide`;
-
   return (
     <Card>
       <CardHeader>
@@ -308,49 +380,18 @@ function DayV2Deployment({
           </Badge>
         </div>
         <CardDescription>
-          Everything a real market is deployed with, grouped and ordered the way the
-          Royco deploy flow asks for it.
+          What to settle before you open the flow. Anything the flow enters against a live
+          chain is listed at the end rather than collected here.
         </CardDescription>
       </CardHeader>
 
       <CardContent className="flex flex-col gap-4">
         <p className="max-w-[72ch] text-[14.5px] leading-relaxed text-[var(--foreground)]">
-          {ready
-            ? "Every parameter without a sensible default now has a value. Take this to the deploy flow."
-            : "These are the parameters a real market is deployed with. The ones already showing a value are set by the controls above or come from the template. The rest are yours to decide, and the flow will ask for them in this order."}
+          These are the decisions the deploy flow will ask you to make. A figure means
+          the controls above already set it. A box is yours, and the greyed number in it
+          is the value Royco&apos;s own flow starts from, so you can take it as read or
+          change it. Hover any label for what it does.
         </p>
-
-        {ready ? null : (
-          <ul className="flex flex-wrap gap-2">
-            {outstanding.map((group) => (
-              <li key={group.title}>
-                <a
-                  className="flex items-center gap-1.5 rounded-lg border border-[color-mix(in_srgb,var(--theme-gold)_45%,transparent)] bg-[color-mix(in_srgb,var(--theme-gold)_12%,transparent)] px-2.5 py-1 text-[11px] font-semibold text-[var(--gold-emphasis)]"
-                  href={`#day-v2-group-${group.title.replace(/\s+/g, "-").toLowerCase()}`}
-                >
-                  {group.title}
-                  <span className="font-mono tabular-nums">{group.count}</span>
-                </a>
-              </li>
-            ))}
-          </ul>
-        )}
-
-        {/* The taxonomy, stated once. Two rendering rules carry it after that: a
-            value the page models is never a text box, and a value it does not
-            model never gets a slider. */}
-        <dl className="grid grid-cols-1 gap-x-6 gap-y-1.5 rounded-xl border border-[var(--border-subtle)] px-4 py-3 text-[10.5px] leading-snug sm:grid-cols-3">
-          {([
-            ["Shown as a value", "Set by a control above. Moving it changes every figure on this page."],
-            ["Shown as a box", "Required at launch. It does not move the figures above, so it is collected rather than simulated."],
-            ["Marked in the flow", "The deploy flow reads or computes it on chain. A simulator cannot settle it."],
-          ] as const).map(([term, detail]) => (
-            <div key={term}>
-              <dt className="font-semibold text-[var(--foreground)]">{term}</dt>
-              <dd className="text-[var(--tertiary)]">{detail}</dd>
-            </div>
-          ))}
-        </dl>
 
         {/* Two explicit columns, not CSS masonry. This list is walked in the
             order the flow asks for it, and column-fill reorders it. */}
@@ -369,7 +410,14 @@ function DayV2Deployment({
               {group.fields.map((field) => (
                 <div className="flex flex-col gap-1" key={field.label}>
                   <span className="flex items-baseline justify-between gap-2">
-                    <span className="text-[11.5px] leading-snug text-[var(--secondary)]">
+                    <span
+                      className={`text-[11.5px] leading-snug text-[var(--secondary)] ${
+                        field.hint
+                          ? "cursor-help decoration-dotted underline-offset-2 [text-decoration-line:underline]"
+                          : ""
+                      }`}
+                      title={field.hint}
+                    >
                       {field.label}
                     </span>
                     {field.kind === "live" || field.kind === "fixed" ? (

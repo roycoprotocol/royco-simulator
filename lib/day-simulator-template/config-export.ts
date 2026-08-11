@@ -37,6 +37,9 @@ export const DAY_DEPLOYMENT_INPUT_IDS = [
   'depositExpiry',
   'withdrawalSettlementDelay',
   'withdrawalExpiry',
+  // Pool sizing the real flow's step 6 collects and the simulator did not.
+  'poolLambda',
+  'exitAssetYield',
 ] as const;
 
 export const DAY_DEPLOYMENT_TERM_IDS = [
@@ -78,6 +81,8 @@ export const EMPTY_DAY_DEPLOYMENT_INPUTS: DayDeploymentInputValues = {
   depositExpiry: '',
   withdrawalSettlementDelay: '',
   withdrawalExpiry: '',
+  poolLambda: '',
+  exitAssetYield: '',
 };
 
 export const EMPTY_DAY_DEPLOYMENT_FIELDS: DayDeploymentFieldValues = {

@@ -92,9 +92,20 @@ function Line({
 export default function DayV2Comparison({
   poolEconomics,
   positions,
+  shares,
   source,
   unit,
 }: {
+  /** How the two premiums were priced, so Simulate can show the derivation it
+   *  has no controls for. */
+  shares: {
+    coveragePct: number;
+    liquidityPct: number;
+    riskSharePct: number;
+    liqSharePct: number;
+    targetUtilization: number;
+    onOpenDeploy: () => void;
+  };
   /** The venue assumptions the pool base rests on, read off the run's config. */
   poolEconomics: { stableYield: number; swapFeeBps: number; turnoverPerYear: number };
   positions: DayV2PositionBreakdown[];
@@ -116,7 +127,31 @@ export default function DayV2Comparison({
           mechanism pays it. Open a row to see the build-up.
         </CardDescription>
       </CardHeader>
-      <CardContent>
+      <CardContent className="flex flex-col gap-3">
+        {/* Simulate has no control for either share, so it has to say where they
+            came from. Otherwise the two premiums are numbers that appear from
+            nowhere and the reader cannot tell whether they were chosen. */}
+        <p className="max-w-[76ch] rounded-lg border border-dashed border-[var(--border-subtle)] px-3.5 py-2.5 text-[11px] leading-relaxed text-[var(--secondary)]">
+          The two premiums are not set by hand here. Each tranche is priced for what it
+          supplies: at {pct(shares.coveragePct / 100)} coverage Jr is paid{" "}
+          <strong className="font-mono font-semibold tabular-nums">
+            {pct(shares.riskSharePct / 100)}
+          </strong>{" "}
+          of Sr&apos;s yield, and at {pct(shares.liquidityPct / 100)} liquidity SLP is paid{" "}
+          <strong className="font-mono font-semibold tabular-nums">
+            {pct(shares.liqSharePct / 100)}
+          </strong>
+          , both read off their own curve at the {pct(shares.targetUtilization)} target.
+          Move coverage or liquidity and the shares move with them.{" "}
+          <button
+            className="font-semibold text-[var(--foreground)] underline underline-offset-2"
+            onClick={shares.onOpenDeploy}
+            type="button"
+          >
+            Set the curves yourself in Deploy
+          </button>
+          .
+        </p>
         <Table>
           <TableHeader>
             <TableRow>

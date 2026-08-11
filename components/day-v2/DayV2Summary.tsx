@@ -101,6 +101,10 @@ export default function DayV2Summary({
   // has decided and now has to set every parameter a real market takes. The two
   // share one model, so the figures never disagree between them.
   const [mode, setMode] = useState<DayV2Mode>(linked?.mode ?? "simulate");
+  // Whether to run this market's real price path at all. Off, the page is a
+  // pure forward projection at the stated rate and says so, instead of showing
+  // a history the reader did not ask for.
+  const [useHistory, setUseHistory] = useState(linked?.useHistory ?? true);
   const deploying = mode === "deploy";
   const [marketId, setMarketId] = useState(initialMarket.id);
   // An imported source outranks the registry selection while it is loaded, so
@@ -348,6 +352,7 @@ export default function DayV2Summary({
     y100Pct: y100Override,
     liqY0Pct: liqY0Override,
     liqY100Pct: liqY100Override,
+    useHistory,
   });
   // replaceState rather than a router push: this fires on every slider tick, and
   // a history entry per pixel of drag would make the back button useless.
@@ -432,7 +437,7 @@ export default function DayV2Summary({
           </span>
           <select
             aria-label="Yield source"
-            className="w-full max-w-[420px] rounded-lg border border-[var(--border-subtle)] bg-[var(--card)] px-3 py-2 text-[13px] font-medium"
+            className="w-full max-w-[460px] rounded-lg border border-[var(--border-subtle)] bg-[var(--card)] px-3 py-2 text-[14px] font-semibold"
             onChange={(event) => selectMarket(event.target.value)}
             value={draftMarket ? "__draft" : marketId}
           >
@@ -471,8 +476,11 @@ export default function DayV2Summary({
         <h1 className="max-w-[26ch] text-[clamp(26px,2.6vw,36px)] font-semibold leading-[1.06] tracking-[-0.02em]">
           One yield source, split into three risks.
         </h1>
-        <p className="max-w-[64ch] text-[13.5px] leading-relaxed text-[var(--secondary)]">
-          This market earns{" "}
+        <p className="max-w-[68ch] text-[13.5px] leading-relaxed text-[var(--secondary)]">
+          <strong className="font-semibold text-[var(--foreground)]">
+            {market.identity.marketName}
+          </strong>{" "}
+          earns{" "}
           <strong className="font-semibold text-[var(--foreground)]">{pct(source)}</strong> a year
           before it is split.{" "}
           {deploying
@@ -480,6 +488,61 @@ export default function DayV2Summary({
             : "Move the terms below and every figure updates."}
         </p>
       </header>
+
+      {/* The source, said out loud. It used to be a small label in the corner
+          and readers only worked out the page was about a particular asset when
+          they reached the backtest. */}
+      <section
+        aria-label="Yield source"
+        className="flex flex-wrap items-center justify-between gap-x-6 gap-y-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--card)] px-5 py-3.5"
+      >
+        <div className="flex flex-col gap-0.5">
+          <span className="text-[9.5px] font-semibold uppercase tracking-[0.1em] text-[var(--tertiary)]">
+            Modeling
+          </span>
+          <span className="text-[14px] font-semibold">{market.identity.marketName}</span>
+          <span className="text-[11px] text-[var(--tertiary)]">
+            {market.series.length >= 3
+              ? `${market.series.length} dated observations, ${market.series[0].date} to ${market.series[market.series.length - 1].date}`
+              : "Published yield, no dated history"}
+          </span>
+        </div>
+
+        {market.series.length >= 3 ? (
+          <label className="flex items-center gap-2.5">
+            <span className="flex flex-col gap-0.5">
+              <span className="text-[9.5px] font-semibold uppercase tracking-[0.1em] text-[var(--tertiary)]">
+                Its price history
+              </span>
+              <span className="max-w-[34ch] text-[11px] leading-snug text-[var(--tertiary)]">
+                Off, the page is a forward projection at the rate you set and the backtest
+                comes off
+              </span>
+            </span>
+            <span
+              aria-label="Run this source's price history"
+              className="flex items-center gap-0.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--foundation)] p-0.5"
+              role="group"
+            >
+              {([["Run it", true], ["Ignore", false]] as const).map(([label, value]) => (
+                <button
+                  aria-pressed={useHistory === value}
+                  className={`rounded-md px-2.5 py-1 text-[11.5px] font-semibold ${
+                    useHistory === value
+                      ? "bg-[var(--foreground)] text-[var(--background)]"
+                      : "text-[var(--secondary)]"
+                  }`}
+                  key={label}
+                  onClick={() => setUseHistory(value)}
+                  type="button"
+                >
+                  {label}
+                </button>
+              ))}
+            </span>
+          </label>
+        ) : null}
+      </section>
 
       <DayV2Source
         activeDraft={draftMarket}
@@ -549,6 +612,7 @@ export default function DayV2Summary({
             bandPct={bandPct}
             ceilingPct={resolved.riskCeiling * 100}
             liqCeilingPct={resolved.liquidityCeiling * 100}
+            sourceApy={source}
             liqY0Pct={liqY0Override ?? resolved.liqY0 * 100}
             liqY100Pct={liqY100Override ?? resolved.liqY100 * 100}
             onLiqY0Pct={setLiqY0Override}
@@ -696,6 +760,14 @@ export default function DayV2Summary({
         <DayV2Comparison
           poolEconomics={model.pool}
           positions={positions as DayV2PositionBreakdown[]}
+          shares={{
+            coveragePct: inputs.coveragePct,
+            liquidityPct: inputs.liquidityPct,
+            riskSharePct: resolved.riskYieldShare * 100,
+            liqSharePct: resolved.liquidityYieldShare * 100,
+            targetUtilization: DAY_TARGET_UTILIZATION,
+            onOpenDeploy: () => setMode("deploy"),
+          }}
           source={source}
           unit={returnUnit}
         />
@@ -707,11 +779,14 @@ export default function DayV2Summary({
       >
         What actually happened
       </h2>
-      {/* Shown in both flows. A deployer needs it more than anyone: the coverage
-          restoration toggle lives in the parameters below, and its single most
-          important consequence, that outside capital funded Sr's result, is
-          disclosed here. Splitting a control from its consequence would hide
-          the thing the control is for. */}
+      {/* Shown in both flows when a history is being run. A deployer needs it
+          more than anyone: the coverage restoration toggle lives in the
+          parameters, and its single most important consequence, that outside
+          capital funded Sr's result, is disclosed here. */}
+      {/* Gated on the reader's choice only. A market with no dated history still
+          renders: the component's own branch explains that the figures are a
+          forward projection, and hiding it made the section vanish silently. */}
+      {useHistory ? (
       <DayV2Backtest
         bandPct={inputs.bandPct}
         coveragePct={inputs.coveragePct}
@@ -724,6 +799,7 @@ export default function DayV2Summary({
         riskSharePct={resolved.riskYieldShare * 100}
         sourceApyPct={inputs.sourceApyPct}
       />
+      ) : null}
 
       {deploying ? (
         <>

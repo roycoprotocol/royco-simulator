@@ -75,7 +75,9 @@ export default function DayV2ExitCost({
           <CardTitle className="text-[17px]">Exit cost and depth</CardTitle>
         </div>
         <CardDescription>
-          How much Sr can sell into the pool, and what leaving early costs.
+          How much Sr can sell into the pool, and what leaving early costs. The venue is a
+          Balancer E-CLP holding 90% exit asset and 10% Sr shares at the peg, so the exit
+          asset is what Sr sells into and the depth below is that side of the pool.
         </CardDescription>
       </CardHeader>
 

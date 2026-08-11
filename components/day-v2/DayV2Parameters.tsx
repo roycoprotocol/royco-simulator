@@ -70,6 +70,7 @@ function DayV2Parameters({
   ceilingPct,
   curveOverridden,
   liqCeilingPct,
+  sourceApy,
   liqY0Pct,
   liqY100Pct,
   onLiqY0Pct,
@@ -99,6 +100,8 @@ function DayV2Parameters({
   curveOverridden: boolean;
   /** What the market's own risk curve leaves for the SLP side. */
   liqCeilingPct: number;
+  /** The source rate, so the curves can quote a share as a rate. */
+  sourceApy: number;
   liqY0Pct: number;
   liqY100Pct: number;
   onLiqY0Pct: (value: number) => void;
@@ -152,7 +155,7 @@ function DayV2Parameters({
           </Field>
 
           <Field
-            hint="Width of the E-CLP pool's price band around NAV"
+            hint="How far the pool price may move from NAV before the Sr side is exhausted. The pool is a Balancer E-CLP weighted 90% exit asset to 10% Sr shares at the peg, and this sets its lower price bound directly."
             label="Pool band"
             value={pct(bandPct / 100)}
           >
@@ -259,6 +262,8 @@ function DayV2Parameters({
                   ))}
                 </div>
                 <DayV2YieldCurve
+                  paidTo={model.paid}
+                  sourceApy={sourceApy}
                   target={curve.targetUtilization}
                   y0={model.curveY0 / 100}
                   y100={model.curveY100 / 100}

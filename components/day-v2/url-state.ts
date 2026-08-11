@@ -26,6 +26,8 @@ export type DayV2UrlState = {
   y100Pct: number | null;
   liqY0Pct: number | null;
   liqY100Pct: number | null;
+  /** Whether the market's real price path is being run at all. */
+  useHistory: boolean | null;
 };
 
 const number = (raw: string | null, min: number, max: number): number | null => {
@@ -56,6 +58,7 @@ export function readDayV2UrlState(search: string): DayV2UrlState {
     y100Pct: number(params.get("jr100"), 0, 100),
     liqY0Pct: number(params.get("slp0"), 0, 100),
     liqY100Pct: number(params.get("slp100"), 0, 100),
+    useHistory: params.get("hist") === "0" ? false : params.get("hist") === "1" ? true : null,
   };
 }
 
@@ -74,6 +77,7 @@ export function buildDayV2Query(state: {
   y100Pct: number | null;
   liqY0Pct: number | null;
   liqY100Pct: number | null;
+  useHistory: boolean;
 }): string {
   const params = new URLSearchParams();
   params.set("m", state.market);
@@ -92,6 +96,7 @@ export function buildDayV2Query(state: {
   if (state.y100Pct !== null) params.set("jr100", String(round(state.y100Pct)));
   if (state.liqY0Pct !== null) params.set("slp0", String(round(state.liqY0Pct)));
   if (state.liqY100Pct !== null) params.set("slp100", String(round(state.liqY100Pct)));
+  if (!state.useHistory) params.set("hist", "0");
   return params.toString();
 }
 

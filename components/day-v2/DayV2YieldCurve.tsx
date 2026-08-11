@@ -24,11 +24,17 @@ import {
  * number that binds and the other two describe what happens either side of it.
  */
 function DayV2YieldCurve({
+  paidTo,
+  sourceApy,
   target,
   y0,
   y100,
   yTarget,
 }: {
+  /** Who the share is paid to, for the tooltip's second line. */
+  paidTo: string;
+  /** The source rate, so a share can be quoted as a rate and not only a share. */
+  sourceApy: number;
   target: number;
   y0: number;
   y100: number;
@@ -78,7 +84,13 @@ function DayV2YieldCurve({
               borderRadius: 8,
               fontSize: 11,
             }}
-            formatter={(value: number) => [`${value.toFixed(1)}% of Sr yield`, "Jr is paid"]}
+            // A share means nothing on its own. Quoted against the source rate
+            // it becomes what it actually is: the yield per dollar of Sr handed
+            // over at that utilization.
+            formatter={(value: number) => [
+              `${value.toFixed(1)}% of Sr's yield, about ${((value / 100) * sourceApy * 100).toFixed(2)}% a year per dollar of Sr`,
+              `${paidTo} is paid`,
+            ]}
             labelFormatter={(value: number) => `At ${value}% utilization`}
           />
           {/* Linear, because the curve genuinely is piecewise-linear between the
