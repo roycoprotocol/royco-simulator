@@ -129,6 +129,10 @@ export default function DayV2Summary({
   // actually designing a curve.
   const [y0Override, setY0Override] = useState<number | null>(null);
   const [y100Override, setY100Override] = useState<number | null>(null);
+  // The liquidity side has a curve of its own, keyed on a different
+  // utilization. Only its target anchor was ever settable here.
+  const [liqY0Override, setLiqY0Override] = useState<number | null>(null);
+  const [liqY100Override, setLiqY100Override] = useState<number | null>(null);
 
   // Switching market adopts that market's own terms, so the sliders describe the
   // market on screen rather than carrying the previous one's numbers over.
@@ -143,6 +147,8 @@ export default function DayV2Summary({
     setLiqShareOverride(null);
     setY0Override(null);
     setY100Override(null);
+    setLiqY0Override(null);
+    setLiqY100Override(null);
   };
 
   // An issuer preset is a complete design, not two slider positions, so it sets
@@ -162,6 +168,8 @@ export default function DayV2Summary({
     setLiqShareOverride(null);
     setY0Override(null);
     setY100Override(null);
+    setLiqY0Override(null);
+    setLiqY100Override(null);
   };
 
   const selectMarket = (nextId: string) => {
@@ -178,7 +186,7 @@ export default function DayV2Summary({
   const inputs = useDeferredValue({
     coveragePct, liquidityPct, sourceApyPct,
     observationDays, bandPct, maintainCoverage, riskShareOverride, liqShareOverride,
-    y0Override, y100Override,
+    y0Override, y100Override, liqY0Override, liqY100Override,
   });
 
   // One place decides what the engine is actually run with, so the panel that
@@ -206,11 +214,15 @@ export default function DayV2Summary({
     const marketRiskCurveMax = Math.max(defaults.riskYDM.y0, defaults.riskYDM.y100);
     const liquidityCeiling = Math.max(0, 1 - marketRiskCurveMax);
     liquidityYieldShare = Math.min(liquidityYieldShare, liquidityCeiling);
-    const maxLiquidityCurve = Math.max(
-      defaults.liqYDM.y0,
-      liquidityYieldShare,
-      defaults.liqYDM.y100,
-    );
+    const liqY0 = inputs.liqY0Override === null
+      ? Math.min(defaults.liqYDM.y0, liquidityYieldShare)
+      : inputs.liqY0Override / 100;
+    const liqY100 = inputs.liqY100Override === null
+      ? Math.max(defaults.liqYDM.y100, liquidityYieldShare)
+      : inputs.liqY100Override / 100;
+    // Each contract cap is the peak of its own curve, so the peak is what has
+    // to clear the shared 100% budget, not the target anchor.
+    const maxLiquidityCurve = Math.max(liqY0, liquidityYieldShare, liqY100);
     const riskCeiling = Math.max(0, 1 - maxLiquidityCurve);
     const cap = (value: number) => Math.min(value, riskCeiling);
     // The static curve runs through (0% -> y0, 90% -> yTarget, 100% -> y100).
@@ -232,6 +244,8 @@ export default function DayV2Summary({
       liquidityYieldShare,
       y0,
       y100,
+      liqY0: Math.min(liqY0, liquidityCeiling),
+      liqY100: Math.min(liqY100, liquidityCeiling),
       riskCeiling,
       liquidityCeiling,
     };
@@ -253,7 +267,12 @@ export default function DayV2Summary({
         yTarget: resolved.riskYieldShare,
         y100: resolved.y100,
       },
-      liqYDM: { ...defaults.liqYDM, yTarget: resolved.liquidityYieldShare },
+      liqYDM: {
+        ...defaults.liqYDM,
+        y0: resolved.liqY0,
+        yTarget: resolved.liquidityYieldShare,
+        y100: resolved.liqY100,
+      },
     };
     // The same terms `runDayTargetScenario` assembles for itself. Building them
     // once here means the rates and the loss waterfall are two readings of one
@@ -516,6 +535,10 @@ export default function DayV2Summary({
             bandPct={bandPct}
             ceilingPct={resolved.riskCeiling * 100}
             liqCeilingPct={resolved.liquidityCeiling * 100}
+            liqY0Pct={liqY0Override ?? resolved.liqY0 * 100}
+            liqY100Pct={liqY100Override ?? resolved.liqY100 * 100}
+            onLiqY0Pct={setLiqY0Override}
+            onLiqY100Pct={setLiqY100Override}
             derivedLiqSharePct={resolved.derived.liquidityYieldShare * 100}
             derivedRiskSharePct={resolved.derived.riskYieldShare * 100}
             liqSharePct={liqShareOverride ?? liveDerived.liquidityYieldShare * 100}
@@ -529,6 +552,8 @@ export default function DayV2Summary({
               setLiqShareOverride(null);
               setY0Override(null);
               setY100Override(null);
+              setLiqY0Override(null);
+              setLiqY100Override(null);
             }}
             onRiskSharePct={setRiskShareOverride}
             onY0Pct={setY0Override}
@@ -541,6 +566,7 @@ export default function DayV2Summary({
             curveOverridden={
               riskShareOverride !== null || liqShareOverride !== null
               || y0Override !== null || y100Override !== null
+              || liqY0Override !== null || liqY100Override !== null
             }
           />
 
