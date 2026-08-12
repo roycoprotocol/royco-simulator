@@ -19,6 +19,7 @@ if (head !== lock.commit) {
 const harnessSource = path.join(root, "lib/day/engine/harness/DayVectorGen.t.sol");
 const harnessTarget = path.join(repo, "test/vectors/DayVectorGen.t.sol");
 const outputDir = path.join(repo, "output");
+const coreRawPath = path.join(outputDir, "day-core-vectors.raw.json");
 const rawPath = path.join(outputDir, "day-solidity-vectors.raw.json");
 mkdirSync(path.dirname(harnessTarget), { recursive: true });
 mkdirSync(outputDir, { recursive: true });
@@ -32,7 +33,14 @@ try {
   );
   if (forge.status !== 0) throw new Error(`Foundry vector generation failed with exit ${forge.status}`);
 
+  const coreVectors = JSON.parse(readFileSync(coreRawPath, "utf8"));
   const vectors = JSON.parse(readFileSync(rawPath, "utf8"));
+  if (coreVectors.length !== 52) {
+    throw new Error(`expected 52 core vectors, generated ${coreVectors.length}`);
+  }
+  if (vectors.length !== 22) {
+    throw new Error(`expected 22 extended vectors, generated ${vectors.length}`);
+  }
   const requiredGroups = [
     "liquidity-utilization",
     "rounding-boundaries",
@@ -51,22 +59,32 @@ try {
   }
 
   const harnessSha256 = createHash("sha256").update(readFileSync(harnessSource)).digest("hex");
+  const provenance = {
+    repository: lock.repository,
+    commit: lock.commit,
+    solc: lock.solc,
+    harness: "lib/day/engine/harness/DayVectorGen.t.sol",
+    harnessSha256,
+    generator: "scripts/day-simulator/generate-day-vectors.mjs",
+  };
+  const coreBundle = {
+    schemaVersion: lock.schemaVersion,
+    provenance,
+    requiredGroups: ["A", "B", "C", "D", "E"],
+    vectors: coreVectors,
+  };
   const bundle = {
     schemaVersion: lock.schemaVersion,
-    provenance: {
-      repository: lock.repository,
-      commit: lock.commit,
-      solc: lock.solc,
-      harness: "lib/day/engine/harness/DayVectorGen.t.sol",
-      harnessSha256,
-      generator: "scripts/day-simulator/generate-day-vectors.mjs",
-    },
+    provenance,
     requiredGroups,
     vectors,
   };
+  const coreTarget = path.join(root, "lib/day/engine/vectors/core.golden.json");
   const target = path.join(root, "lib/day/engine/vectors/golden.json");
+  writeFileSync(coreTarget, `${JSON.stringify(coreBundle, null, 2)}\n`);
   writeFileSync(target, `${JSON.stringify(bundle, null, 2)}\n`);
-  console.log(`Wrote ${vectors.length} pinned Day Solidity vectors to ${target}`);
+  console.log(`Wrote ${coreVectors.length} core vectors to ${coreTarget}`);
+  console.log(`Wrote ${vectors.length} extended vectors to ${target}`);
 } finally {
   rmSync(harnessTarget, { force: true });
 }

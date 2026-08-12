@@ -49,6 +49,7 @@ export default function DayV2ExitCost({
     stableYield: number;
     swapFeeBps: number;
     turnoverPerYear: number;
+    seniorWeight: number;
   };
   metrics: DayExplainerMetrics["liquidity"];
   unit: DayV2Unit;
@@ -122,7 +123,8 @@ export default function DayV2ExitCost({
           <DayV2DocsLink label="SLP Mechanics" topic="slpTranche" />
         </div>
         <CardDescription>
-          One-trade SLP capacity in a 90/10 Balancer E-CLP (λ
+          One-trade SLP capacity in a {pct(1 - assumptions.seniorWeight)}/
+          {pct(assumptions.seniorWeight)} exit/Sr Balancer E-CLP (λ
           {assumptions.concentration}) with a {pct(assumptions.bandPct / 100)}{" "}
           maximum discount and a {assumptions.swapFeeBps} bps pool swap fee.
         </CardDescription>
@@ -140,7 +142,7 @@ export default function DayV2ExitCost({
               </strong>{" "}
               ({pct(metrics.boundarySellShareOfSenior)} of Sr). Draining the SLP
               costs {bps(metrics.boundaryQuote.slippage)}; depth runs out before
-              the {pct(metrics.arbitrageReference)} maximum discount.
+              the {pct(metrics.arbitrageReference)} average-discount reference.
             </>
           ) : (
             <>
@@ -148,9 +150,9 @@ export default function DayV2ExitCost({
               <strong className="font-mono text-[16px] font-bold tracking-[-0.01em] tabular-nums">
                 {amount(metrics.referenceSellNAV)}
               </strong>{" "}
-              ({pct(metrics.referenceSellShareOfSenior)} of Sr) before the{" "}
-              {pct(metrics.arbitrageReference)} maximum discount. Full SLP depth
-              is {amount(metrics.boundarySellNAV)}.
+              ({pct(metrics.referenceSellShareOfSenior)} of Sr) before reaching{" "}
+              {pct(metrics.arbitrageReference)} average execution discount. Full
+              SLP depth is {amount(metrics.boundarySellNAV)}.
             </>
           )}
         </p>
@@ -281,10 +283,11 @@ export default function DayV2ExitCost({
                 Capacity may reset
               </span>
               <p className="text-[11.5px] leading-relaxed text-[var(--foreground)]">
-                Each quote is one sale into a pool at rest. At the{" "}
-                {pct(metrics.arbitrageReference)} maximum discount, arbitrage
-                may replenish capacity before another sale; timing and price are
-                not guaranteed.
+                Each quote is one sale into a pool at rest. As price moves away
+                from NAV—up to the configured{" "}
+                {pct(assumptions.bandPct / 100)} boundary—arbitrage may
+                replenish capacity before another sale; timing and price are not
+                guaranteed.
               </p>
             </div>
           </>

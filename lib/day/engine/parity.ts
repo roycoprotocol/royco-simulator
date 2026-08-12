@@ -20,7 +20,7 @@ import {
 } from './engine';
 import { defaultConfig } from './runner';
 import type { LiveState, MarketConfig } from './types';
-import { UINT256_MAX, WAD } from './wad';
+import { mulDiv, Rounding, saturatingSub, UINT256_MAX, WAD } from './wad';
 
 interface Vector {
   group: string;
@@ -36,10 +36,24 @@ interface Vector {
   };
 }
 
+interface CoreBundle {
+  schemaVersion: number;
+  provenance: {
+    repository: string;
+    commit: string;
+    solc: string;
+    harness: string;
+    harnessSha256: string;
+    generator: string;
+  };
+  requiredGroups: string[];
+  vectors: Vector[];
+}
+
 const here = dirname(fileURLToPath(import.meta.url));
-const vectors: Vector[] = JSON.parse(
-  readFileSync(join(here, '../../try/vectors.golden.json'), 'utf8'),
-);
+const corePath = join(here, 'vectors/core.golden.json');
+const core = JSON.parse(readFileSync(corePath, 'utf8')) as CoreBundle;
+const vectors = core.vectors;
 const byLabel = new Map(vectors.map((vector) => [vector.label, vector]));
 const rows: Array<{ group: string; label: string; failures: string[] }> = [];
 
@@ -208,12 +222,19 @@ const lock = JSON.parse(readFileSync(join(here, 'vectors/contract-lock.json'), '
   schemaVersion: number;
 };
 const extended = JSON.parse(readFileSync(extendedPath, 'utf8')) as ExtendedBundle;
+if (core.schemaVersion !== lock.schemaVersion) throw new Error('Day core Solidity vector schema version does not match the contract lock');
 if (extended.schemaVersion !== lock.schemaVersion) throw new Error('Day Solidity vector schema version does not match the contract lock');
+if (core.provenance.commit !== lock.commit) throw new Error('Day core Solidity vectors were not generated from the pinned royco-day commit');
 if (extended.provenance.commit !== lock.commit) throw new Error('Day Solidity vectors were not generated from the pinned royco-day commit');
 const harnessHash = createHash('sha256')
   .update(readFileSync(join(here, 'harness/DayVectorGen.t.sol')))
   .digest('hex');
+if (harnessHash !== core.provenance.harnessSha256) throw new Error('Day core Solidity vector harness hash does not match provenance');
 if (harnessHash !== extended.provenance.harnessSha256) throw new Error('Day Solidity vector harness hash does not match provenance');
+const coreGroups = new Set(core.vectors.map((vector) => vector.group));
+for (const group of core.requiredGroups) {
+  if (!coreGroups.has(group)) throw new Error(`missing required Day core Solidity vector group: ${group}`);
+}
 const extendedGroups = new Set(extended.vectors.map((vector) => vector.group));
 for (const group of extended.requiredGroups) {
   if (!extendedGroups.has(group)) throw new Error(`missing required Day Solidity vector group: ${group}`);
@@ -223,11 +244,6 @@ const bigintField = (fields: ExtendedFields, name: string): bigint => {
   const value = fields[name];
   if (typeof value !== 'string' || !/^\d+$/.test(value)) throw new Error(`${name} must be an unsigned decimal string`);
   return BigInt(value);
-};
-const boolField = (fields: ExtendedFields, name: string): boolean => {
-  const value = fields[name];
-  if (typeof value !== 'boolean') throw new Error(`${name} must be boolean`);
-  return value;
 };
 const compareExtended = (vector: ExtendedVector, actual: Record<string, bigint | string | boolean>) => {
   const failures: string[] = [];
@@ -261,10 +277,13 @@ for (const vector of extended.vectors) {
       ),
     });
   } else if (vector.kind === 'feePremiumShares') {
-    const retained = bigintField(vector.inputs, 'stEffective') - bigintField(vector.inputs, 'premium') - bigintField(vector.inputs, 'fee');
+    const premium = bigintField(vector.inputs, 'premium');
+    const stFee = bigintField(vector.inputs, 'stFee');
+    const lptFee = bigintField(vector.inputs, 'lptFee');
+    const retained = bigintField(vector.inputs, 'stEffective') - premium - stFee;
     const supply = bigintField(vector.inputs, 'supply');
-    const premiumShares = sharesForValueWad(bigintField(vector.inputs, 'premium'), retained, supply);
-    const feeShares = sharesForValueWad(bigintField(vector.inputs, 'fee'), retained, supply);
+    const premiumShares = sharesForValueWad(saturatingSub(premium, lptFee), retained, supply);
+    const feeShares = sharesForValueWad(stFee + lptFee, retained, supply);
     compareExtended(vector, { premiumShares, feeShares, supplyAfter: supply + premiumShares + feeShares });
   } else if (vector.kind === 'accountantSync') {
     const fee = (name: string) => vector.inputs[name] === undefined ? 100000000000000000n : bigintField(vector.inputs, name);
@@ -306,6 +325,31 @@ for (const vector of extended.vectors) {
     });
   } else if (vector.kind === 'ltCommit') {
     compareExtended(vector, { lastLTRawNAV: bigintField(vector.inputs, 'ltRaw') });
+  } else if (vector.kind === 'maxSTDeposit') {
+    const collateral = bigintField(vector.inputs, 'collateral');
+    const stEffective = bigintField(vector.inputs, 'stEffective');
+    const jtEffective = bigintField(vector.inputs, 'jtEffective');
+    const lptRaw = bigintField(vector.inputs, 'lptRaw');
+    const minCoverageWAD = bigintField(vector.inputs, 'minCoverageWAD');
+    const minLiquidityWAD = bigintField(vector.inputs, 'minLiquidityWAD');
+    const dust = bigintField(vector.inputs, 'dust');
+    const coverageBound = minCoverageWAD === 0n
+      ? UINT256_MAX
+      : saturatingSub(mulDiv(jtEffective, WAD, minCoverageWAD), collateral + dust);
+    const liquidityBound = minLiquidityWAD === 0n
+      ? UINT256_MAX
+      : saturatingSub(mulDiv(lptRaw, WAD, minLiquidityWAD), stEffective + dust);
+    compareExtended(vector, { max: coverageBound < liquidityBound ? coverageBound : liquidityBound });
+  } else if (vector.kind === 'maxLPTWithdrawal') {
+    const lptRaw = bigintField(vector.inputs, 'lptRaw');
+    const minLiquidityWAD = bigintField(vector.inputs, 'minLiquidityWAD');
+    const required = mulDiv(
+      bigintField(vector.inputs, 'stEffective') + bigintField(vector.inputs, 'dust'),
+      minLiquidityWAD,
+      WAD,
+      Rounding.Ceil,
+    );
+    compareExtended(vector, { max: saturatingSub(lptRaw, required) });
   } else if (vector.kind === 'postOp' || vector.kind === 'postOpRevert') {
     const seedST = bigintField(vector.inputs, 'seedST');
     const seedJT = bigintField(vector.inputs, 'seedJT');
@@ -314,7 +358,7 @@ for (const vector of extended.vectors) {
     try {
       const actual = postOpAccountingWad(
         { stRawNAV: seedST, jtRawNAV: seedJT, stEffectiveNAV: seedST, jtEffectiveNAV: seedJT, jtImpermanentLoss: 0n },
-        { beta: 1, coverage: 0.1, minLiquidity: 0.05 },
+        { beta: 1, coverage: 0.1, minLiquidity: 0.05, liquidationUtilization: 1.1 },
         {
           operation,
           stRaw: bigintField(vector.inputs, 'stRaw'),
@@ -341,7 +385,7 @@ for (const vector of extended.vectors) {
       const message = error instanceof Error ? error.message : String(error);
       compareExtended(vector, { reverted: true, selector: selectorByError[message] ?? 0n });
     }
-  } else if (vector.kind === 'reinvestment') {
+  } else if (vector.kind === 'premiumStaging') {
     const stEffective = bigintField(vector.inputs, 'stEffective');
     const premium = bigintField(vector.inputs, 'premium');
     const stFee = bigintField(vector.inputs, 'stFee');
@@ -350,39 +394,35 @@ for (const vector of extended.vectors) {
     const stSupply = bigintField(vector.inputs, 'stSupply');
     const jtSupply = bigintField(vector.inputs, 'jtSupply');
     const ltSupply = bigintField(vector.inputs, 'ltSupply');
-    const premiumShares = sharesForValueWad(premium, stEffective - premium - stFee, stSupply);
-    const stFeeShares = sharesForValueWad(stFee, stEffective - premium - stFee, stSupply);
+    const premiumShares = sharesForValueWad(saturatingSub(premium, ltFee), stEffective - premium - stFee, stSupply);
+    const stFeeShares = sharesForValueWad(stFee + ltFee, stEffective - premium - stFee, stSupply);
     const stSupplyAfter = stSupply + premiumShares + stFeeShares;
     const jtFeeShares = sharesForValueWad(jtFee, bigintField(vector.inputs, 'jtEffective') - jtFee, jtSupply);
-    const success = boolField(vector.inputs, 'success');
-    const idlePremiumShares = success ? 0n : premiumShares;
-    const idleValue = idlePremiumShares * stEffective / stSupplyAfter;
-    const ltEffective = bigintField(vector.inputs, 'ltRaw') + idleValue;
-    const ltFeeShares = sharesForValueWad(ltFee, ltEffective - ltFee, ltSupply);
     compareExtended(vector, {
       stSupplyAfter,
       jtSupplyAfter: jtSupply + jtFeeShares,
-      ltSupplyAfter: ltSupply + ltFeeShares,
+      ltSupplyAfter: ltSupply,
       premiumShares,
       stFeeShares,
       jtFeeShares,
-      ltFeeShares,
-      idlePremiumShares,
+      ltFeeShares: 0n,
+      idlePremiumShares: premiumShares,
     });
   } else if (vector.kind === 'selfLiquidation') {
-    compareExtended(vector, selfLiquidationClaimWad({
+    const result = selfLiquidationClaimWad({
       bonusWAD: bigintField(vector.inputs, 'bonusWAD'),
-      stRaw: bigintField(vector.inputs, 'stRaw'),
-      jtRaw: bigintField(vector.inputs, 'jtRaw'),
       stEffective: bigintField(vector.inputs, 'stEffective'),
       jtEffective: bigintField(vector.inputs, 'jtEffective'),
       coverageUtilWAD: bigintField(vector.inputs, 'coverageUtilWAD'),
       liquidationUtilWAD: bigintField(vector.inputs, 'liquidationUtilWAD'),
-      jtCoinvested: boolField(vector.inputs, 'jtCoinvested'),
-      claimST: bigintField(vector.inputs, 'claimST'),
-      claimJT: bigintField(vector.inputs, 'claimJT'),
+      claimCollateral: bigintField(vector.inputs, 'claimCollateral'),
       claimNAV: bigintField(vector.inputs, 'claimNAV'),
-    }));
+    });
+    compareExtended(vector, {
+      bonus: result.bonus,
+      claimCollateral: result.claimCollateral,
+      claimNAV: result.claimNAV,
+    });
   } else {
     throw new Error(`unsupported Day Solidity vector kind: ${vector.kind}`);
   }

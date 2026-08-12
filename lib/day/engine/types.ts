@@ -37,10 +37,13 @@ export interface YDMConfig {
 export interface MarketConfig {
   // ---- Dawn coverage parameters (RoycoAccountant) ----
   coverage: number; // COV  in [0.01, 1)            -> min senior protection
-  beta: number; // β    in [0, 1]               -> JT correlation to ST loss
+  /** @deprecated Current Royco Day uses one coinvested collateral NAV. Kept so
+   * older callers can load, but contract accounting always treats it as 1. */
+  beta: number;
   targetUtilization: number; // U*  (kink), default 0.90    -> TARGET_UTILIZATION_WAD
   liquidationUtilization: number; // > 1.0           -> liquidationUtilizationWAD
   fixedTermDurationSec: number; // 0 => permanently perpetual
+  fixedTermGracePeriodSec: number; // deployment-age lockout before a term can begin
 
   // ---- Protocol fees (taken from yield; 0 in fixed term) ----
   stProtocolFee: number; // on ST kept yield
@@ -80,8 +83,9 @@ export interface MarketConfig {
   dustTolerance: number; // NAV dust (abs) treated as zero
 }
 
-// The liquidity-tranche pool (E-CLP BPT: ~10% ST shares / 90% T-bill stable).
-// Modeled by value, not by curve mechanics: the pool earns swap fees (fee × volume)
+// The liquidity-tranche pool (E-CLP BPT: ST shares / quote asset). Its starting
+// composition is read from the configured E-CLP at the 1.0 mark.
+// Modeled by value: the pool earns swap fees (fee × volume)
 // plus the T-bill rate on its stable leg plus net senior yield on its ST-share leg.
 export interface PoolState {
   stShares: bigint; // WAD ST shares held in the pool
@@ -170,7 +174,7 @@ export interface Snapshot {
   stIL: number;
   jtIL: number;
   // health
-  coverageRequiredNAV: number; // ceil(COV * (stRaw + beta * jtRaw))
+  coverageRequiredNAV: number; // ceil(COV * total collateral NAV)
   liquidityRequiredNAV: number; // ceil(MIN_LIQUIDITY * stEffective)
   utilization: number;
   liquidityUtilization: number;

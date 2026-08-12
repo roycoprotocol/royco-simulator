@@ -1,3 +1,4 @@
+import type { EclpParams } from "@/lib/day/engine/eclp";
 import type { YDMConfig } from "@/lib/day/engine/types";
 
 export type DaySimulatorDefaults = {
@@ -6,6 +7,7 @@ export type DaySimulatorDefaults = {
   minLiquidity: number;
   liquidationUtilization: number;
   observationDays: number;
+  fixedTermGracePeriodDays?: number;
   exitBufferPct: number;
   linkJuniorToFirstLoss: boolean;
   maintainCoverage: boolean;
@@ -20,6 +22,10 @@ export type DaySimulatorDefaults = {
   swapFeeBps: number;
   poolTurnoverPerYear: number;
   eclpBandWidth: number;
+  eclpParams?: EclpParams;
+  maxJTYieldShare?: number;
+  maxLTYieldShare?: number;
+  dustTolerance?: number;
   reinvestLiquidityPremium: boolean;
   initialST: number;
   initialJT: number;

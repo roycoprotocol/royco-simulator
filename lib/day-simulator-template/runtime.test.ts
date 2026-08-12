@@ -215,14 +215,15 @@ assert.equal(
 
 const initial = buildDayInitialBalances(market.defaults, terms);
 assert.equal(initial.st, 1000);
-assert.ok(Math.abs(initial.jt - 58.82352941176471) < 1e-12);
+assert.ok(Math.abs(initial.jt - 34.48275862068966) < 1e-12);
 assert.ok(Math.abs(initial.lt - 111.11111111111111) < 1e-12);
 
 const config = buildDayMarketConfig(market.defaults, terms);
 assert.equal(config.targetUtilization, 0.9);
 assert.equal(config.liqTargetUtilization, 0.9);
 assert.equal(config.fixedTermDurationSec, 7 * 86_400);
-assert.equal(config.liquidationUtilization, 100);
+assert.equal(config.fixedTermGracePeriodSec, 7 * 86_400);
+assert.ok(Math.abs(config.liquidationUtilization - 3 / 2.99) < 1e-12);
 assert.equal(config.eclpBandWidth, market.defaults.eclpBandWidth);
 assert.equal(config.yieldShareProtocolFee, market.defaults.jtYieldShareProtocolFee);
 assert.equal(config.ltYieldShareProtocolFee, market.defaults.ltYieldShareProtocolFee);
@@ -235,9 +236,9 @@ const tighterBandConfig = buildDayMarketConfig(market.defaults, {
 assert.equal(tighterBandConfig.eclpBandWidth, 0.05);
 
 const yields = runDayTargetScenario(market.defaults);
-assert.ok(Math.abs(yields.seniorApy - 0.0890991205100371) < 1e-12);
-assert.ok(Math.abs(yields.juniorApy - 0.18744522546727427) < 1e-12);
-assert.ok(Math.abs(yields.liquidityApy - 0.09562064039802576) < 1e-12);
+assert.ok(Math.abs(yields.seniorApy - 0.08790227464146527) < 1e-12);
+assert.ok(Math.abs(yields.juniorApy - 0.1309043150652931) < 1e-12);
+assert.ok(Math.abs(yields.liquidityApy - 0.09316543116293063) < 1e-12);
 
 const forwardSeries = buildDayForwardSeries(0.114, market.defaults.stableYield, "2026-07-20");
 assert.equal(forwardSeries.length, 13);

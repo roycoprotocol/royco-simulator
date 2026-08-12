@@ -42,6 +42,7 @@ type Terms = {
   y100SharePct: number;
   presetId: DayIssuerPresetId | null;
   poolConcentration: number;
+  poolSeniorWeightPct: number;
 };
 
 type Modeled = {
@@ -112,16 +113,16 @@ function DayV2Deployment({
   const maximumDiscountBps = terms.eclpBandWidthPct * 100;
   const discountFitsFlow =
     maximumDiscountBps >= 50 && maximumDiscountBps <= 500;
-  const riskCap = Math.max(
+  const riskCap = (defaults.maxJTYieldShare ?? Math.max(
     terms.riskY0Pct,
     terms.riskSharePct,
     terms.riskY100Pct,
-  );
-  const liquidityCap = Math.max(
+  )) * (defaults.maxJTYieldShare === undefined ? 1 : 100);
+  const liquidityCap = (defaults.maxLTYieldShare ?? Math.max(
     terms.liqY0Pct,
     terms.liqSharePct,
     terms.liqY100Pct,
-  );
+  )) * (defaults.maxLTYieldShare === undefined ? 1 : 100);
   const coverageEnabled = terms.coveragePct > 0;
   const protectedExitRemainingCoveragePct = coverageEnabled
     ? (defaults.exitBufferPct / 100) * terms.coveragePct
@@ -170,7 +171,37 @@ function DayV2Deployment({
         y100SharePct: terms.y100SharePct,
         exitBufferPct: defaults.exitBufferPct,
         selfLiquidationBonusPct: defaults.selfLiquidationBonus * 100,
+        fixedTermGracePeriodDays: defaults.fixedTermGracePeriodDays,
         poolConcentration: terms.poolConcentration,
+        poolSeniorWeightPct: terms.poolSeniorWeightPct,
+        maxJTYieldSharePct: defaults.maxJTYieldShare === undefined
+          ? undefined
+          : defaults.maxJTYieldShare * 100,
+        maxLTYieldSharePct: defaults.maxLTYieldShare === undefined
+          ? undefined
+          : defaults.maxLTYieldShare * 100,
+        riskYDMMode: defaults.riskYDM.mode,
+        liqYDMMode: defaults.liqYDM.mode,
+        riskAdaptationSpeedPerYear:
+          defaults.riskYDM.maxAdaptSpeedPerYear,
+        liqAdaptationSpeedPerYear:
+          defaults.liqYDM.maxAdaptSpeedPerYear,
+        riskMinYTargetPct:
+          defaults.riskYDM.minYTarget === undefined
+            ? undefined
+            : defaults.riskYDM.minYTarget * 100,
+        riskMaxYTargetPct:
+          defaults.riskYDM.maxYTarget === undefined
+            ? undefined
+            : defaults.riskYDM.maxYTarget * 100,
+        liqMinYTargetPct:
+          defaults.liqYDM.minYTarget === undefined
+            ? undefined
+            : defaults.liqYDM.minYTarget * 100,
+        liqMaxYTargetPct:
+          defaults.liqYDM.maxYTarget === undefined
+            ? undefined
+            : defaults.liqYDM.maxYTarget * 100,
       },
       scenario: {
         hasHistoricalSeries: market.hasHistoricalSeries,
@@ -247,6 +278,11 @@ function DayV2Deployment({
               note="Loss-recovery window; exported in seconds"
               value={`${terms.observationDays} days`}
             />
+            <Row
+              label="Observation grace period"
+              note="Configured market default"
+              value={`${defaults.fixedTermGracePeriodDays ?? 0} days`}
+            />
           </section>
 
           <section className="rounded-xl border border-[var(--border-subtle)] bg-[var(--foundation)] px-4 py-3">
@@ -256,7 +292,16 @@ function DayV2Deployment({
               </h3>
               <DayV2DocsLink label="Yield Split" topic="yieldSplit" />
             </div>
-            <Row label="Curve type" note="Both sides" value="Static" />
+            <Row
+              label="Curve type"
+              note="Both sides"
+              value={
+                defaults.riskYDM.mode === "adaptive" &&
+                defaults.liqYDM.mode === "adaptive"
+                  ? "Adaptive V2"
+                  : "Static"
+              }
+            />
             <Row label="Target utilization" value="90%" />
             <Row
               label="Jr shares · Y0 / YT / Y100"
@@ -264,7 +309,7 @@ function DayV2Deployment({
             />
             <Row
               label="Jr cap"
-              note="Highest point on its curve"
+              note="Configured contract cap"
               value={`${displayNumber(riskCap)}%`}
             />
             <Row
@@ -273,7 +318,7 @@ function DayV2Deployment({
             />
             <Row
               label="SLP cap"
-              note="Highest point on its curve"
+              note="Configured contract cap"
               value={`${displayNumber(liquidityCap)}%`}
             />
           </section>
@@ -285,7 +330,10 @@ function DayV2Deployment({
               </h3>
               <DayV2DocsLink label="Liquidity Requirements" topic="liquidity" />
             </div>
-            <Row label="Peg composition" value="90% exit / 10% Sr" />
+            <Row
+              label="Peg composition"
+              value={`${displayNumber(100 - terms.poolSeniorWeightPct)}% exit / ${displayNumber(terms.poolSeniorWeightPct)}% Sr`}
+            />
             <Row
               label="Maximum discount"
               note={
@@ -295,12 +343,12 @@ function DayV2Deployment({
             />
             <Row
               label="Maximum premium"
-              note="Derived for the 90/10 peg"
+              note="Derived for the configured peg composition"
               value="Derived"
             />
             <Row
               label="Modeled depth"
-              note="Deployment defaults to λ300"
+              note="Current deployment curve"
               value={`λ${displayNumber(terms.poolConcentration)}`}
             />
             <Row

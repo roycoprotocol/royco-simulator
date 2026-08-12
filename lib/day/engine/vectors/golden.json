@@ -2,10 +2,10 @@
   "schemaVersion": 1,
   "provenance": {
     "repository": "https://github.com/roycoprotocol/royco-day",
-    "commit": "952d22968968a43bbb80e4b892bc1aa3ba20c12d",
+    "commit": "9764c9e20c8e8af7df1358f228c4be83b78be97f",
     "solc": "0.8.35",
     "harness": "lib/day/engine/harness/DayVectorGen.t.sol",
-    "harnessSha256": "43b4be678bce8c4c7a10c7d4a662ea451b202b780825852581acbf176d231af3",
+    "harnessSha256": "60510a9ab95e60ae65edc8cd4c2f04bfd7291a18d1e3eaa6c255f28ef012aa42",
     "generator": "scripts/day-simulator/generate-day-vectors.mjs"
   },
   "requiredGroups": [
@@ -54,12 +54,13 @@
       "inputs": {
         "stEffective": "1120000000000000000000",
         "premium": "10000000000000000000",
-        "fee": "5000000000000000000",
+        "stFee": "5000000000000000000",
+        "lptFee": "1000000000000000000",
         "supply": "1000000000000000000000"
       },
       "outputs": {
-        "premiumShares": "9049773755656108597",
-        "feeShares": "4524886877828054298",
+        "premiumShares": "8144796380090497737",
+        "feeShares": "5429864253393665158",
         "supplyAfter": "1013574660633484162895"
       }
     },
@@ -73,7 +74,7 @@
         "supply": "1000000000000000000"
       },
       "outputs": {
-        "shares": "999999999999000000000000000000"
+        "shares": "999999999999000000999999999999"
       }
     },
     {
@@ -209,7 +210,7 @@
       }
     },
     {
-      "id": "fee-lt-yield-share-only",
+      "id": "fee-lpt-yield-share-only",
       "group": "nonzero-fees",
       "kind": "accountantSync",
       "inputs": {
@@ -243,7 +244,7 @@
       }
     },
     {
-      "id": "post-mint-lt-raw-commit",
+      "id": "post-mint-lpt-raw-commit",
       "group": "lt-raw-commit",
       "kind": "ltCommit",
       "inputs": {
@@ -314,7 +315,7 @@
       }
     },
     {
-      "id": "post-lt-deposit",
+      "id": "post-lpt-deposit",
       "group": "post-operations",
       "kind": "postOp",
       "inputs": {
@@ -404,7 +405,7 @@
       }
     },
     {
-      "id": "post-lt-redeem",
+      "id": "post-lpt-redeem",
       "group": "post-operations",
       "kind": "postOp",
       "inputs": {
@@ -464,49 +465,41 @@
       }
     },
     {
-      "id": "gate-st-deposit-coverage-liquidity",
+      "id": "max-st-deposit-coverage-bound",
       "group": "operation-gates",
-      "kind": "postOpRevert",
+      "kind": "maxSTDeposit",
       "inputs": {
-        "operation": "ST_DEPOSIT",
-        "seedST": "1000000000000000000000",
-        "seedJT": "200000000000000000000",
-        "seedLT": "100000000000000000000",
-        "stRaw": "2001000000000000000000",
-        "jtRaw": "200000000000000000000",
-        "ltRaw": "100000000000000000000",
-        "bonus": "0"
+        "collateral": "1200000000000000000000",
+        "stEffective": "1000000000000000000000",
+        "jtEffective": "200000000000000000000",
+        "lptRaw": "100000000000000000000",
+        "minCoverageWAD": "100000000000000000",
+        "minLiquidityWAD": "50000000000000000",
+        "dust": "0"
       },
       "outputs": {
-        "reverted": true,
-        "selector": "1887653499"
+        "max": "800000000000000000000"
       }
     },
     {
-      "id": "gate-lt-redeem-liquidity",
+      "id": "max-lpt-withdrawal-liquidity-bound",
       "group": "operation-gates",
-      "kind": "postOpRevert",
+      "kind": "maxLPTWithdrawal",
       "inputs": {
-        "operation": "LT_REDEEM",
-        "seedST": "1000000000000000000000",
-        "seedJT": "200000000000000000000",
-        "seedLT": "100000000000000000000",
-        "stRaw": "1000000000000000000000",
-        "jtRaw": "200000000000000000000",
-        "ltRaw": "49000000000000000000",
-        "bonus": "0"
+        "stEffective": "1000000000000000000000",
+        "lptRaw": "100000000000000000000",
+        "minLiquidityWAD": "50000000000000000",
+        "dust": "0"
       },
       "outputs": {
-        "reverted": true,
-        "selector": "422986096"
+        "max": "50000000000000000000"
       }
     },
     {
-      "id": "premium-reinvestment-success",
+      "id": "premium-staging-with-fees",
       "group": "premium-reinvestment",
-      "kind": "reinvestment",
+      "kind": "premiumStaging",
       "inputs": {
-        "success": true,
         "stEffective": "1120000000000000000000",
         "jtEffective": "220000000000000000000",
         "ltRaw": "100000000000000000000",
@@ -521,40 +514,39 @@
       "outputs": {
         "stSupplyAfter": "1013574660633484162895",
         "jtSupplyAfter": "201834862385321100917",
-        "ltSupplyAfter": "101010101010101010101",
-        "premiumShares": "9049773755656108597",
-        "stFeeShares": "4524886877828054298",
+        "ltSupplyAfter": "100000000000000000000",
+        "premiumShares": "8144796380090497737",
+        "stFeeShares": "5429864253393665158",
         "jtFeeShares": "1834862385321100917",
-        "ltFeeShares": "1010101010101010101",
+        "ltFeeShares": "0",
+        "idlePremiumShares": "8144796380090497737"
+      }
+    },
+    {
+      "id": "premium-staging-zero-lpt-premium",
+      "group": "premium-reinvestment",
+      "kind": "premiumStaging",
+      "inputs": {
+        "stEffective": "1120000000000000000000",
+        "jtEffective": "220000000000000000000",
+        "ltRaw": "100000000000000000000",
+        "premium": "0",
+        "stFee": "5000000000000000000",
+        "jtFee": "2000000000000000000",
+        "ltFee": "0",
+        "stSupply": "1000000000000000000000",
+        "jtSupply": "200000000000000000000",
+        "ltSupply": "100000000000000000000"
+      },
+      "outputs": {
+        "stSupplyAfter": "1004484304932735426008",
+        "jtSupplyAfter": "201834862385321100917",
+        "ltSupplyAfter": "100000000000000000000",
+        "premiumShares": "0",
+        "stFeeShares": "4484304932735426008",
+        "jtFeeShares": "1834862385321100917",
+        "ltFeeShares": "0",
         "idlePremiumShares": "0"
-      }
-    },
-    {
-      "id": "premium-reinvestment-deferred",
-      "group": "premium-reinvestment",
-      "kind": "reinvestment",
-      "inputs": {
-        "success": false,
-        "stEffective": "1120000000000000000000",
-        "jtEffective": "220000000000000000000",
-        "ltRaw": "100000000000000000000",
-        "premium": "10000000000000000000",
-        "stFee": "5000000000000000000",
-        "jtFee": "2000000000000000000",
-        "ltFee": "1000000000000000000",
-        "stSupply": "1000000000000000000000",
-        "jtSupply": "200000000000000000000",
-        "ltSupply": "100000000000000000000"
-      },
-      "outputs": {
-        "stSupplyAfter": "1013574660633484162895",
-        "jtSupplyAfter": "201834862385321100917",
-        "ltSupplyAfter": "100917431192660550458",
-        "premiumShares": "9049773755656108597",
-        "stFeeShares": "4524886877828054298",
-        "jtFeeShares": "1834862385321100917",
-        "ltFeeShares": "917431192660550458",
-        "idlePremiumShares": "9049773755656108597"
       }
     },
     {
@@ -563,21 +555,16 @@
       "kind": "selfLiquidation",
       "inputs": {
         "bonusWAD": "10000000000000000",
-        "stRaw": "800000000000000000000",
-        "jtRaw": "240000000000000000000",
         "stEffective": "1000000000000000000000",
         "jtEffective": "40000000000000000000",
         "coverageUtilWAD": "5200000000000000000",
         "liquidationUtilWAD": "4000000000000000000",
-        "jtCoinvested": true,
-        "claimST": "80000000000000000000",
-        "claimJT": "20000000000000000000",
+        "claimCollateral": "100000000000000000000",
         "claimNAV": "100000000000000000000"
       },
       "outputs": {
         "bonus": "1000000000000000000",
-        "claimST": "80000000000000000000",
-        "claimJT": "21000000000000000000",
+        "claimCollateral": "101000000000000000000",
         "claimNAV": "101000000000000000000"
       }
     }

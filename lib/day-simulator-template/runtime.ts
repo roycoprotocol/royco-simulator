@@ -146,6 +146,7 @@ export function buildDayMarketConfig(
       y100: Math.max(defaults.liqYDM.y100, terms.liquidityYieldShare),
     },
     fixedTermDurationSec: terms.observationDays * 86_400,
+    fixedTermGracePeriodSec: (defaults.fixedTermGracePeriodDays ?? 0) * 86_400,
     liquidationUtilization: 100 / Math.max(defaults.exitBufferPct, 0.01),
     stSelfLiquidationBonus: defaults.selfLiquidationBonus,
     stProtocolFee: defaults.stProtocolFee,
@@ -156,6 +157,15 @@ export function buildDayMarketConfig(
     swapFeeBps: defaults.swapFeeBps,
     poolTurnoverPerYear: defaults.poolTurnoverPerYear,
     eclpBandWidth: terms.eclpBandWidth,
+    eclpParams:
+      defaults.eclpParams && Math.abs(terms.eclpBandWidth - defaults.eclpBandWidth) < 1e-12
+        ? defaults.eclpParams
+        : undefined,
+    maxJTYieldShare: defaults.maxJTYieldShare,
+    maxLTYieldShare: defaults.maxLTYieldShare,
+    ...(defaults.dustTolerance === undefined
+      ? {}
+      : { dustTolerance: defaults.dustTolerance }),
     reinvestLiquidityPremium: defaults.reinvestLiquidityPremium,
   });
 }

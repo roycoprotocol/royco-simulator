@@ -67,7 +67,7 @@ export class Sim {
   constructor(cfg: MarketConfig, init: { st: number; jt: number; lt: number }) {
     this.cfg = cfg;
     this._state = newMarket(cfg, init);
-    this.events.push({ t: 0, kind: "init", msg: `Market opened: ST ${init.st}, JT ${init.jt}, SLP ${init.lt}. Coverage ${(cfg.coverage * 100).toFixed(0)}%, β ${cfg.beta}.`, level: "good" });
+    this.events.push({ t: 0, kind: "init", msg: `Market opened: ST ${init.st}, JT ${init.jt}, SLP ${init.lt}. Coverage ${(cfg.coverage * 100).toFixed(0)}%.`, level: "good" });
     this.snap(0, 0);
   }
 
@@ -121,14 +121,15 @@ function applyOp(state: LiveState, cfg: MarketConfig, op: Op) {
 export function defaultConfig(over: Partial<MarketConfig> = {}): MarketConfig {
   const cfg: MarketConfig = {
     coverage: 0.2,
-    beta: 0, // engine-neutral default for the test harness; the product UI locks beta=1 (JT co-invested)
+    beta: 1, // compatibility field; current Day accounting uses one collateral NAV
     targetUtilization: 0.9,
     liquidationUtilization: 1.5,
     fixedTermDurationSec: 30 * 24 * 3600,
+    fixedTermGracePeriodSec: 0,
     stProtocolFee: 0,
     jtProtocolFee: 0,
-    yieldShareProtocolFee: 0,
-    ltYieldShareProtocolFee: 0,
+    yieldShareProtocolFee: 0.45,
+    ltYieldShareProtocolFee: 0.45,
     riskYDM: { mode: "static", y0: 0.35, yTarget: 0.35, y100: 0.35 },
     maxJTYieldShare: 0.35,
     minLiquidity: 0.12,
@@ -138,9 +139,9 @@ export function defaultConfig(over: Partial<MarketConfig> = {}): MarketConfig {
     stableYield: 0.035,
     swapFeeBps: 10,
     poolTurnoverPerYear: 8,
-    eclpBandWidth: 0.1,
+    eclpBandWidth: 0.02,
     reinvestLiquidityPremium: true,
-    stSelfLiquidationBonus: 0.02,
+    stSelfLiquidationBonus: 0.01,
     dustTolerance: 1e-6,
     ...over,
   };
