@@ -60,7 +60,7 @@ const jbbb = DAY_MARKETS.find((m) => m.id === 'jbbb')!.defaults;
 // Decimal requirements close to the 90% target used to be sized a few wei
 // short by the UI's float formula, even though the exact engine inversion found
 // a valid stack. These are the manual-override values that previously crashed
-// /v3 during server rendering.
+// during server rendering.
 for (const coverage of [0.5001, 0.8, 0.8999]) {
   const terms = {
     coverage,
