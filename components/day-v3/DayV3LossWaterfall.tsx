@@ -3,10 +3,10 @@
 import { useMemo, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
-import DayV2DocsLink from "@/components/day-v2/DayV2DocsLink";
-import DayV2LossChart, {
-  type DayV2LossPoint,
-} from "@/components/day-v2/DayV2LossChart";
+import DayV3DocsLink from "@/components/day-v3/DayV3DocsLink";
+import DayV3LossChart, {
+  type DayV3LossPoint,
+} from "@/components/day-v3/DayV3LossChart";
 import {
   Card,
   CardContent,
@@ -18,9 +18,9 @@ import {
   pct,
   stake100,
   unitAmount,
-  type DayV2Unit,
-} from "@/components/day-v2/format";
-import { dayV2RangeStyle } from "@/components/day-v2/range";
+  type DayV3Unit,
+} from "@/components/day-v3/format";
+import { dayV3RangeStyle } from "@/components/day-v3/range";
 import {
   Table,
   TableBody,
@@ -38,22 +38,22 @@ import type { DayExplainerMetrics } from "@/lib/day-simulator-template/explainer
 /** The engine point closest to a target loss, so every figure on screen is a
     value the accountant actually returned rather than an interpolation. */
 function nearest(
-  points: readonly DayV2LossPoint[],
+  points: readonly DayV3LossPoint[],
   target: number,
-): DayV2LossPoint {
+): DayV3LossPoint {
   return points.reduce((best, point) =>
     Math.abs(point.loss - target) < Math.abs(best.loss - target) ? point : best,
   );
 }
 
-export default function DayV2LossWaterfall({
+export default function DayV3LossWaterfall({
   metrics,
   unit,
 }: {
   metrics: DayExplainerMetrics["coverage"];
-  unit: DayV2Unit;
+  unit: DayV3Unit;
 }) {
-  const points = useMemo<DayV2LossPoint[]>(
+  const points = useMemo<DayV3LossPoint[]>(
     () =>
       metrics.points.map((point) => ({
         loss: point.loss,
@@ -117,9 +117,9 @@ export default function DayV2LossWaterfall({
           <CardTitle className="text-[17px]">Loss waterfall</CardTitle>
           <span className="flex items-baseline gap-2">
             <Badge tone={coverageFunded ? "junior" : "caution"}>
-              {coverageFunded ? "Jr First" : "No Cover"}
+              {coverageFunded ? "Jr first" : "no cover"}
             </Badge>
-            <DayV2DocsLink label="Impermanent Loss" topic="impermanentLoss" />
+            <DayV3DocsLink label="Impermanent loss" topic="impermanentLoss" />
           </span>
         </div>
         <CardDescription>How losses move from Jr to Sr.</CardDescription>
@@ -197,12 +197,12 @@ export default function DayV2LossWaterfall({
           <input
             aria-label="Source drawdown"
             aria-valuetext={`${pct(selected.loss)} source drawdown; Senior loses ${unitAmount(seniorLoss, unit)}`}
-            className="day-v2-range"
+            className="day-v3-range"
             max={points.length - 1}
             min={0}
             onChange={(event) => setRawIndex(Number(event.target.value))}
             step={1}
-            style={dayV2RangeStyle(index, 0, points.length - 1)}
+            style={dayV3RangeStyle(index, 0, points.length - 1)}
             type="range"
             value={index}
           />
@@ -261,7 +261,7 @@ export default function DayV2LossWaterfall({
           </div>
         </div>
 
-        <DayV2LossChart
+        <DayV3LossChart
           limit={limit}
           marker={selected}
           maxLoss={metrics.displayMaxLoss}

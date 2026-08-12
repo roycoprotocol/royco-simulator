@@ -121,11 +121,20 @@ export function liquidityUtilization(
 
 let eclpCache: { key: string; params: EclpParams } | null = null;
 function eclpParamsFor(cfg: MarketConfig): EclpParams {
-  const key = `${DAY_ECLP_SIMULATION_LAMBDA}|${cfg.eclpBandWidth}`;
+  const supplied = cfg.eclpParams;
+  const key = supplied
+    ? `${supplied.alpha}|${supplied.beta}|${supplied.c}|${supplied.s}|${supplied.lambda}`
+    : `${DAY_ECLP_SIMULATION_LAMBDA}|${cfg.eclpBandWidth}`;
   if (!eclpCache || eclpCache.key !== key) {
     eclpCache = {
       key,
-      params: eclpParamsForWeight(0.1, DAY_ECLP_SIMULATION_LAMBDA, cfg.eclpBandWidth),
+      params:
+        supplied ??
+        eclpParamsForWeight(
+          0.1,
+          DAY_ECLP_SIMULATION_LAMBDA,
+          cfg.eclpBandWidth,
+        ),
     };
   }
   return eclpCache.params;

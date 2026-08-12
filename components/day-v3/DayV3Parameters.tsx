@@ -3,13 +3,13 @@
 import { memo, useDeferredValue } from "react";
 
 import { Badge } from "@/components/ui/badge";
-import DayV2Button from "@/components/day-v2/DayV2Button";
-import DayV2Disclosure from "@/components/day-v2/DayV2Disclosure";
-import DayV2DocsLink from "@/components/day-v2/DayV2DocsLink";
-import DayV2Group from "@/components/day-v2/DayV2Group";
-import DayV2Slider from "@/components/day-v2/DayV2Slider";
-import DayV2YieldCurve from "@/components/day-v2/DayV2YieldCurve";
-import { pct } from "@/components/day-v2/format";
+import DayV3Button from "@/components/day-v3/DayV3Button";
+import DayV3Disclosure from "@/components/day-v3/DayV3Disclosure";
+import DayV3DocsLink from "@/components/day-v3/DayV3DocsLink";
+import DayV3Group from "@/components/day-v3/DayV3Group";
+import DayV3Slider from "@/components/day-v3/DayV3Slider";
+import DayV3YieldCurve from "@/components/day-v3/DayV3YieldCurve";
+import { pct } from "@/components/day-v3/format";
 
 /**
  * Every remaining term a real market takes. These were pinned at the market
@@ -25,7 +25,7 @@ import { pct } from "@/components/day-v2/format";
  * band and both premium curves together under it. Timing and venue is one kind
  * of decision and how a premium is priced is another.
  *
- * Every control here is now the shared `DayV2Slider`. There used to be a local
+ * Every control here is now the shared `DayV3Slider`. There used to be a local
  * `Field` plus `Range` pair drawing a third slider shape, so nine controls in
  * one panel read as three unrelated families.
  */
@@ -46,11 +46,11 @@ function Aside({
   summary: string;
 }) {
   return (
-    <DayV2Disclosure summary={summary} variant="inline">
+    <DayV3Disclosure summary={summary} variant="inline">
       <div className="max-w-[78ch] text-[10.5px] leading-relaxed text-[var(--tertiary)]">
         {children}
       </div>
-    </DayV2Disclosure>
+    </DayV3Disclosure>
   );
 }
 
@@ -64,7 +64,7 @@ function Aside({
  * The ratio is shown rather than asserted as 1x, because it is not always 1x.
  * `issuer-presets.ts` states the rule as Jr at 1x its requirement and SLP at
  * 0.5x, and twelve of the thirteen markets sit exactly there, but `muga` is a
- * reverse market pricing 6.7% coverage at 1.4%. `dayV2EffectiveShares` scales
+ * reverse market pricing 6.7% coverage at 1.4%. `dayV3EffectiveShares` scales
  * from each market's OWN default for that reason, so the copy has to read the
  * ratio off the market too instead of restating the headline rule.
  */
@@ -119,7 +119,7 @@ function TargetBasis({
   );
 }
 
-function DayV2Parameters({
+function DayV3Parameters({
   bandPct,
   ceilingPct,
   coveragePct,
@@ -212,16 +212,16 @@ function DayV2Parameters({
     // it. The declared checklist is the thing that is genuinely different, and
     // it stays outside because moving it changes nothing here.
     <>
-      <DayV2Group
+      <DayV3Group
         deployOnly
         docs="marketStates"
-        docsLabel="Market States"
+        docsLabel="Market states"
         index={startIndex}
         subtitle="Set loss timing and the modeled exit range"
         title="Timing and the venue"
       >
         <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-          <DayV2Slider
+          <DayV3Slider
             display={`${observationDays} days`}
             docs="observation"
             hint="The historical backtest uses this window: recovery inside it erases the drawdown; expiry realizes the loss against Jr."
@@ -234,7 +234,7 @@ function DayV2Parameters({
             step={1}
             value={observationDays}
           />
-          <DayV2Slider
+          <DayV3Slider
             display={pct(bandPct / 100)}
             docs="slpTranche"
             hint="The only E-CLP input modeled here. Deployment also sets premium, depth, reinvestment slippage, and seed liquidity."
@@ -248,12 +248,12 @@ function DayV2Parameters({
             value={Math.min(5, Math.max(0.5, bandPct))}
           />
         </div>
-      </DayV2Group>
+      </DayV3Group>
 
-      <DayV2Group
+      <DayV3Group
         deployOnly
         docs="yieldSplit"
-        docsLabel="Yield Split"
+        docsLabel="Yield split"
         index={startIndex + 1}
         subtitle="Set the Jr and SLP shares of Sr yield"
         title="How the premiums are priced"
@@ -282,14 +282,14 @@ function DayV2Parameters({
                   ? `Priced by hand. Following the requirements would pay Jr ${pct(derivedRiskSharePct / 100)} and SLP ${pct(derivedLiqSharePct / 100)} at target.`
                   : "The curve shape has been changed from this market's own."}
               </span>
-              <DayV2Button
+              <DayV3Button
                 className="text-[11.5px]"
                 onClick={onResetCurve}
                 size="inline"
                 variant="link"
               >
                 Reset to this market&apos;s own
-              </DayV2Button>
+              </DayV3Button>
             </div>
           ) : null}
 
@@ -363,9 +363,9 @@ function DayV2Parameters({
                 <div className="flex items-baseline justify-between gap-2">
                   <h4 className="text-[12px] font-semibold">{model.title}</h4>
                   <span className="flex items-baseline gap-2">
-                    <Badge tone="neutral">Static Curve</Badge>
-                    <DayV2DocsLink
-                      label={`${model.paid} Premium`}
+                    <Badge tone="neutral">static curve</Badge>
+                    <DayV3DocsLink
+                      label={`${model.paid} premium`}
                       topic={model.docs}
                     />
                   </span>
@@ -378,7 +378,7 @@ function DayV2Parameters({
                   another control, so it leads and the other two follow it
                   rather than sandwiching it. */}
                 <div className="flex flex-col gap-2">
-                  <DayV2Slider
+                  <DayV3Slider
                     display={pct(model.yt / 100)}
                     hint={`The share ${model.paid} is paid at the ${pct(targetUtilization)} target, which is where every figure on this page is read.`}
                     label="YT"
@@ -409,7 +409,7 @@ function DayV2Parameters({
                   <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                     {model.shaping.map(
                       ([anchor, note, value, onChange, min, max]) => (
-                        <DayV2Slider
+                        <DayV3Slider
                           display={pct(value / 100)}
                           key={anchor}
                           label={anchor}
@@ -453,7 +453,7 @@ function DayV2Parameters({
                     ) : null}
                   </p>
                 </div>
-                <DayV2YieldCurve
+                <DayV3YieldCurve
                   paidTo={model.paid}
                   seniorShareOfCapital={seniorShareOfCapital}
                   sourceApy={sourceApy}
@@ -466,9 +466,9 @@ function DayV2Parameters({
             ))}
           </div>
         </div>
-      </DayV2Group>
+      </DayV3Group>
     </>
   );
 }
 
-export default memo(DayV2Parameters);
+export default memo(DayV3Parameters);

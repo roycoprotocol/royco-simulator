@@ -1,5 +1,5 @@
 import { Sim } from '@/lib/day/engine/runner';
-import { MarketState } from '@/lib/day/engine/types';
+import { MarketState, type MarketConfig } from '@/lib/day/engine/types';
 import { buildDayErasureEvent, type DayErasureEvent } from '@/lib/day-simulator-template/erasure';
 import type { DaySeriesPoint, DaySimulatorDefaults } from '@/lib/day-simulator-template/market';
 import { shouldRefillJunior } from '@/lib/day-simulator-template/refill';
@@ -95,6 +95,9 @@ export type DayBacktestInput = {
    * starts mid-history has a real first month rather than a zero-return stub.
    */
   monthlyBaselineDate?: string;
+  /** V3 can inject exact canonical venue fields without deriving pool math in
+   * Dawn. Existing callers omit this and retain byte-for-byte defaults. */
+  configOverrides?: Partial<Pick<MarketConfig, 'swapFeeBps' | 'eclpParams'>>;
 };
 
 /**
@@ -144,14 +147,17 @@ export function runDayHistoricalBacktest(input: DayBacktestInput) {
     },
   };
   const initial = buildDayInitialBalances(defaults, { coverage, minLiquidity });
-  const cfg = buildDayMarketConfig(configuredDefaults, {
-    coverage,
-    minLiquidity,
-    eclpBandWidth,
-    observationDays: enginePremiumInputs.observationDays,
-    riskYieldShare: riskTarget,
-    liquidityYieldShare: liqTarget,
-  });
+  const cfg = {
+    ...buildDayMarketConfig(configuredDefaults, {
+      coverage,
+      minLiquidity,
+      eclpBandWidth,
+      observationDays: enginePremiumInputs.observationDays,
+      riskYieldShare: riskTarget,
+      liquidityYieldShare: liqTarget,
+    }),
+    ...input.configOverrides,
+  };
   const sim = new Sim(cfg, initial);
   const snapshots = [sim.last()];
   const firstSnapshot = snapshots[0];

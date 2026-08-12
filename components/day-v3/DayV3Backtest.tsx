@@ -3,10 +3,10 @@
 import { memo, useDeferredValue, useMemo, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
-import DayV2BacktestChart, {
-  type DayV2BacktestPoint,
-} from "@/components/day-v2/DayV2BacktestChart";
-import DayV2SegmentedControl from "@/components/day-v2/DayV2SegmentedControl";
+import DayV3BacktestChart, {
+  type DayV3BacktestPoint,
+} from "@/components/day-v3/DayV3BacktestChart";
+import DayV3SegmentedControl from "@/components/day-v3/DayV3SegmentedControl";
 import {
   Card,
   CardContent,
@@ -14,7 +14,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { pct } from "@/components/day-v2/format";
+import { pct } from "@/components/day-v3/format";
 import {
   Table,
   TableBody,
@@ -24,6 +24,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { runDayHistoricalBacktest } from "@/lib/day-simulator-template/backtest";
+import type { MarketConfig } from "@/lib/day/engine/types";
 import type { DayMarket } from "@/lib/day-simulator-template/market";
 import { calibrateSeriesApy } from "@/lib/day-simulator-template/series";
 
@@ -51,7 +52,7 @@ const monthLabel = (key: string) => {
 const signed = (value: number) =>
   `${value < 0 ? "-" : "+"}${Math.abs(value * 100).toFixed(2)}%`;
 
-function DayV2Backtest({
+function DayV3Backtest({
   bandPct: bandInput,
   coveragePct: coverageInput,
   customSource,
@@ -62,6 +63,7 @@ function DayV2Backtest({
   maintainCoverage,
   market,
   onMaintainCoverage,
+  poolConfigOverrides,
   observationDays: observationInput,
   riskY0Pct: riskY0Input,
   riskY100Pct: riskY100Input,
@@ -78,6 +80,7 @@ function DayV2Backtest({
   maintainCoverage: boolean;
   market: DayMarket;
   onMaintainCoverage: (value: boolean) => void;
+  poolConfigOverrides: Partial<Pick<MarketConfig, "swapFeeBps" | "eclpParams">>;
   observationDays: number;
   riskY0Pct: number;
   riskY100Pct: number;
@@ -198,6 +201,7 @@ function DayV2Backtest({
       // Still passed, so a window that starts mid-history is never treated as
       // the opening period even when a market does declare the flag.
       monthlyBaselineDate: series[0]?.date,
+      configOverrides: poolConfigOverrides,
     });
   }, [
     bandPct,
@@ -210,6 +214,7 @@ function DayV2Backtest({
     maintainCoverage,
     market,
     observationDays,
+    poolConfigOverrides,
     riskSharePct,
     riskY0Pct,
     riskY100Pct,
@@ -217,7 +222,7 @@ function DayV2Backtest({
     view,
   ]);
 
-  const chartData = useMemo<DayV2BacktestPoint[]>(
+  const chartData = useMemo<DayV3BacktestPoint[]>(
     () =>
       result
         ? result.chart.map((point) => ({
@@ -239,11 +244,11 @@ function DayV2Backtest({
             <CardTitle className="text-[17px]" level={3}>
               Historical backtest
             </CardTitle>
-            <Badge tone="caution">No History</Badge>
+            <Badge tone="caution">no history</Badge>
           </div>
           <CardDescription>
             {customSource
-              ? "Add dated NAV or price history in step 3 to run this test."
+              ? "Add dated NAV or price history in the source step to run this test."
               : "No dated history is available; results above are forward projections at the selected source yield."}
           </CardDescription>
         </CardHeader>
@@ -387,7 +392,7 @@ function DayV2Backtest({
             a stack of differently sized slabs, and a 1.3fr/1fr here was the
             only place breaking it. */}
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-          <DayV2BacktestChart data={chartData} unit={returnUnit} />
+          <DayV3BacktestChart data={chartData} unit={returnUnit} />
 
           {/* Detail, visible by default rather than behind a toggle. */}
           <div className="max-h-[360px] overflow-y-auto rounded-lg border border-[var(--border-subtle)]">
@@ -436,7 +441,7 @@ function DayV2Backtest({
           <span className="text-[9.5px] font-semibold uppercase tracking-[0.1em] text-[var(--tertiary)]">
             Coverage restoration
           </span>
-          <DayV2SegmentedControl
+          <DayV3SegmentedControl
             ariaLabel="Coverage restoration"
             className="w-fit"
             onValueChange={(value) => onMaintainCoverage(value === "on")}
@@ -520,4 +525,4 @@ function DayV2Backtest({
 // Props change on every slider tick, so memo alone cannot skip the work. It is
 // here to keep the deferred low-priority pass from also re-rendering this
 // subtree when unrelated page state changes.
-export default memo(DayV2Backtest);
+export default memo(DayV3Backtest);

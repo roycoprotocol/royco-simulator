@@ -207,8 +207,8 @@ function DayV2Deployment({
           <CardTitle>Deployment brief</CardTitle>
           <Badge tone={modeledTermsCompatible ? "liquidity" : "caution"}>
             {modeledTermsCompatible
-              ? "modeled terms compatible"
-              : "review highlighted terms"}
+              ? "Modeled Terms Compatible"
+              : "Review Highlighted Terms"}
           </Badge>
         </div>
         <CardDescription>
@@ -225,8 +225,8 @@ function DayV2Deployment({
                 Market economics
               </h3>
               <span className="flex items-baseline gap-2">
-                <DayV2DocsLink label="Minimum coverage" topic="coverage" />
-                <DayV2DocsLink label="Minimum liquidity" topic="liquidity" />
+                <DayV2DocsLink label="Minimum Coverage" topic="coverage" />
+                <DayV2DocsLink label="Minimum Liquidity" topic="liquidity" />
               </span>
             </div>
             <Row
@@ -254,7 +254,7 @@ function DayV2Deployment({
               <h3 className="text-[11px] font-semibold uppercase tracking-[0.1em]">
                 Yield distribution
               </h3>
-              <DayV2DocsLink label="Yield split" topic="yieldSplit" />
+              <DayV2DocsLink label="Yield Split" topic="yieldSplit" />
             </div>
             <Row label="Curve type" note="Both sides" value="Static" />
             <Row label="Target utilization" value="90%" />
@@ -283,7 +283,7 @@ function DayV2Deployment({
               <h3 className="text-[11px] font-semibold uppercase tracking-[0.1em]">
                 Liquidity venue
               </h3>
-              <DayV2DocsLink label="Liquidity requirements" topic="liquidity" />
+              <DayV2DocsLink label="Liquidity Requirements" topic="liquidity" />
             </div>
             <Row label="Peg composition" value="90% exit / 10% Sr" />
             <Row
@@ -360,11 +360,7 @@ function DayV2Deployment({
           >
             {copied ? "Copied" : "Copy JSON"}
           </DayV2Button>
-          <DayV2Button
-            onClick={download}
-            size="md"
-            variant="secondary"
-          >
+          <DayV2Button onClick={download} size="md" variant="secondary">
             Download JSON
           </DayV2Button>
           <a

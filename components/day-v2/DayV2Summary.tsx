@@ -15,6 +15,7 @@ import DayV2Deployment from "@/components/day-v2/DayV2Deployment";
 import DayV2Disclosure from "@/components/day-v2/DayV2Disclosure";
 import DayV2DocsLink from "@/components/day-v2/DayV2DocsLink";
 import DayV2Group from "@/components/day-v2/DayV2Group";
+import DayV2Hero from "@/components/day-v2/DayV2Hero";
 import DayV2Parameters from "@/components/day-v2/DayV2Parameters";
 import DayV2Slider from "@/components/day-v2/DayV2Slider";
 import DayV2ExitCost from "@/components/day-v2/DayV2ExitCost";
@@ -31,7 +32,10 @@ import {
 } from "@/components/ui/card";
 import { dayV2RangeStyle } from "@/components/day-v2/range";
 import { dayV2EffectiveShares } from "@/components/day-v2/terms";
-import { buildDayV2Query, type DayV2UrlState } from "@/components/day-v2/url-state";
+import {
+  buildDayV2Query,
+  type DayV2UrlState,
+} from "@/components/day-v2/url-state";
 import { buildDayYieldDraftMarket } from "@/lib/day-simulator-template/explorer-market";
 import { matchDayIssuerPreset } from "@/lib/day-simulator-template/issuer-presets";
 import { dayPoolSeniorWeight } from "@/lib/day-simulator-template/capital-sizing";
@@ -578,43 +582,7 @@ export default function DayV2Summary({
     // Capped rather than full-bleed. Past about 1400px the cards stop gaining
     // anything and the prose lines just get harder to track back to.
     <main className="royco-v2 mx-auto flex w-full max-w-[1440px] flex-col gap-8 px-5 py-8 sm:px-8">
-      <header className="grid grid-cols-1 items-center gap-6 rounded-2xl border border-[var(--border-subtle)] bg-[var(--card)] px-5 py-6 shadow-[0_8px_28px_-20px_rgba(23,25,31,0.45)] sm:px-7 lg:grid-cols-[minmax(0,1fr)_minmax(320px,0.72fr)]">
-        <div className="flex flex-col gap-3">
-          <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--tertiary)]">
-            Royco Day · Market simulator
-          </span>
-          <h1 className="text-balance text-[clamp(30px,3.5vw,48px)] font-semibold leading-[1.02] tracking-[-0.03em]">
-            One yield source, split into three positions.
-          </h1>
-          <p className="max-w-[62ch] text-[14px] leading-relaxed text-[var(--secondary)]">
-            See how market terms change returns, protection, and exit liquidity
-            for Sr, Jr, and SLP.
-          </p>
-        </div>
-
-        <div className="flex flex-col gap-2">
-          <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--tertiary)]">
-            {deploying
-              ? "Finalize a market design"
-              : "Explore how the protocol works"}
-          </span>
-          <DayV2SegmentedControl
-            ariaLabel="Simulation mode"
-            className="w-full"
-            onValueChange={setMode}
-            options={[
-              { label: "Simulate", value: "simulate" },
-              { label: "Deploy", value: "deploy" },
-            ]}
-            size="lg"
-            toggleOnSelected
-            value={mode}
-          />
-          <span className="text-[10.5px] leading-snug text-[var(--tertiary)]">
-            Click either side to switch views. Your terms stay in place.
-          </span>
-        </div>
-      </header>
+      <DayV2Hero />
 
       {/* One panel. Every input on the page is in here, on both tabs: the
           source, the three terms, the named designs, and on Deploy the rest of
@@ -627,7 +595,7 @@ export default function DayV2Summary({
         aria-labelledby="day-v2-inputs-heading"
         className="flex flex-col gap-4 rounded-2xl border border-[var(--border-subtle)] bg-[var(--foundation)] px-5 py-4 shadow-[0_6px_22px_-14px_rgba(23,25,31,0.4)]"
       >
-        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+        <div className="flex flex-col gap-3 border-b border-[var(--border-subtle)] pb-3 sm:flex-row sm:items-center sm:justify-between">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <h2
               className="text-[11px] font-semibold uppercase tracking-[0.14em]"
@@ -638,13 +606,31 @@ export default function DayV2Summary({
             <p className="text-[11px] text-[var(--tertiary)]">
               Set the terms that drive the model.
             </p>
+            {draftMarket ? (
+              <Badge tone="caution">Unverified Import</Badge>
+            ) : null}
           </div>
-          {draftMarket ? <Badge tone="caution">unverified import</Badge> : null}
+          <div className="flex w-full flex-col gap-1.5 sm:w-auto sm:flex-row sm:items-center sm:gap-2.5">
+            <span className="shrink-0 text-[9px] font-semibold uppercase tracking-[0.12em] text-[var(--tertiary)]">
+              Workflow
+            </span>
+            <DayV2SegmentedControl
+              ariaLabel="Simulation mode"
+              className="w-full min-w-0 sm:w-[360px] sm:flex-none"
+              onValueChange={setMode}
+              options={[
+                { label: "Simulate your terms", value: "simulate" },
+                { label: "Deploy your terms", value: "deploy" },
+              ]}
+              size="sm"
+              value={mode}
+            />
+          </div>
         </div>
 
         <DayV2Group
           docs="tranching"
-          docsLabel="How tranching works"
+          docsLabel="How Tranching Works"
           index={1}
           subtitle="Enter a custom yield or choose a listed source"
           title="What you are modeling"
@@ -664,7 +650,7 @@ export default function DayV2Summary({
               <DayV2Slider
                 display={pct(sourceApyPct / 100)}
                 docs="dawn"
-                label="Custom source yield"
+                label="Custom Source Yield"
                 max={30}
                 maxLabel="30%"
                 min={0}
@@ -686,7 +672,7 @@ export default function DayV2Summary({
 
         <DayV2Group
           docs="yieldSplit"
-          docsLabel="How yield is split"
+          docsLabel="How Yield Is Split"
           index={2}
           subtitle="Set the minimum protection and exit-liquidity requirements"
           title="The terms you set"
@@ -700,7 +686,7 @@ export default function DayV2Summary({
           <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
             <DayV2Slider
               display={pct(coveragePct / 100)}
-              label="Minimum coverage"
+              label="Minimum Coverage"
               max={25}
               maxLabel="25%"
               min={0}
@@ -716,7 +702,7 @@ export default function DayV2Summary({
             />
             <DayV2Slider
               display={pct(liquidityPct / 100)}
-              label="Minimum liquidity"
+              label="Minimum Liquidity"
               max={25}
               maxLabel="25%"
               min={0}
@@ -783,57 +769,55 @@ export default function DayV2Summary({
               <>
                 Timing, maximum discount, and premium curves ·{" "}
                 {advancedChanged
-                  ? "custom settings"
-                  : "recommended defaults applied"}
+                  ? "Custom Settings"
+                  : "Recommended Defaults Applied"}
               </>
             }
             summary="Advanced market mechanics"
           >
             <DayV2Parameters
-                bandPct={bandPct}
-                ceilingPct={resolved.riskCeiling * 100}
-                coveragePct={coveragePct}
-                curveOverridden={curveOverridden}
-                derivedLiqSharePct={resolved.derived.liquidityYieldShare * 100}
-                derivedRiskSharePct={resolved.derived.riskYieldShare * 100}
-                liqCeilingPct={resolved.liquidityCeiling * 100}
-                liquidityPct={liquidityPct}
-                liqShareOverridden={liqShareOverride !== null}
-                liqSharePct={resolved.liquidityYieldShare * 100}
-                liqY0Pct={resolved.liqY0 * 100}
-                liqY100Pct={resolved.liqY100 * 100}
-                observationDays={observationDays}
-                onBandPct={setBandPct}
-                onLiqSharePct={setLiqShareOverride}
-                onLiqY0Pct={setLiqY0Override}
-                onLiqY100Pct={setLiqY100Override}
-                onObservationDays={setObservationDays}
-                onResetCurve={() => {
-                  setRiskShareOverride(null);
-                  setLiqShareOverride(null);
-                  setY0Override(null);
-                  setY100Override(null);
-                  setLiqY0Override(null);
-                  setLiqY100Override(null);
-                }}
-                onRiskSharePct={setRiskShareOverride}
-                onY0Pct={setY0Override}
-                onY100Pct={setY100Override}
-                riskShareOverridden={riskShareOverride !== null}
-                riskSharePct={resolved.riskYieldShare * 100}
-                seniorShareOfCapital={
-                  model.balances.st + model.balances.jt + model.balances.lt > 0
-                    ? model.balances.st /
-                      (model.balances.st +
-                        model.balances.jt +
-                        model.balances.lt)
-                    : 1
-                }
-                sourceApy={source}
-                startIndex={customSource ? 4 : 3}
-                targetUtilization={DAY_TARGET_UTILIZATION}
-                y0Pct={resolved.y0 * 100}
-                y100Pct={resolved.y100 * 100}
+              bandPct={bandPct}
+              ceilingPct={resolved.riskCeiling * 100}
+              coveragePct={coveragePct}
+              curveOverridden={curveOverridden}
+              derivedLiqSharePct={resolved.derived.liquidityYieldShare * 100}
+              derivedRiskSharePct={resolved.derived.riskYieldShare * 100}
+              liqCeilingPct={resolved.liquidityCeiling * 100}
+              liquidityPct={liquidityPct}
+              liqShareOverridden={liqShareOverride !== null}
+              liqSharePct={resolved.liquidityYieldShare * 100}
+              liqY0Pct={resolved.liqY0 * 100}
+              liqY100Pct={resolved.liqY100 * 100}
+              observationDays={observationDays}
+              onBandPct={setBandPct}
+              onLiqSharePct={setLiqShareOverride}
+              onLiqY0Pct={setLiqY0Override}
+              onLiqY100Pct={setLiqY100Override}
+              onObservationDays={setObservationDays}
+              onResetCurve={() => {
+                setRiskShareOverride(null);
+                setLiqShareOverride(null);
+                setY0Override(null);
+                setY100Override(null);
+                setLiqY0Override(null);
+                setLiqY100Override(null);
+              }}
+              onRiskSharePct={setRiskShareOverride}
+              onY0Pct={setY0Override}
+              onY100Pct={setY100Override}
+              riskShareOverridden={riskShareOverride !== null}
+              riskSharePct={resolved.riskYieldShare * 100}
+              seniorShareOfCapital={
+                model.balances.st + model.balances.jt + model.balances.lt > 0
+                  ? model.balances.st /
+                    (model.balances.st + model.balances.jt + model.balances.lt)
+                  : 1
+              }
+              sourceApy={source}
+              startIndex={customSource ? 4 : 3}
+              targetUtilization={DAY_TARGET_UTILIZATION}
+              y0Pct={resolved.y0 * 100}
+              y100Pct={resolved.y100 * 100}
             />
           </DayV2Disclosure>
         ) : null}
@@ -901,7 +885,7 @@ export default function DayV2Summary({
         >
           What each position earns at these terms
         </h2>
-        <DayV2DocsLink label="Yield split" topic="yieldSplit" />
+        <DayV2DocsLink label="Yield Split" topic="yieldSplit" />
       </div>
       {/* Three peers, scanned across: identical slots, so the eye compares the
           rate first and reads detail only if it wants to. */}
@@ -938,7 +922,7 @@ export default function DayV2Summary({
                   {position.name}
                 </CardTitle>
                 {position.funded ? null : (
-                  <Badge tone="neutral">not funded</Badge>
+                  <Badge tone="neutral">Not Funded</Badge>
                 )}
               </div>
               <CardDescription>{position.holds}</CardDescription>
@@ -989,7 +973,7 @@ export default function DayV2Summary({
         >
           What can go wrong
         </h2>
-        <DayV2DocsLink label="Protected exit" topic="protectedExit" />
+        <DayV2DocsLink label="Protected Exit" topic="protectedExit" />
       </div>
       {/* Losing money and getting out are the two ways a position goes wrong,
           and the projection above deliberately contains neither. They read

@@ -3,7 +3,6 @@
 import { useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
-import DayV2Button from "@/components/day-v2/DayV2Button";
 import {
   Card,
   CardContent,
@@ -11,13 +10,13 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import DayV2DocsLink from "@/components/day-v2/DayV2DocsLink";
+import DayV3DocsLink from "@/components/day-v3/DayV3DocsLink";
 import {
   pct,
   stake100,
   unitAmount,
-  type DayV2Unit,
-} from "@/components/day-v2/format";
+  type DayV3Unit,
+} from "@/components/day-v3/format";
 import {
   Table,
   TableBody,
@@ -31,7 +30,7 @@ import {
 // Every component is the difference between two `runDayTargetScenario` runs
 // with a premium switched off, so the parts are engine output and they sum to
 // the engine's own total exactly. Nothing here divides a number by hand.
-export type DayV2PositionBreakdown = {
+export type DayV3PositionBreakdown = {
   tone: "senior" | "junior" | "liquidity";
   name: string;
   short: string;
@@ -54,22 +53,22 @@ export type DayV2PositionBreakdown = {
  * twice, so the colour stays and the duplicate words go. The badge is kept for
  * the one state that adds information, which is a position with no capital.
  */
-export const DAY_V2_TONE_DOT: Record<DayV2PositionBreakdown["tone"], string> = {
+export const DAY_V3_TONE_DOT: Record<DayV3PositionBreakdown["tone"], string> = {
   senior: "var(--theme-navy)",
   junior: "var(--theme-brown)",
   liquidity: "var(--theme-green)",
 };
 
-export function DayV2ToneDot({
+export function DayV3ToneDot({
   tone,
 }: {
-  tone: DayV2PositionBreakdown["tone"];
+  tone: DayV3PositionBreakdown["tone"];
 }) {
   return (
     <span
       aria-hidden="true"
       className="inline-block h-2 w-2 shrink-0 rounded-full"
-      style={{ background: DAY_V2_TONE_DOT[tone] }}
+      style={{ background: DAY_V3_TONE_DOT[tone] }}
     />
   );
 }
@@ -110,7 +109,7 @@ function Line({
   );
 }
 
-export default function DayV2Comparison({
+export default function DayV3Comparison({
   poolEconomics,
   positions,
   shares,
@@ -131,13 +130,13 @@ export default function DayV2Comparison({
   };
   /** The venue assumptions the pool base rests on, read off the run's config. */
   poolEconomics: {
-    stableYield: number;
-    swapFeeBps: number;
-    turnoverPerYear: number;
+    stableYield: number | null;
+    swapFeeBps: number | null;
+    turnoverPerYear: number | null;
   };
-  positions: DayV2PositionBreakdown[];
+  positions: DayV3PositionBreakdown[];
   source: number;
-  unit: DayV2Unit;
+  unit: DayV3Unit;
 }) {
   const [open, setOpen] = useState<string | null>(null);
 
@@ -146,7 +145,7 @@ export default function DayV2Comparison({
       <CardHeader>
         <div className="flex items-baseline justify-between gap-2">
           <CardTitle>Position comparison</CardTitle>
-          <DayV2DocsLink label="How Yield Is Split" topic="yieldSplit" />
+          <DayV3DocsLink label="How yield is split" topic="yieldSplit" />
         </div>
         {/* A basis is prose, not status. Badges are for state. */}
         <CardDescription>
@@ -159,11 +158,9 @@ export default function DayV2Comparison({
             came from. Otherwise the two premiums are numbers that appear from
             nowhere and the reader cannot tell whether they were chosen. */}
         <p className="max-w-[76ch] rounded-lg border border-dashed border-[var(--border-subtle)] px-3.5 py-2.5 text-[11px] leading-relaxed text-[var(--secondary)]">
-          {shares.deploying
-            ? shares.curveOverridden
-              ? "Custom curves. "
-              : "Source-default curves. "
-            : null}
+          {shares.curveOverridden
+            ? "Manual yield-share curves. "
+            : "Source-model yield-share curves. "}
           At the {pct(shares.targetUtilization)} target, Jr receives{" "}
           <strong className="font-mono font-semibold tabular-nums">
             {pct(shares.riskSharePct / 100)}
@@ -173,20 +170,9 @@ export default function DayV2Comparison({
           <strong className="font-mono font-semibold tabular-nums">
             {pct(shares.liqSharePct / 100)}
           </strong>{" "}
-          at {pct(shares.liquidityPct / 100)} minimum liquidity.
-          {shares.deploying ? null : (
-            <>
-              {" "}
-              <DayV2Button
-                onClick={shares.onOpenDeploy}
-                size="inline"
-                variant="link"
-              >
-                Edit curves in Deploy
-              </DayV2Button>
-              .
-            </>
-          )}
+          at {pct(shares.liquidityPct / 100)} minimum liquidity. These curves
+          are visible simulation assumptions; V3 does not export them as
+          issuer-approved deployment terms.
         </p>
         <Table>
           <TableHeader>
@@ -219,7 +205,7 @@ export default function DayV2Comparison({
 
             {positions.map((position) => {
               const expanded = open === position.short;
-              const detailsId = `day-v2-${position.short.toLowerCase()}-breakdown`;
+              const detailsId = `day-v3-${position.short.toLowerCase()}-breakdown`;
               const toggle = () => {
                 if (!position.funded) return;
                 setOpen(expanded ? null : position.short);
@@ -254,10 +240,10 @@ export default function DayV2Comparison({
                 >
                   <TableCell className="font-semibold whitespace-nowrap">
                     <span className="flex items-center gap-2">
-                      <DayV2ToneDot tone={position.tone} />
+                      <DayV3ToneDot tone={position.tone} />
                       {position.name}
                       {position.funded ? null : (
-                        <Badge tone="neutral">Not Funded</Badge>
+                        <Badge tone="neutral">not funded</Badge>
                       )}
                     </span>
                   </TableCell>
@@ -304,7 +290,16 @@ export default function DayV2Comparison({
                         ) : (
                           <Line
                             label="SLP pool carry"
-                            note={`Sr/exit-asset mix; ${pct(poolEconomics.stableYield)} exit yield; ${poolEconomics.swapFeeBps} bps × ${poolEconomics.turnoverPerYear}x modeled swaps`}
+                            note={
+                              poolEconomics.stableYield === null ||
+                              poolEconomics.swapFeeBps === null ||
+                              poolEconomics.turnoverPerYear === null
+                                ? "Live template fee unresolved; no exit-asset yield or swap-volume income is forecast"
+                                : poolEconomics.stableYield === 0 &&
+                                    poolEconomics.turnoverPerYear === 0
+                                  ? `${poolEconomics.swapFeeBps} bps live fee prices execution; V3 forecasts no exit-asset yield or swap-volume income`
+                                  : `Sr/exit-asset mix; ${pct(poolEconomics.stableYield)} exit yield; ${poolEconomics.swapFeeBps} bps × ${poolEconomics.turnoverPerYear}x modeled swaps`
+                            }
                             value={exact(position.base)}
                           />
                         )}

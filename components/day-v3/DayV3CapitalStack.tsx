@@ -3,9 +3,9 @@
 import { memo } from "react";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import DayV2DocsLink from "@/components/day-v2/DayV2DocsLink";
-import DayV2StackDiagram from "@/components/day-v2/DayV2StackDiagram";
-import { pct, unitRatio, type DayV2Unit } from "@/components/day-v2/format";
+import DayV3DocsLink from "@/components/day-v3/DayV3DocsLink";
+import DayV3StackDiagram from "@/components/day-v3/DayV3StackDiagram";
+import { pct, unitRatio, type DayV3Unit } from "@/components/day-v3/format";
 import {
   dayCapitalAtUtilization,
   dayCapitalInYieldSource,
@@ -29,7 +29,7 @@ import type { DaySimulatorDefaults } from "@/lib/day-simulator-template/market";
  * and the rates are two readings of one market. The target and minimum columns
  * keep that distinction visible without repeating a notional-sized summary.
  */
-function DayV2CapitalStack({
+function DayV3CapitalStack({
   balances,
   coverage,
   defaults,
@@ -48,7 +48,7 @@ function DayV2CapitalStack({
    *  the pool's Senior leg and not its exit-asset leg. */
   poolSeniorWeight: number;
   targetUtilization: number;
-  unit: DayV2Unit;
+  unit: DayV3Unit;
 }) {
   const { st, jt, lt } = balances;
   // Senior is the reference, not a fourth figure: an issuer picks the Senior
@@ -128,7 +128,7 @@ function DayV2CapitalStack({
       <CardHeader>
         <div className="flex items-baseline justify-between gap-2">
           <CardTitle>What it takes to open</CardTitle>
-          <DayV2DocsLink label="How Tranching Works" topic="tranching" />
+          <DayV3DocsLink label="How tranching works" topic="tranching" />
         </div>
       </CardHeader>
 
@@ -137,7 +137,7 @@ function DayV2CapitalStack({
           {/* Per 100 of Senior, exactly like the table beside it. Passing the
               raw balances printed $40000000.0 on the Senior block: `initialST`
               is a modelling basis, not anybody's raise. */}
-          <DayV2StackDiagram
+          <DayV3StackDiagram
             jt={per100(jt)}
             jtFloor={per100(floor.jt)}
             lt={per100(lt)}
@@ -319,4 +319,4 @@ function DayV2CapitalStack({
   );
 }
 
-export default memo(DayV2CapitalStack);
+export default memo(DayV3CapitalStack);

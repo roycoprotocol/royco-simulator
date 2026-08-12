@@ -2,10 +2,10 @@
 
 import { useMemo, useState } from "react";
 
-import DayV2DocsLink from "@/components/day-v2/DayV2DocsLink";
-import DayV2ExitChart, {
-  type DayV2ExitPoint,
-} from "@/components/day-v2/DayV2ExitChart";
+import DayV3DocsLink from "@/components/day-v3/DayV3DocsLink";
+import DayV3ExitChart, {
+  type DayV3ExitPoint,
+} from "@/components/day-v3/DayV3ExitChart";
 import {
   Card,
   CardContent,
@@ -18,9 +18,9 @@ import {
   compactAmount,
   isUsdUnit,
   pct,
-  type DayV2Unit,
-} from "@/components/day-v2/format";
-import { dayV2RangeStyle } from "@/components/day-v2/range";
+  type DayV3Unit,
+} from "@/components/day-v3/format";
+import { dayV3RangeStyle } from "@/components/day-v3/range";
 import {
   Table,
   TableBody,
@@ -38,7 +38,7 @@ import type { DayExplainerMetrics } from "@/lib/day-simulator-template/explainer
 //   slippage     = 1 - executionPrice
 // So a curve point's dollar cost is `sellNAV * slippage` by the engine's own
 // definition of those fields, not a formula invented in the UI.
-export default function DayV2ExitCost({
+export default function DayV3ExitCost({
   assumptions,
   metrics,
   unit,
@@ -51,14 +51,14 @@ export default function DayV2ExitCost({
     turnoverPerYear: number;
   };
   metrics: DayExplainerMetrics["liquidity"];
-  unit: DayV2Unit;
+  unit: DayV3Unit;
 }) {
   // Two of the thirteen markets are quoted in ETH and one in BTC, and every
   // figure here was printed with a hard "$". The same defect was found and
   // fixed once already in the backtest: the rule is to drop the symbol rather
   // than assert a currency nobody quoted the market in.
   const amount = (value: number) => compactAmount(value, unit);
-  const points = useMemo<DayV2ExitPoint[]>(
+  const points = useMemo<DayV3ExitPoint[]>(
     () =>
       metrics.curve.map((point) => ({
         sellNAV: point.sellNAV,
@@ -119,7 +119,7 @@ export default function DayV2ExitCost({
       <CardHeader>
         <div className="flex items-center justify-between gap-2">
           <CardTitle className="text-[17px]">Exit cost and depth</CardTitle>
-          <DayV2DocsLink label="SLP Mechanics" topic="slpTranche" />
+          <DayV3DocsLink label="SLP mechanics" topic="slpTranche" />
         </div>
         <CardDescription>
           One-trade SLP capacity in a 90/10 Balancer E-CLP (λ
@@ -170,12 +170,12 @@ export default function DayV2ExitCost({
               <input
                 aria-label="Senior amount sold into the SLP"
                 aria-valuetext={`${amount(sellNAV)}, ${pct(shareOfSr)} of the Senior position`}
-                className="day-v2-range"
+                className="day-v3-range"
                 max={metrics.curve.length - 1}
                 min={0}
                 onChange={(event) => setRawIndex(Number(event.target.value))}
                 step={1}
-                style={dayV2RangeStyle(index, 0, metrics.curve.length - 1)}
+                style={dayV3RangeStyle(index, 0, metrics.curve.length - 1)}
                 type="range"
                 value={index}
               />
@@ -229,7 +229,7 @@ export default function DayV2ExitCost({
               </div>
             </div>
 
-            <DayV2ExitChart
+            <DayV3ExitChart
               compactUsd={amount}
               marker={points[index]}
               points={points}

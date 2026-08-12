@@ -61,56 +61,60 @@ export default function DayV2Slider({
         big ? "gap-2.5 px-4 py-3" : "gap-2 px-3 py-2.5"
       }`}
     >
-      <label className={`flex cursor-pointer flex-col ${big ? "gap-2.5" : "gap-2"}`}>
-      <span className="flex items-baseline justify-between gap-3">
-        <span className="min-w-0 truncate text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--tertiary)]">
-          {label}
-          {note ? (
-            // Dropped only in the band where cells sit side by side but stay
-            // narrow, roughly 640 to 1024, where the note is what gets clipped.
-            <span className="inline font-normal normal-case tracking-normal sm:hidden lg:inline">
-              {" · "}
-              {note}
-            </span>
-          ) : null}
+      <label
+        className={`flex cursor-pointer flex-col ${big ? "gap-2.5" : "gap-2"}`}
+      >
+        <span className="flex items-baseline justify-between gap-3">
+          <span className="min-w-0 truncate text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--tertiary)]">
+            {label}
+            {note ? (
+              // Dropped only in the band where cells sit side by side but stay
+              // narrow, roughly 640 to 1024, where the note is what gets clipped.
+              <span className="inline font-normal normal-case tracking-normal sm:hidden lg:inline">
+                {" · "}
+                {note}
+              </span>
+            ) : null}
+          </span>
+          <span
+            className={`shrink-0 font-mono font-bold leading-none tracking-[-0.02em] tabular-nums ${
+              big ? "text-[22px]" : "text-[15px]"
+            }`}
+          >
+            {display}
+          </span>
         </span>
-        <span
-          className={`shrink-0 font-mono font-bold leading-none tracking-[-0.02em] tabular-nums ${
-            big ? "text-[22px]" : "text-[15px]"
-          }`}
-        >
-          {display}
+        <span className="flex items-center gap-2.5">
+          <span className="w-7 shrink-0 text-right font-mono text-[9.5px] tabular-nums text-[var(--tertiary)]">
+            {minLabel}
+          </span>
+          <input
+            // Named explicitly. The wrapping label would otherwise give the range
+            // the whole cell's text as its accessible name, so a screen reader
+            // announced the label, the big value and both endpoint numbers as one
+            // string. The note is worth keeping in the name: "coverage,
+            // first-loss requirement" is the useful reading.
+            aria-label={note ? `${label}, ${note}` : label}
+            className="day-v2-range"
+            max={max}
+            min={min}
+            onChange={(event) => onChange(Number(event.target.value))}
+            step={step}
+            style={dayV2RangeStyle(value, min, max)}
+            type="range"
+            value={value}
+          />
+          <span className="w-7 shrink-0 font-mono text-[9.5px] tabular-nums text-[var(--tertiary)]">
+            {maxLabel}
+          </span>
         </span>
-      </span>
-      <span className="flex items-center gap-2.5">
-        <span className="w-7 shrink-0 text-right font-mono text-[9.5px] tabular-nums text-[var(--tertiary)]">
-          {minLabel}
-        </span>
-        <input
-          // Named explicitly. The wrapping label would otherwise give the range
-          // the whole cell's text as its accessible name, so a screen reader
-          // announced the label, the big value and both endpoint numbers as one
-          // string. The note is worth keeping in the name: "coverage,
-          // first-loss requirement" is the useful reading.
-          aria-label={note ? `${label}, ${note}` : label}
-          className="day-v2-range"
-          max={max}
-          min={min}
-          onChange={(event) => onChange(Number(event.target.value))}
-          step={step}
-          style={dayV2RangeStyle(value, min, max)}
-          type="range"
-          value={value}
-        />
-        <span className="w-7 shrink-0 font-mono text-[9.5px] tabular-nums text-[var(--tertiary)]">
-          {maxLabel}
-        </span>
-      </span>
       </label>
       {hint || docs ? (
         <span className="flex items-baseline justify-between gap-2">
-          <span className="text-[10px] leading-snug text-[var(--tertiary)]">{hint}</span>
-          {docs ? <DayV2DocsLink label={label.toLowerCase()} topic={docs} /> : null}
+          <span className="text-[10px] leading-snug text-[var(--tertiary)]">
+            {hint}
+          </span>
+          {docs ? <DayV2DocsLink label={label} topic={docs} /> : null}
         </span>
       ) : null}
     </div>

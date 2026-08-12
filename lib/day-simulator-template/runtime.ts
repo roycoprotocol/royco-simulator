@@ -1,5 +1,6 @@
 import { Sim, defaultConfig, steadyYear } from "@/lib/day/engine/runner";
 import type { MarketConfig } from "@/lib/day/engine/types";
+import { dayCapitalAtUtilization } from "@/lib/day-simulator-template/capital-sizing";
 import type {
   DayForwardScenarioId,
   DayForwardTestCustomization,
@@ -113,15 +114,13 @@ export function buildDayInitialBalances(
   defaults: DaySimulatorDefaults,
   terms: Pick<DayEditableTerms, "coverage" | "minLiquidity">,
 ): { st: number; jt: number; lt: number } {
-  const juniorRatio = terms.coverage / Math.max(DAY_TARGET_UTILIZATION - terms.coverage, 0.001);
-  const liquidityRatio = terms.minLiquidity / DAY_TARGET_UTILIZATION;
-  return {
-    st: defaults.initialST,
-    jt: defaults.linkJuniorToFirstLoss
-      ? defaults.initialST * juniorRatio
-      : defaults.initialJT,
-    lt: defaults.initialST * liquidityRatio,
-  };
+  // Ask the engine-defined utilization functions for the target balances. The
+  // former closed-form float expression could land a few wei below the required
+  // capital at high-but-valid coverage settings (for example 50.01%), causing
+  // `newMarket` to reject an otherwise valid V3 design. The shared inversion is
+  // already the canonical capital-sizing path and preserves the same 90% target
+  // and unlinked-Junior behavior for every existing simulator.
+  return dayCapitalAtUtilization(defaults, terms, DAY_TARGET_UTILIZATION);
 }
 
 export function buildDayMarketConfig(
@@ -164,6 +163,7 @@ export function buildDayMarketConfig(
 export function runDayTargetScenario(
   defaults: DaySimulatorDefaults,
   overrides: Partial<Pick<DayEditableTerms, "riskYieldShare" | "liquidityYieldShare">> = {},
+  configOverrides: Partial<Pick<MarketConfig, "swapFeeBps" | "eclpParams">> = {},
 ): { seniorApy: number; juniorApy: number; liquidityApy: number } {
   const terms: DayEditableTerms = {
     coverage: defaults.coverage,
@@ -173,7 +173,7 @@ export function runDayTargetScenario(
     riskYieldShare: overrides.riskYieldShare ?? defaults.riskYDM.yTarget,
     liquidityYieldShare: overrides.liquidityYieldShare ?? defaults.liqYDM.yTarget,
   };
-  const cfg = buildDayMarketConfig(defaults, terms);
+  const cfg = { ...buildDayMarketConfig(defaults, terms), ...configOverrides };
   const initial = buildDayInitialBalances(defaults, terms);
   const sim = new Sim(cfg, initial);
   const opening = sim.last();

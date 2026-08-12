@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 
+import { Sim } from '@/lib/day/engine/runner';
 import { DAY_MARKETS } from '@/lib/day-markets/registry';
 import {
   dayCapitalAtUtilization,
@@ -21,11 +22,11 @@ const TARGET = 0.9;
 const rel = (a: number, b: number) => (b === 0 ? Math.abs(a) : Math.abs(a - b) / Math.abs(b));
 
 // ---------------------------------------------------------------------------
-// The inversion agrees with the engine's own sizing at the target
+// The public target-sizing paths agree across every market
 // ---------------------------------------------------------------------------
-// This is the whole basis for trusting the 100% answer: the same solver, run at
-// 0.90, has to land on what `buildDayInitialBalances` already produces. If this
-// drifts, the minimum column is wrong too and nothing else would catch it.
+// The runtime factory delegates to the exact engine inversion. Keep that
+// contract pinned so future wiring changes cannot size the rendered market and
+// the capital table through different paths.
 for (const market of DAY_MARKETS) {
   const defaults = market.defaults;
   for (const coverage of [0, 0.01, 0.05, 0.1, 0.2, 0.25]) {
@@ -55,6 +56,29 @@ for (const market of DAY_MARKETS) {
 // The floor is below the target, and is the requirement met exactly
 // ---------------------------------------------------------------------------
 const jbbb = DAY_MARKETS.find((m) => m.id === 'jbbb')!.defaults;
+
+// Decimal requirements close to the 90% target used to be sized a few wei
+// short by the UI's float formula, even though the exact engine inversion found
+// a valid stack. These are the manual-override values that previously crashed
+// /v3 during server rendering.
+for (const coverage of [0.5001, 0.8, 0.8999]) {
+  const terms = {
+    coverage,
+    minLiquidity: 0.1,
+    eclpBandWidth: jbbb.eclpBandWidth,
+    observationDays: jbbb.observationDays,
+    riskYieldShare: jbbb.riskYDM.yTarget,
+    liquidityYieldShare: jbbb.liqYDM.yTarget,
+  };
+  const balances = buildDayInitialBalances(jbbb, terms);
+  const cfg = buildDayMarketConfig(jbbb, terms);
+  assert.doesNotThrow(() => new Sim(cfg, balances));
+  assert.doesNotThrow(() => dayPoolSeniorWeight(cfg));
+  check(
+    `cov=${coverage}: exact target balances and pool probe initialize a valid market`,
+    balances.jt > 0 && Math.abs(dayPoolSeniorWeight(cfg) - 0.1) < 1e-12,
+  );
+}
 
 for (const coverage of [0.05, 0.1, 0.2, 0.25]) {
   const terms = { coverage, minLiquidity: 0.1 };

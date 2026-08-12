@@ -10,8 +10,8 @@ import type { DaySimulatorDefaults } from '@/lib/day-simulator-template/market';
 /**
  * How much capital each leg needs to hold a given utilization.
  *
- * `buildDayInitialBalances` answers this at the 0.90 target and only there, and
- * the target is not the whole answer an issuer wants. The requirement is only
+ * `buildDayInitialBalances` delegates here at the 0.90 target, and the target
+ * is not the whole answer an issuer wants. The requirement is only
  * literally met at 100% utilization: that is the floor, the least capital that
  * satisfies the term at all. The target is where the market is designed to sit,
  * with headroom above the floor. Showing one without the other makes the target
@@ -21,10 +21,9 @@ import type { DaySimulatorDefaults } from '@/lib/day-simulator-template/market';
  * `coverageUtilizationWad` and `liquidityUtilizationWad` in the engine, and this
  * module inverts those functions numerically rather than re-deriving their
  * algebra. Re-deriving is how the two drift apart, and AGENTS.md rule 1 exists
- * for exactly this. `capital-sizing.test.ts` pins the inversion by asserting it
- * reproduces `buildDayInitialBalances` at 0.90 across every market and a range
- * of settings, so the 100% answer is trustworthy for the same reason the 90%
- * one is.
+ * for exactly this. `capital-sizing.test.ts` pins the shared target-sizing
+ * contract across every market and a range of settings, then exercises the
+ * resulting balances through the accountant.
  */
 
 /** Bisect for the capital that drives `utilizationOf` down to `target`.
@@ -67,7 +66,20 @@ function solveCapital(
  * change to that constant shows up here rather than silently disagreeing.
  */
 export function dayPoolSeniorWeight(cfg: MarketConfig): number {
-  const probe = newMarket(cfg, { st: 1, jt: 1, lt: 1 });
+  // Seed the probe through the same exact utilization inversion used by the
+  // real market. A fixed 1/1/1 probe is invalid whenever a legitimate coverage
+  // requirement exceeds 50%, so merely asking for the pool's fixed composition
+  // could previously take V3 down before its actual target balances were used.
+  const probeBalances = dayCapitalAtUtilization(
+    {
+      initialST: 1,
+      initialJT: 1,
+      linkJuniorToFirstLoss: true,
+    },
+    { coverage: cfg.coverage, minLiquidity: cfg.minLiquidity },
+    Math.min(cfg.targetUtilization, cfg.liqTargetUtilization),
+  );
+  const probe = newMarket(cfg, probeBalances);
   const stShares = Number(probe.pool.stShares);
   const stable = Number(probe.pool.stable);
   const total = stShares + stable;
@@ -94,11 +106,14 @@ export type DayCapitalSizing = { st: number; jt: number; lt: number };
 /**
  * The stack sized so both utilizations land on `utilization`.
  *
- * At 0.90 this reproduces `buildDayInitialBalances`. At 1.0 it is the floor:
- * the least Junior and pool capital that satisfies the two requirements.
+ * At 0.90 this is the path used by `buildDayInitialBalances`. At 1.0 it is the
+ * floor: the least Junior and pool capital that satisfies the two requirements.
  */
 export function dayCapitalAtUtilization(
-  defaults: DaySimulatorDefaults,
+  defaults: Pick<
+    DaySimulatorDefaults,
+    "initialST" | "initialJT" | "linkJuniorToFirstLoss"
+  >,
   terms: { coverage: number; minLiquidity: number },
   utilization: number,
 ): DayCapitalSizing {
