@@ -139,7 +139,7 @@ Certification runs data verification, accountant runtime checks, all 74 Solidity
 
 ```text
 Data integrity: PASS
-Accountant parity: PASS (74/74 Solidity vectors)
+Accountant parity: PASS (74/74 replayed vectors from royco-day @952d229689)
 Calibration guardrails: PASS
 Locked copy: PASS
 Design contract: PASS
@@ -166,7 +166,9 @@ The SHA-256 lock file makes that boundary machine-verifiable. It prevents a mark
 
 All Day state transitions and outputs flow through `lib/day/engine`. Shared wiring in `lib/day-simulator-template/runtime.ts` is the only adapter allowed to build initial balances and accountant configuration. The UI, market files, calibration command, and verifier consume this shared adapter; none may duplicate its formulas.
 
-The Solidity suite contains 52 Foundry-generated core accountant vectors and 22 pinned current-contract vectors. It covers SLP commitment/reinvestment (contract symbol LT), all four fee rates, ST liquidity-premium share minting, all six post-operation paths, coverage/liquidity gates, Protected Exit, one-wei rounding, and the mint-dilution clamp. Regenerate vectors only from the locked compiled contracts using the documented generator—never from TypeScript.
+The Solidity suite contains 52 Foundry-generated core accountant vectors and 22 vectors generated from the contract commit pinned in `lib/day/engine/vectors/contract-lock.json`. It covers SLP commitment/reinvestment (contract symbol LPT), all four fee rates, ST liquidity-premium share minting, all six post-operation paths, coverage/liquidity gates, Protected Exit, one-wei rounding, and the mint-dilution clamp. Regenerate vectors only from the locked compiled contracts using the documented generator—never from TypeScript.
+
+`day-sim:parity` replays these checked-in vectors; it does not compile Solidity. A PASS therefore means the engine still reproduces the vectors generated from the pinned commit. Whenever the pin is advanced, the generator has to be re-run against the new commit, and the harness in `lib/day/engine/harness/` has to be updated first if the accountant's struct or enum names moved — a stale harness fails to compile rather than producing wrong vectors, which is the intended failure mode.
 
 SLP stable-asset yield, trading-fee income, turnover, and execution-liquidity economics are variable off-chain model inputs. They are invariant-tested, but they are not fixed onchain economics.
 

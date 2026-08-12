@@ -10,7 +10,9 @@ import {
   dayAdaptationSpeedApplies,
   dayCurveModelIsAdaptive,
   dayDerivedExpiryDays,
+  dayExitBufferFromLiquidationUtilization,
   dayExitBufferPctFromAbsolute,
+  dayLiquidationUtilizationFromExitBuffer,
   dayRestockHurdleBps,
   dayValidateDeployFields,
 } from '@/lib/day-simulator-template/deploy-fields';
@@ -300,5 +302,55 @@ for (const [id, rule] of Object.entries(DAY_DEPLOY_FIELD_RULES)) {
     check(`rule ${id} has a coherent range`, rule.min < rule.max, `${rule.min}..${rule.max}`);
   }
 }
+
+// ---------------------------------------------------------------------------
+// The protected-exit threshold is one setting in two scales. The converters are
+// the only place the inversion is written, so they are the only place it can go
+// wrong: a caller that open-codes `100 / v` against a percent-scaled value is
+// off by 100x and reads as plausible either way.
+// ---------------------------------------------------------------------------
+
+// The relationship itself, at the anchors a reader can check by hand.
+check(
+  '100% of the requirement standing is 1.0x utilization',
+  dayLiquidationUtilizationFromExitBuffer(100) === 1,
+  String(dayLiquidationUtilizationFromExitBuffer(100)),
+);
+check(
+  '50% standing is 2.0x utilization',
+  dayLiquidationUtilizationFromExitBuffer(50) === 2,
+  String(dayLiquidationUtilizationFromExitBuffer(50)),
+);
+check(
+  '10% standing is 10x utilization',
+  dayLiquidationUtilizationFromExitBuffer(10) === 10,
+  String(dayLiquidationUtilizationFromExitBuffer(10)),
+);
+
+// Round-trips, which is what "consistent" has to mean in practice.
+for (const pct of [0.01, 1, 5, 12.5, 50, 71.43, 99.91, 100]) {
+  const back = dayExitBufferFromLiquidationUtilization(
+    dayLiquidationUtilizationFromExitBuffer(pct),
+  );
+  check(
+    `exit buffer ${pct}% round-trips through utilization`,
+    Math.abs(back - pct) < 1e-9,
+    `got ${back}`,
+  );
+}
+
+// The floor keeps a zero threshold finite rather than Infinity.
+check(
+  'a zero threshold is floored, not divided by zero',
+  Number.isFinite(dayLiquidationUtilizationFromExitBuffer(0)),
+  String(dayLiquidationUtilizationFromExitBuffer(0)),
+);
+
+// The two scales are genuinely different numbers, which is the trap this guards.
+check(
+  'the absolute and share-of-requirement units are not interchangeable',
+  dayAbsoluteFromExitBufferPct(50, 10) === 5
+    && dayExitBufferPctFromAbsolute(5, 10) === 50,
+);
 
 console.log(`deploy-fields: ${passed} checks passed`);

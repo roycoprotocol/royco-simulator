@@ -16,6 +16,7 @@ import {
   runDayTargetScenario,
 } from "./runtime";
 import { annualizedSeriesApy, hasObservedDrawdown } from "./series";
+import { dayLiquidationUtilizationFromExitBuffer } from "./deploy-fields";
 
 const market = manifest as DayMarketManifest;
 assert.deepEqual(validateDayMarketCustomization(market.customization), []);
@@ -223,6 +224,24 @@ assert.equal(config.targetUtilization, 0.9);
 assert.equal(config.liqTargetUtilization, 0.9);
 assert.equal(config.fixedTermDurationSec, 7 * 86_400);
 assert.equal(config.liquidationUtilization, 100);
+// The manifest's exitBufferPct is the share of the coverage requirement still
+// standing when the protected exit arms; the engine takes the inverse of it as a
+// utilization ratio. Asserted through the shared converter as well as against the
+// literal above, so the config and the converter cannot drift apart.
+assert.equal(
+  config.liquidationUtilization,
+  dayLiquidationUtilizationFromExitBuffer(market.defaults.exitBufferPct),
+);
+for (const exitBufferPct of [1, 5, 50, 99.91]) {
+  const scoped = buildDayMarketConfig(
+    { ...market.defaults, exitBufferPct },
+    terms,
+  );
+  assert.equal(
+    scoped.liquidationUtilization,
+    dayLiquidationUtilizationFromExitBuffer(exitBufferPct),
+  );
+}
 assert.equal(config.eclpBandWidth, market.defaults.eclpBandWidth);
 assert.equal(config.yieldShareProtocolFee, market.defaults.jtYieldShareProtocolFee);
 assert.equal(config.ltYieldShareProtocolFee, market.defaults.ltYieldShareProtocolFee);

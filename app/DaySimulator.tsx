@@ -451,7 +451,7 @@ export default function DaySimulator() {
   // ---------------------------------------------------------------------------
   // YDM chart data — 101 points sweeping each curve over its OWN utilization
   // axis. The risk YDM (→JT) is keyed on coverage utilization; the liquidity
-  // Liquidity YDM (→SLP; contract symbol LT) is keyed on liquidity utilization. These two utilizations move
+  // Liquidity YDM (→SLP; contract symbol LPT) is keyed on liquidity utilization. These two utilizations move
   // independently, so each curve gets its own chart and axis.
   // ---------------------------------------------------------------------------
   const riskCurveData = useMemo(() => {
@@ -570,7 +570,7 @@ export default function DaySimulator() {
                     Key Takeaway
                   </div>
                   <p className="text-sm text-[var(--secondary-text)]">
-                    Royco Day adds the Senior Liquidity Provider (SLP; contract symbol LT), which provides secondary liquidity for ST sales through an E-CLP BPT pool and earns a liquidity premium and trading fees.
+                    Royco Day adds the Senior Liquidity Provider (SLP; contract symbol LPT), which provides secondary liquidity for ST sales through an E-CLP BPT pool and earns a liquidity premium and trading fees.
                   </p>
                 </div>
               </div>
@@ -587,7 +587,7 @@ export default function DaySimulator() {
                     </p>
                   </div>
                   <p className="text-sm text-[var(--secondary-text)] leading-relaxed">
-                    Senior Tranche (ST) = first-loss covered capital. Junior Tranche (JT) = first-loss capital. Senior Liquidity Provider (SLP; LT in the contracts) = the AMM-backed secondary-liquidity position.
+                    Senior Tranche (ST) = first-loss covered capital. Junior Tranche (JT) = first-loss capital. Senior Liquidity Provider (SLP; LPT in the contracts) = the AMM-backed secondary-liquidity position.
                   </p>
                 </div>
 
@@ -625,7 +625,7 @@ export default function DaySimulator() {
                       4
                     </span>
                     <p className="text-sm font-medium text-[var(--primary-text)]">
-                      SLP position (contract: LT)
+                      SLP position (contract: LPT)
                     </p>
                   </div>
                   <p className="text-sm text-[var(--secondary-text)] leading-relaxed">
@@ -742,7 +742,7 @@ export default function DaySimulator() {
             <Field label="Junior (JT)">
               <NumIn value={initJT} step={1_000_000} w={96} onChange={setInitJT} />
             </Field>
-              <Field label="SLP (contract: LT)">
+              <Field label="SLP (contract: LPT)">
               <NumIn value={initLT} step={500_000} w={96} onChange={setInitLT} />
             </Field>
           </Card>

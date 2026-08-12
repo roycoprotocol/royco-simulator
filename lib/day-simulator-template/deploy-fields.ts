@@ -35,7 +35,10 @@ export const DAY_UINT24_DAYS = 16_777_215 / 86_400;
  *  Source: constants.ts UINT32_MAX = 4_294_967_295. */
 export const DAY_UINT32_DAYS = 4_294_967_295 / 86_400;
 
-/** The T+1 withdrawal floor. Royco mandates it, the chain does not.
+/** The T+1 withdrawal floor, enforced in both places. The deploy flow mandates
+ *  it, and the Day deployment template also rejects any tranche configured
+ *  below it (MIN_REDEMPTION_DELAY_SECONDS = 24 hours, reverting with
+ *  REDEMPTION_DELAY_BELOW_MIN), so a sub-24h exit delay is not deployable.
  *  Source: constants.ts MIN_REDEMPTION_DELAY_SECONDS = 86_400. */
 export const DAY_MIN_WITHDRAWAL_DELAY_DAYS = 1;
 
@@ -155,6 +158,35 @@ export function dayAbsoluteFromExitBufferPct(
   coveragePct: number,
 ): number {
   return (exitBufferPct / 100) * coveragePct;
+}
+
+/** Floor applied before inverting, so a zero threshold cannot divide by zero.
+ *  Matches the guard the engine config has always used. */
+export const DAY_EXIT_BUFFER_MIN_PCT = 0.01;
+
+/**
+ * `exitBufferPct` and `liquidationUtilization` are the same setting inverted.
+ *
+ *     liquidationUtilization = 100 / exitBufferPct
+ *     exitBufferPct          = 100 / liquidationUtilization
+ *
+ * `exitBufferPct` is a PERCENTAGE: the share of the coverage requirement still
+ * standing when the protected exit arms. `liquidationUtilization` is a RATIO:
+ * the coverage utilization at that same moment, which is the form the engine
+ * config and the accountant both take. 50% standing is 2.0x utilization; 99.91%
+ * standing is 1.0009x.
+ *
+ * Both directions live here so that no caller open-codes the inversion. Three
+ * spellings of it used to be scattered across the codebase in two different
+ * scales (`100 / v` returning a ratio, `10000 / v` returning a percent), which
+ * is what made the setting hard to read.
+ */
+export function dayLiquidationUtilizationFromExitBuffer(exitBufferPct: number): number {
+  return 100 / Math.max(exitBufferPct, DAY_EXIT_BUFFER_MIN_PCT);
+}
+
+export function dayExitBufferFromLiquidationUtilization(liquidationUtilization: number): number {
+  return 100 / Math.max(liquidationUtilization, DAY_EXIT_BUFFER_MIN_PCT);
 }
 
 // ---------------------------------------------------------------------------

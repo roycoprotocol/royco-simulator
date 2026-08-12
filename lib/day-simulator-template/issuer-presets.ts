@@ -32,7 +32,7 @@ export const DAY_ISSUER_PRESETS: readonly DayIssuerPreset[] = [
     label: 'Lower Sr volatility',
     caption: 'Deep Jr buffer, tight peg band, long recovery window',
     rationale:
-      'A 25% minimum coverage requirement sizes the largest Jr first-loss buffer the market allows, a 1% E-CLP band keeps modeled pool prices close to $1, and a 90-day Observation Period gives the source time to recover before a covered loss is finalized. Jr is paid 25% of Sr yield and SLP 10%, in proportion to what each supplies.',
+      'A 25% minimum coverage requirement sizes the deepest Jr first-loss buffer this page offers, a 1% E-CLP band keeps modeled pool prices close to $1, and a 90-day Observation Period gives the source time to recover before a covered loss is finalized. Jr is paid 25% of Sr yield and SLP 10%, in proportion to what each supplies.',
     values: {
       coveragePct: 25,
       minLiquidityPct: 20,
