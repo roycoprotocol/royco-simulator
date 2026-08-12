@@ -7,7 +7,7 @@
     "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint",
-    "test": "node scripts/day-simulator/factory.test.mjs && npx tsx lib/day/engine/engine.test.ts && npx tsx lib/day-simulator-template/runtime.test.ts && npx tsx lib/day-simulator-template/explorer-market.test.ts && npx tsx lib/day-simulator-template/erasure.test.ts && npx tsx lib/day-simulator-template/explainer.test.ts && npx tsx lib/day-simulator-template/stress.test.ts && npx tsx lib/day-simulator-template/permalink.test.ts && npx tsx lib/day-simulator-template/config-export.test.ts && npx tsx lib/hybond/timeframe.test.ts && npx tsx lib/hybond/permalink.test.ts",
+    "test": "node scripts/day-simulator/factory.test.mjs && npx tsx lib/day/engine/engine.test.ts && npx tsx lib/day-simulator-template/runtime.test.ts && npx tsx lib/day-simulator-template/explorer-market.test.ts && npx tsx lib/day-simulator-template/erasure.test.ts && npx tsx lib/day-simulator-template/explainer.test.ts && npx tsx lib/day-simulator-template/stress.test.ts && npx tsx lib/day-simulator-template/source-parser.test.ts && npx tsx lib/day-simulator-template/permalink.test.ts && npx tsx lib/day-simulator-template/config-export.test.ts && npx tsx lib/day-simulator-template/backtest.test.ts && npx tsx lib/day-simulator-template/deploy-fields.test.ts && npx tsx lib/day-simulator-template/capital-sizing.test.ts && npx tsx components/day-v2/url-state.test.ts && npx tsx lib/day-v3/day-v3.test.ts && node scripts/day-v3/route-boundary.test.mjs && npx tsx lib/hybond/timeframe.test.ts && npx tsx lib/hybond/permalink.test.ts",
     "parity": "npx tsx lib/try/parity.ts && npx tsx lib/hybond/parity.ts",
     "audit:v2-math": "node scripts/v2-math-invariants.mjs",
     "sim:new": "node scripts/simulator/create.mjs",
@@ -24,10 +24,13 @@
     "day-sim:certify": "node scripts/day-simulator/certify.mjs"
   },
   "dependencies": {
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
     "next": "16.0.7",
     "react": "19.2.0",
     "react-dom": "19.2.0",
-    "recharts": "^3.5.0"
+    "recharts": "^3.5.0",
+    "tailwind-merge": "^3.6.0"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",

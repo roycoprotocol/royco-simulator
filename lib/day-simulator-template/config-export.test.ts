@@ -7,7 +7,6 @@ import {
   dayConfigExportFilename,
   dayConfigExportSlug,
   EMPTY_DAY_DEPLOYMENT_FIELDS,
-  EMPTY_DAY_DEPLOYMENT_INPUTS,
   parseDayDeploymentTerm,
   type DayConfigExportInput,
 } from "./config-export";
@@ -30,14 +29,19 @@ const input: DayConfigExportInput = {
     eclpBandWidthPct: 10,
     riskSharePct: 5.6,
     liqSharePct: 21.1,
+    riskY0Pct: 2,
+    riskY100Pct: 18,
+    liqY0Pct: 1,
+    liqY100Pct: 30,
     observationDays: 7,
     sourceApyPct: 11.4,
     maintainCoverage: true,
     y100SharePct: 18,
     exitBufferPct: 1,
     selfLiquidationBonusPct: 1,
+    poolConcentration: 1,
   },
-  scenario: { sourceStressPct: 0 },
+  scenario: { hasHistoricalSeries: true, sourceStressPct: 0 },
   modeled: {
     seniorApy: 0.0725,
     juniorApy: 0.2676,
@@ -46,22 +50,41 @@ const input: DayConfigExportInput = {
     referenceSellShareOfSenior: 0.041,
     boundarySellShareOfSenior: 0.118,
   },
-  deploymentInputs: {
-    tokenContractSource: "https://example.com/token",
-    tokenContractAddress: "0x0000000000000000000000000000000000000001",
-    chain: "Ethereum",
-    adaptationSpeed: "",
-  },
 };
 
 const payload = buildDayConfigExport(input);
-assert.equal(payload.schemaVersion, 2);
+assert.equal(payload.schemaVersion, 4);
 // A shock must travel with the export, or `modeled` misattributes shocked
 // outcomes to unshocked terms.
 assert.equal(payload.scenario.sourceStressApplied, false);
+assert.equal(payload.scenario.hasHistoricalSeries, true);
 assert.equal(payload.scenario.sourceStressPct, 0);
+assert.equal(payload.scenario.coverageRestoration, true);
 assert.match(payload.scenario.note, /no hypothetical shock/);
-const stressed = buildDayConfigExport({ ...input, scenario: { sourceStressPct: 12 } });
+
+// The protected exit threshold has two units and they are not interchangeable.
+// The engine's `exitBufferPct` is a percentage OF the coverage requirement and
+// the deploy flow's field of the same name is an absolute coverage level, so a
+// payload carrying only one of them is a payload a reader can transcribe into
+// the wrong box. At 3% coverage and a 1% buffer the flow's field is 0.03%.
+assert.equal(payload.protectedExit.remainingAsShareOfRequirementPct, 1);
+assert.ok(
+  Math.abs(payload.protectedExit.remainingCoveragePct - 0.03) < 1e-12,
+  `absolute threshold: ${payload.protectedExit.remainingCoveragePct}`,
+);
+// Both express the same on-chain liquidation multiple.
+assert.ok(
+  Math.abs(
+    100 / payload.protectedExit.remainingAsShareOfRequirementPct -
+      payload.termsPct.coveragePct / payload.protectedExit.remainingCoveragePct,
+  ) < 1e-9,
+);
+// The absolute level must sit below the requirement or the flow refuses it.
+assert.ok(payload.protectedExit.remainingCoveragePct < payload.termsPct.coveragePct);
+const stressed = buildDayConfigExport({
+  ...input,
+  scenario: { ...input.scenario, sourceStressPct: 12 },
+});
 assert.equal(stressed.scenario.sourceStressApplied, true);
 assert.equal(stressed.scenario.sourceStressPct, 12);
 assert.match(stressed.scenario.note, /hypothetical 12% source drawdown/);
@@ -80,7 +103,7 @@ assert.ok(Math.abs(payload.terms.liquidityYieldShare - 0.211) < 1e-12);
 assert.equal(payload.terms.observationDays, 7);
 assert.equal(payload.terms.fixedTermDurationSec, 7 * 86_400);
 assert.ok(Math.abs(payload.terms.sourceApy - 0.114) < 1e-12);
-assert.equal(payload.terms.maintainCoverage, true);
+assert.ok(!("maintainCoverage" in payload.terms), "backtest restoration is not a deploy term");
 assert.ok(Math.abs(payload.terms.riskYieldShareAtFullUtilization - 0.18) < 1e-12);
 assert.equal(payload.terms.exitBufferPct, 1);
 assert.ok(Math.abs(payload.terms.selfLiquidationBonus - 0.01) < 1e-12);
@@ -99,12 +122,67 @@ assert.deepEqual(payload.termsPct, {
   selfLiquidationBonusPct: 1,
 });
 assert.deepEqual(payload.modeled, input.modeled);
-assert.deepEqual(payload.deploymentInputs, input.deploymentInputs);
-assert.deepEqual(Object.keys(payload.deploymentInputs).sort(), [...DAY_DEPLOYMENT_INPUT_IDS].sort());
-assert.deepEqual(
-  buildDayConfigExport({ ...input, deploymentInputs: EMPTY_DAY_DEPLOYMENT_INPUTS }).deploymentInputs,
-  { tokenContractSource: "", tokenContractAddress: "", chain: "", adaptationSpeed: "" },
-);
+assert.ok(!("deploymentInputs" in payload), "the handoff must not export an empty duplicate form");
+assert.deepEqual(payload.deploymentBrief.coverage, {
+  enabled: true,
+  minimumCoveragePct: 3,
+  observationPeriodSeconds: 7 * 86_400,
+  protectedExitRemainingCoveragePct: 0.03,
+  selfLiquidationBonusPct: 1,
+});
+assert.deepEqual(payload.deploymentBrief.liquidity, {
+  enabled: true,
+  minimumLiquidityPct: 15,
+});
+assert.deepEqual(payload.deploymentBrief.yieldModels.junior, {
+  model: "STATIC_CURVE",
+  y0Pct: 2,
+  yTargetPct: 5.6,
+  y100Pct: 18,
+  capPct: 18,
+});
+assert.deepEqual(payload.deploymentBrief.yieldModels.seniorLp, {
+  model: "STATIC_CURVE",
+  y0Pct: 1,
+  yTargetPct: 21.1,
+  y100Pct: 30,
+  capPct: 30,
+});
+assert.equal(payload.deploymentBrief.exitPool.maximumDiscountBps, 1_000);
+assert.equal(payload.deploymentBrief.exitPool.maximumDiscountWithinDeployRange, false);
+assert.equal(payload.deploymentBrief.exitPool.simulationConcentration, 1);
+assert.equal(payload.deploymentBrief.exitPool.deploymentDefaultConcentration, 300);
+assert.equal(payload.deploymentBrief.compatibility.modeledTermsCompatible, false);
+assert.ok(payload.deploymentBrief.compatibility.issues.length > 0);
+assert.equal(payload.deploymentBrief.settlementDefaults.depositDelaySeconds, 300);
+assert.equal(payload.deploymentBrief.settlementDefaults.withdrawalDelaySeconds, 86_400);
+assert.ok(payload.deploymentBrief.stillRequiredInFlow.some((item) => /oracle/i.test(item)));
+const serializedBrief = JSON.stringify(payload.deploymentBrief);
+assert.doesNotMatch(serializedBrief, /restockHurdle|redemptionDelay|navUpdateCadence|exitLiquidity/);
+const deployCompatibleBand = buildDayConfigExport({
+  ...input,
+  terms: { ...input.terms, eclpBandWidthPct: 3.5, exitBufferPct: 80 },
+});
+assert.equal(deployCompatibleBand.deploymentBrief.exitPool.maximumDiscountBps, 350);
+assert.equal(deployCompatibleBand.deploymentBrief.exitPool.maximumDiscountWithinDeployRange, true);
+assert.equal(deployCompatibleBand.deploymentBrief.compatibility.modeledTermsCompatible, true);
+
+const forwardOnly = buildDayConfigExport({
+  ...input,
+  scenario: { hasHistoricalSeries: false, sourceStressPct: 0 },
+});
+assert.match(forwardOnly.scenario.note, /forward projections/);
+
+const coverageOff = buildDayConfigExport({
+  ...input,
+  terms: { ...input.terms, coveragePct: 0 },
+});
+assert.equal(coverageOff.deploymentBrief.coverage.enabled, false);
+assert.equal(coverageOff.deploymentBrief.coverage.observationPeriodSeconds, 0);
+assert.equal(coverageOff.deploymentBrief.coverage.protectedExitRemainingCoveragePct, 0);
+assert.equal(coverageOff.deploymentBrief.coverage.selfLiquidationBonusPct, 0);
+assert.equal(coverageOff.terms.fixedTermDurationSec, 0);
+assert.equal(coverageOff.scenario.coverageRestoration, false);
 
 // The payload is JSON-serializable without loss.
 assert.deepEqual(JSON.parse(JSON.stringify(payload)), payload);

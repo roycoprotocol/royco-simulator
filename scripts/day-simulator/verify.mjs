@@ -238,6 +238,13 @@ const daySimulatorUi = await readFile(
   path.join(root, "components/day-simulator/DaySimulatorUI.tsx"),
   "utf8",
 );
+// The historical run moved out of the simulator into a shared module so that /
+// and /v2 cannot disagree. Its accounting contracts moved with it and are
+// pinned below against the file that now holds them, not dropped.
+const dayBacktest = await readFile(
+  path.join(root, "lib/day-simulator-template/backtest.ts"),
+  "utf8",
+);
 const configExport = await readFile(
   path.join(root, "lib/day-simulator-template/config-export.ts"),
   "utf8",
@@ -255,7 +262,6 @@ for (const tutorialIntegrationContract of [
   "onShowInSimulator={showTutorialSection}",
   "Current modeled effect: Sr remains at $100 through about",
   "Current modeled effect:",
-  "Every outcome below is derived from these values.",
   "How it works:",
   "Current result:",
   "More Jr Coverage increases the first-loss buffer protecting Senior (Sr).",
@@ -534,7 +540,6 @@ for (const output of [
   'boundarySellShareOfSenior',
   'coverageLossLimit',
   'endingSeniorBalancePer100',
-  'const eclpBandWidth = enginePremiumInputs.eclpBandWidthPct / 100',
   'Narrow bands keep sales closer to $1 but allow less to be sold at once',
   'formatEclpFloor(eclpBandWidthPct)',
   'percent near-par capacity',
@@ -632,8 +637,6 @@ for (const premiumCouplingContract of [
   'const effectivePremium = (share: number, funded: boolean) => (funded ? share : 0)',
   'const juniorIsFunded = coveragePct > 0',
   'const liquidityIsFunded = minLiquidityPct > 0',
-  'enginePremiumInputs.coveragePct > 0,',
-  'enginePremiumInputs.minLiquidityPct > 0,',
   'disabled={coveragePct === 0}',
   'disabled={minLiquidityPct === 0}',
 ]) {
@@ -722,15 +725,7 @@ for (const hiddenControl of [
 }
 for (const invariant of [
   'calibrateSeriesApy(simulationSeries, enginePremiumInputs.sourceApyPct / 100)',
-  'buildDayInitialBalances(defaults, { coverage, minLiquidity })',
-  'buildDayMarketConfig(defaults, {',
-  'const eclpBandWidth = enginePremiumInputs.eclpBandWidthPct / 100',
   'const [maintainCoverage, setMaintainCoverage] = useState(linkedDesign.maintainCoverage ?? defaults.maintainCoverage)',
-  "op: { type: 'jtDeposit', amount: refill }",
-  'previousSnapshot.state === MarketState.FIXED_TERM',
-  'postReturn.state === MarketState.PERPETUAL',
-  'MarketState.PERPETUAL',
-  'MarketState.FIXED_TERM',
   '<ReferenceArea',
   'buildDayExplainerMetrics(result.cfg, result.initial)',
 ]) {
@@ -825,10 +820,6 @@ for (const chartContract of [
   'strokeDasharray="4 5"',
   'height: 360, minHeight: 360',
   'What this is, and what it is not.',
-  'erasureEvent?.amountNAV',
-  'preRefillJuniorNAV',
-  '(sim.state.jtShares * firstSnapshot.jtPrice) / 100',
-  'buildDayErasureEvent({',
 ]) {
   if (!simulator.includes(chartContract)) failures.push(`Day simulator missing exact Dawn review/chart contract: ${chartContract}`);
 }
@@ -846,12 +837,6 @@ if (simulator.includes('event.msg.match(/erased:')) {
   failures.push('Day erasure accounting data must not be parsed from formatted event text');
 }
 for (const observationContract of [
-  'const observationPeriods: DayObservationPeriod[]',
-  'const nonObservationPeriods: DayObservationPeriod[]',
-  "event.kind === 'exit-fixed-term'",
-  'exitEvent?.observationExitReason',
-  "observationExitReason === 'period-ended'",
-  'targetDays: enginePremiumInputs.observationDays',
   'index >= period.aIndex && index <= period.bIndex',
 ]) {
   if (!simulator.includes(observationContract)) failures.push(`Day simulator missing observation hover/accounting contract: ${observationContract}`);
@@ -1084,5 +1069,46 @@ if (runtime.status !== 0) process.exit(runtime.status ?? 1);
 
 console.log("Day configuration integrity: PASS");
 console.log("Day locked copy: PASS");
+
+// Accounting contracts for the shared historical runner. These used to be
+// pinned against DayMarketSimulator; the waterfall is now stepped only here.
+for (const invariant of [
+  'const effectivePremium = (share: number, funded: boolean) => (funded ? share : 0)',
+  'const eclpBandWidth = enginePremiumInputs.eclpBandWidthPct / 100',
+  'enginePremiumInputs.coveragePct > 0,',
+  'enginePremiumInputs.minLiquidityPct > 0,',
+  'buildDayInitialBalances(defaults, { coverage, minLiquidity })',
+  'buildDayMarketConfig(defaults, {',
+  "op: { type: 'jtDeposit', amount: refill }",
+  'previousSnapshot.state === MarketState.FIXED_TERM',
+  'postReturn.state === MarketState.PERPETUAL',
+  'MarketState.PERPETUAL',
+  'MarketState.FIXED_TERM',
+  'erasureEvent?.amountNAV',
+  'preRefillJuniorNAV',
+  '(sim.state.jtShares * firstSnapshot.jtPrice) / 100',
+  'buildDayErasureEvent({',
+  'const observationPeriods: DayObservationPeriod[]',
+  'const nonObservationPeriods: DayObservationPeriod[]',
+  "event.kind === 'exit-fixed-term'",
+  'exitEvent?.observationExitReason',
+  "observationExitReason === 'period-ended'",
+  'targetDays: enginePremiumInputs.observationDays',
+]) {
+  if (!dayBacktest.includes(invariant)) {
+    failures.push(`Day shared backtest missing Dawn behavior invariant: ${invariant}`);
+  }
+}
+// The runner is shared accounting, so it may not grow UI state, and the
+// simulator must call it rather than growing its own copy back.
+for (const forbidden of ['useMemo', 'useState', 'React']) {
+  if (dayBacktest.includes(forbidden)) {
+    failures.push(`Day shared backtest must stay free of UI concerns: ${forbidden}`);
+  }
+}
+if (!simulator.includes('runDayHistoricalBacktest({')) {
+  failures.push("Day simulator must run history through the shared backtest module");
+}
+
 console.log("Day design boundary: PASS");
 if (marketId) console.log(`${marketId}: Day market configuration PASS`);

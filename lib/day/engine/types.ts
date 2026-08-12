@@ -1,4 +1,6 @@
 // =============================================================================
+
+import type { EclpParams } from "./eclp";
 // Royco Day — engine types
 // -----------------------------------------------------------------------------
 // Contract-facing accounting values are stored as 18-decimal WAD bigint
@@ -63,6 +65,9 @@ export interface MarketConfig {
   swapFeeBps: number; // pool trading fee, basis points
   poolTurnoverPerYear: number; // annual volume as a multiple of pool value (the "volume")
   eclpBandWidth: number; // peg band: how far ST can be sold before stable is exhausted
+  /** Exact externally derived pool parameters. When absent, existing markets
+   * retain the simulator's declared band/weight model. */
+  eclpParams?: EclpParams;
   // Contract-side premium deployment policy. This is separate from modeled
   // venue yield/volume: true deploys newly minted LT-owned Senior shares into
   // the venue; false leaves them staged as idle LT-owned Senior shares.

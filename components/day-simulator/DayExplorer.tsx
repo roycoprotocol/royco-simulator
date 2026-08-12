@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import DayMarketSimulator from "@/components/day-simulator/DayMarketSimulator";
 import {
@@ -85,7 +85,7 @@ function shortMonthYear(isoDate: string): string {
 function coverageLabel(market: DayMarket): string {
   const { firstDate, lastDate } = market.provenance;
   if (!firstDate || !lastDate) return "Date range unknown";
-  return `${shortMonthYear(firstDate)} – ${shortMonthYear(lastDate)}`;
+  return `${shortMonthYear(firstDate)} to ${shortMonthYear(lastDate)}`;
 }
 
 function marketLabel(market: DayMarket): string {
@@ -143,21 +143,39 @@ export default function DayExplorer({
   experience?: "guided" | "learning";
   routePath?: string;
 }) {
-  const requestedMarket = typeof window === "undefined"
-    ? false
-    : new URLSearchParams(window.location.search).has("market");
   const [selectedMarketId, setSelectedMarketId] = useState(initialMarket.id);
   const [draftSource, setDraftSource] = useState<DayDraftSource | null>(null);
-  const [yieldDraft, setYieldDraft] = useState<DayYieldDraftSource | null>(
-    requestedMarket ? null : {
-      label: "Custom yield source",
-      sourceApy: DEFAULT_CUSTOM_SOURCE_APY_PCT / 100,
-    },
-  );
+  const [yieldDraft, setYieldDraft] = useState<DayYieldDraftSource | null>({
+    label: "Custom yield source",
+    sourceApy: DEFAULT_CUSTOM_SOURCE_APY_PCT / 100,
+  });
   const [draftVersion, setDraftVersion] = useState(0);
-  const [sourceMode, setSourceMode] = useState<"yield" | "history">(
-    requestedMarket ? "history" : "yield",
-  );
+  const [depth, setDepth] = useState<"simple" | "advanced">("simple");
+  const isSimple = depth === "simple";
+  const [sourceMode, setSourceMode] = useState<"yield" | "history">("yield");
+  // Simple has no backtest, so the source is always a single expected APY. This
+  // is derived rather than written back so switching to Advanced restores
+  // whichever source model was last chosen there.
+  const effectiveSourceMode = isSimple ? "yield" : sourceMode;
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    // A link that names a market is asking for that market's history, which
+    // only Advanced can show.
+    const wantsHistory = params.has("market");
+    // Terms Simple does not render. A link carrying them must not land where
+    // they are invisible but still feeding the accountant: `stress` in
+    // particular restates every return without appearing anywhere on the page.
+    const carriesAdvancedTerms = ["band", "obs"].some((key) => {
+      const raw = params.get(key);
+      return raw !== null && raw.trim() !== "" && Number.isFinite(Number(raw));
+    }) || Number(params.get("stress") ?? 0) > 0;
+    if (wantsHistory) {
+      setSourceMode("history");
+      setYieldDraft(null);
+    }
+    if (wantsHistory || carriesAdvancedTerms) setDepth("advanced");
+  }, []);
+
   const [yieldLabel, setYieldLabel] = useState("Custom yield source");
   // A custom yield source starts from a neutral 5% net APY rather than the
   // loaded sample's APY, so the typed input is not anchored to another market.
@@ -299,7 +317,7 @@ export default function DayExplorer({
   };
 
   return (
-    <div className="flex flex-col" style={{ gap: 12 }}>
+    <div className="flex flex-col" data-day-sim style={{ gap: 12 }}>
       <DaySurface id="day-sim-source" padding="spacious" style={{ scrollMarginTop: 16 }}>
         <div>
           <div>
@@ -329,6 +347,31 @@ export default function DayExplorer({
               </span>
               </span>
               {experience !== "learning" && (
+                <div className="flex items-center" style={{ flex: '0 0 auto', gap: 8 }}>
+                <DaySegmentedControl compact label="Detail">
+                  <DaySegmentedButton
+                    active={isSimple}
+                    compact
+                    onClick={() => {
+                      setDepth("simple");
+                      if (!yieldDraft) {
+                        setYieldDraft({
+                          label: yieldLabel,
+                          sourceApy: yieldApyPct / 100,
+                        });
+                      }
+                    }}
+                  >
+                    Simple
+                  </DaySegmentedButton>
+                  <DaySegmentedButton
+                    active={!isSimple}
+                    compact
+                    onClick={() => setDepth("advanced")}
+                  >
+                    Advanced
+                  </DaySegmentedButton>
+                </DaySegmentedControl>
                 <DayButton
                   aria-label={showTutorial ? "Close tutorial" : "New to Royco?"}
                   aria-pressed={showTutorial}
@@ -338,6 +381,7 @@ export default function DayExplorer({
                 >
                   {showTutorial ? "Close tutorial" : "New to Royco?"}
                 </DayButton>
+                </div>
               )}
             </div>
             {/* The hero states the mechanism as a claim and sets the position
@@ -394,9 +438,9 @@ export default function DayExplorer({
                 chart, tables, and diagrams below arrive already legible. */}
             <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-3 sm:gap-0">
               {[
-                { color: DAY_SIMULATOR_THEME.seniorLine, name: "Sr", role: "Senior — protected, and can sell early" },
-                { color: DAY_SIMULATOR_THEME.juniorLine, name: "Jr", role: "Junior — absorbs losses first, paid for it" },
-                { color: DAY_SIMULATOR_THEME.olive, name: "SLP", role: "Liquidity — supplies the pool Sr sells into" },
+                { color: DAY_SIMULATOR_THEME.seniorLine, name: "Sr", role: "Senior. Protected, and can sell early" },
+                { color: DAY_SIMULATOR_THEME.juniorLine, name: "Jr", role: "Junior. Absorbs losses first, paid for it" },
+                { color: DAY_SIMULATOR_THEME.olive, name: "SLP", role: "Liquidity. Supplies the pool Sr sells into" },
               ].map((position) => (
                 <div
                   className="border-l-2 pt-0 pl-3 sm:border-l-0 sm:border-t-2 sm:pl-0 sm:pr-4 sm:pt-2.5"
@@ -446,6 +490,12 @@ export default function DayExplorer({
           ) : (
             <DaySectionHeader title="Yield source" />
           )}
+          {isSimple ? (
+            <p className="mt-1" style={{ color: COLORS.muted, fontSize: 11.5, lineHeight: 1.45 }}>
+              Simple uses one expected net APY. Switch to Advanced to backtest
+              against historical data.
+            </p>
+          ) : (
           <div className="mt-2">
             <DaySegmentedControl label="Source model">
               <DaySegmentedButton
@@ -467,9 +517,10 @@ export default function DayExplorer({
               </DaySegmentedButton>
             </DaySegmentedControl>
           </div>
+          )}
         </div>
 
-        {sourceMode === "yield" ? (
+        {effectiveSourceMode === "yield" ? (
           <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-[minmax(0,1.2fr)_minmax(150px,.55fr)_auto]" style={{ alignItems: "end" }}>
             <DayFieldLabel>
               <DayFieldCaption>Source name</DayFieldCaption>
@@ -530,7 +581,7 @@ export default function DayExplorer({
             {draftSource && (
               <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2" style={{ background: COLORS.soft, border: `1px solid ${COLORS.border}`, borderRadius: 10, padding: 12 }}>
                 <DayFieldLabel><DayFieldCaption>Source name</DayFieldCaption><input aria-label="Imported source name" onChange={(event) => updateDraft({ label: event.target.value || "Imported yield source" })} style={fieldStyle} value={draftSource.label} /></DayFieldLabel>
-                <DayFieldLabel><DayFieldCaption>Value type</DayFieldCaption><select aria-label="Imported data value type" onChange={(event) => updateDraft({ priceType: event.target.value as DayDraftSource["priceType"] })} style={fieldStyle} value={draftSource.priceType}><option value="unknown">Not specified</option><option value="nav">NAV — accounting value</option><option value="price">Price — tradable market value</option><option value="total-return-index">Total-return index</option></select></DayFieldLabel>
+                <DayFieldLabel><DayFieldCaption>Value type</DayFieldCaption><select aria-label="Imported data value type" onChange={(event) => updateDraft({ priceType: event.target.value as DayDraftSource["priceType"] })} style={fieldStyle} value={draftSource.priceType}><option value="unknown">Not specified</option><option value="nav">NAV, accounting value</option><option value="price">Price — tradable market value</option><option value="total-return-index">Total-return index</option></select></DayFieldLabel>
                 <p className="sm:col-span-2" style={{ color: COLORS.muted, fontSize: 10 }}>Imported values are treated as net of source-level fees.</p>
               </div>
             )}
@@ -548,7 +599,7 @@ export default function DayExplorer({
         )}
 
         <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1" style={{ color: COLORS.muted, fontSize: 10 }}>
-          {sourceMode === "yield" && !isYieldDraft ? (
+          {effectiveSourceMode === "yield" && !isYieldDraft ? (
             <span>Enter a net APY and run the yield model to replace the current sample.</span>
           ) : (
             <>
@@ -583,6 +634,7 @@ export default function DayExplorer({
       ) : (
         <DayMarketSimulator
           key={activeKey}
+          depth={depth}
           market={activeMarket}
           onExitTutorial={() => setShowTutorial(false)}
           variant={showTutorial ? "tutorial" : "guided"}
