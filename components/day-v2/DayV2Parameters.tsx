@@ -271,8 +271,10 @@ function DayV2Parameters({
           >
             Each curve converts utilization into a share of Sr yield. The rates
             on this page use YT at {pct(targetUtilization)} utilization; Y0 and
-            Y100 set the behavior away from that target, and the curve&apos;s
-            highest point becomes its cap.
+            Y100 set the behavior away from that target. This page carries each
+            curve&apos;s peak through as its cap, but the accountant takes the
+            two caps as their own deployment parameters, so they are chosen at
+            deploy time rather than read off the curve.
           </Aside>
 
           {curveOverridden ? (
@@ -434,8 +436,9 @@ function DayV2Parameters({
                     attributed it to the contract, which is a claim about the
                     chain that the chain does not make. */}
                   <p className="text-[10px] leading-snug text-[var(--tertiary)]">
-                    The curve&apos;s peak is its cap. Jr and SLP caps must total
-                    100% or less, leaving this side a{" "}
+                    This page caps each side at its curve&apos;s peak; the
+                    accountant takes both caps as separate deploy parameters and
+                    only requires they total 100% or less, leaving this side a{" "}
                     <strong className="font-mono font-semibold tabular-nums text-[var(--secondary)]">
                       {pct(model.contractCeiling / 100)}
                     </strong>{" "}

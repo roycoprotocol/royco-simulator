@@ -126,14 +126,18 @@ export default function DayV2ExitCost({
           One-trade SLP capacity in a {pct(1 - assumptions.seniorWeight)}/
           {pct(assumptions.seniorWeight)} exit/Sr Balancer E-CLP (λ
           {assumptions.concentration}) with a {pct(assumptions.bandPct / 100)}{" "}
-          maximum discount and a {assumptions.swapFeeBps} bps pool swap fee.
+          maximum discount. Figures below are curve slippage only; the venue
+          charges its {assumptions.swapFeeBps} bps swap fee on top.
         </CardDescription>
       </CardHeader>
 
       <CardContent className="flex flex-col gap-4">
         <p className="max-w-[64ch] text-[14.5px] leading-relaxed text-[var(--foreground)]">
           {metrics.boundarySellNAV <= 0 ? (
-            <>No SLP is funded, so early exit is unavailable.</>
+            <>
+              No SLP is funded, so there is no secondary route. Sr still redeems
+              at full effective NAV through the primary queue.
+            </>
           ) : depthBindsFirst ? (
             <>
               One trade can exit{" "}

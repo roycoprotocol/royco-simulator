@@ -239,7 +239,7 @@ export default function Simulator() {
           <Panel title="Initial deposits">
             <Field label="Senior Tranche (ST)"><NumIn value={initST} step={1_000_000} w={96} onChange={setInitST} /></Field>
             <Field label="Junior Tranche (JT)"><NumIn value={initJT} step={1_000_000} w={96} onChange={setInitJT} /></Field>
-            <Field label="SLP (contract: LT)"><NumIn value={initLT} step={500_000} w={96} onChange={setInitLT} /></Field>
+            <Field label="SLP (contract: LPT)"><NumIn value={initLT} step={500_000} w={96} onChange={setInitLT} /></Field>
           </Panel>
         </div>
 

@@ -1,6 +1,7 @@
 import { Sim, defaultConfig, steadyYear } from "@/lib/day/engine/runner";
 import type { MarketConfig } from "@/lib/day/engine/types";
 import { dayCapitalAtUtilization } from "@/lib/day-simulator-template/capital-sizing";
+import { dayLiquidationUtilizationFromExitBuffer } from "@/lib/day-simulator-template/deploy-fields";
 import type {
   DayForwardScenarioId,
   DayForwardTestCustomization,
@@ -147,7 +148,7 @@ export function buildDayMarketConfig(
     },
     fixedTermDurationSec: terms.observationDays * 86_400,
     fixedTermGracePeriodSec: (defaults.fixedTermGracePeriodDays ?? 0) * 86_400,
-    liquidationUtilization: 100 / Math.max(defaults.exitBufferPct, 0.01),
+    liquidationUtilization: dayLiquidationUtilizationFromExitBuffer(defaults.exitBufferPct),
     stSelfLiquidationBonus: defaults.selfLiquidationBonus,
     stProtocolFee: defaults.stProtocolFee,
     jtProtocolFee: defaults.jtProtocolFee,

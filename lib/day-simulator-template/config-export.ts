@@ -25,14 +25,20 @@ export function dayDeploymentCompatibility(
   issues: string[];
 } {
   const coverageEnabled = values.coveragePct > 0;
-  const liquidityEnabled = values.minLiquidityPct > 0;
   const discountBps = values.eclpBandWidthPct * 100;
+  // Both yield models are initialized on every market, whatever its
+  // requirements are: the deployment validation rejects empty initialization
+  // data for either side, and StaticCurveYDM then requires a positive target
+  // share unconditionally — the clause does not consult minimum coverage or
+  // minimum liquidity. So a 0/0/0 curve is undeployable even on a side whose
+  // requirement is zero, and the check cannot be skipped when the requirement
+  // is off. A zero requirement still pays a zero premium, because the curve is
+  // read at zero utilization; it just cannot be *initialized* at zero.
   const orderedCurve = (
-    enabled: boolean,
     y0: number,
     yTarget: number,
     y100: number,
-  ) => !enabled || (yTarget > 0 && y0 <= yTarget && yTarget <= y100);
+  ) => yTarget > 0 && y0 <= yTarget && yTarget <= y100;
   const riskCap = Math.max(
     values.riskY0Pct,
     values.riskSharePct,
@@ -48,20 +54,18 @@ export function dayDeploymentCompatibility(
       ? ["Maximum discount must be 50–500 bps."]
       : []),
     ...(!orderedCurve(
-      coverageEnabled,
       values.riskY0Pct,
       values.riskSharePct,
       values.riskY100Pct,
     )
-      ? ["Jr static curve must satisfy Y0 ≤ YT ≤ Y100 with a positive YT."]
+      ? ["Jr static curve must satisfy Y0 ≤ YT ≤ Y100 with a positive YT, even at 0% coverage."]
       : []),
     ...(!orderedCurve(
-      liquidityEnabled,
       values.liqY0Pct,
       values.liqSharePct,
       values.liqY100Pct,
     )
-      ? ["SLP static curve must satisfy Y0 ≤ YT ≤ Y100 with a positive YT."]
+      ? ["SLP static curve must satisfy Y0 ≤ YT ≤ Y100 with a positive YT, even at 0% minimum liquidity."]
       : []),
     ...(riskCap + liquidityCap > 100 + 1e-9
       ? ["The Jr and SLP curve caps must sum to 100% or less."]
