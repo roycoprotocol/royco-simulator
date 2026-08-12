@@ -2,9 +2,15 @@
 
 import { memo } from "react";
 
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { DAY_V2_TONE_DOT } from "@/components/day-v2/DayV2Comparison";
-import { compactAmount, pct, type DayV2Unit } from "@/components/day-v2/format";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import DayV2DocsLink from "@/components/day-v2/DayV2DocsLink";
+import DayV2StackDiagram from "@/components/day-v2/DayV2StackDiagram";
+import { pct, unitRatio, type DayV2Unit } from "@/components/day-v2/format";
+import {
+  dayCapitalAtUtilization,
+  dayCapitalInYieldSource,
+} from "@/lib/day-simulator-template/capital-sizing";
+import type { DaySimulatorDefaults } from "@/lib/day-simulator-template/market";
 
 /**
  * What the design asks the issuer to raise.
@@ -20,150 +26,294 @@ import { compactAmount, pct, type DayV2Unit } from "@/components/day-v2/format";
  *
  * Nothing here is computed locally. The balances are `buildDayInitialBalances`,
  * the same function that seeds the run whose rates appear above, so the stack
- * and the rates are two readings of one market. Measured across all 13 markets
- * and six coverage settings, to 1e-12:
- *
- *   coverageLossLimit === junior / (senior + junior) === coverage / target
- *
- * which is why the caption below can chain the issuer's whole trade together:
- * a coverage setting fixes a Junior raise, and that raise is exactly the source
- * fall Senior is protected through. It holds at the 90% target, which is where
- * every figure on this page is read, and not away from it.
+ * and the rates are two readings of one market. The target and minimum columns
+ * keep that distinction visible without repeating a notional-sized summary.
  */
 function DayV2CapitalStack({
   balances,
   coverage,
-  coverageLossLimit,
+  defaults,
   minLiquidity,
+  poolSeniorWeight,
   targetUtilization,
   unit,
 }: {
   balances: { st: number; jt: number; lt: number };
   coverage: number;
-  coverageLossLimit: number;
+  /** Needed to size the same stack at 100% utilization, which is the floor the
+   *  requirement is literally met at. */
+  defaults: DaySimulatorDefaults;
   minLiquidity: number;
+  /** How much of the pool sits in Senior shares, so the in-source figure counts
+   *  the pool's Senior leg and not its exit-asset leg. */
+  poolSeniorWeight: number;
   targetUtilization: number;
   unit: DayV2Unit;
 }) {
   const { st, jt, lt } = balances;
   // Senior is the reference, not a fourth figure: an issuer picks the Senior
   // raise and asks what else has to stand beside it, so the page answers in
-  // those terms. A "Senior: 100 per 100 of Senior" cell said nothing.
+  // those terms.
   const per100 = (value: number) => (st > 0 ? (value / st) * 100 : 0);
+  const total = st + jt + lt;
+  const share = (value: number) => (total > 0 ? (value / total) * 100 : 0);
+
+  /**
+   * A capital stack, drawn as one, with every leg's proportion inside its own
+   * row rather than in a separate column beside them.
+   *
+   * The previous attempt put one continuous to-scale column to the left of
+   * equal-height rows, and the two could not line up: at 5% coverage the navy
+   * band covered the Senior row AND the Junior row, the brown sliver landed on
+   * the boundary, and the green band sat beside the exit pool row only by
+   * accident. Adjacency implies correspondence, so it read as broken. A bar per
+   * row is aligned by construction, is still strictly to scale against a shared
+   * 0-to-total axis so the rows stay comparable, and a thin leg is now thin in
+   * one dimension the row can afford rather than in the dimension that squeezes
+   * its label out.
+   *
+   * Senior leads: loss arrives at the bottom of a stack and works up, which is
+   * why Junior sits under Senior and absorbs first. The two loss layers carry a
+   * coloured left edge; the exit pool does not, because it is venue capital
+   * rather than a layer that absorbs anything.
+   */
+
+  // The same stack at the floor. The requirement is only literally met at 100%
+  // utilization, and the 0.90 target sits above it with headroom. Showing the
+  // target alone makes it look like the minimum, which it is not.
+  const floor = dayCapitalAtUtilization(
+    defaults,
+    { coverage, minLiquidity },
+    1,
+  );
+
   const legs = [
     {
-      tone: "junior" as const,
-      name: "Junior",
+      name: "Sr",
+      amount: st,
+      ratio: 100,
+      // Senior is the basis and does not move with utilization, so it has no
+      // separate floor to state. A repeated 100.0 in both columns would invite
+      // the reader to look for a difference that cannot exist.
+      floorRatio: null,
+      description: "The raise; last to take a loss",
+      funded: true,
+      fill: "var(--theme-navy)",
+      lossLayer: true,
+    },
+    {
+      name: "Jr",
       amount: jt,
       ratio: per100(jt),
-      note: `Meets the ${pct(coverage)} coverage requirement at the ${pct(targetUtilization)} target`,
+      floorRatio: per100(floor.jt),
+      description: `First loss; meets ${pct(coverage)} minimum coverage at the ${pct(targetUtilization)} target`,
       funded: coverage > 0,
+      fill: "var(--theme-brown)",
+      lossLayer: true,
     },
     {
-      tone: "liquidity" as const,
-      name: "Exit pool",
+      name: "SLP",
       amount: lt,
       ratio: per100(lt),
-      note: `Meets the ${pct(minLiquidity)} liquidity requirement at the ${pct(targetUtilization)} target`,
+      floorRatio: per100(floor.lt),
+      description: `Exit liquidity; meets ${pct(minLiquidity)} minimum liquidity at the ${pct(targetUtilization)} target`,
       funded: minLiquidity > 0,
-    },
-    {
-      tone: "senior" as const,
-      name: "Total capital",
-      amount: st + jt + lt,
-      ratio: 100 + per100(jt) + per100(lt),
-      note: "Everything that has to be standing before the market can open",
-      funded: true,
+      fill: "var(--theme-green)",
+      lossLayer: false,
     },
   ];
 
   return (
     <Card weight="primary">
       <CardHeader>
-        <CardTitle>What it takes to open</CardTitle>
-        <CardDescription>
-          For every 100 of Senior you raise, this is what has to stand beside it. Sized
-          by the engine rather than read off the requirement, because a requirement is
-          not a tranche size.
-        </CardDescription>
+        <div className="flex items-baseline justify-between gap-2">
+          <CardTitle>What it takes to open</CardTitle>
+          <DayV2DocsLink label="How tranching works" topic="tranching" />
+        </div>
       </CardHeader>
 
-      <CardContent className="flex flex-col gap-4">
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          {legs.map((leg) => (
-            <div
-              className="flex flex-col gap-1.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--foundation)] px-4 py-3"
-              key={leg.name}
-              style={leg.funded ? undefined : { borderStyle: "dashed" }}
-            >
-              <span className="flex items-center gap-1.5">
-                <span
-                  aria-hidden="true"
-                  className="h-1.5 w-1.5 shrink-0 rounded-full"
-                  style={{
-                    background: leg.funded
-                      ? DAY_V2_TONE_DOT[leg.tone]
-                      : `color-mix(in srgb, ${DAY_V2_TONE_DOT[leg.tone]} 30%, transparent)`,
-                  }}
-                />
-                <span className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--tertiary)]">
-                  {leg.name}
-                </span>
-              </span>
-              <span className="flex items-baseline gap-1.5">
-                <span
-                  className="font-mono text-[24px] font-bold leading-none tracking-[-0.02em] tabular-nums"
-                  style={leg.funded ? undefined : { color: "var(--tertiary)" }}
-                >
-                  {leg.ratio.toFixed(1)}
-                </span>
-                <span className="text-[10.5px] text-[var(--tertiary)]">per 100 of Senior</span>
-              </span>
-              <span className="text-[10.5px] leading-snug text-[var(--tertiary)]">{leg.note}</span>
-            </div>
-          ))}
+      <CardContent className="flex flex-col gap-4 lg:flex-row lg:items-center">
+        <div className="mx-auto w-full max-w-[260px] shrink-0 lg:mx-0 lg:w-[260px]">
+          {/* Per 100 of Senior, exactly like the table beside it. Passing the
+              raw balances printed $40000000.0 on the Senior block: `initialST`
+              is a modelling basis, not anybody's raise. */}
+          <DayV2StackDiagram
+            jt={per100(jt)}
+            jtFloor={per100(floor.jt)}
+            lt={per100(lt)}
+            ltFloor={per100(floor.lt)}
+            st={100}
+            unit={unit}
+          />
+          <p className="mt-2 max-w-[46ch] text-[10.5px] leading-snug text-[var(--tertiary)]">
+            Dashed markers show minimums; lighter caps show target headroom.
+          </p>
         </div>
 
-        {/* The absolute figures are secondary and labelled as a basis on
-            purpose. Eleven of the thirteen markets ship `initialST` as 1000,
-            which is a normalizing unit rather than anybody's raise, so leading
-            with "$1.00k to open" would read as a capital plan and be one. */}
-        <p className="flex flex-wrap items-baseline gap-x-4 gap-y-1 border-t border-[var(--border-subtle)] pt-3 font-mono text-[11.5px] tabular-nums text-[var(--tertiary)]">
-          <span>Modelled here at</span>
-          <span>Sr {compactAmount(st, unit)}</span>
-          <span>Jr {coverage > 0 ? compactAmount(jt, unit) : "none"}</span>
-          <span>pool {minLiquidity > 0 ? compactAmount(lt, unit) : "none"}</span>
-        </p>
+        <div className="flex min-w-0 flex-1 flex-col gap-2">
+          {/* One column rhythm for the whole block, set once here and reused by
+            every row and the total, so the three numeric columns line up
+            without any row restating a width. */}
+          <div className="hidden items-baseline gap-3 pl-3.5 pr-3.5 text-[9px] font-semibold uppercase tracking-[0.08em] text-[var(--tertiary)] sm:flex">
+            <span className="min-w-0 flex-1">Leg</span>
+            <span className="w-[86px] shrink-0 text-right">Target</span>
+            <span className="w-[86px] shrink-0 text-right">Minimum</span>
+            <span className="w-[54px] shrink-0 text-right">Share</span>
+          </div>
 
-        {/* The issuer's whole trade in one chain, and every link of it is a
-            measured engine identity rather than an arrangement of the same
-            number three ways. */}
-        {coverage > 0 ? (
-          <p className="text-[11.5px] leading-relaxed text-[var(--secondary)]">
-            Coverage of{" "}
-            <strong className="font-mono font-semibold tabular-nums">{pct(coverage)}</strong> is a
-            requirement, not a Junior size. Meeting it at the{" "}
-            <strong className="font-mono font-semibold tabular-nums">
-              {pct(targetUtilization)}
-            </strong>{" "}
-            target takes Junior capital equal to{" "}
-            <strong className="font-mono font-semibold tabular-nums">
-              {per100(jt).toFixed(1)}%
-            </strong>{" "}
-            of Senior, which is{" "}
-            <strong className="font-mono font-semibold tabular-nums">
-              {pct(coverageLossLimit)}
-            </strong>{" "}
-            of the two together, and that is exactly the source fall Senior is protected
-            through.
-          </p>
-        ) : (
-          <p className="text-[11.5px] leading-relaxed text-[var(--secondary)]">
-            At zero coverage no Junior capital is raised and Senior is unprotected: the
-            first dollar the source loses is Senior&apos;s. Nothing is paid for cover
-            either, which is why Senior keeps the whole rate above.
-          </p>
-        )}
+          <ul className="flex flex-col gap-2">
+            {legs.map((leg) => (
+              <li
+                className={`flex min-w-0 flex-col gap-0.5 rounded-lg border px-3.5 py-2.5 ${
+                  leg.funded
+                    ? "border-[var(--border-subtle)] bg-[var(--foundation)]"
+                    : "border-dashed border-[var(--border-subtle)]"
+                }`}
+                key={leg.name}
+                // The loss ordering, drawn rather than stated: a left edge in the
+                // leg's own colour on the two tranches that actually absorb, and
+                // none on the pool, which does not.
+                style={
+                  leg.lossLayer && leg.funded
+                    ? { borderLeftColor: leg.fill, borderLeftWidth: 3 }
+                    : undefined
+                }
+              >
+                <span className="grid grid-cols-3 items-start gap-x-3 gap-y-2 sm:flex sm:items-center sm:gap-3">
+                  <span className="col-span-3 flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5 sm:flex-1">
+                    <span className="shrink-0 text-[11px] font-semibold uppercase tracking-[0.1em] text-[var(--tertiary)]">
+                      {leg.name}
+                    </span>
+                    <span className="text-[11px] leading-snug text-[var(--tertiary)]">
+                      {leg.description}
+                    </span>
+                  </span>
+                  <span className="flex min-w-0 flex-col gap-1 sm:w-[86px] sm:shrink-0 sm:text-right">
+                    <span className="text-[8px] font-semibold uppercase tracking-[0.08em] text-[var(--tertiary)] sm:hidden">
+                      Target
+                    </span>
+                    <span
+                      className="font-mono text-[14px] font-semibold leading-none tabular-nums"
+                      style={
+                        leg.funded ? undefined : { color: "var(--tertiary)" }
+                      }
+                    >
+                      {leg.funded ? unitRatio(leg.ratio, unit) : "none"}
+                    </span>
+                  </span>
+                  <span className="flex min-w-0 flex-col gap-1 sm:w-[86px] sm:shrink-0 sm:text-right">
+                    <span className="text-[8px] font-semibold uppercase tracking-[0.08em] text-[var(--tertiary)] sm:hidden">
+                      Minimum
+                    </span>
+                    <span
+                      className="font-mono text-[14px] font-semibold leading-none tabular-nums text-[var(--tertiary)]"
+                      title={
+                        leg.floorRatio === null
+                          ? "Senior is the basis. It does not move with utilization."
+                          : "The least capital that satisfies the requirement, which is 100% utilization with no headroom."
+                      }
+                    >
+                      {leg.floorRatio === null
+                        ? "basis"
+                        : leg.funded
+                          ? unitRatio(leg.floorRatio, unit)
+                          : "none"}
+                    </span>
+                  </span>
+                  <span className="flex min-w-0 flex-col gap-1 text-right sm:w-[54px] sm:shrink-0">
+                    <span className="text-[8px] font-semibold uppercase tracking-[0.08em] text-[var(--tertiary)] sm:hidden">
+                      Share
+                    </span>
+                    <span className="font-mono text-[14px] font-semibold leading-none tabular-nums text-[var(--tertiary)]">
+                      {leg.funded ? `${share(leg.amount).toFixed(1)}%` : "0%"}
+                    </span>
+                  </span>
+                </span>
+              </li>
+            ))}
+          </ul>
+
+          {/* Totals are grouped away from the three funded positions so summary
+            rows cannot be mistaken for additional tranches. */}
+          <div className="mt-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--card)] px-3.5">
+            <div className="grid grid-cols-3 items-start gap-x-3 gap-y-2 py-2.5 sm:flex sm:items-center sm:gap-3">
+              <span className="col-span-3 flex min-w-0 flex-col gap-0.5 sm:flex-1">
+                <span className="text-[11px] font-semibold text-[var(--secondary)]">
+                  In the yield source
+                </span>
+                <span className="text-[11px] leading-snug text-[var(--tertiary)]">
+                  Sr, Jr, and SLP&apos;s {pct(poolSeniorWeight)} Sr allocation
+                </span>
+              </span>
+              <span className="flex min-w-0 flex-col gap-1 sm:w-[86px] sm:shrink-0 sm:text-right">
+                <span className="text-[8px] font-semibold uppercase tracking-[0.08em] text-[var(--tertiary)] sm:hidden">
+                  Target
+                </span>
+                <span className="font-mono text-[14px] font-semibold leading-none tabular-nums">
+                  {unitRatio(
+                    dayCapitalInYieldSource(
+                      { st: 100, jt: per100(jt), lt: per100(lt) },
+                      poolSeniorWeight,
+                    ),
+                    unit,
+                  )}
+                </span>
+              </span>
+              <span className="flex min-w-0 flex-col gap-1 sm:w-[86px] sm:shrink-0 sm:text-right">
+                <span className="text-[8px] font-semibold uppercase tracking-[0.08em] text-[var(--tertiary)] sm:hidden">
+                  Minimum
+                </span>
+                <span className="font-mono text-[14px] font-semibold leading-none tabular-nums text-[var(--tertiary)]">
+                  {unitRatio(
+                    dayCapitalInYieldSource(
+                      { st: 100, jt: per100(floor.jt), lt: per100(floor.lt) },
+                      poolSeniorWeight,
+                    ),
+                    unit,
+                  )}
+                </span>
+              </span>
+              <span className="flex min-w-0 flex-col gap-1 text-right sm:w-[54px] sm:shrink-0">
+                <span className="text-[8px] font-semibold uppercase tracking-[0.08em] text-[var(--tertiary)] sm:hidden">
+                  Share
+                </span>
+                <span className="font-mono text-[14px] font-semibold leading-none tabular-nums text-[var(--tertiary)]">
+                  {`${((dayCapitalInYieldSource({ st, jt, lt }, poolSeniorWeight) / total) * 100).toFixed(1)}%`}
+                </span>
+              </span>
+            </div>
+
+            <div className="grid grid-cols-3 items-baseline gap-x-3 gap-y-2 border-t border-[var(--border-subtle)] py-2.5 sm:flex sm:gap-3">
+              <span className="col-span-3 min-w-0 text-[11px] font-semibold text-[var(--secondary)] sm:flex-1">
+                Total capital
+              </span>
+              <span className="flex min-w-0 flex-col gap-1 sm:w-[86px] sm:shrink-0 sm:text-right">
+                <span className="text-[8px] font-semibold uppercase tracking-[0.08em] text-[var(--tertiary)] sm:hidden">
+                  Target
+                </span>
+                <span className="font-mono text-[14px] font-bold leading-none tabular-nums">
+                  {unitRatio(100 + per100(jt) + per100(lt), unit)}
+                </span>
+              </span>
+              <span className="flex min-w-0 flex-col gap-1 sm:w-[86px] sm:shrink-0 sm:text-right">
+                <span className="text-[8px] font-semibold uppercase tracking-[0.08em] text-[var(--tertiary)] sm:hidden">
+                  Minimum
+                </span>
+                <span className="font-mono text-[14px] font-bold leading-none tabular-nums text-[var(--tertiary)]">
+                  {unitRatio(100 + per100(floor.jt) + per100(floor.lt), unit)}
+                </span>
+              </span>
+              <span className="flex min-w-0 flex-col gap-1 text-right sm:w-[54px] sm:shrink-0">
+                <span className="text-[8px] font-semibold uppercase tracking-[0.08em] text-[var(--tertiary)] sm:hidden">
+                  Share
+                </span>
+                <span className="font-mono text-[14px] font-bold leading-none tabular-nums text-[var(--tertiary)]">
+                  100.0%
+                </span>
+              </span>
+            </div>
+          </div>
+        </div>
       </CardContent>
     </Card>
   );

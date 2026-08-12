@@ -38,7 +38,9 @@ import {
   eclpTVL,
 } from './eclp';
 
-const LT_LAMBDA = 1;
+/** Fixed concentration used by the simulator's E-CLP quote model. Exported so
+ * the UI can disclose the exact venue assumption without restating it. */
+export const DAY_ECLP_SIMULATION_LAMBDA = 1;
 const LT_WEIGHT_WAD = toWad('0.1');
 const ONE_NAV_WEI = 1n;
 // Equivalent to the contract's finite dilution protection for a wiped tranche.
@@ -119,11 +121,11 @@ export function liquidityUtilization(
 
 let eclpCache: { key: string; params: EclpParams } | null = null;
 function eclpParamsFor(cfg: MarketConfig): EclpParams {
-  const key = `${LT_LAMBDA}|${cfg.eclpBandWidth}`;
+  const key = `${DAY_ECLP_SIMULATION_LAMBDA}|${cfg.eclpBandWidth}`;
   if (!eclpCache || eclpCache.key !== key) {
     eclpCache = {
       key,
-      params: eclpParamsForWeight(0.1, LT_LAMBDA, cfg.eclpBandWidth),
+      params: eclpParamsForWeight(0.1, DAY_ECLP_SIMULATION_LAMBDA, cfg.eclpBandWidth),
     };
   }
   return eclpCache.params;

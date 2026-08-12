@@ -38,6 +38,14 @@ export const unitAmount = (value: number, unit: DayV2Unit) =>
   isUsdUnit(unit) ? `$${value.toFixed(2)}` : value.toFixed(2);
 
 /**
+ * A per-100 ratio in the market's own unit, at the one decimal the capital
+ * stack states these in. Same currency rule as everything else here: a market
+ * quoted in ETH never gets a dollar sign in front of a number of ETH.
+ */
+export const unitRatio = (value: number, unit: DayV2Unit) =>
+  isUsdUnit(unit) ? `$${value.toFixed(1)}` : value.toFixed(1);
+
+/**
  * A position-sized figure in the market's own unit. `initialST` is a count of
  * the market's own asset, not dollars, so the two ETH and one BTC market would
  * otherwise have their tranche sizes labelled with a currency nobody quoted

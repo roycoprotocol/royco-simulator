@@ -50,14 +50,12 @@ import {
 } from '@/lib/day-simulator-template/issuer-presets';
 import {
   buildDayConfigExport,
-  DAY_DEPLOYMENT_INPUT_IDS,
   DAY_DEPLOYMENT_TERM_BOUNDS,
   dayConfigExportFilename,
   EMPTY_DAY_DEPLOYMENT_FIELDS,
   parseDayDeploymentTerm,
   type DayDeploymentFieldId,
   type DayDeploymentFieldValues,
-  type DayDeploymentInputValues,
 } from '@/lib/day-simulator-template/config-export';
 import {
   buildDayFiniteForwardSeries,
@@ -2436,6 +2434,7 @@ export default function DayMarketSimulator({
         selfLiquidationBonusPct,
       },
       scenario: {
+        hasHistoricalSeries: activeMarket.series.length >= 3,
         sourceStressPct: stressDepthPct,
       },
       modeled: {
@@ -2446,9 +2445,6 @@ export default function DayMarketSimulator({
         referenceSellShareOfSenior: result.explainer.liquidity.referenceSellShareOfSenior,
         boundarySellShareOfSenior: result.explainer.liquidity.boundarySellShareOfSenior,
       },
-      deploymentInputs: Object.fromEntries(
-        DAY_DEPLOYMENT_INPUT_IDS.map((id) => [id, deploymentInputs[id]]),
-      ) as DayDeploymentInputValues,
     });
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
@@ -2463,8 +2459,8 @@ export default function DayMarketSimulator({
     activeMarket.id,
     activeMarket.identity.displayAssetName,
     activeMarket.identity.marketName,
+    activeMarket.series.length,
     coveragePct,
-    deploymentInputs,
     eclpBandWidthPct,
     exitBufferPct,
     liqSharePct,

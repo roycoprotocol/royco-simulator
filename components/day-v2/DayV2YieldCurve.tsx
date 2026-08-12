@@ -23,8 +23,73 @@ import {
  * requirement, and the target is where the modeled scenario sits, so YT is the
  * number that binds and the other two describe what happens either side of it.
  */
+/**
+ * Three readings of one point on the curve, because the share alone is not
+ * enough to act on and the single line this replaces tried to carry all of it
+ * as one run-on sentence.
+ *
+ * The three answer three different questions. The share is what the curve
+ * literally plots. The rate is what that share is worth per year, which is the
+ * only form the reader can compare against anything else. The share of total
+ * yield is what it comes to once the Junior and pool capital are counted in the
+ * pot as well, which is always the smallest of the three and is the one people
+ * assume the first number already is.
+ */
+function CurveTooltip({
+  active,
+  label,
+  paidTo,
+  payload,
+  seniorShareOfCapital,
+  sourceApy,
+}: {
+  active?: boolean;
+  label?: number;
+  paidTo: string;
+  payload?: readonly { value: number }[];
+  seniorShareOfCapital: number;
+  sourceApy: number;
+}) {
+  if (!active || !payload?.length) return null;
+  const sharePct = payload[0].value;
+  const rows: [string, string][] = [
+    ["Share of Sr's yield", `${sharePct.toFixed(1)}%`],
+    // No currency symbol. This page runs markets quoted in ETH and BTC as well
+    // as dollars, and the line this replaces said "per dollar of Sr" on all of
+    // them.
+    ["Additional yield", `${((sharePct / 100) * sourceApy * 100).toFixed(2)}% a year on Sr`],
+    [
+      "Share of total yield",
+      `${(sharePct * seniorShareOfCapital).toFixed(1)}%`,
+    ],
+  ];
+  return (
+    <div className="rounded-lg border border-[#e4e0d6] bg-[#fcfbf8] px-2.5 py-2 text-[11px] shadow-[0_4px_14px_-8px_rgba(23,25,31,0.4)]">
+      <p className="font-semibold text-[#17191f]">
+        {paidTo} at {label}% utilization
+      </p>
+      <table className="mt-1">
+        <tbody>
+          {rows.map(([name, value]) => (
+            <tr key={name}>
+              <td className="pr-3 text-[10.5px] text-[#596270]">{name}</td>
+              <td className="text-right font-mono text-[11px] font-semibold tabular-nums text-[#1d4987]">
+                {value}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+      <p className="mt-1 text-[9.5px] leading-snug text-[#8a8f98]">
+        Total yield counts Jr and the pool in the pot, not just Sr.
+      </p>
+    </div>
+  );
+}
+
 function DayV2YieldCurve({
   paidTo,
+  seniorShareOfCapital,
   sourceApy,
   target,
   y0,
@@ -33,6 +98,9 @@ function DayV2YieldCurve({
 }: {
   /** Who the share is paid to, for the tooltip's second line. */
   paidTo: string;
+  /** Sr as a fraction of all the capital standing, so the share of Sr's yield
+   *  can also be quoted against everything the market earns. */
+  seniorShareOfCapital: number;
   /** The source rate, so a share can be quoted as a rate and not only a share. */
   sourceApy: number;
   target: number;
@@ -78,20 +146,14 @@ function DayV2YieldCurve({
             x={target * 100}
           />
           <Tooltip
-            contentStyle={{
-              background: "#fcfbf8",
-              border: "1px solid #e4e0d6",
-              borderRadius: 8,
-              fontSize: 11,
-            }}
-            // A share means nothing on its own. Quoted against the source rate
-            // it becomes what it actually is: the yield per dollar of Sr handed
-            // over at that utilization.
-            formatter={(value: number) => [
-              `${value.toFixed(1)}% of Sr's yield, about ${((value / 100) * sourceApy * 100).toFixed(2)}% a year per dollar of Sr`,
-              `${paidTo} is paid`,
-            ]}
-            labelFormatter={(value: number) => `At ${value}% utilization`}
+            content={
+              <CurveTooltip
+                paidTo={paidTo}
+                seniorShareOfCapital={seniorShareOfCapital}
+                sourceApy={sourceApy}
+              />
+            }
+            cursor={{ stroke: "#c9c4b8", strokeDasharray: "3 3" }}
           />
           {/* Linear, because the curve genuinely is piecewise-linear between the
               three anchors. A smoothed spline would draw a shape the engine

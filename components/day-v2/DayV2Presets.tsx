@@ -27,7 +27,7 @@ export default function DayV2Presets({
         className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--tertiary)]"
         id="day-v2-presets-heading"
       >
-        Or start from a named design, then adjust
+        Or start from a named design
       </h3>
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
         {DAY_ISSUER_PRESETS.map((preset) => {

@@ -9,22 +9,33 @@ import DayV2Comparison, {
   type DayV2PositionBreakdown,
 } from "@/components/day-v2/DayV2Comparison";
 import DayV2Backtest from "@/components/day-v2/DayV2Backtest";
+import DayV2Button from "@/components/day-v2/DayV2Button";
 import DayV2CapitalStack from "@/components/day-v2/DayV2CapitalStack";
-import DayV2Deploy from "@/components/day-v2/DayV2Deploy";
 import DayV2Deployment from "@/components/day-v2/DayV2Deployment";
+import DayV2Disclosure from "@/components/day-v2/DayV2Disclosure";
+import DayV2DocsLink from "@/components/day-v2/DayV2DocsLink";
+import DayV2Group from "@/components/day-v2/DayV2Group";
 import DayV2Parameters from "@/components/day-v2/DayV2Parameters";
-import DayV2Presets from "@/components/day-v2/DayV2Presets";
+import DayV2Slider from "@/components/day-v2/DayV2Slider";
 import DayV2ExitCost from "@/components/day-v2/DayV2ExitCost";
 import DayV2LossWaterfall from "@/components/day-v2/DayV2LossWaterfall";
+import DayV2MarketSelect from "@/components/day-v2/DayV2MarketSelect";
+import DayV2SegmentedControl from "@/components/day-v2/DayV2SegmentedControl";
 import DayV2Source from "@/components/day-v2/DayV2Source";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { dayV2RangeStyle } from "@/components/day-v2/range";
 import { dayV2EffectiveShares } from "@/components/day-v2/terms";
 import { buildDayV2Query, type DayV2UrlState } from "@/components/day-v2/url-state";
-import {
-  matchDayIssuerPreset,
-  type DayIssuerPreset,
-} from "@/lib/day-simulator-template/issuer-presets";
+import { buildDayYieldDraftMarket } from "@/lib/day-simulator-template/explorer-market";
+import { matchDayIssuerPreset } from "@/lib/day-simulator-template/issuer-presets";
+import { dayPoolSeniorWeight } from "@/lib/day-simulator-template/capital-sizing";
+import { DAY_ECLP_SIMULATION_LAMBDA } from "@/lib/day/engine/engine";
 import { buildDayExplainerMetrics } from "@/lib/day-simulator-template/explainer";
 import type { DayMarket } from "@/lib/day-simulator-template/market";
 import {
@@ -44,82 +55,13 @@ type DayV2Mode = "simulate" | "deploy";
 
 const pct = (value: number) => `${(value * 100).toFixed(1)}%`;
 const DAY_TARGET_UTILIZATION = 0.9;
-
-/**
- * A term the reader sets, drawn so it cannot be mistaken for a readout.
- *
- * The old control was a hairline track under a 15px number, which read as a
- * label with a rule under it. Three things fix that and all three are about
- * affordance rather than decoration: its own raised cell, so it is an object
- * you act on rather than a line of text; a filled track, so the handle has a
- * visible travelled distance behind it; and the endpoints spelled out, so the
- * range it can move through is on screen instead of implied.
- *
- * The fill treatment is shared with every other range on the page, so the deploy
- * parameters and the two exploration sliders inside the result cards read as the
- * same kind of object as these three.
- */
-function Slider({
-  label,
-  display,
-  max,
-  maxLabel,
-  min,
-  minLabel,
-  onChange,
-  note,
-  step,
-  value,
-}: {
-  label: string;
-  display: string;
-  max: number;
-  maxLabel: string;
-  min: number;
-  minLabel: string;
-  onChange: (value: number) => void;
-  note: string;
-  step: number;
-  value: number;
-}) {
-  return (
-    <label className="flex cursor-pointer flex-col gap-2.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--card)] px-4 py-3 transition-[border-color,box-shadow] hover:border-[var(--secondary)] focus-within:border-[var(--foreground)] focus-within:shadow-[0_2px_10px_-4px_rgba(23,25,31,0.24)]">
-      <span className="flex items-baseline justify-between gap-3">
-        <span className="min-w-0 truncate text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--tertiary)]">
-          {label}
-          {/* Dropped only in the band where the three cells are side by side but
-              still narrow, roughly 640 to 1024, where the note is what gets
-              clipped. Stacked below that and wide above it, there is room. */}
-          <span className="inline font-normal normal-case tracking-normal sm:hidden lg:inline">
-            {" · "}
-            {note}
-          </span>
-        </span>
-        <span className="shrink-0 font-mono text-[22px] font-bold leading-none tracking-[-0.02em] tabular-nums">
-          {display}
-        </span>
-      </span>
-      <span className="flex items-center gap-2.5">
-        <span className="w-7 shrink-0 text-right font-mono text-[9.5px] tabular-nums text-[var(--tertiary)]">
-          {minLabel}
-        </span>
-        <input
-          className="day-v2-range"
-          max={max}
-          min={min}
-          onChange={(event) => onChange(Number(event.target.value))}
-          step={step}
-          style={dayV2RangeStyle(value, min, max)}
-          type="range"
-          value={value}
-        />
-        <span className="w-7 shrink-0 font-mono text-[9.5px] tabular-nums text-[var(--tertiary)]">
-          {maxLabel}
-        </span>
-      </span>
-    </label>
-  );
-}
+const CUSTOM_SOURCE_ID = "custom";
+const clampDeployDiscount = (value: number) =>
+  Math.min(5, Math.max(0.5, value));
+const CUSTOM_SOURCE_MARKET = buildDayYieldDraftMarket({
+  label: "Custom yield source",
+  sourceApy: 0.12,
+});
 
 /**
  * The same three terms, sized for the bar that takes over once the input panel
@@ -128,6 +70,7 @@ function Slider({
  * what the control is, which the full panel already did.
  */
 function CompactSlider({
+  ariaLabel,
   display,
   label,
   max,
@@ -136,6 +79,7 @@ function CompactSlider({
   step,
   value,
 }: {
+  ariaLabel: string;
   display: string;
   label: string;
   max: number;
@@ -150,6 +94,7 @@ function CompactSlider({
         {label}
       </span>
       <input
+        aria-label={ariaLabel}
         className="day-v2-range"
         max={max}
         min={min}
@@ -183,51 +128,85 @@ export default function DayV2Summary({
   // has decided and now has to set every parameter a real market takes. The two
   // share one model, so the figures never disagree between them.
   const [mode, setMode] = useState<DayV2Mode>(linked?.mode ?? "simulate");
-  // Whether to run this market's real price path at all. Off, the page is a
-  // pure forward projection at the stated rate and says so, instead of showing
-  // a history the reader did not ask for.
-  const [useHistory, setUseHistory] = useState(linked?.useHistory ?? true);
   const deploying = mode === "deploy";
+  const [customSource, setCustomSource] = useState(
+    linked?.market === CUSTOM_SOURCE_ID ||
+      !markets.some((candidate) => candidate.id === linked?.market),
+  );
   const [marketId, setMarketId] = useState(initialMarket.id);
   // An imported source outranks the registry selection while it is loaded, so
   // every section below runs on the reader's own history.
   const [draftMarket, setDraftMarket] = useState<DayMarket | null>(null);
-  // The importer is opened from the input panel rather than from a band of its
-  // own, so the state that used to live inside it is lifted here.
-  const [sourceOpen, setSourceOpen] = useState(false);
   // Whether the slim terms bar has taken over. Driven by a sentinel sitting
   // right below the three sliders rather than by the panel itself: on the deploy
   // tab the panel runs well past a viewport, so watching the whole thing would
   // leave the terms off screen and the bar still hidden.
   const termsEndRef = useRef<HTMLDivElement>(null);
   const [termsPinned, setTermsPinned] = useState(false);
-  const selectedMarket = markets.find((candidate) => candidate.id === marketId) ?? initialMarket;
-  const market = draftMarket ?? selectedMarket;
+  const selectedMarket =
+    markets.find((candidate) => candidate.id === marketId) ?? initialMarket;
+  // Importing history attaches a path to the Custom design; it must not replace
+  // that design's market defaults. The current sliders remain the source of
+  // truth and the imported draft contributes only identity, provenance and the
+  // dated series.
+  const market = draftMarket
+    ? { ...draftMarket, defaults: CUSTOM_SOURCE_MARKET.defaults }
+    : customSource
+      ? CUSTOM_SOURCE_MARKET
+      : selectedMarket;
   const defaults = market.defaults;
   // A few markets report in their own asset rather than dollars. Declared on
   // the market, so it follows an imported draft too.
-  const returnUnit = market.customization.backtestDisplay?.returnUnit ?? "USD";
-  const [coveragePct, setCoveragePct] = useState(linked?.coveragePct ?? defaults.coverage * 100);
-  const [liquidityPct, setLiquidityPct] = useState(linked?.liquidityPct ?? defaults.minLiquidity * 100);
-  const [sourceApyPct, setSourceApyPct] = useState(linked?.sourceApyPct ?? defaults.sourceApy * 100);
+  const returnUnit = customSource
+    ? "units"
+    : (market.customization.backtestDisplay?.returnUnit ?? "USD");
+  const [coveragePct, setCoveragePct] = useState(
+    linked?.coveragePct ?? defaults.coverage * 100,
+  );
+  const [liquidityPct, setLiquidityPct] = useState(
+    linked?.liquidityPct ?? defaults.minLiquidity * 100,
+  );
+  const [sourceApyPct, setSourceApyPct] = useState(
+    customSource
+      ? (linked?.sourceApyPct ?? defaults.sourceApy * 100)
+      : defaults.sourceApy * 100,
+  );
   // The rest of the market's terms. They are real inputs to the engine and were
   // previously pinned at the market default with no way to see or move them.
-  const [observationDays, setObservationDays] = useState(linked?.observationDays ?? defaults.observationDays);
-  const [bandPct, setBandPct] = useState(linked?.bandPct ?? defaults.eclpBandWidth * 100);
-  const [maintainCoverage, setMaintainCoverage] = useState(linked?.maintainCoverage ?? defaults.maintainCoverage);
+  const [observationDays, setObservationDays] = useState(
+    linked?.observationDays ?? defaults.observationDays,
+  );
+  const [bandPct, setBandPct] = useState(
+    clampDeployDiscount(linked?.bandPct ?? defaults.eclpBandWidth * 100),
+  );
+  const [maintainCoverage, setMaintainCoverage] = useState(
+    linked?.maintainCoverage ?? defaults.maintainCoverage,
+  );
   // Null means "follow the requirement", which is the rule in `terms.ts`. A
   // number means the deployer has priced the tranche themselves.
-  const [riskShareOverride, setRiskShareOverride] = useState<number | null>(linked?.riskSharePct ?? null);
-  const [liqShareOverride, setLiqShareOverride] = useState<number | null>(linked?.liqSharePct ?? null);
+  const [riskShareOverride, setRiskShareOverride] = useState<number | null>(
+    linked?.riskSharePct ?? null,
+  );
+  const [liqShareOverride, setLiqShareOverride] = useState<number | null>(
+    linked?.liqSharePct ?? null,
+  );
   // The other two anchors of the yield-share curve. Null means "as the market
   // ships it", which is what every registry market wants until someone is
   // actually designing a curve.
-  const [y0Override, setY0Override] = useState<number | null>(linked?.y0Pct ?? null);
-  const [y100Override, setY100Override] = useState<number | null>(linked?.y100Pct ?? null);
+  const [y0Override, setY0Override] = useState<number | null>(
+    linked?.y0Pct ?? null,
+  );
+  const [y100Override, setY100Override] = useState<number | null>(
+    linked?.y100Pct ?? null,
+  );
   // The liquidity side has a curve of its own, keyed on a different
   // utilization. Only its target anchor was ever settable here.
-  const [liqY0Override, setLiqY0Override] = useState<number | null>(linked?.liqY0Pct ?? null);
-  const [liqY100Override, setLiqY100Override] = useState<number | null>(linked?.liqY100Pct ?? null);
+  const [liqY0Override, setLiqY0Override] = useState<number | null>(
+    linked?.liqY0Pct ?? null,
+  );
+  const [liqY100Override, setLiqY100Override] = useState<number | null>(
+    linked?.liqY100Pct ?? null,
+  );
 
   // Switching market adopts that market's own terms, so the sliders describe the
   // market on screen rather than carrying the previous one's numbers over.
@@ -236,29 +215,8 @@ export default function DayV2Summary({
     setLiquidityPct(next.defaults.minLiquidity * 100);
     setSourceApyPct(next.defaults.sourceApy * 100);
     setObservationDays(next.defaults.observationDays);
-    setBandPct(next.defaults.eclpBandWidth * 100);
+    setBandPct(clampDeployDiscount(next.defaults.eclpBandWidth * 100));
     setMaintainCoverage(next.defaults.maintainCoverage);
-    setRiskShareOverride(null);
-    setLiqShareOverride(null);
-    setY0Override(null);
-    setY100Override(null);
-    setLiqY0Override(null);
-    setLiqY100Override(null);
-  };
-
-  // An issuer preset is a complete design, not two slider positions, so it sets
-  // the band and the observation period too. Applying only the parts /v2 used
-  // to expose would put a preset's name on a market that is not that preset.
-  const applyPreset = (preset: DayIssuerPreset) => {
-    const values = preset.values;
-    setCoveragePct(values.coveragePct);
-    setLiquidityPct(values.minLiquidityPct);
-    setObservationDays(values.observationDays);
-    setBandPct(values.eclpBandWidthPct);
-    setMaintainCoverage(values.maintainCoverage);
-    // The presets' own shares land exactly on the requirement-derived rule for
-    // every market, so following the rule reproduces them rather than pinning
-    // numbers that would then be stale if a slider moved.
     setRiskShareOverride(null);
     setLiqShareOverride(null);
     setY0Override(null);
@@ -271,17 +229,34 @@ export default function DayV2Summary({
     const next = markets.find((candidate) => candidate.id === nextId);
     if (!next) return;
     // Choosing a registry market is a decision to stop looking at the import.
+    setCustomSource(false);
     setDraftMarket(null);
     setMarketId(nextId);
     adoptTerms(next);
   };
 
+  const selectSourceType = (nextCustom: boolean) => {
+    if (nextCustom === customSource) return;
+    setCustomSource(nextCustom);
+    setDraftMarket(null);
+    adoptTerms(nextCustom ? CUSTOM_SOURCE_MARKET : selectedMarket);
+  };
+
   // Keeps the controls responsive while the engine re-runs, the same pattern the
   // main simulator uses after measuring input lag.
   const inputs = useDeferredValue({
-    coveragePct, liquidityPct, sourceApyPct,
-    observationDays, bandPct, maintainCoverage, riskShareOverride, liqShareOverride,
-    y0Override, y100Override, liqY0Override, liqY100Override,
+    coveragePct,
+    liquidityPct,
+    sourceApyPct,
+    observationDays,
+    bandPct,
+    maintainCoverage,
+    riskShareOverride,
+    liqShareOverride,
+    y0Override,
+    y100Override,
+    liqY0Override,
+    liqY100Override,
   });
 
   // One place decides what the engine is actually run with, so the panel that
@@ -296,61 +271,100 @@ export default function DayV2Summary({
     // the engine charged Sr 1.185pp for cover that does not exist and paid it
     // to nobody, because there is no Jr capital to receive it. Measured on
     // jbbb: Sr 5.529% correctly zeroed, 4.344% with the leak.
-    const riskYieldShare = coverage <= 0
-      ? 0
-      : inputs.riskShareOverride === null
-        ? derived.riskYieldShare
-        : inputs.riskShareOverride / 100;
-    let liquidityYieldShare = minLiquidity <= 0
-      ? 0
-      : inputs.liqShareOverride === null
-        ? derived.liquidityYieldShare
-        : inputs.liqShareOverride / 100;
+    let riskYieldShare =
+      coverage <= 0
+        ? 0
+        : inputs.riskShareOverride === null
+          ? derived.riskYieldShare
+          : inputs.riskShareOverride / 100;
+    let liquidityYieldShare =
+      minLiquidity <= 0
+        ? 0
+        : inputs.liqShareOverride === null
+          ? derived.liquidityYieldShare
+          : inputs.liqShareOverride / 100;
+    // The deploy flow rejects an active static curve whose target share is
+    // zero. The controls move in 0.5-point steps, so that is the smallest
+    // positive value either active curve can represent.
+    if (coverage > 0) riskYieldShare = Math.max(0.005, riskYieldShare);
+    if (minLiquidity > 0)
+      liquidityYieldShare = Math.max(0.005, liquidityYieldShare);
     // The engine derives each contract cap as the highest point of its curve and
     // throws INVALID_YIELD_SHARE_CONFIG when the two caps exceed 100% together,
     // which would take the page down on a keystroke. Holding the whole risk
     // curve under what the liquidity curve leaves makes that unreachable rather
     // than merely unlikely. On jbbb this ceiling is 85%, on muga 64.3%.
-    // The backtest runner builds its own config from the market's own y0 and
-    // y100 rather than the curve set here, so the liquidity share has to stay
-    // under what *that* curve leaves or the history throws while the projection
-    // is fine. Found by slamming every slider to its maximum, which is the only
-    // corner where it bites.
-    const marketRiskCurveMax = Math.max(defaults.riskYDM.y0, defaults.riskYDM.y100);
+    // Keep the liquidity side inside what the selected source's risk curve
+    // leaves. The full resolved curves are handed to both the projection and
+    // backtest below, so this one ceiling protects both runs.
+    const marketRiskCurveMax = Math.max(
+      defaults.riskYDM.y0,
+      defaults.riskYDM.y100,
+    );
     const liquidityCeiling = Math.max(0, 1 - marketRiskCurveMax);
     liquidityYieldShare = Math.min(liquidityYieldShare, liquidityCeiling);
-    const liqY0 = minLiquidity <= 0 ? 0 : inputs.liqY0Override === null
-      ? Math.min(defaults.liqYDM.y0, liquidityYieldShare)
-      : inputs.liqY0Override / 100;
-    const liqY100 = minLiquidity <= 0 ? 0 : inputs.liqY100Override === null
-      ? Math.max(defaults.liqYDM.y100, liquidityYieldShare)
-      : inputs.liqY100Override / 100;
+    const requestedLiqY0 =
+      minLiquidity <= 0
+        ? 0
+        : inputs.liqY0Override === null
+          ? Math.min(defaults.liqYDM.y0, liquidityYieldShare)
+          : inputs.liqY0Override / 100;
+    const requestedLiqY100 =
+      minLiquidity <= 0
+        ? 0
+        : inputs.liqY100Override === null
+          ? Math.max(defaults.liqYDM.y100, liquidityYieldShare)
+          : inputs.liqY100Override / 100;
+    const liqY0 = Math.min(
+      requestedLiqY0,
+      liquidityYieldShare,
+      liquidityCeiling,
+    );
+    const liqY100 = Math.min(
+      Math.max(requestedLiqY100, liquidityYieldShare),
+      liquidityCeiling,
+    );
     // Each contract cap is the peak of its own curve, so the peak is what has
     // to clear the shared 100% budget, not the target anchor.
     const maxLiquidityCurve = Math.max(liqY0, liquidityYieldShare, liqY100);
     const riskCeiling = Math.max(0, 1 - maxLiquidityCurve);
     const cap = (value: number) => Math.min(value, riskCeiling);
+    const resolvedRiskYieldShare = cap(riskYieldShare);
     // The static curve runs through (0% -> y0, 90% -> yTarget, 100% -> y100).
     // Left to the market, y0 is clamped so the curve never slopes down into its
     // own target: the deployment panel already displayed it that way while the
     // engine was handed the raw value, so the two disagreed below about 10%
-    // coverage. Set deliberately, the reader's number is respected.
-    const y0 = coverage <= 0 ? 0 : cap(inputs.y0Override === null
-      ? Math.min(defaults.riskYDM.y0, riskYieldShare)
-      : inputs.y0Override / 100);
-    const y100 = coverage <= 0 ? 0 : cap(inputs.y100Override === null
-      ? Math.max(defaults.riskYDM.y100, riskYieldShare)
-      : inputs.y100Override / 100);
+    // coverage. Explicit anchors are normalized to the same deployable order;
+    // the engine applies this rule too, and exporting the raw inverted values
+    // would otherwise describe a different curve than the one it ran.
+    const requestedY0 =
+      coverage <= 0
+        ? 0
+        : cap(
+            inputs.y0Override === null
+              ? Math.min(defaults.riskYDM.y0, riskYieldShare)
+              : inputs.y0Override / 100,
+          );
+    const requestedY100 =
+      coverage <= 0
+        ? 0
+        : cap(
+            inputs.y100Override === null
+              ? Math.max(defaults.riskYDM.y100, riskYieldShare)
+              : inputs.y100Override / 100,
+          );
+    const y0 = Math.min(requestedY0, resolvedRiskYieldShare);
+    const y100 = Math.max(requestedY100, resolvedRiskYieldShare);
     return {
       coverage,
       minLiquidity,
       derived,
-      riskYieldShare: cap(riskYieldShare),
+      riskYieldShare: resolvedRiskYieldShare,
       liquidityYieldShare,
       y0,
       y100,
-      liqY0: Math.min(liqY0, liquidityCeiling),
-      liqY100: Math.min(liqY100, liquidityCeiling),
+      liqY0,
+      liqY100,
       riskCeiling,
       liquidityCeiling,
     };
@@ -393,13 +407,15 @@ export default function DayV2Summary({
     // Where each position's yield comes from, measured by switching each
     // premium off and re-running. Differences between engine runs, so the
     // components sum to the engine's own totals rather than approximating them.
-    const noPremiums = runDayTargetScenario(effective, {
-      riskYieldShare: 0,
-      liquidityYieldShare: 0,
+    const zeroCurve = { mode: "static" as const, y0: 0, yTarget: 0, y100: 0 };
+    const noPremiums = runDayTargetScenario({
+      ...effective,
+      riskYDM: zeroCurve,
+      liqYDM: zeroCurve,
     });
-    const riskOnly = runDayTargetScenario(effective, {
-      riskYieldShare: terms.riskYieldShare,
-      liquidityYieldShare: 0,
+    const riskOnly = runDayTargetScenario({
+      ...effective,
+      liqYDM: zeroCurve,
     });
     // Held rather than rebuilt, so the pool economics quoted to the reader are
     // the ones this run used and cannot drift from them.
@@ -416,6 +432,10 @@ export default function DayV2Summary({
         stableYield: cfg.stableYield,
         swapFeeBps: cfg.swapFeeBps,
         turnoverPerYear: cfg.poolTurnoverPerYear,
+        concentration: DAY_ECLP_SIMULATION_LAMBDA,
+        // Measured off this run's own config, so the split the capital stack
+        // reports is the split the engine seeded.
+        seniorWeight: dayPoolSeniorWeight(cfg),
       },
       explainer: buildDayExplainerMetrics(cfg, balances),
     };
@@ -423,7 +443,8 @@ export default function DayV2Summary({
   const scenario = model.scenario;
 
   const chartData = useMemo<DayV2Point[]>(() => {
-    const grow = (apy: number, months: number) => 100 * (1 + apy) ** (months / 12);
+    const grow = (apy: number, months: number) =>
+      100 * (1 + apy) ** (months / 12);
     return Array.from({ length: 13 }, (_, month) => ({
       month,
       senior: grow(scenario.seniorApy, month),
@@ -433,7 +454,7 @@ export default function DayV2Summary({
   }, [scenario]);
 
   const query = buildDayV2Query({
-    market: marketId,
+    market: customSource ? CUSTOM_SOURCE_ID : marketId,
     mode,
     coveragePct,
     liquidityPct,
@@ -441,13 +462,14 @@ export default function DayV2Summary({
     observationDays,
     bandPct,
     maintainCoverage,
-    riskSharePct: riskShareOverride,
-    liqSharePct: liqShareOverride,
-    y0Pct: y0Override,
-    y100Pct: y100Override,
-    liqY0Pct: liqY0Override,
-    liqY100Pct: liqY100Override,
-    useHistory,
+    riskSharePct:
+      riskShareOverride === null ? null : resolved.riskYieldShare * 100,
+    liqSharePct:
+      liqShareOverride === null ? null : resolved.liquidityYieldShare * 100,
+    y0Pct: y0Override === null ? null : resolved.y0 * 100,
+    y100Pct: y100Override === null ? null : resolved.y100 * 100,
+    liqY0Pct: liqY0Override === null ? null : resolved.liqY0 * 100,
+    liqY100Pct: liqY100Override === null ? null : resolved.liqY100 * 100,
   });
   // replaceState rather than a router push: this fires on every slider tick, and
   // a history entry per pixel of drag would make the back button useless.
@@ -455,7 +477,11 @@ export default function DayV2Summary({
   // a history entry per pixel of drag would make the back button useless. It is
   // also why the link is read on the server instead of in an effect here.
   useEffect(() => {
-    window.history.replaceState(null, "", `${window.location.pathname}?${query}`);
+    window.history.replaceState(
+      null,
+      "",
+      `${window.location.pathname}?${query}`,
+    );
   }, [query]);
 
   // `isIntersecting` alone would raise the bar when the sentinel is below the
@@ -466,7 +492,10 @@ export default function DayV2Summary({
     const node = termsEndRef.current;
     if (!node) return;
     const observer = new IntersectionObserver(
-      ([entry]) => setTermsPinned(!entry.isIntersecting && entry.boundingClientRect.top < 0),
+      ([entry]) =>
+        setTermsPinned(
+          !entry.isIntersecting && entry.boundingClientRect.top < 0,
+        ),
       { threshold: 0 },
     );
     observer.observe(node);
@@ -476,7 +505,7 @@ export default function DayV2Summary({
   // Which named design the current terms are, if any. Tracked by comparison
   // rather than by remembering what was last clicked, so moving any slider
   // deselects the preset instead of leaving a stale label on a changed market.
-  const activePresetId = matchDayIssuerPreset({
+  const matchedPresetId = matchDayIssuerPreset({
     coveragePct: inputs.coveragePct,
     minLiquidityPct: inputs.liquidityPct,
     eclpBandWidthPct: inputs.bandPct,
@@ -485,8 +514,17 @@ export default function DayV2Summary({
     observationDays: inputs.observationDays,
     maintainCoverage: inputs.maintainCoverage,
   });
-
-  const liveDerived = dayV2EffectiveShares(defaults, coveragePct / 100, liquidityPct / 100);
+  const curveOverridden =
+    riskShareOverride !== null ||
+    liqShareOverride !== null ||
+    y0Override !== null ||
+    y100Override !== null ||
+    liqY0Override !== null ||
+    liqY100Override !== null;
+  const advancedChanged =
+    curveOverridden ||
+    Math.abs(observationDays - defaults.observationDays) > 1e-9 ||
+    Math.abs(bandPct - defaults.eclpBandWidth * 100) > 1e-9;
 
   const source = inputs.sourceApyPct / 100;
   const breakdown = (key: "seniorApy" | "juniorApy" | "liquidityApy") => ({
@@ -504,9 +542,10 @@ export default function DayV2Summary({
       role: "Holds the source, pays for cover and an exit",
       holdsSource: true,
       ...breakdown("seniorApy"),
-      risk: coveragePct > 0
-        ? "Loses value only after Jr is exhausted"
-        : "Unprotected. No Jr capital stands in front of it",
+      risk:
+        coveragePct > 0
+          ? "Loses value only after Jr is exhausted"
+          : "Unprotected. No Jr capital stands in front of it",
       funded: true,
     },
     {
@@ -527,7 +566,7 @@ export default function DayV2Summary({
       short: "SLP",
       apy: scenario.liquidityApy,
       holds: "The pool Sr exits into",
-      role: "Supplies the exit pool, paid a premium for it",
+      role: "Supplies exit liquidity, paid a premium for it",
       holdsSource: false,
       ...breakdown("liquidityApy"),
       risk: "Holds Sr shares when Sr sells",
@@ -538,66 +577,42 @@ export default function DayV2Summary({
   return (
     // Capped rather than full-bleed. Past about 1400px the cards stop gaining
     // anything and the prose lines just get harder to track back to.
-    <div className="royco-v2 mx-auto flex w-full max-w-[1440px] flex-col gap-8 px-5 py-8 sm:px-8">
-      {/* The page's own rail: what this is, and which of the two jobs you are
-          doing. Kept off the hero grid so the switch cannot be mistaken for one
-          of the inputs beneath it. */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--tertiary)]">
-          Royco Day · Market simulator
-        </span>
-        <div
-          aria-label="What you are here to do"
-          className="flex items-center gap-0.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--foundation)] p-0.5"
-          role="group"
-        >
-          {([["Simulate", "simulate"], ["Deploy", "deploy"]] as const).map(([label, value]) => (
-            <button
-              aria-pressed={mode === value}
-              className={`cursor-pointer rounded-md px-3.5 py-1.5 text-[12px] font-semibold ${
-                mode === value
-                  ? "bg-[var(--foreground)] text-[var(--background)]"
-                  : "text-[var(--secondary)]"
-              }`}
-              key={label}
-              onClick={() => setMode(value)}
-              type="button"
-            >
-              {label}
-            </button>
-          ))}
+    <main className="royco-v2 mx-auto flex w-full max-w-[1440px] flex-col gap-8 px-5 py-8 sm:px-8">
+      <header className="grid grid-cols-1 items-center gap-6 rounded-2xl border border-[var(--border-subtle)] bg-[var(--card)] px-5 py-6 shadow-[0_8px_28px_-20px_rgba(23,25,31,0.45)] sm:px-7 lg:grid-cols-[minmax(0,1fr)_minmax(320px,0.72fr)]">
+        <div className="flex flex-col gap-3">
+          <span className="text-[10px] font-semibold uppercase tracking-[0.14em] text-[var(--tertiary)]">
+            Royco Day · Market simulator
+          </span>
+          <h1 className="text-balance text-[clamp(30px,3.5vw,48px)] font-semibold leading-[1.02] tracking-[-0.03em]">
+            One yield source, split into three positions.
+          </h1>
+          <p className="max-w-[62ch] text-[14px] leading-relaxed text-[var(--secondary)]">
+            See how market terms change returns, protection, and exit liquidity
+            for Sr, Jr, and SLP.
+          </p>
         </div>
-      </div>
 
-      {/* The hero. Full width, and deliberately holding nothing you can set:
-          everything that takes an input is in the one panel below it, so the
-          reader never has to work out which band is which. */}
-      <header className="grid grid-cols-1 items-start gap-x-8 gap-y-4 lg:grid-cols-2">
-        {/* Balanced rather than max-width capped: at 48px a character count
-            that reads well at 1440px strands "risks." on a line of its own at
-            1280px. */}
-        <h1 className="text-balance text-[clamp(30px,3.5vw,48px)] font-semibold leading-[1.02] tracking-[-0.03em]">
-          One yield source, split into three risks.
-        </h1>
-        <div className="flex flex-col gap-3 lg:pt-1">
-          <p className="max-w-[56ch] text-[14px] leading-relaxed text-[var(--secondary)]">
-            <strong className="font-semibold text-[var(--foreground)]">
-              {market.identity.marketName}
-            </strong>{" "}
-            earns{" "}
-            <strong className="font-semibold text-[var(--foreground)]">{pct(source)}</strong> a
-            year before it is split.{" "}
+        <div className="flex flex-col gap-2">
+          <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--tertiary)]">
             {deploying
-              ? "Set every parameter a real market takes, then hand the design to the deploy flow."
-              : "Nothing on this page is fixed copy: change an input and every figure below is recomputed."}
-          </p>
-          {/* The boundary, stated rather than left to be inferred from styling. */}
-          <p className="max-w-[56ch] border-t border-[var(--border-subtle)] pt-3 text-[12.5px] leading-relaxed text-[var(--tertiary)]">
-            <strong className="font-semibold text-[var(--secondary)]">You set</strong> one panel
-            of inputs.{" "}
-            <strong className="font-semibold text-[var(--secondary)]">The model answers</strong>{" "}
-            with what Sr, Jr and SLP each earn, and what each stands to lose.
-          </p>
+              ? "Finalize a market design"
+              : "Explore how the protocol works"}
+          </span>
+          <DayV2SegmentedControl
+            ariaLabel="Simulation mode"
+            className="w-full"
+            onValueChange={setMode}
+            options={[
+              { label: "Simulate", value: "simulate" },
+              { label: "Deploy", value: "deploy" },
+            ]}
+            size="lg"
+            toggleOnSelected
+            value={mode}
+          />
+          <span className="text-[10.5px] leading-snug text-[var(--tertiary)]">
+            Click either side to switch views. Your terms stay in place.
+          </span>
         </div>
       </header>
 
@@ -612,8 +627,8 @@ export default function DayV2Summary({
         aria-labelledby="day-v2-inputs-heading"
         className="flex flex-col gap-4 rounded-2xl border border-[var(--border-subtle)] bg-[var(--foundation)] px-5 py-4 shadow-[0_6px_22px_-14px_rgba(23,25,31,0.4)]"
       >
-        <div className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
-          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
             <h2
               className="text-[11px] font-semibold uppercase tracking-[0.14em]"
               id="day-v2-inputs-heading"
@@ -621,133 +636,71 @@ export default function DayV2Summary({
               Your inputs
             </h2>
             <p className="text-[11px] text-[var(--tertiary)]">
-              Everything outside this panel is computed from what is inside it.
+              Set the terms that drive the model.
             </p>
           </div>
           {draftMarket ? <Badge tone="caution">unverified import</Badge> : null}
         </div>
 
-        <div className="grid grid-cols-1 items-start gap-x-6 gap-y-4 lg:grid-cols-2">
-          {/* Left: what is being modelled. */}
-          <div className="flex flex-col gap-3">
-            <label className="flex cursor-pointer flex-col gap-1.5">
-              <span className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--tertiary)]">
-                Yield source
-              </span>
-              <select
-                aria-label="Yield source"
-                className="w-full cursor-pointer rounded-xl border border-[var(--border-subtle)] bg-[var(--card)] px-3.5 py-2.5 text-[15px] font-semibold"
-                onChange={(event) => selectMarket(event.target.value)}
-                value={draftMarket ? "__draft" : marketId}
-              >
-                {draftMarket ? (
-                  <option value="__draft">{draftMarket.identity.marketName} (imported)</option>
-                ) : null}
-                {markets.map((candidate) => (
-                  <option key={candidate.id} value={candidate.id}>
-                    {candidate.identity.marketName}
-                  </option>
-                ))}
-              </select>
-              {/* Grouped with an explicit locale: the count is rendered on the
-                  server too, and a locale-dependent separator would differ
-                  between the two and fail hydration. */}
-              <span className="font-mono text-[11px] leading-snug tabular-nums text-[var(--tertiary)]">
-                {market.series.length >= 3
-                  ? `${market.series.length.toLocaleString("en-US")} dated observations · ${market.series[0].date} to ${market.series[market.series.length - 1].date}`
-                  : "Published yield · no dated history"}
-              </span>
-            </label>
-
-            {market.series.length >= 3 ? (
-              <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--card)] px-3.5 py-2.5">
-                <span className="flex flex-col gap-0.5">
-                  <span className="text-[11.5px] font-semibold">Run its price history</span>
-                  <span className="max-w-[38ch] text-[10.5px] leading-snug text-[var(--tertiary)]">
-                    Ignore it and the page is a pure forward projection at the rate you
-                    set, with no backtest
-                  </span>
-                </span>
-                <span
-                  aria-label="Run this source's price history"
-                  className="flex items-center gap-0.5 rounded-lg border border-[var(--border-subtle)] bg-[var(--foundation)] p-0.5"
-                  role="group"
-                >
-                  {([["Run it", true], ["Ignore", false]] as const).map(([label, value]) => (
-                    <button
-                      aria-pressed={useHistory === value}
-                      className={`cursor-pointer rounded-md px-2.5 py-1 text-[11.5px] font-semibold ${
-                        useHistory === value
-                          ? "bg-[var(--foreground)] text-[var(--background)]"
-                          : "text-[var(--secondary)]"
-                      }`}
-                      key={label}
-                      onClick={() => setUseHistory(value)}
-                      type="button"
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </span>
-              </div>
-            ) : null}
-
-            {/* Said outright, because the import button next to it reads as a
-                prerequisite otherwise. Bringing your own data is the option, not
-                the path: the terms beside this run against whichever source is
-                selected, and against no history at all if you switch it off. */}
-            <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 border-t border-[var(--border-subtle)] pt-3">
-              <span className="max-w-[46ch] text-[11.5px] leading-snug text-[var(--tertiary)]">
-                {draftMarket
-                  ? "Running your own imported history. Every term beside this still applies to it."
-                  : "You do not need your own data. Pick any source above and set the terms yourself. Import one only if you want the backtest run on your own price history."}
-              </span>
-              <span className="flex shrink-0 items-center gap-3">
-                {draftMarket ? (
-                  <button
-                    className="cursor-pointer text-[11.5px] font-semibold text-[var(--tertiary)] underline underline-offset-2"
-                    onClick={() => {
-                      setDraftMarket(null);
-                      setSourceOpen(false);
-                      adoptTerms(selectedMarket);
-                    }}
-                    type="button"
-                  >
-                    Remove
-                  </button>
-                ) : null}
-                <button
-                  aria-expanded={sourceOpen}
-                  className="cursor-pointer rounded-lg border border-[var(--border-subtle)] bg-[var(--card)] px-3 py-1.5 text-[11.5px] font-semibold"
-                  onClick={() => setSourceOpen((value) => !value)}
-                  type="button"
-                >
-                  {sourceOpen ? "Close" : draftMarket ? "Replace source" : "Import a source"}
-                </button>
-              </span>
-            </div>
-          </div>
-
-          {/* Right: the terms it is split on. Slider positions come from raw
-              state, never from the deferred model, or the input fights the
-              pointer: the value snaps back to a frame-old number while you are
-              still dragging it. */}
-          <div className="flex flex-col gap-2.5">
-            <Slider
-              display={pct(sourceApyPct / 100)}
-              label="Source yield"
-              max={30}
-              maxLabel="30%"
-              min={0}
-              minLabel="0%"
-              note="before the split"
-              onChange={setSourceApyPct}
-              step={0.1}
-              value={sourceApyPct}
+        <DayV2Group
+          docs="tranching"
+          docsLabel="How tranching works"
+          index={1}
+          subtitle="Enter a custom yield or choose a listed source"
+          title="What you are modeling"
+        >
+          <div className="grid grid-cols-1 items-start gap-3 lg:grid-cols-2">
+            <DayV2SegmentedControl
+              ariaLabel="Yield source type"
+              onValueChange={(value) => selectSourceType(value === "custom")}
+              options={[
+                { label: "Custom yield", value: "custom" },
+                { label: "Listed source", value: "listed" },
+              ]}
+              value={customSource ? "custom" : "listed"}
             />
-            <Slider
+
+            {customSource ? (
+              <DayV2Slider
+                display={pct(sourceApyPct / 100)}
+                docs="dawn"
+                label="Custom source yield"
+                max={30}
+                maxLabel="30%"
+                min={0}
+                minLabel="0%"
+                note="net annual yield"
+                onChange={setSourceApyPct}
+                step={0.1}
+                value={sourceApyPct}
+              />
+            ) : (
+              <DayV2MarketSelect
+                markets={markets}
+                onChange={selectMarket}
+                value={marketId}
+              />
+            )}
+          </div>
+        </DayV2Group>
+
+        <DayV2Group
+          docs="yieldSplit"
+          docsLabel="How yield is split"
+          index={2}
+          subtitle="Set the minimum protection and exit-liquidity requirements"
+          title="The terms you set"
+        >
+          {/* Three across rather than stacked in a half-width column. They are
+              the answer to one question each and they belong on one line, which
+              also lines them up with the three named designs underneath.
+              Slider positions come from raw state, never from the deferred
+              model, or the input fights the pointer: the value snaps back to a
+              frame-old number while you are still dragging it. */}
+          <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
+            <DayV2Slider
               display={pct(coveragePct / 100)}
-              label="Coverage"
+              label="Minimum coverage"
               max={25}
               maxLabel="25%"
               min={0}
@@ -755,87 +708,136 @@ export default function DayV2Summary({
               // Not "Jr per unit of Sr", which it never was: the Junior capital
               // that meets a 20% requirement at the target is 28.6% of Senior.
               // An issuer sizing a raise off the old caption came up 43% short.
-              note="first-loss requirement"
+              note="first-loss protection"
+              docs="coverage"
               onChange={setCoveragePct}
               step={0.5}
               value={coveragePct}
             />
-            <Slider
+            <DayV2Slider
               display={pct(liquidityPct / 100)}
-              label="Liquidity"
+              label="Minimum liquidity"
               max={25}
               maxLabel="25%"
               min={0}
               minLabel="0%"
               // Same correction: a 10% liquidity requirement is met by a pool
               // worth 11.1% of Senior, not 10%.
-              note="exit-pool requirement"
+              note="SLP requirement"
+              docs="liquidity"
               onChange={setLiquidityPct}
               step={0.5}
               value={liquidityPct}
             />
           </div>
-        </div>
 
-        {/* Watched, not stuck. The panel is far too tall to pin to the top, so a
-            slim bar takes over once this scrolls away. */}
-        <div aria-hidden="true" ref={termsEndRef} />
+          {/* Watched, not stuck. The panel is far too tall to pin to the top, so
+              a slim bar takes over once this scrolls away. It has to sit
+              directly below the three sliders: gated on the panel instead, the
+              deploy tab keeps it intersecting long after the terms have gone. */}
+          <div aria-hidden="true" ref={termsEndRef} />
+        </DayV2Group>
 
-        <div className="border-t border-[var(--border-subtle)] pt-4">
-          <DayV2Presets activeId={activePresetId} onSelect={applyPreset} />
-        </div>
+        {customSource ? (
+          <DayV2Group
+            index={3}
+            subtitle="Optional · used for historical backtesting"
+            title="Add price history"
+          >
+            {draftMarket ? (
+              <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--card)] px-4 py-3">
+                <span className="text-[11px] leading-snug text-[var(--secondary)]">
+                  <strong className="font-semibold">
+                    {draftMarket.identity.marketName}
+                  </strong>
+                  {" · "}
+                  {draftMarket.series.length.toLocaleString("en-US")}{" "}
+                  observations
+                  {" · "}
+                  <span className="text-[var(--tertiary)]">
+                    available in this tab only
+                  </span>
+                </span>
+                <DayV2Button
+                  className="text-[11.5px]"
+                  onClick={() => setDraftMarket(null)}
+                  size="inline"
+                  variant="link"
+                >
+                  Remove
+                </DayV2Button>
+              </div>
+            ) : null}
+            <DayV2Source
+              onImport={(next) => {
+                setCustomSource(true);
+                setDraftMarket(next);
+              }}
+            />
+          </DayV2Group>
+        ) : null}
 
         {deploying ? (
-          <DayV2Parameters
-            bandPct={bandPct}
-            ceilingPct={resolved.riskCeiling * 100}
-            liqCeilingPct={resolved.liquidityCeiling * 100}
-            sourceApy={source}
-            liqY0Pct={liqY0Override ?? resolved.liqY0 * 100}
-            liqY100Pct={liqY100Override ?? resolved.liqY100 * 100}
-            onLiqY0Pct={setLiqY0Override}
-            onLiqY100Pct={setLiqY100Override}
-            derivedLiqSharePct={resolved.derived.liquidityYieldShare * 100}
-            derivedRiskSharePct={resolved.derived.riskYieldShare * 100}
-            liqSharePct={liqShareOverride ?? liveDerived.liquidityYieldShare * 100}
-            liqShareOverridden={liqShareOverride !== null}
-            observationDays={observationDays}
-            onBandPct={setBandPct}
-            onLiqSharePct={setLiqShareOverride}
-            onObservationDays={setObservationDays}
-            onResetCurve={() => {
-              setRiskShareOverride(null);
-              setLiqShareOverride(null);
-              setY0Override(null);
-              setY100Override(null);
-              setLiqY0Override(null);
-              setLiqY100Override(null);
-            }}
-            onRiskSharePct={setRiskShareOverride}
-            onY0Pct={setY0Override}
-            onY100Pct={setY100Override}
-            riskSharePct={riskShareOverride ?? liveDerived.riskYieldShare * 100}
-            riskShareOverridden={riskShareOverride !== null}
-            targetUtilization={DAY_TARGET_UTILIZATION}
-            y0Pct={y0Override ?? resolved.y0 * 100}
-            y100Pct={y100Override ?? resolved.y100 * 100}
-            curveOverridden={
-              riskShareOverride !== null || liqShareOverride !== null
-              || y0Override !== null || y100Override !== null
-              || liqY0Override !== null || liqY100Override !== null
+          <DayV2Disclosure
+            description={
+              <>
+                Timing, maximum discount, and premium curves ·{" "}
+                {advancedChanged
+                  ? "custom settings"
+                  : "recommended defaults applied"}
+              </>
             }
-          />
+            summary="Advanced market mechanics"
+          >
+            <DayV2Parameters
+                bandPct={bandPct}
+                ceilingPct={resolved.riskCeiling * 100}
+                coveragePct={coveragePct}
+                curveOverridden={curveOverridden}
+                derivedLiqSharePct={resolved.derived.liquidityYieldShare * 100}
+                derivedRiskSharePct={resolved.derived.riskYieldShare * 100}
+                liqCeilingPct={resolved.liquidityCeiling * 100}
+                liquidityPct={liquidityPct}
+                liqShareOverridden={liqShareOverride !== null}
+                liqSharePct={resolved.liquidityYieldShare * 100}
+                liqY0Pct={resolved.liqY0 * 100}
+                liqY100Pct={resolved.liqY100 * 100}
+                observationDays={observationDays}
+                onBandPct={setBandPct}
+                onLiqSharePct={setLiqShareOverride}
+                onLiqY0Pct={setLiqY0Override}
+                onLiqY100Pct={setLiqY100Override}
+                onObservationDays={setObservationDays}
+                onResetCurve={() => {
+                  setRiskShareOverride(null);
+                  setLiqShareOverride(null);
+                  setY0Override(null);
+                  setY100Override(null);
+                  setLiqY0Override(null);
+                  setLiqY100Override(null);
+                }}
+                onRiskSharePct={setRiskShareOverride}
+                onY0Pct={setY0Override}
+                onY100Pct={setY100Override}
+                riskShareOverridden={riskShareOverride !== null}
+                riskSharePct={resolved.riskYieldShare * 100}
+                seniorShareOfCapital={
+                  model.balances.st + model.balances.jt + model.balances.lt > 0
+                    ? model.balances.st /
+                      (model.balances.st +
+                        model.balances.jt +
+                        model.balances.lt)
+                    : 1
+                }
+                sourceApy={source}
+                startIndex={customSource ? 4 : 3}
+                targetUtilization={DAY_TARGET_UTILIZATION}
+                y0Pct={resolved.y0 * 100}
+                y100Pct={resolved.y100 * 100}
+            />
+          </DayV2Disclosure>
         ) : null}
       </section>
-
-      <DayV2Source
-        onImport={(next) => {
-          setDraftMarket(next);
-          adoptTerms(next);
-        }}
-        onOpenChange={setSourceOpen}
-        open={sourceOpen}
-      />
 
       {/* The three terms, still reachable from anywhere on a 4000px page. The
           panel above cannot be sticky at 400px tall, let alone 1400 on the
@@ -845,25 +847,31 @@ export default function DayV2Summary({
           `sm`, where it would swallow a phone viewport. */}
       <div
         className={`fixed inset-x-0 top-0 z-40 hidden border-b border-[var(--border-subtle)] bg-[color-mix(in_srgb,var(--foundation)_92%,transparent)] shadow-[0_6px_20px_-12px_rgba(23,25,31,0.4)] backdrop-blur transition-[opacity,transform] duration-150 sm:block ${
-          termsPinned ? "visible translate-y-0 opacity-100" : "invisible -translate-y-2 opacity-0"
+          termsPinned
+            ? "visible translate-y-0 opacity-100"
+            : "invisible -translate-y-2 opacity-0"
         }`}
       >
         <div className="mx-auto flex w-full max-w-[1440px] items-center gap-4 px-5 py-2 sm:px-8">
           <span className="hidden max-w-[22ch] shrink-0 truncate text-[11px] font-semibold text-[var(--secondary)] lg:block">
             {market.identity.marketName}
           </span>
+          {customSource ? (
+            <CompactSlider
+              ariaLabel="Custom source yield quick control"
+              display={pct(sourceApyPct / 100)}
+              label="Yield"
+              max={30}
+              min={0}
+              onChange={setSourceApyPct}
+              step={0.1}
+              value={sourceApyPct}
+            />
+          ) : null}
           <CompactSlider
-            display={pct(sourceApyPct / 100)}
-            label="Yield"
-            max={30}
-            min={0}
-            onChange={setSourceApyPct}
-            step={0.1}
-            value={sourceApyPct}
-          />
-          <CompactSlider
+            ariaLabel="Coverage quick control"
             display={pct(coveragePct / 100)}
-            label="Cover"
+            label="Minimum coverage"
             max={25}
             min={0}
             onChange={setCoveragePct}
@@ -871,8 +879,9 @@ export default function DayV2Summary({
             value={coveragePct}
           />
           <CompactSlider
+            ariaLabel="Liquidity quick control"
             display={pct(liquidityPct / 100)}
-            label="Liq"
+            label="Minimum liquidity"
             max={25}
             min={0}
             onChange={setLiquidityPct}
@@ -885,12 +894,15 @@ export default function DayV2Summary({
       {/* The first thing the inputs answer, and the first thing that is not an
           input. It was unlabelled, which left no visible line between the cream
           controls above and the results below. */}
-      <h2
-        className="-mb-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--tertiary)]"
-        id="day-v2-positions-heading"
-      >
-        What each position earns at these terms
-      </h2>
+      <div className="-mb-3 flex flex-wrap items-baseline justify-between gap-2">
+        <h2
+          className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--tertiary)]"
+          id="day-v2-positions-heading"
+        >
+          What each position earns at these terms
+        </h2>
+        <DayV2DocsLink label="Yield split" topic="yieldSplit" />
+      </div>
       {/* Three peers, scanned across: identical slots, so the eye compares the
           rate first and reads detail only if it wants to. */}
       <section
@@ -916,7 +928,7 @@ export default function DayV2Summary({
                 height: 3,
               }}
             />
-            <CardHeader className="px-6">
+            <CardHeader className="px-6 pb-4">
               <div className="flex items-center justify-between gap-2">
                 {/* An eyebrow, not a title. The rate is the title here. */}
                 <CardTitle
@@ -925,7 +937,9 @@ export default function DayV2Summary({
                 >
                   {position.name}
                 </CardTitle>
-                {position.funded ? null : <Badge tone="neutral">not funded</Badge>}
+                {position.funded ? null : (
+                  <Badge tone="neutral">not funded</Badge>
+                )}
               </div>
               <CardDescription>{position.holds}</CardDescription>
             </CardHeader>
@@ -936,11 +950,15 @@ export default function DayV2Summary({
                     took a 44px number to about 2.5:1 against the page. */}
                 <span
                   className="font-mono text-[clamp(34px,3.2vw,44px)] font-bold leading-[0.92] tracking-[-0.03em] tabular-nums"
-                  style={position.funded ? undefined : { color: "var(--tertiary)" }}
+                  style={
+                    position.funded ? undefined : { color: "var(--tertiary)" }
+                  }
                 >
                   {position.funded ? pct(position.apy) : "0.0%"}
                 </span>
-                <span className="text-[11px] text-[var(--tertiary)]">a year</span>
+                <span className="text-[11px] text-[var(--tertiary)]">
+                  a year
+                </span>
               </div>
               <p className="border-t border-[var(--border-subtle)] pt-2 text-[12px] leading-relaxed text-[var(--secondary)]">
                 {position.risk}
@@ -955,26 +973,43 @@ export default function DayV2Summary({
           stand at each one, which is the question that decides whether a design
           can be raised at all. */}
       <DayV2CapitalStack
+        defaults={defaults}
+        poolSeniorWeight={model.pool.seniorWeight}
         balances={model.balances}
         coverage={resolved.coverage}
-        coverageLossLimit={model.explainer.coverage.coverageLossLimit}
         minLiquidity={resolved.minLiquidity}
         targetUtilization={DAY_TARGET_UTILIZATION}
         unit={returnUnit}
       />
 
-      <h2
-        className="-mb-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--tertiary)]"
-        id="day-v2-risk-heading"
-      >
-        What can go wrong
-      </h2>
+      <div className="-mb-3 flex flex-wrap items-baseline justify-between gap-2">
+        <h2
+          className="text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--tertiary)]"
+          id="day-v2-risk-heading"
+        >
+          What can go wrong
+        </h2>
+        <DayV2DocsLink label="Protected exit" topic="protectedExit" />
+      </div>
       {/* Losing money and getting out are the two ways a position goes wrong,
           and the projection above deliberately contains neither. They read
           better next to each other than either does alone. */}
       <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-2">
-        <DayV2LossWaterfall metrics={model.explainer.coverage} unit={returnUnit} />
-        <DayV2ExitCost metrics={model.explainer.liquidity} unit={returnUnit} />
+        <DayV2LossWaterfall
+          metrics={model.explainer.coverage}
+          unit={returnUnit}
+        />
+        <DayV2ExitCost
+          assumptions={{
+            bandPct: inputs.bandPct,
+            concentration: model.pool.concentration,
+            stableYield: model.pool.stableYield,
+            swapFeeBps: model.pool.swapFeeBps,
+            turnoverPerYear: model.pool.turnoverPerYear,
+          }}
+          metrics={model.explainer.liquidity}
+          unit={returnUnit}
+        />
       </div>
 
       {/* Everything above is a projection at the stated terms. This is the one
@@ -998,9 +1033,7 @@ export default function DayV2Summary({
           <CardHeader>
             <CardTitle>Growth over a year</CardTitle>
             <CardDescription>
-              Each line compounds that position&apos;s rate above. It shows what the
-              terms pay, not what a bad year does to them: there is no drawdown in
-              this projection.
+              Compounded from the modeled annual rates above.
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -1013,6 +1046,8 @@ export default function DayV2Summary({
           positions={positions as DayV2PositionBreakdown[]}
           shares={{
             coveragePct: inputs.coveragePct,
+            curveOverridden,
+            deploying,
             liquidityPct: inputs.liquidityPct,
             riskSharePct: resolved.riskYieldShare * 100,
             liqSharePct: resolved.liquidityYieldShare * 100,
@@ -1028,7 +1063,9 @@ export default function DayV2Summary({
         className="-mb-3 text-[10px] font-semibold uppercase tracking-[0.12em] text-[var(--tertiary)]"
         id="day-v2-history-heading"
       >
-        What actually happened
+        {market.series.length >= 3
+          ? "Historical evidence"
+          : "Add history to test the design"}
       </h2>
       {/* Shown in both flows when a history is being run. A deployer needs it
           more than anyone: the coverage restoration toggle lives in the
@@ -1037,20 +1074,23 @@ export default function DayV2Summary({
       {/* Gated on the reader's choice only. A market with no dated history still
           renders: the component's own branch explains that the figures are a
           forward projection, and hiding it made the section vanish silently. */}
-      {useHistory ? (
       <DayV2Backtest
         bandPct={inputs.bandPct}
         coveragePct={inputs.coveragePct}
+        customSource={customSource}
         liqSharePct={resolved.liquidityYieldShare * 100}
         liquidityPct={inputs.liquidityPct}
         maintainCoverage={maintainCoverage}
         onMaintainCoverage={setMaintainCoverage}
         market={market}
         observationDays={inputs.observationDays}
+        riskY0Pct={resolved.y0 * 100}
+        riskY100Pct={resolved.y100 * 100}
         riskSharePct={resolved.riskYieldShare * 100}
+        liqY0Pct={resolved.liqY0 * 100}
+        liqY100Pct={resolved.liqY100 * 100}
         sourceApyPct={inputs.sourceApyPct}
       />
-      ) : null}
 
       {deploying ? (
         <>
@@ -1062,6 +1102,7 @@ export default function DayV2Summary({
               id: market.id,
               name: market.identity.marketName,
               asset: market.identity.displayAssetName,
+              hasHistoricalSeries: market.series.length >= 3,
               variant: "v2",
             }}
             modeled={{
@@ -1069,8 +1110,10 @@ export default function DayV2Summary({
               juniorApy: scenario.juniorApy,
               liquidityApy: scenario.liquidityApy,
               coverageLossLimit: model.explainer.coverage.coverageLossLimit,
-              referenceSellShareOfSenior: model.explainer.liquidity.referenceSellShareOfSenior,
-              boundarySellShareOfSenior: model.explainer.liquidity.boundarySellShareOfSenior,
+              referenceSellShareOfSenior:
+                model.explainer.liquidity.referenceSellShareOfSenior,
+              boundarySellShareOfSenior:
+                model.explainer.liquidity.boundarySellShareOfSenior,
             }}
             terms={{
               coveragePct: inputs.coveragePct,
@@ -1078,6 +1121,10 @@ export default function DayV2Summary({
               eclpBandWidthPct: inputs.bandPct,
               riskSharePct: resolved.riskYieldShare * 100,
               liqSharePct: resolved.liquidityYieldShare * 100,
+              riskY0Pct: resolved.y0 * 100,
+              riskY100Pct: resolved.y100 * 100,
+              liqY0Pct: resolved.liqY0 * 100,
+              liqY100Pct: resolved.liqY100 * 100,
               observationDays: inputs.observationDays,
               sourceApyPct: inputs.sourceApyPct,
               // The export was sending market defaults for these three rather
@@ -1086,35 +1133,28 @@ export default function DayV2Summary({
               // ceiling clamp the engine actually applied.
               maintainCoverage: inputs.maintainCoverage,
               y100SharePct: resolved.y100 * 100,
-              presetId: activePresetId,
+              poolConcentration: model.pool.concentration,
+              presetId: matchedPresetId,
             }}
           />
         </>
       ) : (
-        <button
-          className="self-start rounded-lg border border-[var(--border-subtle)] bg-[var(--card)] px-3.5 py-2 text-[12px] font-semibold"
+        <DayV2Button
+          className="self-start"
           onClick={() => setMode("deploy")}
-          type="button"
+          size="md"
+          variant="primary"
         >
-          Set every parameter and get this ready to deploy
-        </button>
+          Review modeled deployment parameters
+        </DayV2Button>
       )}
-
-      {/* Shown in both flows. Someone who only simulated has still designed a
-          market, and the ask is the same one. */}
-      <DayV2Deploy
-        coverage={inputs.coveragePct / 100}
-        query={query}
-        liquidity={inputs.liquidityPct / 100}
-        seniorApy={scenario.seniorApy}
-        sourceApy={source}
-      />
 
       <p className="max-w-[70ch] text-[10.5px] leading-relaxed text-[var(--tertiary)]">
         Educational simulator only. No securities are offered through this page.
-        Figures are mechanism simulations at the target utilization, not
-        historical backtests, forecasts, or announced terms.
+        Forward projections are mechanism simulations, not forecasts or
+        announced terms. Historical backtests use the selected source path and
+        are not predictions.
       </p>
-    </div>
+    </main>
   );
 }

@@ -3,9 +3,23 @@
 import { useMemo, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
-import DayV2LossChart, { type DayV2LossPoint } from "@/components/day-v2/DayV2LossChart";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { pct, stake100, unitAmount, type DayV2Unit } from "@/components/day-v2/format";
+import DayV2DocsLink from "@/components/day-v2/DayV2DocsLink";
+import DayV2LossChart, {
+  type DayV2LossPoint,
+} from "@/components/day-v2/DayV2LossChart";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
+import {
+  pct,
+  stake100,
+  unitAmount,
+  type DayV2Unit,
+} from "@/components/day-v2/format";
 import { dayV2RangeStyle } from "@/components/day-v2/range";
 import {
   Table,
@@ -23,7 +37,10 @@ import type { DayExplainerMetrics } from "@/lib/day-simulator-template/explainer
 
 /** The engine point closest to a target loss, so every figure on screen is a
     value the accountant actually returned rather than an interpolation. */
-function nearest(points: readonly DayV2LossPoint[], target: number): DayV2LossPoint {
+function nearest(
+  points: readonly DayV2LossPoint[],
+  target: number,
+): DayV2LossPoint {
   return points.reduce((best, point) =>
     Math.abs(point.loss - target) < Math.abs(best.loss - target) ? point : best,
   );
@@ -37,7 +54,11 @@ export default function DayV2LossWaterfall({
   unit: DayV2Unit;
 }) {
   const points = useMemo<DayV2LossPoint[]>(
-    () => metrics.points.map((point) => ({ loss: point.loss, senior: point.seniorBalancePer100 })),
+    () =>
+      metrics.points.map((point) => ({
+        loss: point.loss,
+        senior: point.seniorBalancePer100,
+      })),
     [metrics],
   );
   const limit = metrics.coverageLossLimit;
@@ -50,7 +71,9 @@ export default function DayV2LossWaterfall({
   const coverageFunded = limit >= 0.0005;
   const limitIndex = points.reduce(
     (best, point, index) =>
-      Math.abs(point.loss - limit) < Math.abs(points[best].loss - limit) ? index : best,
+      Math.abs(point.loss - limit) < Math.abs(points[best].loss - limit)
+        ? index
+        : best,
     0,
   );
 
@@ -73,12 +96,18 @@ export default function DayV2LossWaterfall({
   // Even fifths of the plotted range, which land on round losses, plus the
   // limit itself so the row where the cover runs out is always in the table.
   const rows = useMemo(() => {
-    const targets = Array.from({ length: 6 }, (_, step) => (metrics.displayMaxLoss * step) / 5);
+    const targets = Array.from(
+      { length: 6 },
+      (_, step) => (metrics.displayMaxLoss * step) / 5,
+    );
     const picked = targets.map((target) => nearest(points, target));
     picked.push(nearest(points, limit));
     return picked
       .sort((a, b) => a.loss - b.loss)
-      .filter((row, position, all) => position === 0 || row.loss - all[position - 1].loss > 1e-9);
+      .filter(
+        (row, position, all) =>
+          position === 0 || row.loss - all[position - 1].loss > 1e-9,
+      );
   }, [limit, metrics.displayMaxLoss, points]);
 
   return (
@@ -86,13 +115,14 @@ export default function DayV2LossWaterfall({
       <CardHeader>
         <div className="flex items-center justify-between gap-2">
           <CardTitle className="text-[17px]">Loss waterfall</CardTitle>
-          <Badge tone={coverageFunded ? "junior" : "caution"}>
-            {coverageFunded ? "Jr first" : "no cover"}
-          </Badge>
+          <span className="flex items-baseline gap-2">
+            <Badge tone={coverageFunded ? "junior" : "caution"}>
+              {coverageFunded ? "Jr first" : "no cover"}
+            </Badge>
+            <DayV2DocsLink label="Impermanent loss" topic="impermanentLoss" />
+          </span>
         </div>
-        <CardDescription>
-          Where the first loss lands, and how deep a fall it takes to reach Sr.
-        </CardDescription>
+        <CardDescription>How losses move from Jr to Sr.</CardDescription>
       </CardHeader>
 
       <CardContent className="flex flex-col gap-4">
@@ -101,18 +131,16 @@ export default function DayV2LossWaterfall({
         <p className="max-w-[64ch] text-[14.5px] leading-relaxed text-[var(--foreground)]">
           {coverageFunded ? (
             <>
-              Sr keeps every dollar through a{" "}
+              Jr absorbs a{" "}
               <strong className="font-mono text-[16px] font-bold tracking-[-0.01em] tabular-nums text-[var(--foreground)]">
                 {pct(limit)}
               </strong>{" "}
-              fall in the source. Past that, Jr is gone and every further dollar
-              of the fall comes out of Sr.
+              fall before Sr loses value.
             </>
           ) : (
             <>
-              No Jr capital is funded, so nothing stands in front of Sr. The
-              first dollar the source loses is a Sr dollar. Raise coverage above
-              zero to move this line.
+              No Jr capital is funded, so Sr absorbs losses from the first
+              dollar.
             </>
           )}
         </p>
@@ -123,10 +151,16 @@ export default function DayV2LossWaterfall({
           <div className="flex h-9 w-full overflow-hidden rounded-lg border border-[var(--border-subtle)]">
             <div
               className="flex items-center justify-center bg-[color-mix(in_srgb,var(--theme-brown)_16%,transparent)] text-[10px] font-semibold uppercase tracking-[0.08em] text-[#3e2616]"
-              style={{ width: coverageFunded ? `${(limit / metrics.displayMaxLoss) * 100}%` : 0 }}
+              style={{
+                width: coverageFunded
+                  ? `${(limit / metrics.displayMaxLoss) * 100}%`
+                  : 0,
+              }}
             >
               <span className="truncate px-1">
-                {coverageFunded && limit / metrics.displayMaxLoss > 0.16 ? "Jr absorbs" : ""}
+                {coverageFunded && limit / metrics.displayMaxLoss > 0.16
+                  ? "Jr absorbs"
+                  : ""}
               </span>
             </div>
             <div
@@ -143,7 +177,9 @@ export default function DayV2LossWaterfall({
           <span
             aria-hidden
             className="pointer-events-none absolute top-0 h-9 w-0.5 -translate-x-1/2 rounded-full bg-[var(--foreground)]"
-            style={{ left: `${(selected.loss / metrics.displayMaxLoss) * 100}%` }}
+            style={{
+              left: `${(selected.loss / metrics.displayMaxLoss) * 100}%`,
+            }}
           />
         </div>
 
@@ -159,6 +195,8 @@ export default function DayV2LossWaterfall({
             </span>
           </span>
           <input
+            aria-label="Source drawdown"
+            aria-valuetext={`${pct(selected.loss)} source drawdown; Senior loses ${unitAmount(seniorLoss, unit)}`}
             className="day-v2-range"
             max={points.length - 1}
             min={0}
@@ -182,7 +220,9 @@ export default function DayV2LossWaterfall({
             <span className="font-mono text-[24px] font-bold leading-none tracking-[-0.02em] tabular-nums">
               {unitAmount(selected.senior, unit)}
             </span>
-            <span className="text-[10.5px] text-[var(--tertiary)]">of every {stake100(unit)} held</span>
+            <span className="text-[10.5px] text-[var(--tertiary)]">
+              of every {stake100(unit)} held
+            </span>
           </div>
           <div className="flex flex-col gap-0.5">
             <span className="text-[9.5px] font-semibold uppercase tracking-[0.1em] text-[var(--tertiary)]">
@@ -190,7 +230,9 @@ export default function DayV2LossWaterfall({
             </span>
             <span
               className="font-mono text-[24px] font-bold leading-none tracking-[-0.02em] tabular-nums"
-              style={{ color: seniorLoss > 0 ? "var(--red-emphasis)" : undefined }}
+              style={{
+                color: seniorLoss > 0 ? "var(--red-emphasis)" : undefined,
+              }}
             >
               {unitAmount(seniorLoss, unit)}
             </span>
@@ -234,16 +276,23 @@ export default function DayV2LossWaterfall({
             <TableRow>
               <TableHead>Source falls</TableHead>
               <TableHead>Who absorbs it</TableHead>
-              <TableHead className="text-right">Sr per {stake100(unit)}</TableHead>
+              <TableHead className="text-right">
+                Sr per {stake100(unit)}
+              </TableHead>
               <TableHead className="text-right">Sr loss</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
             {rows.map((row) => {
-              const atLimit = coverageFunded && Math.abs(row.loss - limit) < 1e-9;
+              const atLimit =
+                coverageFunded && Math.abs(row.loss - limit) < 1e-9;
               return (
                 <TableRow
-                  className={atLimit ? "bg-[color-mix(in_srgb,var(--theme-brown)_9%,transparent)]" : undefined}
+                  className={
+                    atLimit
+                      ? "bg-[color-mix(in_srgb,var(--theme-brown)_9%,transparent)]"
+                      : undefined
+                  }
                   key={row.loss}
                 >
                   <TableCell className="font-mono font-semibold tabular-nums">

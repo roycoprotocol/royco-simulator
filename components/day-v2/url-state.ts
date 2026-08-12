@@ -26,11 +26,19 @@ export type DayV2UrlState = {
   y100Pct: number | null;
   liqY0Pct: number | null;
   liqY100Pct: number | null;
-  /** Whether the market's real price path is being run at all. */
-  useHistory: boolean | null;
 };
 
-const number = (raw: string | null, min: number, max: number): number | null => {
+export function toggleDayV2Mode(
+  mode: "simulate" | "deploy",
+): "simulate" | "deploy" {
+  return mode === "simulate" ? "deploy" : "simulate";
+}
+
+const number = (
+  raw: string | null,
+  min: number,
+  max: number,
+): number | null => {
   if (raw === null || raw.trim() === "") return null;
   const value = Number(raw);
   if (!Number.isFinite(value) || value < min || value > max) return null;
@@ -47,8 +55,10 @@ export function readDayV2UrlState(search: string): DayV2UrlState {
     coveragePct: number(params.get("cov"), 0, 25),
     liquidityPct: number(params.get("liq"), 0, 25),
     sourceApyPct: number(params.get("apy"), 0, 30),
-    observationDays: number(params.get("obs"), 7, 194),
-    bandPct: number(params.get("band"), 0.25, 20),
+    observationDays: number(params.get("obs"), 0, 194),
+    // The deployment flow accepts a 50–500 bps maximum discount. V2 uses the
+    // same range so a shared design never opens on an undeployable value.
+    bandPct: number(params.get("band"), 0.5, 5),
     maintainCoverage: maintain === "1" ? true : maintain === "0" ? false : null,
     // Shares are optional: absent means "follow the requirement", which is the
     // page's own rule, so a link only carries them when they were overridden.
@@ -58,7 +68,6 @@ export function readDayV2UrlState(search: string): DayV2UrlState {
     y100Pct: number(params.get("jr100"), 0, 100),
     liqY0Pct: number(params.get("slp0"), 0, 100),
     liqY100Pct: number(params.get("slp100"), 0, 100),
-    useHistory: params.get("hist") === "0" ? false : params.get("hist") === "1" ? true : null,
   };
 }
 
@@ -77,7 +86,6 @@ export function buildDayV2Query(state: {
   y100Pct: number | null;
   liqY0Pct: number | null;
   liqY100Pct: number | null;
-  useHistory: boolean;
 }): string {
   const params = new URLSearchParams();
   params.set("m", state.market);
@@ -88,15 +96,18 @@ export function buildDayV2Query(state: {
   params.set("obs", String(Math.round(state.observationDays)));
   params.set("band", String(round(state.bandPct)));
   params.set("restore", state.maintainCoverage ? "1" : "0");
-  if (state.riskSharePct !== null) params.set("jr", String(round(state.riskSharePct)));
-  if (state.liqSharePct !== null) params.set("slp", String(round(state.liqSharePct)));
+  if (state.riskSharePct !== null)
+    params.set("jr", String(round(state.riskSharePct)));
+  if (state.liqSharePct !== null)
+    params.set("slp", String(round(state.liqSharePct)));
   // A curve is four numbers, not one. Carrying only the target anchor dropped
   // the shape a reader had just set, on a shared link and on the deploy handoff.
   if (state.y0Pct !== null) params.set("jr0", String(round(state.y0Pct)));
   if (state.y100Pct !== null) params.set("jr100", String(round(state.y100Pct)));
-  if (state.liqY0Pct !== null) params.set("slp0", String(round(state.liqY0Pct)));
-  if (state.liqY100Pct !== null) params.set("slp100", String(round(state.liqY100Pct)));
-  if (!state.useHistory) params.set("hist", "0");
+  if (state.liqY0Pct !== null)
+    params.set("slp0", String(round(state.liqY0Pct)));
+  if (state.liqY100Pct !== null)
+    params.set("slp100", String(round(state.liqY100Pct)));
   return params.toString();
 }
 

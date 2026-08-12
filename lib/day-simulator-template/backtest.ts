@@ -75,7 +75,11 @@ export type DayBacktestTerms = {
   minLiquidityPct: number;
   eclpBandWidthPct: number;
   riskSharePct: number;
+  riskY0Pct?: number;
+  riskY100Pct?: number;
   liqSharePct: number;
+  liqY0Pct?: number;
+  liqY100Pct?: number;
   observationDays: number;
 };
 
@@ -115,8 +119,32 @@ export function runDayHistoricalBacktest(input: DayBacktestInput) {
     enginePremiumInputs.liqSharePct,
     enginePremiumInputs.minLiquidityPct > 0,
   ) / 100;
+  // V2 exposes the full static curves, so the historical run must use the
+  // same anchors as the forward run and deployment brief. Older callers omit
+  // them and retain the market's declared defaults.
+  const configuredDefaults: DaySimulatorDefaults = {
+    ...defaults,
+    riskYDM: {
+      ...defaults.riskYDM,
+      y0: enginePremiumInputs.riskY0Pct === undefined
+        ? defaults.riskYDM.y0
+        : enginePremiumInputs.riskY0Pct / 100,
+      y100: enginePremiumInputs.riskY100Pct === undefined
+        ? defaults.riskYDM.y100
+        : enginePremiumInputs.riskY100Pct / 100,
+    },
+    liqYDM: {
+      ...defaults.liqYDM,
+      y0: enginePremiumInputs.liqY0Pct === undefined
+        ? defaults.liqYDM.y0
+        : enginePremiumInputs.liqY0Pct / 100,
+      y100: enginePremiumInputs.liqY100Pct === undefined
+        ? defaults.liqYDM.y100
+        : enginePremiumInputs.liqY100Pct / 100,
+    },
+  };
   const initial = buildDayInitialBalances(defaults, { coverage, minLiquidity });
-  const cfg = buildDayMarketConfig(defaults, {
+  const cfg = buildDayMarketConfig(configuredDefaults, {
     coverage,
     minLiquidity,
     eclpBandWidth,

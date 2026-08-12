@@ -83,6 +83,10 @@ function DayV2Chart({ data, unit }: { data: DayV2Point[]; unit: DayV2Unit }) {
               key={key}
               name={label}
               stroke={TONES[key]}
+              // Sr and SLP can finish within a fraction of a chart pixel of one
+              // another. Drawing SLP last and dashed keeps both paths legible
+              // when their values are effectively identical.
+              strokeDasharray={key === "liquidity" ? "6 4" : undefined}
               strokeWidth={2}
               type="monotone"
             />

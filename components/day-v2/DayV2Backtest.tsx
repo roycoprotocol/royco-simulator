@@ -3,8 +3,17 @@
 import { memo, useDeferredValue, useMemo, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
-import DayV2BacktestChart, { type DayV2BacktestPoint } from "@/components/day-v2/DayV2BacktestChart";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import DayV2BacktestChart, {
+  type DayV2BacktestPoint,
+} from "@/components/day-v2/DayV2BacktestChart";
+import DayV2SegmentedControl from "@/components/day-v2/DayV2SegmentedControl";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { pct } from "@/components/day-v2/format";
 import {
   Table,
@@ -22,8 +31,18 @@ import { calibrateSeriesApy } from "@/lib/day-simulator-template/series";
 // steps its history through. This file chooses a window and lays the result
 // out. It does not step the engine itself.
 const MONTH = [
-  "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-  "Jul", "Aug", "Sep", "Oct", "Nov", "Dec",
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
 ];
 const monthLabel = (key: string) => {
   const [year, month] = key.split("-");
@@ -35,23 +54,33 @@ const signed = (value: number) =>
 function DayV2Backtest({
   bandPct: bandInput,
   coveragePct: coverageInput,
+  customSource,
+  liqY0Pct: liqY0Input,
+  liqY100Pct: liqY100Input,
   liqSharePct: liqShareInput,
   liquidityPct: liquidityInput,
   maintainCoverage,
   market,
   onMaintainCoverage,
   observationDays: observationInput,
+  riskY0Pct: riskY0Input,
+  riskY100Pct: riskY100Input,
   riskSharePct: riskShareInput,
   sourceApyPct: sourceInput,
 }: {
   bandPct: number;
   coveragePct: number;
+  customSource: boolean;
+  liqY0Pct: number;
+  liqY100Pct: number;
   liqSharePct: number;
   liquidityPct: number;
   maintainCoverage: boolean;
   market: DayMarket;
   onMaintainCoverage: (value: boolean) => void;
   observationDays: number;
+  riskY0Pct: number;
+  riskY100Pct: number;
   riskSharePct: number;
   sourceApyPct: number;
 }) {
@@ -59,7 +88,9 @@ function DayV2Backtest({
   const [windowId, setWindowId] = useState("full");
   // Declared on the market, the same two fields the root route reads.
   const footnote = market.customization.backtestDisplay?.footnote;
-  const returnUnit = market.customization.backtestDisplay?.returnUnit ?? "USD";
+  const returnUnit = customSource
+    ? "units"
+    : (market.customization.backtestDisplay?.returnUnit ?? "USD");
   const tailRisk = market.customization.forwardTest?.tailRiskDisclosure;
 
   // This section is the expensive one on the page: a few hundred engine steps,
@@ -70,13 +101,29 @@ function DayV2Backtest({
   const deferred = useDeferredValue({
     bandPct: bandInput,
     coveragePct: coverageInput,
+    liqY0Pct: liqY0Input,
+    liqY100Pct: liqY100Input,
     liqSharePct: liqShareInput,
     liquidityPct: liquidityInput,
     observationDays: observationInput,
+    riskY0Pct: riskY0Input,
+    riskY100Pct: riskY100Input,
     riskSharePct: riskShareInput,
     sourceApyPct: sourceInput,
   });
-  const { bandPct, coveragePct, liqSharePct, liquidityPct, observationDays, riskSharePct, sourceApyPct } = deferred;
+  const {
+    bandPct,
+    coveragePct,
+    liqSharePct,
+    liqY0Pct,
+    liqY100Pct,
+    liquidityPct,
+    observationDays,
+    riskSharePct,
+    riskY0Pct,
+    riskY100Pct,
+    sourceApyPct,
+  } = deferred;
 
   // The market's real price path, rescaled so its annualized yield matches the
   // source-yield control. This is what the root route models too: the shape of
@@ -97,17 +144,21 @@ function DayV2Backtest({
       { id: "6m", label: "Last 6 months", months: 6 },
       { id: "3m", label: "Last 3 months", months: 3 },
     ];
-    return spans
-      .map((span) => {
-        if (span.months === 0) return { ...span, from: 0 };
-        const cutoff = lastTime - span.months * 30.44 * 86_400_000;
-        const from = series.findIndex((point) => Date.parse(point.date) >= cutoff);
-        return { ...span, from: from < 0 ? -1 : from };
-      })
-      // A window needs enough points to be a run rather than a line between two
-      // dots, and one that covers the whole series is just "full history" twice.
-      .filter((span) => span.from >= 0 && series.length - span.from >= 3)
-      .filter((span, index, all) => index === 0 || span.from !== all[0].from);
+    return (
+      spans
+        .map((span) => {
+          if (span.months === 0) return { ...span, from: 0 };
+          const cutoff = lastTime - span.months * 30.44 * 86_400_000;
+          const from = series.findIndex(
+            (point) => Date.parse(point.date) >= cutoff,
+          );
+          return { ...span, from: from < 0 ? -1 : from };
+        })
+        // A window needs enough points to be a run rather than a line between two
+        // dots, and one that covers the whole series is just "full history" twice.
+        .filter((span) => span.from >= 0 && series.length - span.from >= 3)
+        .filter((span, index, all) => index === 0 || span.from !== all[0].from)
+    );
   }, [series]);
 
   const active = windows.find((span) => span.id === windowId) ?? windows[0];
@@ -128,9 +179,13 @@ function DayV2Backtest({
         // Two places computing the same terms is two places to disagree, and
         // the history has to run on the same market as the projection above it.
         eclpBandWidthPct: bandPct,
+        liqY0Pct,
+        liqY100Pct,
         riskSharePct,
         liqSharePct,
         observationDays,
+        riskY0Pct,
+        riskY100Pct,
       },
       maintainCoverage,
       // Read off the market the way the root route reads it. Only the
@@ -144,7 +199,23 @@ function DayV2Backtest({
       // the opening period even when a market does declare the flag.
       monthlyBaselineDate: series[0]?.date,
     });
-  }, [bandPct, coveragePct, defaults, liqSharePct, liquidityPct, maintainCoverage, market, observationDays, riskSharePct, series, view]);
+  }, [
+    bandPct,
+    coveragePct,
+    defaults,
+    liqSharePct,
+    liqY0Pct,
+    liqY100Pct,
+    liquidityPct,
+    maintainCoverage,
+    market,
+    observationDays,
+    riskSharePct,
+    riskY0Pct,
+    riskY100Pct,
+    series,
+    view,
+  ]);
 
   const chartData = useMemo<DayV2BacktestPoint[]>(
     () =>
@@ -165,26 +236,29 @@ function DayV2Backtest({
       <Card>
         <CardHeader>
           <div className="flex items-center justify-between gap-2">
-            <CardTitle className="text-[17px]">Historical backtest</CardTitle>
+            <CardTitle className="text-[17px]" level={3}>
+              Historical backtest
+            </CardTitle>
             <Badge tone="caution">no history</Badge>
           </div>
-          <CardDescription>What these terms would have done over the real price path.</CardDescription>
+          <CardDescription>
+            {customSource
+              ? "Add dated NAV or price history in step 3 to run this test."
+              : "No dated history is available; results above are forward projections at the selected source yield."}
+          </CardDescription>
         </CardHeader>
         <CardContent>
-          <p className="max-w-[64ch] text-[14.5px] leading-relaxed text-[var(--foreground)]">
-            This market has no dated price history to run. It is modeled from a
-            published yield instead, so every figure on this page is a forward
-            projection at the stated terms rather than something that happened.
-          </p>
           {/* The markets without history are the forward-modeled ones, which is
               exactly where this disclosure lives. Dropping it on this branch
               would hide it on every market that declares one. */}
           {tailRisk ? (
             <p
-              className="mt-3 rounded-lg border px-3.5 py-2.5 text-[11.5px] leading-relaxed"
+              className="rounded-lg border px-3.5 py-2.5 text-[11.5px] leading-relaxed"
               style={{
-                background: "color-mix(in srgb, var(--theme-red) 8%, transparent)",
-                borderColor: "color-mix(in srgb, var(--theme-red) 40%, transparent)",
+                background:
+                  "color-mix(in srgb, var(--theme-red) 8%, transparent)",
+                borderColor:
+                  "color-mix(in srgb, var(--theme-red) 40%, transparent)",
                 color: "var(--red-emphasis)",
               }}
             >
@@ -214,95 +288,66 @@ function DayV2Backtest({
     <Card data-accountant-source="runDayHistoricalBacktest">
       <CardHeader>
         <div className="flex items-center justify-between gap-2">
-          <CardTitle className="text-[17px]">Historical backtest</CardTitle>
+          <CardTitle className="text-[17px]" level={3}>
+            Historical backtest
+          </CardTitle>
           <Badge tone="neutral">
-            {result.chart[0].date} to {result.chart[result.chart.length - 1].date}
+            {result.chart[0].date} to{" "}
+            {result.chart[result.chart.length - 1].date}
           </Badge>
         </div>
         <CardDescription>
-          What these terms would have done over this market&apos;s real price path.
+          Runs these terms, including the {observationDays}-day Observation
+          Period, against the source&apos;s dated price path.
         </CardDescription>
       </CardHeader>
 
       <CardContent className="flex flex-col gap-4">
         <p className="max-w-[68ch] text-[14.5px] leading-relaxed text-[var(--foreground)]">
-          On this market&apos;s real path the source fell{" "}
+          Worst drawdown: source{" "}
           <strong className="font-mono text-[16px] font-bold tabular-nums">
             {pct(result.strategyMaxDrawdown)}
-          </strong>{" "}
-          at its worst, and Sr fell {pct(result.seniorMaxDrawdown)}.{" "}
+          </strong>
+          ; Sr {pct(result.seniorMaxDrawdown)}.{" "}
           {protectionPaid ? (
             <>
-              Sr ended {pct(Math.abs(ahead))} a year ahead of the source, because
-              Jr took the falls in its place and ended at {pct(result.juniorApy)}.
-              {outsideCapitalMatters ? " Read that with the note below." : ""}
+              Sr&apos;s annualized return was {pct(Math.abs(ahead))} higher than
+              the source.
             </>
           ) : protectionCost ? (
             <>
-              Sr ended {pct(Math.abs(ahead))} a year behind the source, which is
-              what the cover and the exit cost when the falls never arrive. Jr was
-              paid {pct(result.juniorApy)} for standing there.
+              Sr&apos;s annualized return was {pct(Math.abs(ahead))} lower than
+              the source.
             </>
           ) : (
-            <>
-              Sr tracked the source almost exactly over this window, so the cover
-              was neither called on nor especially expensive.
-            </>
+            <>Sr tracked the source&apos;s annualized return.</>
           )}
         </p>
 
-        {/* Inputs. Both are assumptions about how this run was done rather than
-            terms of the market, which is why coverage restoration lives here and
-            not with the market parameters: it moves nothing in the projection,
-            the loss waterfall or the exit depth. It only changes a history, and
-            the note below is the thing it changes. */}
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
-        <label className="flex flex-1 max-w-[420px] flex-col gap-1.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--foundation)] px-4 py-3">
-          <span className="text-[9.5px] font-semibold uppercase tracking-[0.1em] text-[var(--tertiary)]">
-            Backtest window
-          </span>
-          <select
-            className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--card)] px-3 py-2 text-[13px] font-medium"
-            onChange={(event) => setWindowId(event.target.value)}
-            value={active.id}
-          >
-            {windows.map((span) => (
-              <option key={span.id} value={span.id}>
-                {span.label} ({series[span.from].date} to {series[series.length - 1].date})
-              </option>
-            ))}
-          </select>
-          <span className="text-[10px] leading-snug text-[var(--tertiary)]">
-            The run restarts from the window&apos;s first day, so each window is its own history
-          </span>
-        </label>
-
-        <div className="flex flex-1 flex-col gap-1.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--foundation)] px-4 py-3">
-          <span className="text-[9.5px] font-semibold uppercase tracking-[0.1em] text-[var(--tertiary)]">
-            Coverage restoration
-          </span>
-          <div className="flex items-center gap-2">
-            {([["On", true], ["Off", false]] as const).map(([label, value]) => (
-              <button
-                aria-pressed={maintainCoverage === value}
-                className={`rounded-lg border px-3 py-1.5 text-[12px] font-semibold ${
-                  maintainCoverage === value
-                    ? "border-transparent bg-[var(--foreground)] text-[var(--background)]"
-                    : "border-[var(--border-subtle)] bg-[var(--card)] text-[var(--secondary)]"
-                }`}
-                key={label}
-                onClick={() => onMaintainCoverage(value)}
-                type="button"
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-          <span className="text-[10px] leading-snug text-[var(--tertiary)]">
-            Whether Jr is refilled from outside the market after a finalized loss. It
-            changes this history only
-          </span>
-        </div>
+        {/* The window chooses which part of the supplied history to run. Coverage
+            restoration is intentionally kept below the chart it changes, so it
+            cannot be mistaken for a market term. */}
+        <div>
+          <label className="flex flex-1 max-w-[420px] flex-col gap-1.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--foundation)] px-4 py-3">
+            <span className="text-[9.5px] font-semibold uppercase tracking-[0.1em] text-[var(--tertiary)]">
+              Backtest window
+            </span>
+            <select
+              className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--card)] px-3 py-2 text-[13px] font-medium"
+              onChange={(event) => setWindowId(event.target.value)}
+              value={active.id}
+            >
+              {windows.map((span) => (
+                <option key={span.id} value={span.id}>
+                  {span.label} ({series[span.from].date} to{" "}
+                  {series[series.length - 1].date})
+                </option>
+              ))}
+            </select>
+            <span className="text-[10px] leading-snug text-[var(--tertiary)]">
+              Each window starts a new run from its first date.
+            </span>
+          </label>
         </div>
 
         {/* Outputs. Labelled as a group: four figures that only mean anything
@@ -312,12 +357,14 @@ function DayV2Backtest({
           className="grid grid-cols-2 gap-x-5 gap-y-3 border-t border-[var(--border-subtle)] pt-3 sm:grid-cols-4"
           role="group"
         >
-          {([
-            ["Source", result.strategyApy, result.strategyMaxDrawdown],
-            ["Sr", result.seniorApy, result.seniorMaxDrawdown],
-            ["Jr", result.juniorApy, result.juniorMaxDrawdown],
-            ["SLP", result.liquidityApy, result.liquidityMaxDrawdown],
-          ] as const).map(([label, apy, drawdown]) => (
+          {(
+            [
+              ["Source", result.strategyApy, result.strategyMaxDrawdown],
+              ["Sr", result.seniorApy, result.seniorMaxDrawdown],
+              ["Jr", result.juniorApy, result.juniorMaxDrawdown],
+              ["SLP", result.liquidityApy, result.liquidityMaxDrawdown],
+            ] as const
+          ).map(([label, apy, drawdown]) => (
             <div className="flex flex-col gap-0.5" key={label}>
               <span className="text-[9.5px] font-semibold uppercase tracking-[0.1em] text-[var(--tertiary)]">
                 {label}
@@ -335,7 +382,11 @@ function DayV2Backtest({
         {/* The path and the months that make it up, side by side. Stacked, the
             five numeric columns stretched across the whole card and the table
             pushed the chart a screen away from the rows explaining it. */}
-        <div className="grid grid-cols-1 gap-4 xl:grid-cols-[minmax(0,1.3fr)_minmax(0,1fr)]">
+        {/* Equal widths, like every other pair on this page. One proportion
+            used everywhere is what makes the page read as a system rather than
+            a stack of differently sized slabs, and a 1.3fr/1fr here was the
+            only place breaking it. */}
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
           <DayV2BacktestChart data={chartData} unit={returnUnit} />
 
           {/* Detail, visible by default rather than behind a toggle. */}
@@ -356,22 +407,50 @@ function DayV2Backtest({
                     <TableCell className="font-semibold whitespace-nowrap">
                       {monthLabel(row.month)}
                     </TableCell>
-                    {([row.strategyReturn, row.seniorReturn, row.juniorReturn, row.liquidityReturn]).map(
-                      (value, position) => (
-                        <TableCell
-                          className="text-right font-mono tabular-nums"
-                          key={position}
-                          style={value < 0 ? { color: "var(--red-emphasis)" } : undefined}
-                        >
-                          {signed(value)}
-                        </TableCell>
-                      ),
-                    )}
+                    {[
+                      row.strategyReturn,
+                      row.seniorReturn,
+                      row.juniorReturn,
+                      row.liquidityReturn,
+                    ].map((value, position) => (
+                      <TableCell
+                        className="text-right font-mono tabular-nums"
+                        key={position}
+                        style={
+                          value < 0
+                            ? { color: "var(--red-emphasis)" }
+                            : undefined
+                        }
+                      >
+                        {signed(value)}
+                      </TableCell>
+                    ))}
                   </TableRow>
                 ))}
               </TableBody>
             </Table>
           </div>
+        </div>
+
+        <div className="flex max-w-[520px] flex-col gap-1.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--foundation)] px-4 py-3">
+          <span className="text-[9.5px] font-semibold uppercase tracking-[0.1em] text-[var(--tertiary)]">
+            Coverage restoration
+          </span>
+          <DayV2SegmentedControl
+            ariaLabel="Coverage restoration"
+            className="w-fit"
+            onValueChange={(value) => onMaintainCoverage(value === "on")}
+            options={[
+              { label: "On", value: "on" },
+              { label: "Off", value: "off" },
+            ]}
+            size="sm"
+            value={maintainCoverage ? "on" : "off"}
+          />
+          <span className="text-[10.5px] leading-snug text-[var(--tertiary)]">
+            Refills Jr with outside capital after a finalized loss; affects this
+            backtest only.
+          </span>
         </div>
 
         {/* Not a footnote. Where coverage was restored, this is the difference
@@ -381,18 +460,19 @@ function DayV2Backtest({
           <p
             className="rounded-lg border px-3.5 py-2.5 text-[11.5px] leading-relaxed"
             style={{
-              background: "color-mix(in srgb, var(--theme-gold) 12%, transparent)",
-              borderColor: "color-mix(in srgb, var(--theme-gold) 45%, transparent)",
+              background:
+                "color-mix(in srgb, var(--theme-gold) 12%, transparent)",
+              borderColor:
+                "color-mix(in srgb, var(--theme-gold) 45%, transparent)",
               color: "var(--gold-emphasis)",
             }}
           >
-            <strong className="font-semibold">
-              Sr&apos;s return here is not funded by the source alone.
+            Coverage restoration added{" "}
+            <strong className="font-mono font-bold tabular-nums">
+              {pct(toppedUp)}
             </strong>{" "}
-            Holding coverage through this history took{" "}
-            <strong className="font-mono font-bold tabular-nums">{pct(toppedUp)}</strong> of
-            Jr&apos;s starting capital in fresh money, and that outside capital pays for much of
-            Sr&apos;s result. Turn coverage restoration off in the deploy flow to see Sr without it.
+            of Jr&apos;s starting capital from outside the market. Turn it off
+            to see the unrefilled result.
           </p>
         ) : null}
 
@@ -410,8 +490,10 @@ function DayV2Backtest({
           <p
             className="rounded-lg border px-3.5 py-2.5 text-[11.5px] leading-relaxed"
             style={{
-              background: "color-mix(in srgb, var(--theme-red) 8%, transparent)",
-              borderColor: "color-mix(in srgb, var(--theme-red) 40%, transparent)",
+              background:
+                "color-mix(in srgb, var(--theme-red) 8%, transparent)",
+              borderColor:
+                "color-mix(in srgb, var(--theme-red) 40%, transparent)",
               color: "var(--red-emphasis)",
             }}
           >
@@ -420,13 +502,14 @@ function DayV2Backtest({
         ) : null}
 
         <p className="text-[10.5px] leading-relaxed text-[var(--tertiary)]">
-          The price path is this market&apos;s own history, rescaled so its annual
-          yield matches the source-yield control above. So the source rate here is
-          the one that was set, not a discovered result. What the history supplies
-          is the shape: when it fell, how far, and how quickly it came back. Past
-          behavior of the source is not a forecast of the market.
+          The dated path is rescaled to the{" "}
+          {customSource ? "custom" : "selected"} source yield; that yield is an
+          input, not a historical estimate. Past behavior is not a forecast.
           {returnUnit === "USD" ? null : (
-            <> Returns on this market are quoted in {returnUnit}, not dollars.</>
+            <>
+              {" "}
+              Returns on this market are quoted in {returnUnit}, not dollars.
+            </>
           )}
         </p>
       </CardContent>
