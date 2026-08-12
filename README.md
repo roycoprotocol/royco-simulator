@@ -1,6 +1,6 @@
 # Royco Dawn Simulator Template
 
-This repository contains the standardized Dawn simulator factory and its shared accountant, locked copy, design contract, market-data importer, verification checks, and certification commands.
+This repository contains the standardized Dawn simulator factory and its shared accountant, locked copy, design contract, market-data importer, verification checks, and certification commands.b
 
 To create a market simulator, follow [`docs/NEW_SIMULATOR.md`](docs/NEW_SIMULATOR.md). The factory commands are:
 
