@@ -213,8 +213,6 @@ function DayV3PremiumCurveEditor({
       docs="yieldSplit"
       docsLabel="Yield split"
       id="day-v3-premium-inputs"
-      impactHref="#day-v3-return-models"
-      impactLabel="See return impact"
       index={index}
       status={
         validationIssues.length === 0

@@ -1210,8 +1210,6 @@ export default function DayV3Summary({
             docs="tranching"
             docsLabel="How tranching works"
             id="day-v3-source-inputs"
-            impactHref="#day-v3-return-models"
-            impactLabel="See return impact"
             index={1}
             key="yield-source"
             status={
@@ -1289,17 +1287,6 @@ export default function DayV3Summary({
                     setSourceApyPct(nextMarket.defaults.sourceApy * 100);
                   }}
                 />
-                {importedMarket && importedMarket.series.length >= 3 ? (
-                  <a
-                    className={dayV3ButtonVariants({
-                      size: "sm",
-                      variant: "secondary",
-                    })}
-                    href="#day-v3-history-models"
-                  >
-                    View historical backtest
-                  </a>
-                ) : null}
               </div>
             ) : null}
           </DayV3Group>

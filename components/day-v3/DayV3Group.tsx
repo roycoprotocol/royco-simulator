@@ -118,8 +118,6 @@ export default function DayV3Group({
   docsLabel,
   id,
   index,
-  impactHref,
-  impactLabel = "See impact",
   status,
   subtitle,
   summary,
@@ -135,8 +133,6 @@ export default function DayV3Group({
   docsLabel?: string;
   id?: string;
   index: number;
-  impactHref?: string;
-  impactLabel?: string;
   status?: DayV3GroupStatus;
   subtitle: string;
   summary?: React.ReactNode;
@@ -276,14 +272,6 @@ export default function DayV3Group({
             {heading}
           </div>
         )}
-        {impactHref ? (
-          <a
-            className="inline-flex min-h-9 shrink-0 self-end items-center rounded-md px-2 text-[10.5px] font-semibold text-[var(--secondary)] underline decoration-dotted underline-offset-2 transition-colors hover:text-[var(--foreground)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--foreground)] sm:self-auto"
-            href={impactHref}
-          >
-            {impactLabel} <span aria-hidden="true">↓</span>
-          </a>
-        ) : null}
       </div>
       {status?.tone === "incomplete" && missingCount > 0 && open ? (
         <p

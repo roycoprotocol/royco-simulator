@@ -217,8 +217,6 @@ export default function DayV3Goals({
         docs="coverage"
         docsLabel="How Junior protects Senior"
         id="day-v3-protection-inputs"
-        impactHref="#day-v3-risk-models"
-        impactLabel="See loss impact"
         index={1 + indexOffset}
         status={
           protectionComplete
@@ -417,8 +415,6 @@ export default function DayV3Goals({
         docs="liquidity"
         docsLabel="How Senior exits"
         id="day-v3-exit-inputs"
-        impactHref="#day-v3-exit-models"
-        impactLabel="See exit impact"
         index={2 + indexOffset}
         status={exitStatus}
         subtitle="Choose whether Senior needs an immediate exit and how it should perform"

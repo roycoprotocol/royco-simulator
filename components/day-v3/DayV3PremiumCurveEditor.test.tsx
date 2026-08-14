@@ -30,7 +30,7 @@ assert.match(markup, /Yield split/);
 assert.match(markup, /aria-expanded="false"/);
 assert.match(markup, /Jr 13\.0% · SLP 5\.0% at 90\.0% utilization/);
 assert.match(markup, /Section status: Set/);
-assert.match(markup, /See return impact/);
+assert.doesNotMatch(markup, /See .*impact/i);
 assert.match(markup, /Junior yield share/);
 assert.match(markup, /SLP yield share/);
 assert.match(markup, /Jr share at 90% utilization/);

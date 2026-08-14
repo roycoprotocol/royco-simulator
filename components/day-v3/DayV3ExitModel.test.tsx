@@ -271,6 +271,7 @@ assert.match(goalsMarkup, />10\.90%</);
 assert.match(goalsMarkup, />\$96\.2</);
 assert.match(goalsMarkup, />\$9\.6</);
 assert.doesNotMatch(goalsMarkup, /Maximum discount/);
+assert.doesNotMatch(goalsMarkup, /See .*impact/i);
 
 const protectionStart = goalsMarkup.indexOf('id="day-v3-protection-inputs"');
 const observationMode = goalsMarkup.indexOf('aria-label="Observation mode"');
