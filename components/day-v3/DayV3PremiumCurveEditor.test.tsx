@@ -134,4 +134,36 @@ assert.match(starterMarkup, /Your six YDM anchors are complete/);
 assert.match(starterMarkup, /Live pool validation is handled separately/);
 assert.doesNotMatch(starterMarkup, /SLP pending/);
 
+const slpOnlyMarkup = renderToStaticMarkup(
+  <DayV3PremiumCurveEditor
+    curveOverridden={false}
+    juniorEnabled={false}
+    ready
+    liqCapPct={20}
+    liqY0Pct={1}
+    liqY100Pct={15}
+    liqYtPct={5}
+    juniorModeledApy={0}
+    onLiqY0Pct={ignore}
+    onLiqY100Pct={ignore}
+    onLiqYtPct={ignore}
+    onResetCurve={ignore}
+    onRiskY0Pct={ignore}
+    onRiskY100Pct={ignore}
+    onRiskYtPct={ignore}
+    riskCapPct={0}
+    riskY0Pct={0}
+    riskY100Pct={0}
+    riskYtPct={0}
+    slpModeledApy={0.024}
+    seniorShareOfCapital={0.8}
+    sourceApy={0.06}
+    targetUtilization={0.9}
+  />,
+);
+assert.match(slpOnlyMarkup, /Set how Senior yield is shared with SLP/);
+assert.match(slpOnlyMarkup, /SLP premium curve/);
+assert.doesNotMatch(slpOnlyMarkup, /Junior premium curve/);
+assert.equal(slpOnlyMarkup.match(/type="range"/g)?.length, 3);
+
 console.log("Day V3 premium-curve editor presentation: PASS");

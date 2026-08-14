@@ -48,4 +48,24 @@ assert.match(markup, /selected Balancer V3 deployment template enforces/);
 assert.match(markup, /recovery-only planning floor/);
 assert.match(markup, /may require a longer window/);
 
+const noSlpMarkup = renderToStaticMarkup(
+  <DayV3DeploymentPolicy
+    depositDelaySeconds={300}
+    depositExpirySeconds="no-expiry"
+    gateByOracleUpdate
+    maxReinvestmentSlippageBps={null}
+    onDepositDelaySeconds={noop}
+    onDepositExpirySeconds={noop}
+    onGateByOracleUpdate={noop}
+    onMaxReinvestmentSlippageBps={noop}
+    onWithdrawalExpirySeconds={noop}
+    recoveryDays={0}
+    slpEnabled={false}
+    withdrawalDelayDays={1}
+    withdrawalExpirySeconds="no-expiry"
+  />,
+);
+assert.doesNotMatch(noSlpMarkup, /How much value may SLP reinvestment give up/);
+assert.doesNotMatch(noSlpMarkup, /Exit-asset dependency/);
+
 console.log("Day V3 deployment policy UI: PASS");

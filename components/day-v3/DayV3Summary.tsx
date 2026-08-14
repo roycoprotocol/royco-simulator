@@ -262,6 +262,68 @@ export default function DayV3Summary({
     linked?.recoveryDays ?? 0,
   );
   const [maintainCoverage, setMaintainCoverage] = useState(false);
+  const chooseJuniorSupport = (enabled: boolean) => {
+    markStarterFieldEdited("drawdown");
+    markStarterFieldEdited("recovery");
+    markStarterFieldEdited("grace");
+    if (!enabled) {
+      setProtectedDrawdownPct(0);
+      setRecoveryMode("none");
+      setRecoveryDaysInput(0);
+      setObservationDays(0);
+      setFixedTermGraceDays(0);
+      setIncentiveBudgetPer100(0);
+      setProtectedExitThresholdOverride(null);
+      setManualOverrides((current) => ({
+        ...current,
+        coveragePct: null,
+        protectedExitThresholdPct: null,
+        protectedExitBonusPct: null,
+        jrYieldShareAtZeroPct: null,
+        jrYieldShareAtTargetPct: null,
+        jrYieldShareAtFullPct: null,
+      }));
+      return;
+    }
+    if (protectedDrawdownPct === null || protectedDrawdownPct === 0) {
+      setProtectedDrawdownPct(15);
+      setRecoveryMode("none");
+      setRecoveryDaysInput(0);
+      setObservationDays(0);
+      setFixedTermGraceDays(0);
+    }
+  };
+  const chooseSlpSupport = (enabled: boolean) => {
+    markStarterFieldEdited("exit-amount");
+    markStarterFieldEdited("payout");
+    markStarterFieldEdited("conversion-days");
+    markStarterFieldEdited("conversion-cost");
+    if (!enabled) {
+      setImmediateExitSharePct(0);
+      setMinimumProceedsPer100(0);
+      setCollateralToExitDays(null);
+      setCollateralToExitCostBps(null);
+      setMaxReinvestmentSlippageBps(null);
+      setManualOverrides((current) => ({
+        ...current,
+        minimumLiquidityPct: null,
+        maximumDiscountPct: null,
+        depthAtNav: null,
+        maximumPremiumPct: null,
+        poolCapitalPer100: null,
+        slpYieldShareAtZeroPct: null,
+        slpYieldShareAtTargetPct: null,
+        slpYieldShareAtFullPct: null,
+      }));
+      return;
+    }
+    if (immediateExitSharePct === null || immediateExitSharePct === 0) {
+      setImmediateExitSharePct(10);
+      setMinimumProceedsPer100(95);
+      setCollateralToExitDays(0);
+      setCollateralToExitCostBps(50);
+    }
+  };
   // Yield curves are Deploy inputs. They stay in URL state across a mode
   // switch, while `activeManualOverrides` prevents hidden Deploy values from
   // changing the deliberately minimal Simulate model.
@@ -1538,10 +1600,12 @@ export default function DayV3Summary({
       yieldCurvePolicyResolved={deploymentYieldTarget !== null}
     />
   );
-  const premiumCurveEditor = deploying ? (
+  const premiumCurveEditor =
+    deploying && (!protectionDisabled || !exitDisabled) ? (
     <DayV3PremiumCurveEditor
       curveOverridden={curveOverridden}
-      index={6}
+      index={7}
+      juniorEnabled={!protectionDisabled}
       juniorModeledApy={scenario.juniorApy}
       startingCurveBasis={startingCurveBasis}
       liqCapPct={resolved.liquidityCeiling * 100}
@@ -1580,6 +1644,7 @@ export default function DayV3Summary({
         inputs.policyBasis === "illustrative"
       }
       slpModeledApy={scenario.liquidityApy}
+      slpEnabled={!exitDisabled}
       seniorShareOfCapital={
         model.balances.st + model.balances.jt + model.balances.lt > 0
           ? model.balances.st /
@@ -1590,7 +1655,7 @@ export default function DayV3Summary({
       targetUtilization={DAY_TARGET_UTILIZATION}
       validationIssues={startingCurveIssues}
     />
-  ) : null;
+    ) : null;
   const sourceReadiness = dayV3InputReadiness([
     { id: "source-yield", label: "Source yield", ready: sourceApyPct !== null },
   ]);
@@ -1664,12 +1729,18 @@ export default function DayV3Summary({
       label: "Post-request oracle gate",
       ready: gateByOracleUpdate !== null && !starterFields.has("price-gate"),
     },
-    {
-      id: "reinvestment",
-      label: "Reinvestment slippage ceiling",
-      ready: maxReinvestmentSlippageBps !== null,
-    },
+    ...(!exitDisabled
+      ? [
+          {
+            id: "reinvestment",
+            label: "Reinvestment slippage ceiling",
+            ready: maxReinvestmentSlippageBps !== null,
+          },
+        ]
+      : []),
   ]);
+  const deploymentStructureComplete =
+    protectedDrawdownPct !== null && immediateExitSharePct !== null;
   const deploymentProtectionComplete =
     protectedDrawdownPct !== null &&
     recoveryDaysInput !== null &&
@@ -1701,11 +1772,14 @@ export default function DayV3Summary({
   const activeSectionCompletion = deploying
     ? [
         sourceReadiness.complete,
+        deploymentStructureComplete,
         deploymentSetupReadiness.complete,
         requestPolicyReadiness.complete,
-        deploymentProtectionComplete,
-        deploymentExitComplete,
-        deploymentCurveComplete,
+        ...(!protectionDisabled ? [deploymentProtectionComplete] : []),
+        ...(!exitDisabled ? [deploymentExitComplete] : []),
+        ...(!protectionDisabled || !exitDisabled
+          ? [deploymentCurveComplete]
+          : []),
         ...(protectionDisabled ? [] : [deploymentProtectedExitComplete]),
       ]
     : [
@@ -1724,6 +1798,12 @@ export default function DayV3Summary({
           label: "Choose the yield source",
         },
         {
+          complete: deploymentStructureComplete,
+          detail: "Choose whether Senior needs Junior protection, an SLP exit pool, or both.",
+          id: "day-v3-market-structure-inputs",
+          label: "Choose the market structure",
+        },
+        {
           complete: deploymentSetupReadiness.complete,
           detail: `${deploymentSetupReadiness.missing.length} ${deploymentSetupReadiness.missing.length === 1 ? "answer" : "answers"} needed`,
           id: "day-v3-deployment-setup-inputs",
@@ -1735,24 +1815,37 @@ export default function DayV3Summary({
           id: "day-v3-request-policy-inputs",
           label: "Set the request policy",
         },
-        {
-          complete: deploymentProtectionComplete,
-          detail: "Choose the loss Senior should survive and its recovery window.",
-          id: "day-v3-protection-inputs",
-          label: "Review Senior protection",
-        },
-        {
-          complete: deploymentExitComplete,
-          detail: "Choose the immediate exit amount and minimum payout.",
-          id: "day-v3-exit-inputs",
-          label: "Review the Senior exit",
-        },
-        {
-          complete: deploymentCurveComplete,
-          detail: "Review how Junior and SLP share Senior yield.",
-          id: "day-v3-premium-inputs",
-          label: "Review the yield split",
-        },
+        ...(!protectionDisabled
+          ? [
+              {
+                complete: deploymentProtectionComplete,
+                detail:
+                  "Choose the loss Senior should survive and its recovery window.",
+                id: "day-v3-protection-inputs",
+                label: "Review Senior protection",
+              },
+            ]
+          : []),
+        ...(!exitDisabled
+          ? [
+              {
+                complete: deploymentExitComplete,
+                detail: "Choose the immediate exit amount and minimum payout.",
+                id: "day-v3-exit-inputs",
+                label: "Review the Senior exit",
+              },
+            ]
+          : []),
+        ...(!protectionDisabled || !exitDisabled
+          ? [
+              {
+                complete: deploymentCurveComplete,
+                detail: `Review how ${!protectionDisabled && !exitDisabled ? "Junior and SLP share" : !protectionDisabled ? "Junior shares" : "SLP shares"} Senior yield.`,
+                id: "day-v3-premium-inputs",
+                label: "Review the yield split",
+              },
+            ]
+          : []),
         ...(!protectionDisabled
           ? [
               {
@@ -2003,8 +2096,89 @@ export default function DayV3Summary({
             <DayV3Group
               collapsible
               defaultOpen={false}
-              id="day-v3-deployment-setup-inputs"
+              id="day-v3-market-structure-inputs"
               index={2}
+              status={
+                deploymentStructureComplete
+                  ? { label: "Complete", tone: "complete" }
+                  : {
+                      label: "Incomplete",
+                      tone: "incomplete",
+                      missing: ["Junior choice", "SLP choice"],
+                    }
+              }
+              subtitle="Decide whether Senior needs loss protection, immediate liquidity, or both"
+              summary={`${protectionDisabled ? "No Junior" : "Junior protection"} · ${exitDisabled ? "No SLP" : "SLP exit pool"}`}
+              title="Market structure"
+            >
+              <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+                <div className="flex flex-col gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--card)] px-4 py-3.5">
+                  <div>
+                    <h4 className="text-[12.5px] font-semibold leading-tight">
+                      Does Senior need Junior first-loss protection?
+                    </h4>
+                    <p className="mt-1 text-[10.5px] leading-relaxed text-[var(--tertiary)]">
+                      Choose no to remove coverage, recovery timing, Protected
+                      Exit, and every Junior premium question below.
+                    </p>
+                  </div>
+                  <DayV3SegmentedControl
+                    ariaLabel="Junior support required"
+                    onValueChange={(value) =>
+                      chooseJuniorSupport(value === "yes")
+                    }
+                    options={[
+                      { label: "Use Junior", value: "yes" },
+                      { label: "No Junior", value: "no" },
+                    ]}
+                    value={
+                      protectedDrawdownPct === null
+                        ? ""
+                        : protectionDisabled
+                          ? "no"
+                          : "yes"
+                    }
+                  />
+                </div>
+
+                <div className="flex flex-col gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--card)] px-4 py-3.5">
+                  <div>
+                    <h4 className="text-[12.5px] font-semibold leading-tight">
+                      Does Senior need an immediate SLP exit pool?
+                    </h4>
+                    <p className="mt-1 text-[10.5px] leading-relaxed text-[var(--tertiary)]">
+                      Choose no to remove exit sizing, conversion, restocking,
+                      reinvestment, and every SLP premium question below.
+                    </p>
+                  </div>
+                  <DayV3SegmentedControl
+                    ariaLabel="SLP support required"
+                    onValueChange={(value) =>
+                      chooseSlpSupport(value === "yes")
+                    }
+                    options={[
+                      { label: "Use an SLP", value: "yes" },
+                      { label: "No SLP", value: "no" },
+                    ]}
+                    value={
+                      immediateExitSharePct === null
+                        ? ""
+                        : exitDisabled
+                          ? "no"
+                          : "yes"
+                    }
+                  />
+                </div>
+              </div>
+            </DayV3Group>
+          ) : null}
+
+          {deploying ? (
+            <DayV3Group
+              collapsible
+              defaultOpen={false}
+              id="day-v3-deployment-setup-inputs"
+              index={3}
               status={
                 deploymentSetupReadiness.complete
                   ? { label: "Complete", tone: "complete" }
@@ -2074,6 +2248,8 @@ export default function DayV3Summary({
                     ? "illustrative"
                     : "source-fact",
                 }}
+                seniorProtectionEnabled={!protectionDisabled}
+                slpEnabled={!exitDisabled}
               />
             </DayV3Group>
           ) : null}
@@ -2083,7 +2259,7 @@ export default function DayV3Summary({
               collapsible
               defaultOpen={false}
               id="day-v3-request-policy-inputs"
-              index={3}
+              index={4}
               status={
                 requestPolicyReadiness.complete
                   ? { label: "Complete", tone: "complete" }
@@ -2118,6 +2294,7 @@ export default function DayV3Summary({
                 onMaxReinvestmentSlippageBps={setMaxReinvestmentSlippageBps}
                 onWithdrawalExpirySeconds={setWithdrawalExpirySeconds}
                 recoveryDays={recoveryDaysInput}
+                slpEnabled={!exitDisabled}
                 withdrawalDelayDays={entryPointSettlementDays}
                 withdrawalExpirySeconds={withdrawalExpirySeconds}
               />
@@ -2130,7 +2307,7 @@ export default function DayV3Summary({
             exit={exitView}
             exitSharePct={immediateExitSharePct}
             incentiveBudgetPer100={incentiveBudgetPer100}
-            indexOffset={deploying ? 2 : 0}
+            indexOffset={deploying ? 3 : 0}
             inputOrigins={{
               drawdown: starterFields.has("drawdown")
                 ? "illustrative"
@@ -2152,12 +2329,18 @@ export default function DayV3Summary({
             onDrawdownPct={(value) => {
               markStarterFieldEdited("drawdown");
               if (value === 0) {
+                markStarterFieldEdited("grace");
                 setManualOverrides((current) => ({
                   ...current,
                   coveragePct: null,
                   protectedExitThresholdPct: null,
                   protectedExitBonusPct: null,
+                  jrYieldShareAtZeroPct: null,
+                  jrYieldShareAtTargetPct: null,
+                  jrYieldShareAtFullPct: null,
                 }));
+                setFixedTermGraceDays(0);
+                setIncentiveBudgetPer100(0);
                 setProtectedExitThresholdOverride(null);
               }
               setProtectedDrawdownPct(value);
@@ -2165,6 +2348,8 @@ export default function DayV3Summary({
             onExitSharePct={(value) => {
               markStarterFieldEdited("exit-amount");
               if (value === 0) {
+                markStarterFieldEdited("conversion-days");
+                markStarterFieldEdited("conversion-cost");
                 setManualOverrides((current) => ({
                   ...current,
                   minimumLiquidityPct: null,
@@ -2172,7 +2357,13 @@ export default function DayV3Summary({
                   depthAtNav: null,
                   maximumPremiumPct: null,
                   poolCapitalPer100: null,
+                  slpYieldShareAtZeroPct: null,
+                  slpYieldShareAtTargetPct: null,
+                  slpYieldShareAtFullPct: null,
                 }));
+                setCollateralToExitDays(null);
+                setCollateralToExitCostBps(null);
+                setMaxReinvestmentSlippageBps(null);
               }
               setImmediateExitSharePct(value);
             }}
@@ -2217,6 +2408,9 @@ export default function DayV3Summary({
             recovery={recoveryView}
             recoveryDays={recoveryDaysInput}
             recoveryMode={recoveryMode}
+            showExitSection={!deploying || !exitDisabled}
+            showInlineFeatureControls={!deploying}
+            showProtectionSection={!deploying || !protectionDisabled}
           />
         </DayV3GroupAccordion>
       </section>
