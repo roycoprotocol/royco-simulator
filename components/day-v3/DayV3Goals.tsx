@@ -8,6 +8,10 @@ import DayV3NumberField from "@/components/day-v3/DayV3NumberField";
 import DayV3Origin, {
   type DayV3VisibleOrigin,
 } from "@/components/day-v3/DayV3Origin";
+import DayV3QuoteAsset from "@/components/day-v3/DayV3QuoteAsset";
+import DayV3RestockCheck, {
+  type DayV3RestockView,
+} from "@/components/day-v3/DayV3RestockCheck";
 import DayV3SegmentedControl from "@/components/day-v3/DayV3SegmentedControl";
 import {
   dayV3ExitInputReadiness,
@@ -142,17 +146,26 @@ export default function DayV3Goals({
   exitSharePct,
   indexOffset = 0,
   inputOrigins = {},
+  marketMakerCostOfCapitalPct,
   minimumProceedsPer100,
   onDrawdownPct,
   onExitSharePct,
+  onMarketMakerCostOfCapitalPct,
   onMinimumProceedsPer100,
+  onQuoteAssetLabel,
+  onQuoteAssetYieldPct,
   onRecoveryDays,
   onRecoveryMode,
+  onRedemptionDays,
   onResetExit,
   onResetProtection,
   protection,
+  quoteAssetLabel,
+  quoteAssetYieldPct,
   recoveryDays,
   recoveryMode,
+  redemptionDays,
+  restock,
 }: {
   drawdownPct: MaybeNumber;
   exit: DayV3ExitView;
@@ -162,18 +175,28 @@ export default function DayV3Goals({
     drawdown: DayV3VisibleOrigin;
     exitAmount: DayV3VisibleOrigin;
     payout: DayV3VisibleOrigin;
+    quoteAsset: DayV3VisibleOrigin;
   }>;
+  marketMakerCostOfCapitalPct: MaybeNumber;
   minimumProceedsPer100: MaybeNumber;
   onDrawdownPct: (value: MaybeNumber) => void;
   onExitSharePct: (value: MaybeNumber) => void;
+  onMarketMakerCostOfCapitalPct: (value: MaybeNumber) => void;
   onMinimumProceedsPer100: (value: MaybeNumber) => void;
+  onQuoteAssetLabel: (value: string) => void;
+  onQuoteAssetYieldPct: (value: MaybeNumber) => void;
   onRecoveryDays: (value: MaybeNumber) => void;
   onRecoveryMode: (value: "none" | "window") => void;
+  onRedemptionDays: (value: MaybeNumber) => void;
   onResetExit: () => void;
   onResetProtection: () => void;
   protection: DayV3ProtectionView;
+  quoteAssetLabel: string;
+  quoteAssetYieldPct: MaybeNumber;
   recoveryDays: MaybeNumber;
   recoveryMode: "none" | "window" | null;
+  redemptionDays: MaybeNumber;
+  restock: DayV3RestockView;
 }) {
   const inputOrigin = (origin: DayV3VisibleOrigin | undefined) =>
     origin ?? "your-answer";
@@ -265,8 +288,8 @@ export default function DayV3Goals({
                 Should Senior have first-loss protection?
               </h4>
               <p className="mt-1 text-[10.5px] leading-relaxed text-[var(--tertiary)]">
-                Turning this off removes Junior capital and lets Senior absorb
-                source losses directly.
+                Turning this off removes Junior capital, lets Senior absorb
+                source losses directly, and greys out every Junior model below.
               </p>
             </div>
             <DayV3Origin origin={inputOrigin(inputOrigins.drawdown)} />
@@ -460,7 +483,8 @@ export default function DayV3Goals({
                 Should Senior have an immediate pool exit?
               </h4>
               <p className="mt-1 text-[10.5px] leading-relaxed text-[var(--tertiary)]">
-                Turning this off removes the SLP and its one-trade exit promise.
+                Turning this off removes the SLP and its one-trade exit
+                promise, and greys out every SLP model below.
               </p>
             </div>
             <DayV3Origin origin={inputOrigin(inputOrigins.exitAmount)} />
@@ -487,46 +511,55 @@ export default function DayV3Goals({
         </div>
 
         {!exitDisabled ? (
-          <div className="grid grid-cols-1 items-start gap-3 lg:grid-cols-2">
-            <DayV3NumberField
-              label="Out of every $100 Senior, how much should be sellable right away?"
-              max={100}
-              min={0.01}
-              note="This determines the SLP capital required for one sale into a pool at rest; it is not a lifetime withdrawal limit."
-              onChange={onExitSharePct}
-              origin={inputOrigin(inputOrigins.exitAmount)}
-              placeholder="Choose an amount"
-              prefix="$"
-              presets={[
-                { label: "$5", value: 5 },
-                { label: "$10", value: 10 },
-                { label: "$20", value: 20 },
-              ]}
-              step={0.5}
-              suffix="of $100"
-              value={exitSharePct}
-              required
+          <>
+            <div className="grid grid-cols-1 items-start gap-3 lg:grid-cols-2">
+              <DayV3NumberField
+                label="Out of every $100 Senior, how much should be sellable right away?"
+                max={100}
+                min={0.01}
+                note="Size for one sale, not for the lifetime of the market. This is what the pool must absorb in a single trade starting from rest, and it is what sets the SLP capital required. The pool does not stay drained: a sale leaves it below NAV, and outside desks that buy the discounted Senior and redeem it at NAV push it back to rest, which is what restores capacity for the next seller. Check below whether that trade actually pays."
+                onChange={onExitSharePct}
+                origin={inputOrigin(inputOrigins.exitAmount)}
+                placeholder="Choose an amount"
+                prefix="$"
+                presets={[
+                  { label: "$5", value: 5 },
+                  { label: "$10", value: 10 },
+                  { label: "$20", value: 20 },
+                ]}
+                step={0.5}
+                suffix="of $100"
+                value={exitSharePct}
+                required
+              />
+              <DayV3NumberField
+                label="What is the least a seller should receive for $100 Senior?"
+                max={100}
+                min={0}
+                note="Worst case, not the expected case. This is the floor the design has to honour for a seller who takes the whole amount above in one trade, after fees. Smaller sales price nearer to NAV, so most sellers do better than this. Raising the floor buys a tighter worst case and costs more SLP capital to hold it; lowering it does the reverse."
+                onChange={onMinimumProceedsPer100}
+                origin={inputOrigin(inputOrigins.payout)}
+                placeholder="Choose a payout floor"
+                prefix="$"
+                presets={[
+                  { label: "$99", value: 99 },
+                  { label: "$95", value: 95 },
+                  { label: "$90", value: 90 },
+                ]}
+                step={0.1}
+                suffix="of $100"
+                value={minimumProceedsPer100}
+                required
+              />
+            </div>
+            <DayV3QuoteAsset
+              label={quoteAssetLabel}
+              onLabel={onQuoteAssetLabel}
+              onYieldPct={onQuoteAssetYieldPct}
+              yieldOrigin={inputOrigin(inputOrigins.quoteAsset)}
+              yieldPct={quoteAssetYieldPct}
             />
-            <DayV3NumberField
-              label="What is the least a seller should receive for $100 Senior?"
-              max={100}
-              min={0}
-              note="This fee-inclusive floor determines how much price impact the immediate exit may create."
-              onChange={onMinimumProceedsPer100}
-              origin={inputOrigin(inputOrigins.payout)}
-              placeholder="Choose a payout floor"
-              prefix="$"
-              presets={[
-                { label: "$99", value: 99 },
-                { label: "$95", value: 95 },
-                { label: "$90", value: 90 },
-              ]}
-              step={0.1}
-              suffix="of $100"
-              value={minimumProceedsPer100}
-              required
-            />
-          </div>
+          </>
         ) : null}
 
         {exitDisabled ? (
@@ -580,6 +613,19 @@ export default function DayV3Goals({
             Choose the exit amount and payout above to check the exact pool result.
           </p>
         ) : null}
+
+        {/* The design says what one sale costs. This says whether anyone is
+            paid to undo it, which is the only thing that gives the pool its
+            capacity back. */}
+        {exitDisabled ? null : (
+        <DayV3RestockCheck
+          costOfCapitalPct={marketMakerCostOfCapitalPct}
+          onCostOfCapitalPct={onMarketMakerCostOfCapitalPct}
+          onRedemptionDays={onRedemptionDays}
+          redemptionDays={redemptionDays}
+          view={restock}
+        />
+        )}
 
         {exit.status === "infeasible" ? (
           <p

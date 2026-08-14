@@ -208,6 +208,19 @@ function DayV3PremiumCurveEditor({
   ].join(" · ");
   return (
     <DayV3Group
+      // The reset belongs beside the docs link in the section footer. Sharing a
+      // row with the intro paragraph left a wide empty band under the heading
+      // before the reader had reached a single control.
+      action={
+        <DayV3Button
+          disabled={!curveOverridden}
+          onClick={onResetCurve}
+          size="sm"
+          variant="secondary"
+        >
+          Reset yield split
+        </DayV3Button>
+      }
       collapsible
       defaultOpen={false}
       docs="yieldSplit"
@@ -235,22 +248,10 @@ function DayV3PremiumCurveEditor({
       }
       title="Yield split"
     >
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="max-w-[78ch] space-y-1 text-[10.5px] leading-relaxed text-[var(--tertiary)]">
-          <p>
-            Adjust the share paid at the {pct(targetUtilization)} operating
-            target. Each position&apos;s modeled APY updates below.
-          </p>
-        </div>
-        <DayV3Button
-          disabled={!curveOverridden}
-          onClick={onResetCurve}
-          size="sm"
-          variant="secondary"
-        >
-          Reset yield split
-        </DayV3Button>
-      </div>
+      <p className="max-w-[78ch] text-[10.5px] leading-relaxed text-[var(--tertiary)]">
+        Adjust the share paid at the {pct(targetUtilization)} operating target.
+        Each position&apos;s modeled APY updates below.
+      </p>
 
       {validationIssues.length > 0 ? (
         <div
@@ -270,14 +271,23 @@ function DayV3PremiumCurveEditor({
       ) : null}
 
       {slpEnabled ? (
+        // The old wording here was three pieces of jargon in a row and never
+        // said what the reader was supposed to do with it. What matters is that
+        // the SLP rate is a premium divided by pool size, and the pool size in
+        // front of them is a placeholder.
         <p className="rounded-xl border border-[var(--border-subtle)] bg-[var(--foundation)] px-4 py-3 text-[10.5px] leading-relaxed text-[var(--secondary)]">
           <strong className="font-semibold text-[var(--foreground)]">
-            SLP APY basis:
+            Why the SLP rate is what it is:
           </strong>{" "}
-          {slpMinimumLiquidityPct.toFixed(1)}% illustrative Minimum Liquidity,
-          which funds ${slpCapitalPer100.toFixed(1)} SLP per $100 Senior at the{" "}
-          {pct(targetUtilization)} operating target. Exact E-CLP sizing is
-          finalized in Royco Deploy.
+          the premium below is taken out of Senior&apos;s yield, then shared
+          across however much SLP capital the pool holds. This model assumes{" "}
+          <strong className="font-mono font-semibold tabular-nums">
+            ${slpCapitalPer100.toFixed(1)}
+          </strong>{" "}
+          of SLP for every $100 of Senior, which is a{" "}
+          {slpMinimumLiquidityPct.toFixed(1)}% minimum liquidity requirement. A
+          larger pool spreads the same premium across more capital, so the SLP
+          rate falls. Royco Deploy sets the real size.
         </p>
       ) : null}
 

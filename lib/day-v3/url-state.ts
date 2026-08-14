@@ -12,6 +12,14 @@ export interface DayV3UrlState extends DayV3GoalDraft {
   market: string | null;
   mode: DayV3Mode | null;
   sourceApyPct: number | null;
+  /** What Senior is sold for. A label for the reader, not a token address. */
+  quoteAssetLabel: string | null;
+  /** The issuer's answer for what that asset earns while the SLP holds it. */
+  quoteAssetYieldPct: number | null;
+  /** An outside desk's annual cost of capital, for the pool-refill check. */
+  marketMakerCostOfCapitalPct: number | null;
+  /** Days from buying discounted Senior to receiving the underlying at NAV. */
+  redemptionDays: number | null;
   incentiveBudgetPer100: number | null;
   depositDelaySeconds: number | null;
   depositExpirySeconds: DayV3ExpiryPolicy | null;
@@ -258,6 +266,16 @@ const text = (raw: string | null): string | null => {
   return value ? value : null;
 };
 
+/**
+ * A short display name a reader typed. Bounded and stripped of control
+ * characters, because it is the only free text this contract carries and it is
+ * rendered straight back into the page.
+ */
+const label = (raw: string | null): string | null => {
+  const value = (raw ?? "").replace(/[^\p{L}\p{N} ._+-]/gu, "").trim();
+  return value ? value.slice(0, 24) : null;
+};
+
 const expiry = (raw: string | null): DayV3ExpiryPolicy | null => {
   if (raw === "none") return "no-expiry";
   // UINT32_MAX is reserved for the explicit no-expiry sentinel. Numeric
@@ -357,6 +375,10 @@ export function readDayV3UrlState(search: string): DayV3UrlState {
     market: text(params.get("m")),
     mode: rawMode === "simulate" || rawMode === "deploy" ? rawMode : null,
     sourceApyPct: finite(params.get("apy"), 0, 30),
+    quoteAssetLabel: label(params.get("quote")),
+    quoteAssetYieldPct: finite(params.get("quoteApy"), 0, 30),
+    marketMakerCostOfCapitalPct: finite(params.get("mmCost"), 0, 100),
+    redemptionDays: integer(params.get("mmDays"), 0, 365),
     protectedDrawdownPct,
     recoveryDays: integer(params.get("recover"), 0, 194),
     // `0` is an explicit product choice: no immediate pool exit and no SLP.
@@ -431,6 +453,17 @@ export function buildDayV3Query(state: DayV3UrlWriteState): string {
   setNumber("exit", state.immediateExitSharePct);
   if (state.immediateExitSharePct === 0) params.set("receive", "0");
   else setNumber("receive", state.minimumProceedsPer100);
+
+  // The quote asset and its yield are modeled inputs: they move SLP carry and
+  // the position comparison, so a shared link that dropped them would describe
+  // a different market. The refill-check terms travel with them because they
+  // are the reader's stated assumption about who resets the pool.
+  if (state.immediateExitSharePct !== 0) {
+    if (state.quoteAssetLabel) params.set("quote", state.quoteAssetLabel);
+    setNumber("quoteApy", state.quoteAssetYieldPct);
+    setNumber("mmCost", state.marketMakerCostOfCapitalPct);
+    setWholeDays("mmDays", state.redemptionDays);
+  }
 
   // These visible exit inputs drive the canonical restock hurdle. They belong
   // to the unified simulator and no longer depend on a legacy view mode.

@@ -301,8 +301,13 @@ export default function DayV3Group({
         hidden={collapsible && !open}
         id={contentId}
       >
+        {children}
+        {/* Reference material and section-level actions read as a footer.
+            Above the controls they took a whole row before the reader had seen
+            anything to look up, and left an orphaned band of empty space
+            across the top of the section. */}
         {action || docs ? (
-          <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-t border-[var(--border-subtle)] pt-3">
             {docs ? (
               <DayV3DocsLink label={docsLabel ?? title} topic={docs} />
             ) : (
@@ -311,7 +316,6 @@ export default function DayV3Group({
             {action}
           </div>
         ) : null}
-        {children}
       </div>
     </section>
   );

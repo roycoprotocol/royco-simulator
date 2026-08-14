@@ -185,12 +185,17 @@ const noop = () => undefined;
 const goalsProps = {
   drawdownPct: 15,
   exitSharePct: 10,
+  marketMakerCostOfCapitalPct: 12,
   minimumProceedsPer100: 95,
   onDrawdownPct: noop,
   onExitSharePct: noop,
+  onMarketMakerCostOfCapitalPct: noop,
   onMinimumProceedsPer100: noop,
+  onQuoteAssetLabel: noop,
+  onQuoteAssetYieldPct: noop,
   onRecoveryDays: noop,
   onRecoveryMode: noop,
+  onRedemptionDays: noop,
   onResetExit: noop,
   onResetProtection: noop,
   protection: {
@@ -200,8 +205,32 @@ const goalsProps = {
     status: "recommended",
     message: "Senior remains whole.",
   },
+  quoteAssetLabel: "USDC",
+  quoteAssetYieldPct: 0,
   recoveryDays: 7,
   recoveryMode: "window",
+  redemptionDays: 7,
+  restock: {
+    basis: "illustrative",
+    check: {
+      status: "profitable",
+      promisedDiscountBps: 49.8,
+      worstCaseDiscountBps: 60.1,
+      promisedMarginBps: 28.3,
+      worstCaseMarginBps: 38.6,
+      breakEvenSalePer100: 4.3,
+      capacityPer100: 10.06,
+    },
+    hurdle: {
+      financingBps: 23.01,
+      seniorCarryBps: 11.51,
+      netCarryBps: 11.51,
+      swapFeeBps: 10,
+      hurdleBps: 21.51,
+    },
+    promisedSalePer100: 10,
+    seniorApyPct: 6,
+  },
 } satisfies Omit<ComponentProps<typeof DayV3Goals>, "exit">;
 
 const goalsMarkup = renderToStaticMarkup(

@@ -30,6 +30,7 @@ import DayV3ModelGroup, {
 } from "@/components/day-v3/DayV3ModelGroup";
 import DayV3NumberField from "@/components/day-v3/DayV3NumberField";
 import DayV3PremiumCurveEditor from "@/components/day-v3/DayV3PremiumCurveEditor";
+import type { DayV3RestockView } from "@/components/day-v3/DayV3RestockCheck";
 import DayV3SegmentedControl from "@/components/day-v3/DayV3SegmentedControl";
 import DayV3Source from "@/components/day-v3/DayV3Source";
 import DayV3YieldModels from "@/components/day-v3/DayV3YieldModels";
@@ -65,6 +66,10 @@ import {
   dayV3ExitInputReadiness,
   dayV3InputReadiness,
 } from "@/lib/day-v3/input-readiness";
+import {
+  dayV3RestockCheck,
+  dayV3RestockHurdle,
+} from "@/lib/day-v3/restock-arbitrage";
 import type { DayV3Overrides } from "@/lib/day-v3/types";
 import type { DayV3SimulationPoolDesignGoals } from "@/lib/day-v3/simulation-pool-design";
 import { buildDayYieldDraftMarket } from "@/lib/day-simulator-template/explorer-market";
@@ -88,6 +93,8 @@ const pct = (value: number) => `${(value * 100).toFixed(1)}%`;
 const dollars = (value: number) => `$${value.toFixed(1)}`;
 const DAY_TARGET_UTILIZATION = 0.9;
 const CUSTOM_SOURCE_ID = "custom";
+/** A non-accruing stablecoin, so the model opens where it always has: at 0%. */
+const DAY_V3_DEFAULT_QUOTE_ASSET = "USDC";
 const CUSTOM_SOURCE_MARKET = buildDayYieldDraftMarket({
   label: "Custom yield source",
   sourceApy: 0.12,
@@ -170,6 +177,22 @@ export default function DayV3Summary({
   const [minimumProceedsPer100, setMinimumProceedsPer100] = useState<
     number | null
   >(linked?.minimumProceedsPer100 ?? null);
+  // What Senior is sold for, and what that asset earns while the SLP holds it.
+  // Both are issuer answers, never inherited from a market template: the pool's
+  // quote side used to be modeled at a flat zero with no way to say otherwise.
+  const [quoteAssetLabel, setQuoteAssetLabel] = useState(
+    linked?.quoteAssetLabel ?? DAY_V3_DEFAULT_QUOTE_ASSET,
+  );
+  const [quoteAssetYieldPct, setQuoteAssetYieldPct] = useState<number | null>(
+    linked?.quoteAssetYieldPct ?? 0,
+  );
+  // An outside desk's terms. These describe who might arbitrage the pool back
+  // to NAV; they price nothing in the market itself and never gate a result.
+  const [marketMakerCostOfCapitalPct, setMarketMakerCostOfCapitalPct] =
+    useState<number | null>(linked?.marketMakerCostOfCapitalPct ?? 12);
+  const [redemptionDays, setRedemptionDays] = useState<number | null>(
+    linked?.redemptionDays ?? 7,
+  );
   const modeledProtectedDrawdownPct = protectedDrawdownPct;
   const modeledImmediateExitSharePct = immediateExitSharePct;
   const protectionEnabled = (modeledProtectedDrawdownPct ?? 0) > 0;
@@ -187,21 +210,25 @@ export default function DayV3Summary({
   const liqY0Override = activeManualOverrides.slpYieldShareAtZeroPct;
   const liqY100Override = activeManualOverrides.slpYieldShareAtFullPct;
   const modeledSourceApyPct = sourceApyPct ?? 0;
+  const modeledQuoteAssetYieldPct = quoteAssetYieldPct ?? 0;
   const simulationDefaults = useMemo(
     () => ({
       ...defaults,
       sourceApy: modeledSourceApyPct / 100,
-      // V3 does not ask an issuer to forecast exit-asset yield or annual pool
-      // turnover, so neither is silently inherited from a market template.
-      // The live template fee still prices canonical execution quotes; with no
-      // volume forecast it contributes no speculative fee income to SLP APY.
-      stableYield: 0,
+      // The quote asset's yield is the issuer's own answer in the Senior exit
+      // section, never a rate inherited from a market template. It was pinned
+      // at zero here, which is right for a plain stablecoin and silently wrong
+      // for anything that accrues.
+      stableYield: modeledQuoteAssetYieldPct / 100,
+      // V3 still does not ask an issuer to forecast annual pool turnover. The
+      // live template fee prices canonical execution quotes; with no volume
+      // forecast it contributes no speculative fee income to SLP APY.
       poolTurnoverPerYear: 0,
       // This is the shared template's disclosed simulation assumption. A live
       // RWA response replaces it atomically when the exit design resolves.
       swapFeeBps: defaults.swapFeeBps,
     }),
-    [defaults, modeledSourceApyPct],
+    [defaults, modeledQuoteAssetYieldPct, modeledSourceApyPct],
   );
 
   // Switching market adopts that market's own terms, so the sliders describe the
@@ -213,6 +240,10 @@ export default function DayV3Summary({
     setRecoveryMode(null);
     setImmediateExitSharePct(null);
     setMinimumProceedsPer100(null);
+    // The quote asset belongs to the exit design, not to the source, so it is
+    // cleared with the rest of the exit rather than carried across markets.
+    setQuoteAssetLabel(DAY_V3_DEFAULT_QUOTE_ASSET);
+    setQuoteAssetYieldPct(0);
     setImportedMarket(null);
     setManualOverrides(EMPTY_DAY_V3_OVERRIDES);
   };
@@ -401,6 +432,7 @@ export default function DayV3Summary({
           coveragePct,
           liquidityPct,
           sourceApyPct: modeledSourceApyPct,
+          quoteAssetYieldPct: modeledQuoteAssetYieldPct,
           observationDays,
           bandPct: effectiveBandPct,
           maintainCoverage,
@@ -428,6 +460,7 @@ export default function DayV3Summary({
       liquidityPct,
       modeledImmediateExitSharePct,
       maintainCoverage,
+      modeledQuoteAssetYieldPct,
       modeledSourceApyPct,
       observationDays,
       riskShareOverride,
@@ -541,6 +574,7 @@ export default function DayV3Summary({
       coverage,
       minLiquidity,
       sourceApy: inputs.sourceApyPct / 100,
+      stableYield: inputs.quoteAssetYieldPct / 100,
       observationDays: inputs.observationDays,
       eclpBandWidth: inputs.bandPct / 100,
       maintainCoverage: inputs.maintainCoverage,
@@ -568,6 +602,10 @@ export default function DayV3Summary({
         concentration: cfg.eclpParams?.lambda ?? DAY_ECLP_SIMULATION_LAMBDA,
         stableYield: cfg.stableYield,
         swapFeeBps: inputs.engineOverrides?.swapFeeBps ?? null,
+        // The fee the run actually charged, live or illustrative. The nullable
+        // field above is the "is this the live template" signal and cannot be
+        // used where an arithmetic fee is required.
+        engineSwapFeeBps: cfg.swapFeeBps,
         turnoverPerYear: cfg.poolTurnoverPerYear,
         seniorWeight: dayPoolSeniorWeight(cfg),
       },
@@ -576,6 +614,11 @@ export default function DayV3Summary({
         quote: opening.previewSecondarySell(requestedExitNAV),
       },
       explainer: buildDayExplainerMetrics(cfg, balances),
+      // `previewSecondarySell` is read-only, so the refill check can price any
+      // sale size against this same opening pool without a second engine run
+      // and without reconstructing a price curve of its own.
+      quoteSell: (nav: number) => opening.previewSecondarySell(nav),
+      openingSeniorNAV,
     };
   }, [
     inputs.bandPct,
@@ -585,6 +628,7 @@ export default function DayV3Summary({
     inputs.liquidityPct,
     inputs.maintainCoverage,
     inputs.observationDays,
+    inputs.quoteAssetYieldPct,
     inputs.sourceApyPct,
     simulationDefaults,
   ]);
@@ -595,6 +639,7 @@ export default function DayV3Summary({
       coverage: inputs.coveragePct / 100,
       minLiquidity: inputs.liquidityPct / 100,
       sourceApy: inputs.sourceApyPct / 100,
+      stableYield: inputs.quoteAssetYieldPct / 100,
       observationDays: inputs.observationDays,
       eclpBandWidth: inputs.bandPct / 100,
       maintainCoverage: inputs.maintainCoverage,
@@ -605,6 +650,7 @@ export default function DayV3Summary({
       inputs.liquidityPct,
       inputs.maintainCoverage,
       inputs.observationDays,
+      inputs.quoteAssetYieldPct,
       inputs.sourceApyPct,
       simulationDefaults,
     ],
@@ -728,6 +774,43 @@ export default function DayV3Summary({
     }),
     [baseReturns, riskOnly, scenario, structuralModel],
   );
+  // Nothing in the contract refills the exit pool. It comes back only when an
+  // outside desk is paid enough to buy the discounted Senior and redeem it, so
+  // the issuer's own exit terms decide whether capacity ever returns.
+  const restockHurdle = useMemo(
+    () =>
+      marketMakerCostOfCapitalPct === null || redemptionDays === null
+        ? null
+        : dayV3RestockHurdle({
+            costOfCapitalPct: marketMakerCostOfCapitalPct,
+            redemptionDays,
+            seniorApyPct: scenario.seniorApy * 100,
+            swapFeeBps: model.pool.engineSwapFeeBps,
+          }),
+    [
+      marketMakerCostOfCapitalPct,
+      model.pool.engineSwapFeeBps,
+      redemptionDays,
+      scenario.seniorApy,
+    ],
+  );
+  const restockView: DayV3RestockView = {
+    basis: inputs.policyBasis === "live" ? "live" : "illustrative",
+    check:
+      restockHurdle === null || exitDisabled
+        ? null
+        : dayV3RestockCheck({
+            capacityNAV: model.explainer.liquidity.boundarySellNAV,
+            hurdle: restockHurdle,
+            openingSeniorNAV: model.openingSeniorNAV,
+            promisedSalePer100: modeledImmediateExitSharePct,
+            quoteSell: model.quoteSell,
+          }),
+    hurdle: restockHurdle,
+    promisedSalePer100: modeledImmediateExitSharePct,
+    seniorApyPct: scenario.seniorApy * 100,
+  };
+
   const backtestConfigOverrides = useMemo(
     () =>
       inputs.engineOverrides
@@ -764,6 +847,10 @@ export default function DayV3Summary({
     recoveryDays: recoveryDaysInput,
     immediateExitSharePct,
     minimumProceedsPer100,
+    quoteAssetLabel,
+    quoteAssetYieldPct,
+    marketMakerCostOfCapitalPct,
+    redemptionDays,
     // Legacy links still parse these fields, but the simulator no longer asks
     // for deployment-only refill assumptions or writes them into new links.
     entryPointSettlementDays: null,
@@ -1319,6 +1406,7 @@ export default function DayV3Summary({
                 ? "illustrative"
                 : "your-answer",
             }}
+            marketMakerCostOfCapitalPct={marketMakerCostOfCapitalPct}
             minimumProceedsPer100={minimumProceedsPer100}
             onDrawdownPct={(value) => {
               markStarterFieldEdited("drawdown");
@@ -1336,10 +1424,13 @@ export default function DayV3Summary({
               }
               setImmediateExitSharePct(value);
             }}
+            onMarketMakerCostOfCapitalPct={setMarketMakerCostOfCapitalPct}
             onMinimumProceedsPer100={(value) => {
               markStarterFieldEdited("payout");
               setMinimumProceedsPer100(value);
             }}
+            onQuoteAssetLabel={setQuoteAssetLabel}
+            onQuoteAssetYieldPct={setQuoteAssetYieldPct}
             onRecoveryDays={(value) => {
               markStarterFieldEdited("recovery");
               setRecoveryDaysInput(value);
@@ -1349,6 +1440,7 @@ export default function DayV3Summary({
               setRecoveryMode(value);
               setRecoveryDaysInput(value === "none" ? 0 : null);
             }}
+            onRedemptionDays={setRedemptionDays}
             onResetExit={() => {
               markStarterFieldEdited("exit-amount");
               markStarterFieldEdited("payout");
@@ -1363,8 +1455,12 @@ export default function DayV3Summary({
               setRecoveryMode(null);
             }}
             protection={protectionView}
+            quoteAssetLabel={quoteAssetLabel}
+            quoteAssetYieldPct={quoteAssetYieldPct}
             recoveryDays={recoveryDaysInput}
             recoveryMode={recoveryMode}
+            redemptionDays={redemptionDays}
+            restock={restockView}
           />
           {premiumCurveEditor}
         </DayV3GroupAccordion>
@@ -1501,27 +1597,6 @@ export default function DayV3Summary({
           ))}
         </div>
 
-        <div className="border-t border-[var(--border-subtle)] px-5 py-3 text-[10.5px] leading-relaxed text-[var(--secondary)]">
-          <strong className="font-semibold text-[var(--foreground)]">
-            APY inputs:
-          </strong>{" "}
-          {sourceApyPct === null
-            ? "Source yield missing."
-            : `${sourceApyPct.toFixed(1)}% source yield. `}
-          At 90% utilization: {protectionEnabled
-            ? `Junior receives ${(resolved.riskYieldShare * 100).toFixed(1)}% of Senior yield`
-            : "Junior is off"}; {exitEnabled
-            ? `SLP receives ${(resolved.liquidityYieldShare * 100).toFixed(1)}% of Senior yield`
-            : "SLP is off"}.
-          {exitEnabled ? (
-            <span className="ml-1">
-              {" "}SLP APY uses the shared {liquidityPct.toFixed(1)}%
-              illustrative Minimum Liquidity basis
-              ({dollars(model.balances.lt)} SLP per $100 Senior). Exact E-CLP
-              sizing is finalized in Royco Deploy.
-            </span>
-          ) : null}
-        </div>
       </section>
 
       <section
@@ -1571,14 +1646,17 @@ export default function DayV3Summary({
                 </DayV3ModelGroup>
 
                 <DayV3ModelGroup
+                  disabledReason={
+                    protectionDisabled
+                      ? "Protection is off. No Junior is funded, so there is no loss waterfall to draw — Senior absorbs source losses from the first dollar."
+                      : null
+                  }
                   id="day-v3-risk-models"
                   index={2}
                   preview={
                     protectedDrawdownPct === null
                       ? "Choose Senior protection above to model the loss path."
-                      : protectionDisabled
-                        ? "Protection is off · Senior absorbs source losses from the first dollar."
-                        : `Junior absorbs a ${protectedDrawdownPct.toFixed(1)}% source fall before Senior loses value.`
+                      : `Junior absorbs a ${protectedDrawdownPct.toFixed(1)}% source fall before Senior loses value.`
                   }
                   title="Senior protection"
                 >
@@ -1702,6 +1780,7 @@ export default function DayV3Summary({
                   <DayV3Comparison
                     poolCarry={model.poolCarry}
                     poolEconomics={{
+                      exitAssetLabel: quoteAssetLabel,
                       seniorWeight: model.pool.seniorWeight,
                       stableYield: model.pool.stableYield,
                       swapFeeBps: model.pool.swapFeeBps,
@@ -1773,6 +1852,7 @@ export default function DayV3Summary({
                 observationDays={inputs.observationDays}
                 onMaintainCoverage={setMaintainCoverage}
                 poolConfigOverrides={backtestConfigOverrides}
+                quoteAssetYieldPct={inputs.quoteAssetYieldPct}
                 riskSharePct={resolved.riskYieldShare * 100}
                 riskY0Pct={resolved.y0 * 100}
                 riskY100Pct={resolved.y100 * 100}

@@ -37,9 +37,15 @@ assert.match(markup, /Jr share at 90% utilization/);
 assert.match(markup, /SLP share at 90% utilization/);
 assert.match(markup, /Projected Jr APY/);
 assert.match(markup, /Projected SLP APY/);
-assert.match(markup, /SLP APY basis:/);
-assert.match(markup, /10\.0% illustrative Minimum Liquidity/);
-assert.match(markup, /\$11\.1 SLP per \$100 Senior/);
+assert.match(markup, /Why the SLP rate is what it is:/);
+assert.match(markup, /10\.0% minimum liquidity requirement/);
+assert.match(markup, /\$11\.1/);
+assert.match(markup, /for every \$100 of Senior/);
+assert.match(
+  markup,
+  /larger pool spreads the same premium across more capital/,
+  "the basis note has to say why the number moves, not just state it",
+);
 assert.match(markup, /8\.5%/);
 assert.match(markup, /2\.4%/);
 assert.match(markup, /Updates from the shared accountant/);

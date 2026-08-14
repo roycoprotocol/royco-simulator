@@ -67,6 +67,7 @@ function DayV3Backtest({
   onMaintainCoverage,
   poolConfigOverrides,
   observationDays: observationInput,
+  quoteAssetYieldPct: quoteAssetYieldInput,
   riskY0Pct: riskY0Input,
   riskY100Pct: riskY100Input,
   riskSharePct: riskShareInput,
@@ -84,12 +85,20 @@ function DayV3Backtest({
   onMaintainCoverage: (value: boolean) => void;
   poolConfigOverrides: Partial<Pick<MarketConfig, "swapFeeBps" | "eclpParams">>;
   observationDays: number;
+  quoteAssetYieldPct: number;
   riskY0Pct: number;
   riskY100Pct: number;
   riskSharePct: number;
   sourceApyPct: number;
 }) {
-  const defaults = market.defaults;
+  // The history has to run on the same quote asset as the projection above
+  // it. Reading `market.defaults` straight through left the backtest paying
+  // the market template's own exit-asset yield while the forward model was
+  // using the issuer's answer, so the two disagreed about the same pool.
+  const defaults = useMemo(
+    () => ({ ...market.defaults, stableYield: quoteAssetYieldInput / 100 }),
+    [market.defaults, quoteAssetYieldInput],
+  );
   const [windowId, setWindowId] = useState("full");
   // Declared on the market, the same two fields the root route reads.
   const footnote = market.customization.backtestDisplay?.footnote;

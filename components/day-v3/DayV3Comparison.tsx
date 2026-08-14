@@ -149,6 +149,15 @@ function ResultLine({ label, value }: { label: string; value: string }) {
   );
 }
 
+export type DayV3PoolEconomics = {
+  /** What Senior is sold for, as the issuer named it in the exit section. */
+  exitAssetLabel?: string;
+  seniorWeight: number;
+  stableYield: number | null;
+  swapFeeBps: number | null;
+  turnoverPerYear: number | null;
+};
+
 export function DayV3PoolCarryLines({
   breakdown,
   poolEconomics,
@@ -156,12 +165,7 @@ export function DayV3PoolCarryLines({
   total,
 }: {
   breakdown: DayV3PoolCarryBreakdown;
-  poolEconomics: {
-    seniorWeight: number;
-    stableYield: number | null;
-    swapFeeBps: number | null;
-    turnoverPerYear: number | null;
-  };
+  poolEconomics: DayV3PoolEconomics;
   source: number;
   total: number;
 }) {
@@ -182,8 +186,16 @@ export function DayV3PoolCarryLines({
         note={`${pct(poolEconomics.seniorWeight)} of pool · ${pct(source)} source APY`}
         value={signed(breakdown.seniorShareCarry)}
       />
+      {/* This line read a flat +0.00% for every design, because the quote side
+          of the pool was modeled at zero with no way to say otherwise. The
+          asset and its rate are now the issuer's own answers in Senior exit,
+          so the line names the asset it is describing. */}
       <Line
-        label="Exit asset"
+        label={
+          poolEconomics.exitAssetLabel
+            ? `Exit asset · ${poolEconomics.exitAssetLabel}`
+            : "Exit asset"
+        }
         note={`${pct(exitAssetWeight)} of pool · ${poolEconomics.stableYield === null ? "yield unresolved" : `${pct(poolEconomics.stableYield)} modeled yield`}`}
         value={signed(breakdown.exitAssetCarry)}
       />
@@ -223,12 +235,7 @@ export default function DayV3Comparison({
     targetUtilization: number;
   };
   /** The venue assumptions the pool base rests on, read off the run's config. */
-  poolEconomics: {
-    seniorWeight: number;
-    stableYield: number | null;
-    swapFeeBps: number | null;
-    turnoverPerYear: number | null;
-  };
+  poolEconomics: DayV3PoolEconomics;
   positions: DayV3PositionBreakdown[];
   source: number;
   unit: DayV3Unit;
