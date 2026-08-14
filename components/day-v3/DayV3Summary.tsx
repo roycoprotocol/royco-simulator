@@ -144,6 +144,8 @@ export default function DayV3Summary({
   const [starterFields, setStarterFields] = useState<
     Set<DayV3StarterDefaultField>
   >(() => new Set(starterDefaultFields));
+  const [suggestedCurvesConfirmed, setSuggestedCurvesConfirmed] =
+    useState(false);
   const starterScenarioActive = starterFields.size > 0;
   const markStarterFieldEdited = (field: DayV3StarterDefaultField) => {
     setStarterFields((current) => {
@@ -402,6 +404,7 @@ export default function DayV3Summary({
   const clearManualOverrides = () => {
     setManualOverrides(EMPTY_DAY_V3_OVERRIDES);
     setProtectedExitThresholdOverride(null);
+    setSuggestedCurvesConfirmed(false);
   };
 
   const resetYieldCurveOverrides = () => {
@@ -414,6 +417,7 @@ export default function DayV3Summary({
       slpYieldShareAtTargetPct: null,
       slpYieldShareAtFullPct: null,
     }));
+    setSuggestedCurvesConfirmed(false);
   };
 
   const protectionRecommendation = useMemo(
@@ -1147,6 +1151,9 @@ export default function DayV3Summary({
       : []),
     ...yieldCurveValidation.issues,
   ];
+  const yieldCurveInputsConfirmed =
+    startingCurveIssues.length === 0 &&
+    (curveOverridden || suggestedCurvesConfirmed);
   const updateYieldCurveOverride = (
     field: keyof Pick<
       DayV3Overrides,
@@ -1159,6 +1166,7 @@ export default function DayV3Summary({
     >,
     value: number,
   ) => {
+    setSuggestedCurvesConfirmed(true);
     setManualOverrides((current) => ({
       ...current,
       // A curve is one six-anchor input. On the first edit, preserve the other
@@ -1288,7 +1296,7 @@ export default function DayV3Summary({
                   ? model.scenario.juniorApy * 100
                   : null,
               status: "recommended",
-              message: `${protectionRecommendation.reason}${returnDisplayState === "updating" ? " Recalculating the return with the current pool design…" : returnDisplayState === "ready" ? (inputs.engineOverrides !== null ? " Live policy protocol fees are included in the displayed return." : " The displayed return uses the illustrative simulation starter policy; Deploy replaces it with live template terms.") : " Junior return remains unresolved until a source yield and live policy supply every return input."}`,
+              message: `${protectionRecommendation.reason}${returnDisplayState === "updating" ? " Recalculating the return with the current pool design…" : returnDisplayState === "ready" ? (inputs.engineOverrides !== null ? " Live policy protocol fees are included in the displayed return." : " The displayed return uses the illustrative Simple starter policy; Advanced replaces it with live template terms.") : " Junior return remains unresolved until a source yield and live policy supply every return input."}`,
             }
           : {
               coveragePct: null,
@@ -1339,7 +1347,7 @@ export default function DayV3Summary({
       : !exitGoalsComplete
         ? deploying
           ? "Complete protection, operating facts, both exit goals, and a deployment target to resolve a pool design."
-          : "Set the source yield, protection goal, and both exit goals to run the models. Recovery timing is optional in Simulate."
+          : "Set the source yield, protection goal, and both exit goals to run the models. Recovery timing is optional in Simple."
         : hasPoolOverride
           ? "This link contains manual pool overrides. Outcomes are withheld until the canonical service revalidates those exact fields."
           : illustrativeExitActive
@@ -1347,7 +1355,7 @@ export default function DayV3Summary({
             : activePoolDesign.status === "resolved" && !liquidityResolved
               ? (liquidityRecommendation?.reason ??
                 "The canonical pool was resolved, but its Minimum Liquidity mapping remains unresolved.")
-              : `${activePoolDesign.message}${illustrativeExitActive ? " Illustrative starter values remain visible below; they are excluded from the deployment handoff until the live template validates them." : ""}${canonicalOutcomes ? (canonicalOutcomes.restockEconomicFromSoldPct === null ? " The immediate pool quote is resolved; restock remains outside Simulate until conversion time and cost are supplied in Deploy." : " Restock economics use the issuer-supplied conversion assumptions and remain a scenario, not a guarantee.") : ""}`,
+              : `${activePoolDesign.message}${illustrativeExitActive ? " Illustrative starter values remain visible below; they are excluded from the deployment handoff until the live template validates them." : ""}${canonicalOutcomes ? (canonicalOutcomes.restockEconomicFromSoldPct === null ? " The immediate pool quote is resolved; restock remains outside Simple until conversion time and cost are supplied in Advanced." : " Restock economics use the issuer-supplied conversion assumptions and remain a scenario, not a guarantee.") : ""}`,
     sellablePer100: exitDisabled
       ? 0
       : (canonicalOutcomes?.amountSellablePer100Senior ??
@@ -1483,7 +1491,7 @@ export default function DayV3Summary({
                   ? "The capital, exit, and return outcomes below use the selected template's refreshed fee and canonical E-CLP policy."
                   : outcomeBasis === "direct"
                     ? "Junior protection and the immediate SLP exit are both off; Senior holds the modeled source directly."
-                    : "These outcomes use the disclosed V3 simulation policy. Deploy replaces the pool and fee fields with live validated policy before handoff.",
+                    : "These outcomes use the disclosed V3 Simple policy. Advanced replaces the pool and fee fields with live validated policy before handoff.",
     }),
     [
       displayedReturnState,
@@ -1597,7 +1605,9 @@ export default function DayV3Summary({
           y100Pct: resolved.liqY100 * 100,
         },
       }}
-      yieldCurvePolicyResolved={deploymentYieldTarget !== null}
+      yieldCurvePolicyResolved={
+        deploymentYieldTarget !== null && yieldCurveInputsConfirmed
+      }
     />
   );
   const premiumCurveEditor =
@@ -1622,6 +1632,7 @@ export default function DayV3Summary({
         updateYieldCurveOverride("slpYieldShareAtTargetPct", value)
       }
       onResetCurve={resetYieldCurveOverrides}
+      onConfirmSuggestedCurve={() => setSuggestedCurvesConfirmed(true)}
       onRiskY0Pct={(value) =>
         updateYieldCurveOverride("jrYieldShareAtZeroPct", value)
       }
@@ -1640,9 +1651,9 @@ export default function DayV3Summary({
         (exitView.status === "recommended" || exitView.status === "disabled")
       }
       starterDefaultsLoaded={
-        startingCurveIssues.length === 0 &&
-        inputs.policyBasis === "illustrative"
+        startingCurveIssues.length === 0 && !curveOverridden
       }
+      suggestedCurveConfirmed={suggestedCurvesConfirmed}
       slpModeledApy={scenario.liquidityApy}
       slpEnabled={!exitDisabled}
       seniorShareOfCapital={
@@ -1707,6 +1718,20 @@ export default function DayV3Summary({
   const deploymentSetupReadiness = dayV3InputReadiness(
     deploymentSetupRequirements,
   );
+  const deploymentSetupHasAnswers = deploymentSetupRequirements.every(
+    (requirement) =>
+      requirement.id === "target"
+        ? deploymentTarget !== null
+        : requirement.id === "settlement"
+          ? entryPointSettlementDays !== null
+          : requirement.id === "conversion-days"
+            ? collateralToExitDays !== null
+            : requirement.id === "conversion-cost"
+              ? collateralToExitCostBps !== null
+              : requirement.id === "grace"
+                ? fixedTermGraceDays !== null
+                : navUpdateDays !== null,
+  );
   const requestPolicyReadiness = dayV3InputReadiness([
     {
       id: "deposit-delay",
@@ -1739,8 +1764,16 @@ export default function DayV3Summary({
         ]
       : []),
   ]);
+  const requestPolicyHasAnswers =
+    depositDelaySeconds !== null &&
+    depositExpirySeconds !== null &&
+    withdrawalExpirySeconds !== null &&
+    gateByOracleUpdate !== null &&
+    (exitDisabled || maxReinvestmentSlippageBps !== null);
   const deploymentStructureComplete =
     protectedDrawdownPct !== null && immediateExitSharePct !== null;
+  const deploymentStructureNeedsReview =
+    starterFields.has("drawdown") || starterFields.has("exit-amount");
   const deploymentProtectionComplete =
     protectedDrawdownPct !== null &&
     recoveryDaysInput !== null &&
@@ -1757,7 +1790,7 @@ export default function DayV3Summary({
     exitInputReadiness.complete &&
     !starterFields.has("exit-amount") &&
     !starterFields.has("payout");
-  const deploymentCurveComplete = startingCurveIssues.length === 0;
+  const deploymentCurveComplete = yieldCurveInputsConfirmed;
   const deploymentProtectedExitComplete =
     protectionDisabled || protectedExitView.status === "scenario-ready";
   const simulationSourceComplete = sourceApyPct !== null;
@@ -1769,26 +1802,69 @@ export default function DayV3Summary({
     exitView.status === "recommended" ||
     exitView.status === "illustrative" ||
     exitView.status === "disabled";
-  const activeSectionCompletion = deploying
+  type ActiveSectionState = "confirmed" | "review" | "missing";
+  const sectionState = (state: ActiveSectionState) => state;
+  const activeSectionStates: ActiveSectionState[] = deploying
     ? [
-        sourceReadiness.complete,
-        deploymentStructureComplete,
-        deploymentSetupReadiness.complete,
-        requestPolicyReadiness.complete,
-        ...(!protectionDisabled ? [deploymentProtectionComplete] : []),
-        ...(!exitDisabled ? [deploymentExitComplete] : []),
-        ...(!protectionDisabled || !exitDisabled
-          ? [deploymentCurveComplete]
+        sourceReadiness.complete
+          ? starterFields.has("source")
+            ? "review"
+            : "confirmed"
+          : "missing",
+        deploymentStructureComplete
+          ? deploymentStructureNeedsReview
+            ? "review"
+            : "confirmed"
+          : "missing",
+        deploymentSetupReadiness.complete
+          ? "confirmed"
+          : deploymentSetupHasAnswers
+            ? "review"
+            : "missing",
+        requestPolicyReadiness.complete
+          ? "confirmed"
+          : requestPolicyHasAnswers
+            ? "review"
+            : "missing",
+        ...(!protectionDisabled
+          ? [sectionState(deploymentProtectionComplete ? "confirmed" : protectedDrawdownPct !== null ? "review" : "missing")]
           : []),
-        ...(protectionDisabled ? [] : [deploymentProtectedExitComplete]),
+        ...(!exitDisabled
+          ? [sectionState(deploymentExitComplete ? "confirmed" : exitInputReadiness.complete ? "review" : "missing")]
+          : []),
+        ...(!protectionDisabled || !exitDisabled
+          ? [sectionState(deploymentCurveComplete ? "confirmed" : startingCurveIssues.length === 0 ? "review" : "missing")]
+          : []),
+        ...(protectionDisabled
+          ? []
+          : [sectionState(deploymentProtectedExitComplete ? "confirmed" : "missing")]),
       ]
     : [
-        simulationSourceComplete,
-        simulationProtectionComplete,
-        simulationExitComplete,
+        simulationSourceComplete
+          ? starterFields.has("source")
+            ? "review"
+            : "confirmed"
+          : "missing",
+        simulationProtectionComplete
+          ? starterFields.has("drawdown") || starterFields.has("recovery")
+            ? "review"
+            : "confirmed"
+          : "missing",
+        simulationExitComplete
+          ? starterFields.has("exit-amount") || starterFields.has("payout")
+            ? "review"
+            : "confirmed"
+          : "missing",
       ];
-  const completedActiveSections =
-    activeSectionCompletion.filter(Boolean).length;
+  const confirmedSectionCount = activeSectionStates.filter(
+    (state) => state === "confirmed",
+  ).length;
+  const reviewSectionCount = activeSectionStates.filter(
+    (state) => state === "review",
+  ).length;
+  const missingSectionCount = activeSectionStates.filter(
+    (state) => state === "missing",
+  ).length;
   const inputSteps = deploying
     ? [
         {
@@ -1878,9 +1954,11 @@ export default function DayV3Summary({
         },
       ];
   const nextInputStep = inputSteps.find((step) => !step.complete) ?? null;
-  const defaultOpenInputId = starterScenarioActive
-    ? "day-v3-source-inputs"
-    : nextInputStep?.id ?? null;
+  const defaultOpenInputId = deploying
+    ? nextInputStep?.id ?? null
+    : starterScenarioActive
+      ? "day-v3-source-inputs"
+      : nextInputStep?.id ?? null;
 
   return (
     // Capped rather than full-bleed. Past about 1400px the cards stop gaining
@@ -1930,19 +2008,25 @@ export default function DayV3Summary({
 
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-[var(--border-subtle)] pt-3">
           <strong className="font-mono text-[11.5px] tabular-nums text-[var(--secondary)]">
-            {starterScenarioActive
-              ? deploying
-                ? `${completedActiveSections}/${activeSectionCompletion.length} confirmed`
-                : "Example loaded · review 3 choices"
-              : `${completedActiveSections}/${activeSectionCompletion.length} complete`}
+            {confirmedSectionCount} confirmed
           </strong>
+          {reviewSectionCount > 0 ? (
+            <span className="font-mono text-[11px] tabular-nums text-[var(--gold-emphasis)]">
+              {reviewSectionCount} review
+            </span>
+          ) : null}
+          {missingSectionCount > 0 ? (
+            <span className="font-mono text-[11px] tabular-nums text-[var(--red-emphasis)]">
+              {missingSectionCount} missing
+            </span>
+          ) : null}
           {starterScenarioActive ? (
             <Badge tone="neutral">illustrative starter</Badge>
           ) : null}
           <span aria-hidden="true" className="flex min-w-24 flex-1 gap-1.5 sm:max-w-36">
-            {activeSectionCompletion.map((complete, index) => (
+            {activeSectionStates.map((state, index) => (
               <span
-                className={`h-1.5 flex-1 rounded-full ${complete ? "bg-[var(--theme-green)]" : "bg-[var(--border-subtle)]"}`}
+                className={`h-1.5 flex-1 rounded-full ${state === "confirmed" ? "bg-[var(--theme-green)]" : state === "review" ? "bg-[var(--theme-gold)]" : "bg-[var(--border-subtle)]"}`}
                 key={index}
               />
             ))}
@@ -1970,16 +2054,31 @@ export default function DayV3Summary({
             docs="tranching"
             docsLabel="How tranching works"
             id="day-v3-source-inputs"
+            impactHref="#day-v3-return-models"
+            impactLabel="See return impact"
             index={1}
             key={deploying ? "deploy-source" : "simulate-source"}
             status={
               sourceReadiness.complete
-                ? { label: "Complete", tone: "complete" }
+                ? starterFields.has("source")
+                  ? {
+                      label: deploying ? "Review" : "Example",
+                      tone: "review",
+                    }
+                  : {
+                      label: deploying ? "Confirmed" : "Selected",
+                      tone: "complete",
+                    }
                 : {
-                    label: "Incomplete",
+                    label: "Missing",
                     tone: "incomplete",
                     missing: sourceReadiness.missing,
                   }
+            }
+            nextId={
+              deploying
+                ? "day-v3-market-structure-inputs"
+                : "day-v3-protection-inputs"
             }
             subtitle="Choose a listed source or enter a custom net yield"
             summary={`${sourceApyPct === null ? "Yield missing" : `${sourceApyPct.toFixed(1)}% net APY`} · ${customSource ? "custom source" : "listed source"}`}
@@ -2097,12 +2196,17 @@ export default function DayV3Summary({
               collapsible
               defaultOpen={false}
               id="day-v3-market-structure-inputs"
+              impactHref="#day-v3-capital-models"
+              impactLabel="See capital impact"
               index={2}
+              nextId="day-v3-deployment-setup-inputs"
               status={
                 deploymentStructureComplete
-                  ? { label: "Complete", tone: "complete" }
+                  ? deploymentStructureNeedsReview
+                    ? { label: "Review", tone: "review" }
+                    : { label: "Confirmed", tone: "complete" }
                   : {
-                      label: "Incomplete",
+                      label: "Missing",
                       tone: "incomplete",
                       missing: ["Junior choice", "SLP choice"],
                     }
@@ -2178,12 +2282,17 @@ export default function DayV3Summary({
               collapsible
               defaultOpen={false}
               id="day-v3-deployment-setup-inputs"
+              impactHref="#day-v3-exit-models"
+              impactLabel="See exit impact"
               index={3}
+              nextId="day-v3-request-policy-inputs"
               status={
                 deploymentSetupReadiness.complete
-                  ? { label: "Complete", tone: "complete" }
+                  ? { label: "Confirmed", tone: "complete" }
+                  : deploymentSetupHasAnswers
+                    ? { label: "Review", tone: "review" }
                   : {
-                      label: "Incomplete",
+                      label: "Missing",
                       tone: "incomplete",
                       missing: deploymentSetupReadiness.missing,
                     }
@@ -2259,12 +2368,23 @@ export default function DayV3Summary({
               collapsible
               defaultOpen={false}
               id="day-v3-request-policy-inputs"
+              impactHref="#day-v3-exit-models"
+              impactLabel="See execution impact"
               index={4}
+              nextId={
+                protectionDisabled
+                  ? exitDisabled
+                    ? "day-v3-premium-inputs"
+                    : "day-v3-exit-inputs"
+                  : "day-v3-protection-inputs"
+              }
               status={
                 requestPolicyReadiness.complete
-                  ? { label: "Complete", tone: "complete" }
+                  ? { label: "Confirmed", tone: "complete" }
+                  : requestPolicyHasAnswers
+                    ? { label: "Review", tone: "review" }
                   : {
-                      label: "Incomplete",
+                      label: "Missing",
                       tone: "incomplete",
                       missing: requestPolicyReadiness.missing,
                     }
@@ -2344,6 +2464,26 @@ export default function DayV3Summary({
                 setProtectedExitThresholdOverride(null);
               }
               setProtectedDrawdownPct(value);
+            }}
+            onDisableProtectedExit={() => {
+              markStarterFieldEdited("drawdown");
+              markStarterFieldEdited("recovery");
+              markStarterFieldEdited("grace");
+              setManualOverrides((current) => ({
+                ...current,
+                coveragePct: null,
+                protectedExitThresholdPct: null,
+                protectedExitBonusPct: null,
+                jrYieldShareAtZeroPct: null,
+                jrYieldShareAtTargetPct: null,
+                jrYieldShareAtFullPct: null,
+              }));
+              setProtectedDrawdownPct(0);
+              setRecoveryMode("none");
+              setRecoveryDaysInput(0);
+              setFixedTermGraceDays(0);
+              setIncentiveBudgetPer100(0);
+              setProtectedExitThresholdOverride(null);
             }}
             onExitSharePct={(value) => {
               markStarterFieldEdited("exit-amount");
@@ -2539,6 +2679,45 @@ export default function DayV3Summary({
         </div>
 
         <DayV3DesignOutcome current={designOutcome} />
+        <div className="grid grid-cols-1 border-t border-[var(--border-subtle)] sm:grid-cols-3">
+          <a
+            className="px-5 py-3 transition-colors hover:bg-[var(--card)] focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[var(--foreground)]"
+            href="#day-v3-risk-models"
+          >
+            <span className="block text-[9px] font-semibold uppercase tracking-[0.1em] text-[var(--tertiary)]">Why protection changed</span>
+            <strong className="mt-1 block text-[11.5px] leading-snug">
+              {protectionDisabled
+                ? "No Junior → Senior takes source losses directly"
+                : protectedDrawdownPct === null || protectionView.coveragePct === null
+                  ? "Choose a drawdown to size Junior"
+                  : `${protectedDrawdownPct.toFixed(1)}% drawdown → ${protectionView.coveragePct.toFixed(1)}% coverage · $${(protectionView.juniorPer100 ?? 0).toFixed(1)} Junior`}
+            </strong>
+          </a>
+          <a
+            className="border-t border-[var(--border-subtle)] px-5 py-3 transition-colors hover:bg-[var(--card)] focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[var(--foreground)] sm:border-l sm:border-t-0"
+            href="#day-v3-exit-models"
+          >
+            <span className="block text-[9px] font-semibold uppercase tracking-[0.1em] text-[var(--tertiary)]">Why exit capital changed</span>
+            <strong className="mt-1 block text-[11.5px] leading-snug">
+              {exitDisabled
+                ? "No immediate exit → no SLP capital"
+                : immediateExitSharePct === null || minimumProceedsPer100 === null
+                  ? "Complete both exit choices to size the SLP"
+                  : `$${immediateExitSharePct.toFixed(1)} exit at a $${minimumProceedsPer100.toFixed(1)} floor → ${exitView.slpPer100 === null ? "SLP pending" : `$${exitView.slpPer100.toFixed(1)} SLP`}`}
+            </strong>
+          </a>
+          <a
+            className="border-t border-[var(--border-subtle)] px-5 py-3 transition-colors hover:bg-[var(--card)] focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-[var(--foreground)] sm:border-l sm:border-t-0"
+            href="#day-v3-return-models"
+          >
+            <span className="block text-[9px] font-semibold uppercase tracking-[0.1em] text-[var(--tertiary)]">Why returns changed</span>
+            <strong className="mt-1 block text-[11.5px] leading-snug">
+              {displayedReturnState === "ready" && sourceApyPct !== null
+                ? `${sourceApyPct.toFixed(1)}% source → Sr ${pct(scenario.seniorApy)} · Jr ${protectionDisabled ? "off" : pct(scenario.juniorApy)} · SLP ${exitDisabled ? "off" : pct(scenario.liquidityApy)}`
+                : "Complete the terms above to resolve the yield split"}
+            </strong>
+          </a>
+        </div>
       </section>
 
       <section
@@ -2591,7 +2770,7 @@ export default function DayV3Summary({
                 protectionView.status === "missing-goal" &&
                 exitView.status === "missing-goal"
                   ? "Complete Senior protection and the exit promise above to size Junior and SLP capital."
-                  : `Per $100 Senior: ${protectionDisabled ? "$0 Junior" : `$${model.balances.jt.toFixed(1)} Junior`} · ${exitDisabled ? "$0 SLP" : `$${model.balances.lt.toFixed(1)} SLP`}`
+                  : `${protectedDrawdownPct === null ? "Protection pending" : `${protectedDrawdownPct.toFixed(1)}% protection`} + ${immediateExitSharePct === null ? "exit pending" : `$${immediateExitSharePct.toFixed(1)} exit`} → ${protectionDisabled ? "$0 Junior" : `$${model.balances.jt.toFixed(1)} Junior`} + ${exitDisabled ? "$0 SLP" : `$${model.balances.lt.toFixed(1)} SLP`}`
               }
               title="Capital required to open"
             >
@@ -2614,7 +2793,7 @@ export default function DayV3Summary({
                   ? "Complete Senior protection above to model who absorbs a source loss."
                   : protectionDisabled
                     ? "No Junior protection · Senior absorbs losses from the first dollar."
-                    : `Junior absorbs a ${pct(model.explainer.coverage.coverageLossLimit)} source fall before Senior loses value.`
+                    : `${protectedDrawdownPct?.toFixed(1) ?? "—"}% selected fall → Junior absorbs ${pct(model.explainer.coverage.coverageLossLimit)} before Senior loses value.`
               }
               title="Loss protection"
             >
@@ -2641,7 +2820,7 @@ export default function DayV3Summary({
                         ? "Live pool validation is unavailable · your inputs remain saved."
                         : exitView.status === "resolving"
                           ? "Checking the live pool policy and rebuilding the exit curve…"
-                          : `${exitView.sellablePer100 === null ? "Capacity pending" : `$${exitView.sellablePer100.toFixed(2)} sellable`} · ${exitView.proceeds === null ? "proceeds pending" : `$${exitView.proceeds.toFixed(2)} proceeds`} · ${exitView.slpPer100 === null ? "SLP pending" : `$${exitView.slpPer100.toFixed(2)} SLP`}`
+                          : `${immediateExitSharePct === null ? "Exit pending" : `$${immediateExitSharePct.toFixed(2)} goal`} → ${exitView.proceeds === null ? "proceeds pending" : `$${exitView.proceeds.toFixed(2)} proceeds`} → ${exitView.slpPer100 === null ? "SLP pending" : `$${exitView.slpPer100.toFixed(2)} SLP`}`
               }
               title="Senior exit and pool depth"
             >
@@ -2704,7 +2883,7 @@ export default function DayV3Summary({
                   ? "Enter the source yield above to break down how each position earns its return."
                   : displayedReturnState !== "ready"
                     ? "Complete the pool promise or restore live policy to inspect growth, composition, and premium curves."
-                    : `One-year model: Senior ${pct(scenario.seniorApy)} · Junior ${protectionDisabled ? "not funded" : pct(scenario.juniorApy)} · SLP ${exitDisabled ? "not funded" : pct(scenario.liquidityApy)}.`
+                    : `${sourceApyPct.toFixed(1)}% source → Senior ${pct(scenario.seniorApy)} · Junior ${protectionDisabled ? "not funded" : pct(scenario.juniorApy)} · SLP ${exitDisabled ? "not funded" : pct(scenario.liquidityApy)}.`
               }
               title="How the returns are produced"
             >

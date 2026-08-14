@@ -13,7 +13,7 @@ assert.match(
   simulate,
   /Design liquidity and drawdown protection around one yield source/,
 );
-assert.match(simulate, /text-\[clamp\(27px,2\.8vw,39px\)\]/);
+assert.match(simulate, /text-\[clamp\(25px,2\.5vw,35px\)\]/);
 assert.match(simulate, /Underlying yield/);
 assert.match(simulate, /First-loss buffer/);
 assert.match(simulate, /Exit liquidity/);
@@ -24,14 +24,14 @@ assert.match(simulate, /V3 derives the Junior and SLP requirements/);
 assert.match(simulate, /per \$100 Senior/);
 assert.match(simulate, /Explore how the protocol works/);
 assert.match(simulate, /aria-label="Simulation mode"/);
-assert.match(simulate, /aria-pressed="true"[^>]*>Simulate/);
-assert.match(simulate, /aria-pressed="false"[^>]*>Deploy/);
+assert.match(simulate, /aria-pressed="true"[^>]*>Simple/);
+assert.match(simulate, /aria-pressed="false"[^>]*>Advanced/);
 
 const deploy = renderToStaticMarkup(
   <DayV3Hero mode="deploy" onModeChange={ignore} />,
 );
 assert.match(deploy, /Finalize a market design/);
-assert.match(deploy, /aria-pressed="false"[^>]*>Simulate/);
-assert.match(deploy, /aria-pressed="true"[^>]*>Deploy/);
+assert.match(deploy, /aria-pressed="false"[^>]*>Simple/);
+assert.match(deploy, /aria-pressed="true"[^>]*>Advanced/);
 
 console.log("Day V3 main-branch hero presentation: PASS");

@@ -428,6 +428,7 @@ export default function DayV3Goals({
   inputOrigins = {},
   minimumProceedsPer100,
   onDrawdownPct,
+  onDisableProtectedExit,
   onExitSharePct,
   onIncentiveBudgetPer100,
   onMinimumProceedsPer100,
@@ -463,6 +464,7 @@ export default function DayV3Goals({
   }>;
   minimumProceedsPer100: MaybeNumber;
   onDrawdownPct: (value: MaybeNumber) => void;
+  onDisableProtectedExit?: () => void;
   onExitSharePct: (value: MaybeNumber) => void;
   onIncentiveBudgetPer100: (value: MaybeNumber) => void;
   onMinimumProceedsPer100: (value: MaybeNumber) => void;
@@ -514,11 +516,9 @@ export default function DayV3Goals({
   const protectionDisabled = drawdownPct === 0;
   const exitDisabled = exitSharePct === 0;
   const protectionNeedsReview =
-    deploying &&
     (inputOrigins.drawdown === "illustrative" ||
       inputOrigins.recovery === "illustrative");
   const exitNeedsReview =
-    deploying &&
     (inputOrigins.exitAmount === "illustrative" ||
       inputOrigins.payout === "illustrative");
   const exitInputReadiness = dayV3ExitInputReadiness({
@@ -540,7 +540,7 @@ export default function DayV3Goals({
   const exitStatus =
     !exitInputReadiness.complete
       ? ({
-          label: "Incomplete",
+          label: "Missing",
           tone: "incomplete",
           missing: exitInputReadiness.missing,
         } as const)
@@ -549,10 +549,10 @@ export default function DayV3Goals({
         : exit.status === "infeasible"
           ? ({ label: "Needs changes", tone: "blocked" } as const)
           : exit.status === "unresolved"
-            ? ({ label: "Answered", tone: "review" } as const)
-            : exitNeedsReview
-              ? ({ label: "Review", tone: "review" } as const)
-              : ({ label: "Complete", tone: "complete" } as const);
+            ? ({ label: deploying ? "Review" : "Selected", tone: "review" } as const)
+      : exitNeedsReview
+              ? ({ label: deploying ? "Review" : "Example", tone: "review" } as const)
+              : ({ label: deploying ? "Confirmed" : "Selected", tone: "complete" } as const);
   const protectionMissing = [
     ...(drawdownPct === null ? ["Protection choice"] : []),
     ...(!protectionDisabled && deploying && recoveryDays === null
@@ -578,19 +578,22 @@ export default function DayV3Goals({
         docs="coverage"
         docsLabel="How Junior protects Senior"
         id="day-v3-protection-inputs"
+        impactHref="#day-v3-risk-models"
+        impactLabel="See loss impact"
         index={2 + indexOffset}
         key={deploying ? "deploy-protection" : "simulate-protection"}
         status={
           protectionComplete
             ? protectionNeedsReview
-              ? { label: "Review", tone: "review" }
-              : { label: "Complete", tone: "complete" }
+              ? { label: deploying ? "Review" : "Example", tone: "review" }
+              : { label: deploying ? "Confirmed" : "Selected", tone: "complete" }
             : {
-                label: "Incomplete",
+                label: "Missing",
                 tone: "incomplete",
                 missing: protectionMissing,
               }
         }
+        nextId={showExitSection ? "day-v3-exit-inputs" : deploying ? "day-v3-premium-inputs" : undefined}
         subtitle="Choose the source loss Senior should survive and its recovery window"
         summary={
           protectionDisabled
@@ -659,7 +662,7 @@ export default function DayV3Goals({
 
             <DayV3Disclosure
               defaultOpen
-              description="Only needed for recovery analysis and deployment"
+              description="Only needed for recovery analysis and Advanced setup"
               key={deploying ? "deploy-recovery" : "simulate-recovery"}
               summary={
                 recoveryMode === "none"
@@ -837,9 +840,12 @@ export default function DayV3Goals({
         docs="liquidity"
         docsLabel="How Senior exits"
         id="day-v3-exit-inputs"
+        impactHref="#day-v3-exit-models"
+        impactLabel="See exit impact"
         index={3 + indexOffset}
         key={deploying ? "deploy-exit" : "simulate-exit"}
         status={exitStatus}
+        nextId={deploying ? "day-v3-premium-inputs" : undefined}
         subtitle="Choose how much Senior can sell immediately and the minimum payout"
         summary={
           exitDisabled
@@ -1107,7 +1113,7 @@ export default function DayV3Goals({
                     exit.restockPoint === null
                       ? deploying
                         ? "Unresolved"
-                        : "Deploy-only"
+                        : "Advanced only"
                       : `${fixed(exit.restockPoint)}%`
                   }
                 />
@@ -1207,12 +1213,14 @@ export default function DayV3Goals({
           docs="protectedExit"
           docsLabel="Protected Exit"
           id="day-v3-protected-exit-inputs"
+          impactHref="#day-v3-risk-models"
+          impactLabel="See protection impact"
           index={5 + indexOffset}
           status={
             protectedExit.status === "scenario-ready"
-              ? { label: "Complete", tone: "complete" }
+              ? { label: "Confirmed", tone: "complete" }
               : {
-                  label: "Incomplete",
+                  label: "Missing",
                   tone: "incomplete",
                   missing: ["Protected Exit trigger"],
                 }
@@ -1222,6 +1230,27 @@ export default function DayV3Goals({
           title="Protected Exit"
         >
           <div className="flex flex-col gap-4">
+            <div className="flex flex-col gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--foundation)] p-3.5">
+              <div>
+                <h4 className="text-[12.5px] font-semibold leading-tight">
+                  Should this protected market include Protected Exit?
+                </h4>
+                <p className="mt-1 text-[10.5px] leading-relaxed text-[var(--tertiary)]">
+                  Protected Exit is part of a Junior-protected deployment. Turning it off also removes Junior protection so the exported contract terms remain valid.
+                </p>
+              </div>
+              <DayV3SegmentedControl
+                ariaLabel="Protected Exit configuration"
+                onValueChange={(value) => {
+                  if (value === "off") onDisableProtectedExit?.();
+                }}
+                options={[
+                  { label: "Configure Protected Exit", value: "on" },
+                  { label: "No Protected Exit or Junior", value: "off" },
+                ]}
+                value="on"
+              />
+            </div>
             <p className="text-[11.5px] leading-relaxed text-[var(--secondary)]">
               Every deployment needs a trigger that defines when Senior may use
               Protected Exit. The bonus is optional and remains 0% when no

@@ -26,6 +26,7 @@ export type DayV3PremiumCurveEditorProps = {
   onLiqY100Pct: (value: number) => void;
   onLiqYtPct: (value: number) => void;
   onResetCurve: () => void;
+  onConfirmSuggestedCurve?: () => void;
   onRiskY0Pct: (value: number) => void;
   onRiskY100Pct: (value: number) => void;
   onRiskYtPct: (value: number) => void;
@@ -36,6 +37,7 @@ export type DayV3PremiumCurveEditorProps = {
   slpModeledApy: number;
   slpEnabled?: boolean;
   starterDefaultsLoaded?: boolean;
+  suggestedCurveConfirmed?: boolean;
   seniorShareOfCapital: number;
   sourceApy: number;
   targetUtilization: number;
@@ -223,6 +225,7 @@ function DayV3PremiumCurveEditor({
   onLiqY100Pct,
   onLiqYtPct,
   onResetCurve,
+  onConfirmSuggestedCurve,
   onRiskY0Pct,
   onRiskY100Pct,
   onRiskYtPct,
@@ -233,6 +236,7 @@ function DayV3PremiumCurveEditor({
   slpModeledApy,
   slpEnabled = true,
   starterDefaultsLoaded = false,
+  suggestedCurveConfirmed = false,
   seniorShareOfCapital,
   sourceApy,
   targetUtilization,
@@ -253,12 +257,17 @@ function DayV3PremiumCurveEditor({
       docs="yieldSplit"
       docsLabel="Yield split"
       id="day-v3-premium-inputs"
+      impactHref="#day-v3-return-models"
+      impactLabel="See return impact"
       index={index}
+      nextId={juniorEnabled ? "day-v3-protected-exit-inputs" : undefined}
       status={
         validationIssues.length === 0
-          ? { label: "Complete", tone: "complete" }
+          ? starterDefaultsLoaded && !suggestedCurveConfirmed
+            ? { label: "Review", tone: "review" }
+            : { label: "Confirmed", tone: "complete" }
           : {
-              label: "Incomplete",
+              label: "Missing",
               tone: "incomplete",
               missing: [`Valid ${activeCurveLabels.join(" and ")} curve anchors`],
             }
@@ -291,14 +300,21 @@ function DayV3PremiumCurveEditor({
           </p>
           {startingCurveBasis ? <p>{startingCurveBasis}</p> : null}
         </div>
-        <DayV3Button
-          disabled={!curveOverridden}
-          onClick={onResetCurve}
-          size="sm"
-          variant="secondary"
-        >
-          Reset to suggested curves
-        </DayV3Button>
+        <div className="flex flex-wrap items-center gap-2">
+          {!curveOverridden && !suggestedCurveConfirmed && onConfirmSuggestedCurve ? (
+            <DayV3Button onClick={onConfirmSuggestedCurve} size="sm" variant="primary">
+              Confirm suggested curves
+            </DayV3Button>
+          ) : null}
+          <DayV3Button
+            disabled={!curveOverridden}
+            onClick={onResetCurve}
+            size="sm"
+            variant="secondary"
+          >
+            Reset to suggested curves
+          </DayV3Button>
+        </div>
       </div>
 
       {validationIssues.length > 0 ? (

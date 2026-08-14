@@ -200,7 +200,7 @@ export default function DayV3ExitModel({
               value={
                 exit.restockPoint === null
                   ? illustrative
-                    ? "Deploy-only"
+                    ? "Advanced only"
                     : "unresolved"
                   : `${exit.restockPoint.toFixed(1)}%`
               }

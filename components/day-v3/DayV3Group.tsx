@@ -4,6 +4,7 @@ import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
   useRef,
   useState,
@@ -135,6 +136,9 @@ export default function DayV3Group({
   docsLabel,
   id,
   index,
+  impactHref,
+  impactLabel = "See impact",
+  nextId,
   status,
   subtitle,
   summary,
@@ -150,6 +154,10 @@ export default function DayV3Group({
   docsLabel?: string;
   id?: string;
   index: number;
+  impactHref?: string;
+  impactLabel?: string;
+  /** When a user finishes this section, continue to the next decision. */
+  nextId?: string;
   status?: DayV3GroupStatus;
   subtitle: string;
   summary?: React.ReactNode;
@@ -163,6 +171,7 @@ export default function DayV3Group({
   const contentId = `${groupId}-content`;
   const accordion = useContext(DayV3GroupAccordionContext);
   const groupRef = useRef<HTMLElement>(null);
+  const previousTone = useRef(status?.tone);
   const [localOpen, setLocalOpen] = useState(defaultOpen);
   const open = accordion ? accordion.openId === groupId : localOpen;
   const toggleOpen = () => {
@@ -178,6 +187,22 @@ export default function DayV3Group({
   };
 
   const missingCount = status?.missing?.length ?? 0;
+  useEffect(() => {
+    const wasOpenDecision =
+      previousTone.current === "incomplete" ||
+      previousTone.current === "review";
+    const isFinished = status?.tone === "complete";
+    previousTone.current = status?.tone;
+    if (
+      accordion &&
+      accordion.openId === groupId &&
+      nextId &&
+      wasOpenDecision &&
+      isFinished
+    ) {
+      accordion.open(nextId, { focus: true });
+    }
+  }, [accordion, groupId, nextId, status?.tone]);
   const heading = (
     <>
       <span
@@ -204,7 +229,7 @@ export default function DayV3Group({
           </span>
           {deployOnly ? (
             <span className="rounded-full border border-[var(--border-subtle)] px-1.5 py-px text-[9px] font-semibold uppercase tracking-[0.08em] text-[var(--tertiary)]">
-              deploy only
+              advanced only
             </span>
           ) : null}
         </span>
@@ -283,6 +308,14 @@ export default function DayV3Group({
             {heading}
           </div>
         )}
+        {impactHref ? (
+          <a
+            className="inline-flex min-h-9 shrink-0 items-center rounded-md px-2 text-[10.5px] font-semibold text-[var(--secondary)] underline decoration-dotted underline-offset-2 transition-colors hover:text-[var(--foreground)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--foreground)]"
+            href={impactHref}
+          >
+            {impactLabel} <span aria-hidden="true">↓</span>
+          </a>
+        ) : null}
       </div>
       {status?.tone === "incomplete" && missingCount > 0 && open ? (
         <p

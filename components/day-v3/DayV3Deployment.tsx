@@ -363,6 +363,10 @@ function DayV3Deployment({
   };
   const handoffReady = isDayV3HandoffReady(readinessChecks);
   const primaryCta = dayV3DeploymentCta(handoffReady);
+  const confirmedCount = handoffChecks.filter((check) => check.ready).length;
+  const reviewCount = calculationChecks.filter((check) => !check.ready).length;
+  const missingCount = issuerChecks.filter((check) => !check.ready).length;
+  const firstMissing = issuerChecks.find((check) => !check.ready);
   const exportedExit: DayV3ExitView =
     exit.status === "recommended"
       ? exit
@@ -554,10 +558,8 @@ function DayV3Deployment({
                   : "draft · incomplete"}
               </Badge>
             </span>
-            <span className="text-[11px] leading-snug text-[var(--secondary)]">
-              {handoffChecks.filter((check) => check.ready).length}/
-              {handoffChecks.length} fields resolved · normalized to $100 Senior
-              · open for goals, mappings, and readiness
+            <span className="text-[10.5px] leading-snug text-[var(--secondary)]">
+              {confirmedCount} confirmed · {reviewCount} review · {missingCount} missing · normalized to $100 Senior
             </span>
           </span>
           <span
@@ -578,14 +580,27 @@ function DayV3Deployment({
             </svg>
           </span>
         </button>
-        <a
-          className={dayV3ButtonVariants({ size: "md", variant: "primary" })}
-          href={DEPLOY_URL}
-          rel="noreferrer"
-          target="_blank"
-        >
-          Open Royco Deploy <span aria-hidden="true">↗</span>
-        </a>
+        <nav aria-label="Deployment readiness counts" className="flex shrink-0 items-center gap-1.5">
+          <a className="rounded-full border border-[var(--border-subtle)] px-2 py-1 font-mono text-[9.5px] font-semibold underline decoration-dotted underline-offset-2" href="#day-v3-readiness-heading">{confirmedCount} confirmed</a>
+          <a className="rounded-full border border-[var(--border-subtle)] px-2 py-1 font-mono text-[9.5px] font-semibold text-[var(--gold-emphasis)] underline decoration-dotted underline-offset-2" href="#day-v3-readiness-heading">{reviewCount} review</a>
+          <a className="rounded-full border border-[var(--border-subtle)] px-2 py-1 font-mono text-[9.5px] font-semibold text-[var(--red-emphasis)] underline decoration-dotted underline-offset-2" href={firstMissing ? hrefFor(firstMissing.label) : "#day-v3-readiness-heading"}>{missingCount} missing</a>
+        </nav>
+        {handoffReady ? (
+          <DayV3Button onClick={openDeployment} size="md" variant="primary">
+            Open Royco Deploy <span aria-hidden="true">↗</span>
+          </DayV3Button>
+        ) : (
+          <span
+            aria-disabled="true"
+            className={cn(
+              dayV3ButtonVariants({ size: "md", variant: "secondary" }),
+              "cursor-not-allowed opacity-55",
+            )}
+            title="Complete the missing issuer decisions before opening Royco Deploy"
+          >
+            Complete setup to deploy
+          </span>
+        )}
       </div>
 
       <div
@@ -717,8 +732,7 @@ function DayV3Deployment({
                 V3 handoff readiness
               </h3>
               <Badge tone={handoffReady ? "liquidity" : "caution"}>
-                {handoffChecks.filter((check) => check.ready).length}/
-                {handoffChecks.length} handoff fields resolved
+                {confirmedCount} confirmed · {reviewCount} review · {missingCount} missing
               </Badge>
             </div>
             <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-3">

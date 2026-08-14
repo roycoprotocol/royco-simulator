@@ -252,7 +252,7 @@ assert.match(
   goalsMarkup,
   /\$10\.0 immediate exit → \$12\.4 SLP · \$9\.6 proceeds · \$95\.0 floor/,
 );
-assert.match(goalsMarkup, /Section status: Complete/);
+assert.match(goalsMarkup, /Section status: Confirmed/);
 assert.doesNotMatch(
   goalsMarkup,
   /Missing: Protected Exit trigger/,
@@ -260,7 +260,8 @@ assert.doesNotMatch(
 );
 assert.match(goalsMarkup, /aria-label="Required"/);
 assert.match(goalsMarkup, /Trigger missing · 0\.0% bonus/);
-assert.match(goalsMarkup, /Section status: Incomplete/);
+assert.match(goalsMarkup, /Section status: Missing/);
+assert.match(goalsMarkup, /No Protected Exit or Junior/);
 assert.match(goalsMarkup, />3A</);
 assert.match(goalsMarkup, /Size the exit pool/);
 assert.match(goalsMarkup, />3B</);
@@ -363,8 +364,8 @@ const unavailableMarkup = renderToStaticMarkup(
     }}
   />,
 );
-assert.match(unavailableMarkup, /Section status: Answered/);
-assert.match(unavailableMarkup, /data-section-status="review">Answered/);
+assert.match(unavailableMarkup, /Section status: Review/);
+assert.match(unavailableMarkup, /data-section-status="review">Review/);
 assert.match(unavailableMarkup, /live validation unavailable/);
 assert.match(unavailableMarkup, /Retry live validation/);
 

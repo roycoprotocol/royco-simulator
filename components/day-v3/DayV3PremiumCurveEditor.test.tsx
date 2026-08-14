@@ -17,6 +17,7 @@ const markup = renderToStaticMarkup(
     onLiqY0Pct={ignore}
     onLiqY100Pct={ignore}
     onLiqYtPct={ignore}
+    onConfirmSuggestedCurve={ignore}
     onResetCurve={ignore}
     onRiskY0Pct={ignore}
     onRiskY100Pct={ignore}
@@ -35,7 +36,8 @@ const markup = renderToStaticMarkup(
 assert.match(markup, /Yield split/);
 assert.match(markup, /aria-expanded="false"/);
 assert.match(markup, /Custom curves · Jr 13\.0% · SLP 5\.0% at 90\.0%/);
-assert.match(markup, /Section status: Complete/);
+assert.match(markup, /Section status: Confirmed/);
+assert.match(markup, /See return impact/);
 assert.match(markup, /Junior premium curve/);
 assert.match(markup, /SLP premium curve/);
 assert.match(markup, /Curve shape anchors/);
@@ -94,13 +96,14 @@ assert.match(invalidMarkup, /anchors to total 100% or less/);
 assert.match(invalidMarkup, /hard caps are configured separately/);
 assert.match(invalidMarkup, /Waiting for the exit-pool result/);
 assert.match(invalidMarkup, /SLP pending/);
-assert.match(invalidMarkup, /Section status: Incomplete/);
+assert.match(invalidMarkup, /Section status: Missing/);
 
 const starterMarkup = renderToStaticMarkup(
   <DayV3PremiumCurveEditor
     curveOverridden={false}
     ready={false}
     starterDefaultsLoaded
+    onConfirmSuggestedCurve={ignore}
     liqCapPct={73}
     liqY0Pct={4}
     liqY100Pct={42.5}
@@ -129,7 +132,8 @@ assert.match(
   starterMarkup,
   /Suggested curves · Jr 27\.0% · SLP 20\.0% at 90\.0%/,
 );
-assert.match(starterMarkup, /Section status: Complete/);
+assert.match(starterMarkup, /Section status: Review/);
+assert.match(starterMarkup, /Confirm suggested curves/);
 assert.match(starterMarkup, /Your six YDM anchors are complete/);
 assert.match(starterMarkup, /Live pool validation is handled separately/);
 assert.doesNotMatch(starterMarkup, /SLP pending/);
