@@ -1,6 +1,8 @@
 "use client";
 
-import DayV3Button from "@/components/day-v3/DayV3Button";
+import DayV3Button, {
+  dayV3ButtonVariants,
+} from "@/components/day-v3/DayV3Button";
 import DayV3Group from "@/components/day-v3/DayV3Group";
 import DayV3NumberField from "@/components/day-v3/DayV3NumberField";
 import DayV3Origin, {
@@ -135,57 +137,40 @@ const dollars = (value: MaybeNumber, digits = 1) =>
   value === null ? "—" : `$${value.toFixed(digits)}`;
 
 export default function DayV3Goals({
-  conversionCostBps,
-  conversionDays,
   drawdownPct,
-  entryPointSettlementDays,
   exit,
   exitSharePct,
   indexOffset = 0,
   inputOrigins = {},
   minimumProceedsPer100,
   onDrawdownPct,
-  onConversionCostBps,
-  onConversionDays,
-  onEntryPointSettlementDays,
   onExitSharePct,
   onMinimumProceedsPer100,
   onRecoveryDays,
   onRecoveryMode,
   onResetExit,
   onResetProtection,
-  onRetryPoolDesign,
   protection,
   recoveryDays,
   recoveryMode,
 }: {
-  conversionCostBps: MaybeNumber;
-  conversionDays: MaybeNumber;
   drawdownPct: MaybeNumber;
-  entryPointSettlementDays: MaybeNumber;
   exit: DayV3ExitView;
   exitSharePct: MaybeNumber;
   indexOffset?: number;
   inputOrigins?: Partial<{
     drawdown: DayV3VisibleOrigin;
-    conversionCost: DayV3VisibleOrigin;
-    conversionDays: DayV3VisibleOrigin;
-    settlement: DayV3VisibleOrigin;
     exitAmount: DayV3VisibleOrigin;
     payout: DayV3VisibleOrigin;
   }>;
   minimumProceedsPer100: MaybeNumber;
   onDrawdownPct: (value: MaybeNumber) => void;
-  onConversionCostBps: (value: MaybeNumber) => void;
-  onConversionDays: (value: MaybeNumber) => void;
-  onEntryPointSettlementDays: (value: MaybeNumber) => void;
   onExitSharePct: (value: MaybeNumber) => void;
   onMinimumProceedsPer100: (value: MaybeNumber) => void;
   onRecoveryDays: (value: MaybeNumber) => void;
   onRecoveryMode: (value: "none" | "window") => void;
   onResetExit: () => void;
   onResetProtection: () => void;
-  onRetryPoolDesign?: () => void;
   protection: DayV3ProtectionView;
   recoveryDays: MaybeNumber;
   recoveryMode: "none" | "window" | null;
@@ -205,31 +190,15 @@ export default function DayV3Goals({
     exitSharePct,
     minimumProceedsPer100,
   });
-  const missingExitEconomics = [
-    ...(entryPointSettlementDays === null ? ["redemption wait"] : []),
-    ...(conversionDays === null ? ["conversion time"] : []),
-    ...(conversionCostBps === null ? ["stressed conversion cost"] : []),
-  ];
-  const exitEconomicsComplete =
-    exitDisabled || missingExitEconomics.length === 0;
-  const exitStatus = !exitInputReadiness.complete || !exitEconomicsComplete
+  const exitStatus = !exitInputReadiness.complete
     ? ({
         label: "Missing",
         tone: "incomplete",
-        missing: [
-          ...exitInputReadiness.missing,
-          ...missingExitEconomics.map((label) =>
-            label.replace(/^./, (character) => character.toUpperCase()),
-          ),
-        ] as string[],
+        missing: exitInputReadiness.missing,
       } as const)
-    : exit.status === "resolving"
-      ? ({ label: "Checking", tone: "checking" } as const)
-      : exit.status === "infeasible"
-        ? ({ label: "Needs changes", tone: "blocked" } as const)
-        : exit.status === "unresolved"
-          ? ({ label: "Review", tone: "review" } as const)
-          : ({ label: "Set", tone: "complete" } as const);
+    : exit.status === "infeasible"
+      ? ({ label: "Needs changes", tone: "blocked" } as const)
+      : ({ label: "Set", tone: "complete" } as const);
 
   return (
     <>
@@ -462,7 +431,7 @@ export default function DayV3Goals({
                   : `${dollars(exitSharePct)} immediate exit`
               } → ${
                 exit.slpPer100 === null
-                  ? "SLP pending"
+                  ? "SLP basis unavailable"
                   : `${dollars(exit.slpPer100)} SLP`
               }${
                 exit.proceeds === null
@@ -478,7 +447,7 @@ export default function DayV3Goals({
                   : exit.status === "infeasible"
                     ? " · no feasible pool"
                     : exit.status === "unresolved"
-                      ? " · validation unavailable"
+                      ? " · exact sizing unavailable"
                       : ""
               }`
         }
@@ -560,103 +529,6 @@ export default function DayV3Goals({
           </div>
         ) : null}
 
-        {!exitDisabled ? (
-          <details
-            className="group rounded-xl border border-[var(--border-subtle)] bg-[var(--foundation)] p-3.5"
-            open={missingExitEconomics.length > 0}
-          >
-            <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-[var(--foreground)]">
-              <span className="min-w-0">
-                <strong className="block text-[12.5px] font-semibold leading-tight">
-                  Refill feasibility assumptions
-                </strong>
-                <span className="mt-1 block text-[10.5px] leading-relaxed text-[var(--tertiary)]">
-                  {missingExitEconomics.length > 0
-                    ? `Required for the exact exit recommendation · missing: ${missingExitEconomics.join(", ")}`
-                    : `${entryPointSettlementDays}-day redemption · ${conversionDays === 0 ? "same-day conversion" : `${conversionDays}-day conversion`} · ${conversionCostBps === null ? "conversion cost pending" : `${dollars(conversionCostBps / 100)} stressed cost`}`}
-                </span>
-              </span>
-              <span className="shrink-0 text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--tertiary)] group-open:hidden">
-                {missingExitEconomics.length > 0 ? "Complete" : "Review"}
-              </span>
-              <span className="hidden shrink-0 text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--tertiary)] group-open:inline">
-                Close
-              </span>
-            </summary>
-            <div className="mt-3 flex flex-col gap-3 border-t border-[var(--border-subtle)] pt-3">
-              <p className="max-w-[82ch] text-[10.5px] leading-relaxed text-[var(--secondary)]">
-                These values do not reshape the E-CLP directly. The canonical
-                exit recommendation uses them to check whether an arbitrageur
-                could buy discounted Senior, wait for redemption and any
-                conversion, then refill the SLP after covering time and costs.
-              </p>
-              <div className="grid grid-cols-1 items-start gap-3 lg:grid-cols-3">
-                <DayV3NumberField
-                  label="Senior redemption wait"
-                  max={194}
-                  min={1}
-                  note="A longer wait increases the arbitrageur's cost of capital, so refilling needs a deeper discount."
-                  onChange={onEntryPointSettlementDays}
-                  origin={inputOrigin(inputOrigins.settlement)}
-                  placeholder="Enter days"
-                  presets={[
-                    { label: "1 day", value: 1 },
-                    { label: "7 days", value: 7 },
-                    { label: "30 days", value: 30 },
-                    { label: "90 days", value: 90 },
-                  ]}
-                  suffix="days"
-                  value={entryPointSettlementDays}
-                  wholeNumber
-                  required
-                />
-                <DayV3NumberField
-                  label="Underlying-to-exit conversion time"
-                  max={365}
-                  min={0}
-                  note="Use zero when the redeemed underlying asset is already the SLP's exit asset; otherwise this adds to the refill wait."
-                  onChange={onConversionDays}
-                  origin={inputOrigin(inputOrigins.conversionDays)}
-                  placeholder="Enter days"
-                  presets={[
-                    { label: "Same day", value: 0 },
-                    { label: "1 day", value: 1 },
-                    { label: "7 days", value: 7 },
-                  ]}
-                  suffix="days"
-                  value={conversionDays}
-                  wholeNumber
-                  required
-                />
-                <DayV3NumberField
-                  label="Stressed conversion cost per $100"
-                  max={99.99}
-                  min={0}
-                  note="Use a conservative estimate for the external underlying-to-exit conversion. A higher cost requires a deeper refill discount; exclude the SLP swap fee, which is modeled separately."
-                  onChange={(value) =>
-                    onConversionCostBps(value === null ? null : value * 100)
-                  }
-                  origin={inputOrigin(inputOrigins.conversionCost)}
-                  placeholder="Enter cost"
-                  prefix="$"
-                  presets={[
-                    { label: "No cost", value: 0 },
-                    { label: "$0.25", value: 0.25 },
-                    { label: "$0.50", value: 0.5 },
-                    { label: "$1.00", value: 1 },
-                  ]}
-                  step={0.05}
-                  suffix="per $100"
-                  value={
-                    conversionCostBps === null ? null : conversionCostBps / 100
-                  }
-                  required
-                />
-              </div>
-            </div>
-          </details>
-        ) : null}
-
         {exitDisabled ? (
           <p className="rounded-xl border border-dashed border-[var(--border-subtle)] px-4 py-3 text-[10.5px] leading-relaxed text-[var(--secondary)]">
             Immediate exit is off, so this design requires no SLP funding.
@@ -689,16 +561,23 @@ export default function DayV3Goals({
             />
           </div>
         ) : exit.status === "resolving" ? (
-          <p
-            aria-live="polite"
-            className="rounded-xl border border-dashed border-[var(--border-subtle)] px-4 py-3 text-[10.5px] leading-relaxed text-[var(--secondary)]"
-            role="status"
-          >
-            Checking the selected exit against the market terms…
-          </p>
+          <div className="grid grid-cols-2 gap-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--card)] px-4 py-4">
+            <ResultTile
+              label="Illustrative SLP"
+              note="per $100 Senior"
+              origin="illustrative"
+              value={dollars(exit.slpPer100)}
+            />
+            <ResultTile
+              label="Illustrative liquidity"
+              note="used for scenario APY"
+              origin="illustrative"
+              value={`${fixed(exit.minimumLiquidityPct, 2)}%`}
+            />
+          </div>
         ) : exit.status === "missing-goal" ? (
           <p className="rounded-xl border border-dashed border-[var(--border-subtle)] px-4 py-3 text-[10.5px] leading-relaxed text-[var(--secondary)]">
-            Complete the exit amount, payout, and refill assumptions above to see the pool result.
+            Choose the exit amount and payout above to check the exact pool result.
           </p>
         ) : null}
 
@@ -710,22 +589,26 @@ export default function DayV3Goals({
             These inputs do not produce a viable immediate exit. Reduce the
             exit size, lower the payout floor, or turn off the immediate exit.
           </p>
-        ) : exit.status === "unresolved" && onRetryPoolDesign ? (
+        ) : exit.status === "unresolved" ? (
           <div
             aria-live="polite"
             className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-dashed border-[var(--border-subtle)] px-3 py-2.5"
           >
             <span className="text-[10.5px] leading-relaxed text-[var(--secondary)]">
-              Your inputs are saved. Retry validation when the pool service is
-              available.
+              Exact E-CLP sizing is unavailable here. Scenario APYs continue
+              using the disclosed illustrative SLP basis.
             </span>
-            <DayV3Button
-              onClick={onRetryPoolDesign}
-              size="sm"
-              variant="secondary"
+            <a
+              className={dayV3ButtonVariants({
+                size: "sm",
+                variant: "secondary",
+              })}
+              href="https://www.royco.org/deploy-market"
+              rel="noreferrer"
+              target="_blank"
             >
-              Retry validation
-            </DayV3Button>
+              Finalize in Royco Deploy
+            </a>
           </div>
         ) : null}
       </DayV3Group>

@@ -19,6 +19,8 @@ const markup = renderToStaticMarkup(
     riskY0Pct={2}
     riskY100Pct={16}
     riskYtPct={13}
+    slpCapitalPer100={11.1}
+    slpMinimumLiquidityPct={10}
     slpModeledApy={0.024}
     targetUtilization={0.9}
   />,
@@ -35,6 +37,9 @@ assert.match(markup, /Jr share at 90% utilization/);
 assert.match(markup, /SLP share at 90% utilization/);
 assert.match(markup, /Projected Jr APY/);
 assert.match(markup, /Projected SLP APY/);
+assert.match(markup, /SLP APY basis:/);
+assert.match(markup, /10\.0% illustrative Minimum Liquidity/);
+assert.match(markup, /\$11\.1 SLP per \$100 Senior/);
 assert.match(markup, /8\.5%/);
 assert.match(markup, /2\.4%/);
 assert.match(markup, /Updates from the shared accountant/);
@@ -71,6 +76,8 @@ const invalidMarkup = renderToStaticMarkup(
     riskY0Pct={2}
     riskY100Pct={16}
     riskYtPct={13}
+    slpCapitalPer100={11.1}
+    slpMinimumLiquidityPct={10}
     slpModeledApy={0.024}
     targetUtilization={0.9}
     validationIssues={["Junior and SLP target shares must total 100% or less."]}
@@ -96,6 +103,8 @@ const slpOnlyMarkup = renderToStaticMarkup(
     riskY0Pct={0}
     riskY100Pct={0}
     riskYtPct={0}
+    slpCapitalPer100={11.1}
+    slpMinimumLiquidityPct={10}
     slpModeledApy={0.024}
     targetUtilization={0.9}
   />,
@@ -120,6 +129,8 @@ const juniorOnlyMarkup = renderToStaticMarkup(
     riskY0Pct={2}
     riskY100Pct={16}
     riskYtPct={13}
+    slpCapitalPer100={0}
+    slpMinimumLiquidityPct={0}
     slpEnabled={false}
     slpModeledApy={0}
     targetUtilization={0.9}
@@ -146,6 +157,8 @@ const bothOffMarkup = renderToStaticMarkup(
     riskY0Pct={0}
     riskY100Pct={0}
     riskYtPct={0}
+    slpCapitalPer100={0}
+    slpMinimumLiquidityPct={0}
     slpEnabled={false}
     slpModeledApy={0}
     targetUtilization={0.9}
@@ -153,13 +166,13 @@ const bothOffMarkup = renderToStaticMarkup(
 );
 assert.equal(bothOffMarkup, "");
 
-const pendingSlpMarkup = renderToStaticMarkup(
+const unresolvedPoolSlpMarkup = renderToStaticMarkup(
   <DayV3PremiumCurveEditor
     curveOverridden={false}
-    liqCapPct={0}
-    liqY0Pct={0}
-    liqY100Pct={0}
-    liqYtPct={0}
+    liqCapPct={20}
+    liqY0Pct={1}
+    liqY100Pct={15}
+    liqYtPct={5}
     juniorModeledApy={0.085}
     onLiqYtPct={ignore}
     onResetCurve={ignore}
@@ -168,14 +181,16 @@ const pendingSlpMarkup = renderToStaticMarkup(
     riskY0Pct={2}
     riskY100Pct={16}
     riskYtPct={13}
-    slpModeledApy={0}
-    slpPending
+    slpCapitalPer100={11.1}
+    slpMinimumLiquidityPct={10}
+    slpModeledApy={0.024}
     targetUtilization={0.9}
   />,
 );
-assert.match(pendingSlpMarkup, /Jr 13\.0% · SLP pending/);
-assert.match(pendingSlpMarkup, /Section status: Review/);
-assert.match(pendingSlpMarkup, /SLP yield share is awaiting exit validation/);
-assert.equal(pendingSlpMarkup.match(/type="range"/g)?.length, 1);
+assert.match(unresolvedPoolSlpMarkup, /Jr 13\.0% · SLP 5\.0%/);
+assert.match(unresolvedPoolSlpMarkup, /Section status: Set/);
+assert.match(unresolvedPoolSlpMarkup, /SLP APY basis:/);
+assert.doesNotMatch(unresolvedPoolSlpMarkup, /awaiting exit validation/);
+assert.equal(unresolvedPoolSlpMarkup.match(/type="range"/g)?.length, 2);
 
 console.log("Day V3 unified premium-curve editor: PASS");

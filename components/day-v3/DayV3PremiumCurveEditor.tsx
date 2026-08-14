@@ -28,7 +28,8 @@ export type DayV3PremiumCurveEditorProps = {
   riskYtPct: number;
   slpModeledApy: number;
   slpEnabled?: boolean;
-  slpPending?: boolean;
+  slpCapitalPer100: number;
+  slpMinimumLiquidityPct: number;
   targetUtilization: number;
 };
 
@@ -143,7 +144,8 @@ function DayV3PremiumCurveEditor({
   riskYtPct,
   slpModeledApy,
   slpEnabled = true,
-  slpPending = false,
+  slpCapitalPer100,
+  slpMinimumLiquidityPct,
   targetUtilization,
 }: DayV3PremiumCurveEditorProps) {
   const [riskEditor, setRiskEditor] = useState({
@@ -202,9 +204,7 @@ function DayV3PremiumCurveEditor({
   ];
   const activeCurveSummary = [
     ...(juniorEnabled ? [`Jr ${pct(riskDraftPct / 100)}`] : []),
-    ...(slpEnabled
-      ? [slpPending ? "SLP pending" : `SLP ${pct(liqDraftPct / 100)}`]
-      : []),
+    ...(slpEnabled ? [`SLP ${pct(liqDraftPct / 100)}`] : []),
   ].join(" · ");
   return (
     <DayV3Group
@@ -218,9 +218,7 @@ function DayV3PremiumCurveEditor({
       index={index}
       status={
         validationIssues.length === 0
-          ? slpPending
-            ? { label: "Review", tone: "review" }
-            : { label: "Set", tone: "complete" }
+          ? { label: "Set", tone: "complete" }
           : {
               label: "Needs input",
               tone: "incomplete",
@@ -271,6 +269,18 @@ function DayV3PremiumCurveEditor({
         </div>
       ) : null}
 
+      {slpEnabled ? (
+        <p className="rounded-xl border border-[var(--border-subtle)] bg-[var(--foundation)] px-4 py-3 text-[10.5px] leading-relaxed text-[var(--secondary)]">
+          <strong className="font-semibold text-[var(--foreground)]">
+            SLP APY basis:
+          </strong>{" "}
+          {slpMinimumLiquidityPct.toFixed(1)}% illustrative Minimum Liquidity,
+          which funds ${slpCapitalPer100.toFixed(1)} SLP per $100 Senior at the{" "}
+          {pct(targetUtilization)} operating target. Exact E-CLP sizing is
+          finalized in Royco Deploy.
+        </p>
+      ) : null}
+
       <div
         className={`grid grid-cols-1 items-start gap-4 ${juniorEnabled && slpEnabled ? "xl:grid-cols-2" : ""}`}
       >
@@ -291,7 +301,7 @@ function DayV3PremiumCurveEditor({
             ytPct={riskDraftPct}
           />
         ) : null}
-        {slpEnabled && !slpPending ? (
+        {slpEnabled ? (
           <CurveCard
             capPct={liqCapPct}
             description="Sets the share of Senior yield paid to SLP as exit liquidity is used."
@@ -307,17 +317,6 @@ function DayV3PremiumCurveEditor({
             y100Pct={liqY100Pct}
             ytPct={liqDraftPct}
           />
-        ) : slpEnabled ? (
-          <section className="flex min-w-0 flex-col justify-center gap-2 rounded-xl border border-dashed border-[var(--border-subtle)] px-4 py-5">
-            <strong className="text-[13px] font-semibold">
-              SLP yield share is awaiting exit validation
-            </strong>
-            <p className="max-w-[60ch] text-[10.5px] leading-relaxed text-[var(--secondary)]">
-              V3 will expose the SLP share after it knows the exact pool capital
-              and fee inputs. It does not treat an unresolved pool as a 0% SLP
-              allocation.
-            </p>
-          </section>
         ) : null}
       </div>
     </DayV3Group>

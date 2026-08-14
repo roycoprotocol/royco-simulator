@@ -191,13 +191,11 @@ export default function DayV3ExitModel({
               value={dollars(exit.slpPer100, 2)}
             />
             <Outcome
-              label="Refill pays after"
-              note="% of Senior sold under the timing and conversion assumptions"
+              label="Refill point"
+              note="finalized with market operations in Royco Deploy"
               value={
                 exit.restockPoint === null
-                  ? illustrative
-                    ? "Needs market terms"
-                    : "unresolved"
+                  ? "Deploy only"
                   : `${exit.restockPoint.toFixed(1)}%`
               }
             />

@@ -157,51 +157,50 @@ assert.match(
   /Should Senior have an immediate pool exit\?/,
   "The immediate-exit choice must stay inside Senior exit",
 );
-for (const [name, marker] of [
-  ["redemption settlement time", /Senior redemption wait/],
-  [
-    "underlying conversion time",
-    /Underlying-to-exit conversion time/,
-  ],
-  ["stressed conversion cost", /Stressed conversion cost per \$100/],
+for (const marker of [
+  /Refill feasibility assumptions/,
+  /Senior redemption wait/,
+  /Underlying-to-exit conversion time/,
+  /Stressed conversion cost per \$100/,
 ]) {
-  assert.match(
+  assert.doesNotMatch(
     exitGroup,
     marker,
-    `Senior exit must retain the ${name} refill assumption`,
+    "Deployment-only refill assumptions must not block the simulator",
   );
 }
-assert.match(
-  exitGroup,
-  /<details[\s\S]*Refill feasibility assumptions[\s\S]*Senior redemption wait[\s\S]*Underlying-to-exit conversion time[\s\S]*Stressed conversion cost per \$100[\s\S]*<\/details>/,
-  "All three refill assumptions must stay collapsed and clearly labeled inside Senior exit",
-);
-assert.match(
-  exitGroup,
-  /do not reshape the E-CLP directly[\s\S]*arbitrageur[\s\S]*buy discounted Senior[\s\S]*refill the SLP/,
-  "The folded assumptions must explain that they test arbitrage refill feasibility",
-);
-assert.match(
-  exitGroup,
-  /Use zero when the redeemed underlying asset is already the SLP's exit asset[\s\S]*conservative estimate for the external underlying-to-exit conversion[\s\S]*exclude the SLP swap fee/,
-  "Conversion time and stressed cost must explain when and how to answer them",
-);
 
-// There is one exact, unconditional pool-design request for the unified flow.
+// The simulator asks only for the four issuer goals. Exact deployment facts
+// remain the responsibility of Royco Deploy and cannot gate scenario APYs.
 assert.match(
   summary,
-  /useDayV3PoolDesign\(\s*poolDesignGoals,\s*poolDesignContext,\s*true,?\s*\)/,
-  "The unified simulator must call the exact canonical pool-design service",
+  /useDayV3SimulationPoolDesign\(\s*poolDesignGoals,\s*sourceApyPct,?\s*\)/,
+  "The unified simulator must use the four-goal simulation pool-design request",
 );
 assert.doesNotMatch(
   summary,
-  /useDayV3SimulationPoolDesign|deploying\s*\?\s*poolDesignGoals|deploying\s*\?\s*poolDesignContext/,
-  "The unified simulator must not use a reduced or mode-gated E-CLP request",
+  /useDayV3PoolDesign|entryPointSettlementDays:\s*entryPointSettlementDays|collateralToExitDays:\s*collateralToExitDays|collateralToExitCostBps:\s*collateralToExitCostBps/,
+  "The simulator must not send hidden deployment-only inputs to pool sizing",
 );
 assert.match(
   summary,
-  /recoveryDays:\s*recoveryDaysInput[\s\S]*entryPointSettlementDays[\s\S]*collateralToExitDays[\s\S]*collateralToExitCostBps[\s\S]*fixedTermGraceDays:\s*0[\s\S]*navUpdateDays:\s*1/,
-  "The exact request must contain observation time and the three visible refill assumptions",
+  /recoveryDays:\s*recoveryDaysInput \?\? 0[\s\S]*immediateExitSharePct,[\s\S]*minimumProceedsPer100/,
+  "Forward pool checking must remain available before an observation mode is chosen",
+);
+assert.match(
+  summary,
+  /const liquidityPct = exitDisabled[\s\S]*defaults\.minLiquidity \* 100/,
+  "SLP APY must use the source's disclosed illustrative liquidity basis when exact sizing is unavailable",
+);
+assert.match(
+  summary,
+  /slpCapitalPer100=\{model\.balances\.lt\}[\s\S]*slpMinimumLiquidityPct=\{liquidityPct\}/,
+  "The yield-split editor must disclose the capital basis behind SLP APY",
+);
+assert.doesNotMatch(
+  `${summary}\n${editor}`,
+  /slpPending|SLP share awaits exit validation|SLP yield share is awaiting exit validation/,
+  "Unavailable exact pool validation must never suppress an SLP return",
 );
 
 // Every model family is shared because there is no mode branch around the

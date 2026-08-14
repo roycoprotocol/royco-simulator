@@ -183,26 +183,16 @@ assert.doesNotMatch(exitCostMarkup, /early exit is unavailable/);
 
 const noop = () => undefined;
 const goalsProps = {
-  conversionCostBps: 50,
-  conversionDays: 1,
   drawdownPct: 15,
-  entryPointSettlementDays: 7,
   exitSharePct: 10,
-  inputOrigins: {
-    conversionCost: "model-assumption",
-  },
   minimumProceedsPer100: 95,
-  onConversionCostBps: noop,
-  onConversionDays: noop,
   onDrawdownPct: noop,
-  onEntryPointSettlementDays: noop,
   onExitSharePct: noop,
   onMinimumProceedsPer100: noop,
   onRecoveryDays: noop,
   onRecoveryMode: noop,
   onResetExit: noop,
   onResetProtection: noop,
-  onRetryPoolDesign: noop,
   protection: {
     coveragePct: 13.5,
     juniorPer100: 17,
@@ -257,13 +247,11 @@ assert.match(goalsMarkup, /Allow recovery/);
 assert.match(goalsMarkup, /How long should a temporary loss have to recover/);
 assert.match(goalsMarkup, /Observation Period Duration/);
 assert.match(goalsMarkup, /Should Senior have an immediate pool exit/);
-assert.match(goalsMarkup, /Refill feasibility assumptions/);
-assert.match(goalsMarkup, /These values do not reshape the E-CLP directly/);
-assert.match(goalsMarkup, /Senior redemption wait/);
-assert.match(goalsMarkup, /Underlying-to-exit conversion time/);
-assert.match(goalsMarkup, /Stressed conversion cost per \$100/);
-assert.match(goalsMarkup, /<details/);
-assert.match(goalsMarkup, /Model assumption/);
+assert.doesNotMatch(goalsMarkup, /Refill feasibility assumptions/);
+assert.doesNotMatch(goalsMarkup, /Senior redemption wait/);
+assert.doesNotMatch(goalsMarkup, /Underlying-to-exit conversion time/);
+assert.doesNotMatch(goalsMarkup, /Stressed conversion cost per \$100/);
+assert.doesNotMatch(goalsMarkup, /<details/);
 assert.doesNotMatch(goalsMarkup, /solver/i);
 assert.doesNotMatch(goalsMarkup, /Recovery timing/);
 assert.doesNotMatch(goalsMarkup, /Protected Exit/);
@@ -302,22 +290,6 @@ assert.match(
   /data-section-status="incomplete">Missing/,
 );
 
-for (const missingRefillAssumption of [
-  { conversionCostBps: null },
-  { conversionDays: null },
-  { entryPointSettlementDays: null },
-] as const) {
-  const missingMarkup = renderToStaticMarkup(
-    <DayV3Goals
-      {...goalsProps}
-      {...missingRefillAssumption}
-      exit={resolved}
-    />,
-  );
-  assert.match(missingMarkup, /Section status: Missing/);
-  assert.match(missingMarkup, /data-section-status="incomplete">Missing/);
-}
-
 const checkingMarkup = renderToStaticMarkup(
   <DayV3Goals
     {...goalsProps}
@@ -328,8 +300,10 @@ const checkingMarkup = renderToStaticMarkup(
     }}
   />,
 );
-assert.match(checkingMarkup, /Section status: Checking/);
-assert.match(checkingMarkup, /data-section-status="checking">Checking/);
+assert.match(checkingMarkup, /Section status: Set/);
+assert.match(checkingMarkup, /data-section-status="complete">Set/);
+assert.match(checkingMarkup, /Illustrative SLP/);
+assert.match(checkingMarkup, /Illustrative liquidity/);
 
 const infeasibleMarkup = renderToStaticMarkup(
   <DayV3Goals
@@ -363,9 +337,11 @@ const unavailableMarkup = renderToStaticMarkup(
     }}
   />,
 );
-assert.match(unavailableMarkup, /Section status: Review/);
-assert.match(unavailableMarkup, /data-section-status="review">Review/);
-assert.match(unavailableMarkup, /validation unavailable/);
-assert.match(unavailableMarkup, /Retry validation/);
+assert.match(unavailableMarkup, /Section status: Set/);
+assert.match(unavailableMarkup, /data-section-status="complete">Set/);
+assert.match(unavailableMarkup, /exact sizing unavailable/);
+assert.match(unavailableMarkup, /Scenario APYs continue/);
+assert.match(unavailableMarkup, /Finalize in Royco Deploy/);
+assert.doesNotMatch(unavailableMarkup, /Retry validation/);
 
 console.log("Day V3 exit-model presentation: PASS");

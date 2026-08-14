@@ -33,7 +33,7 @@ import DayV3PremiumCurveEditor from "@/components/day-v3/DayV3PremiumCurveEditor
 import DayV3SegmentedControl from "@/components/day-v3/DayV3SegmentedControl";
 import DayV3Source from "@/components/day-v3/DayV3Source";
 import DayV3YieldModels from "@/components/day-v3/DayV3YieldModels";
-import { useDayV3PoolDesign } from "@/components/day-v3/useDayV3PoolDesign";
+import { useDayV3SimulationPoolDesign } from "@/components/day-v3/useDayV3SimulationPoolDesign";
 import {
   Card,
   CardContent,
@@ -65,10 +65,8 @@ import {
   dayV3ExitInputReadiness,
   dayV3InputReadiness,
 } from "@/lib/day-v3/input-readiness";
-import type {
-  DayV3Goals as DayV3PoolGoals,
-  DayV3Overrides,
-} from "@/lib/day-v3/types";
+import type { DayV3Overrides } from "@/lib/day-v3/types";
+import type { DayV3SimulationPoolDesignGoals } from "@/lib/day-v3/simulation-pool-design";
 import { buildDayYieldDraftMarket } from "@/lib/day-simulator-template/explorer-market";
 import { dayPoolSeniorWeight } from "@/lib/day-simulator-template/capital-sizing";
 import type { EclpParams } from "@/lib/day/engine/eclp";
@@ -87,6 +85,7 @@ import {
 // `runDayTargetScenario`, the same target-scenario entry point the interactive
 // simulator uses, so v2 and /day-sim can never disagree.
 const pct = (value: number) => `${(value * 100).toFixed(1)}%`;
+const dollars = (value: number) => `$${value.toFixed(1)}`;
 const DAY_TARGET_UTILIZATION = 0.9;
 const CUSTOM_SOURCE_ID = "custom";
 const CUSTOM_SOURCE_MARKET = buildDayYieldDraftMarket({
@@ -177,16 +176,6 @@ export default function DayV3Summary({
   const exitEnabled = (modeledImmediateExitSharePct ?? 0) > 0;
   const protectionDisabled = modeledProtectedDrawdownPct === 0;
   const exitDisabled = modeledImmediateExitSharePct === 0;
-  const [entryPointSettlementDays, setEntryPointSettlementDays] = useState<
-    number | null
-  >(linked?.entryPointSettlementDays ?? null);
-  const [collateralToExitDays, setCollateralToExitDays] = useState<
-    number | null
-  >(linked?.collateralToExitDays ?? null);
-  const [collateralToExitCostBps, setCollateralToExitCostBps] = useState<
-    number | null
-  >(linked?.collateralToExitCostBps ?? null);
-  const deploymentTarget = linked?.target ?? DAY_V3_STARTER_DEFAULTS.target;
   const observationDays = recoveryDaysInput ?? 0;
   const [maintainCoverage, setMaintainCoverage] = useState(false);
   // The merged simulator exposes only target yield shares. Legacy curve-shape
@@ -225,9 +214,6 @@ export default function DayV3Summary({
     setImmediateExitSharePct(null);
     setMinimumProceedsPer100(null);
     setImportedMarket(null);
-    setEntryPointSettlementDays(null);
-    setCollateralToExitDays(null);
-    setCollateralToExitCostBps(null);
     setManualOverrides(EMPTY_DAY_V3_OVERRIDES);
   };
 
@@ -252,13 +238,6 @@ export default function DayV3Summary({
       );
       setImmediateExitSharePct(DAY_V3_STARTER_DEFAULTS.immediateExitSharePct);
       setMinimumProceedsPer100(DAY_V3_STARTER_DEFAULTS.minimumProceedsPer100);
-      setEntryPointSettlementDays(
-        DAY_V3_STARTER_DEFAULTS.entryPointSettlementDays,
-      );
-      setCollateralToExitDays(DAY_V3_STARTER_DEFAULTS.collateralToExitDays);
-      setCollateralToExitCostBps(
-        DAY_V3_STARTER_DEFAULTS.collateralToExitCostBps,
-      );
     }
   };
 
@@ -290,60 +269,35 @@ export default function DayV3Summary({
         ? (protectionRecommendation.coverage.value ?? 0)
         : 0));
 
-  const poolDesignGoals = useMemo<DayV3PoolGoals | null>(() => {
+  const poolDesignGoals = useMemo<DayV3SimulationPoolDesignGoals | null>(() => {
     if (
       exitDisabled ||
       protectedDrawdownPct === null ||
-      recoveryDaysInput === null ||
       immediateExitSharePct === null ||
-      minimumProceedsPer100 === null ||
-      entryPointSettlementDays === null ||
-      collateralToExitDays === null ||
-      collateralToExitCostBps === null
+      minimumProceedsPer100 === null
     ) {
       return null;
     }
     return {
       protectedDrawdownPct,
-      recoveryDays: recoveryDaysInput,
+      // Recovery timing changes loss realization, not the forward APY. Until
+      // the issuer chooses an observation mode, the pool quote can still be
+      // checked using immediate realization without mutating the visible goal.
+      recoveryDays: recoveryDaysInput ?? 0,
       immediateExitSharePct,
       minimumProceedsPer100,
-      entryPointSettlementDays,
-      collateralToExitDays,
-      collateralToExitCostBps,
-      fixedTermGraceDays: 0,
-      navUpdateDays: 1,
-      target: deploymentTarget ?? DAY_V3_STARTER_DEFAULTS.target,
     };
   }, [
-    collateralToExitCostBps,
-    collateralToExitDays,
-    deploymentTarget,
-    entryPointSettlementDays,
     exitDisabled,
     immediateExitSharePct,
     minimumProceedsPer100,
     protectedDrawdownPct,
     recoveryDaysInput,
   ]);
-  const poolDesignContext = useMemo(
-    () =>
-      sourceApyPct === null
-        ? null
-        : {
-            sourceApyPct,
-            exitAsset: null,
-            exitAssetRateProvider: null,
-            exitAssetYieldBearing: null,
-          },
-    [sourceApyPct],
-  );
-  const poolDesign = useDayV3PoolDesign(
+  const activePoolDesign = useDayV3SimulationPoolDesign(
     poolDesignGoals,
-    poolDesignContext,
-    true,
+    sourceApyPct,
   );
-  const activePoolDesign = poolDesign.design;
   const hasPoolOverride = [
     activeManualOverrides.minimumLiquidityPct,
     activeManualOverrides.maximumDiscountPct,
@@ -421,12 +375,13 @@ export default function DayV3Summary({
         : null,
     [canonicalPoolRecommendation, coveragePct, defaults],
   );
-  // Never fill an unresolved exact pool with illustrative liquidity or fees.
+  // Scenario APYs must remain available even when the canonical pool service
+  // is offline. The selected source's explicit starting Minimum Liquidity is
+  // therefore the disclosed comparison basis. Exact E-CLP sizing remains a
+  // separate result and never silently replaces this return-model denominator.
   const liquidityPct = exitDisabled
     ? 0
-    : liquidityRecommendation?.status === "recommended"
-      ? (liquidityRecommendation.minimumLiquidity.value ?? 0)
-      : 0;
+    : defaults.minLiquidity * 100;
   const effectiveBandPct = canonicalPoolRecommendation
     ? canonicalPoolRecommendation.fields.maximumDiscountBps.value / 100
     : defaults.eclpBandWidth * 100;
@@ -795,6 +750,12 @@ export default function DayV3Summary({
     }));
   }, [scenario]);
 
+  const visibleStarterFields = [...starterFields].filter((field) =>
+    ["source", "drawdown", "recovery", "exit-amount", "payout"].includes(
+      field,
+    ),
+  );
+
   const query = buildDayV3Query({
     market: customSource ? CUSTOM_SOURCE_ID : marketId,
     mode: null,
@@ -803,9 +764,11 @@ export default function DayV3Summary({
     recoveryDays: recoveryDaysInput,
     immediateExitSharePct,
     minimumProceedsPer100,
-    entryPointSettlementDays,
-    collateralToExitDays,
-    collateralToExitCostBps,
+    // Legacy links still parse these fields, but the simulator no longer asks
+    // for deployment-only refill assumptions or writes them into new links.
+    entryPointSettlementDays: null,
+    collateralToExitDays: null,
+    collateralToExitCostBps: null,
     fixedTermGraceDays: null,
     navUpdateDays: null,
     depositDelaySeconds: null,
@@ -814,8 +777,8 @@ export default function DayV3Summary({
     gateByOracleUpdate: null,
     maxReinvestmentSlippageBps: null,
     incentiveBudgetPer100: null,
-    target: deploymentTarget,
-    starterFields: [...starterFields],
+    target: null,
+    starterFields: visibleStarterFields,
     overrides: {
       coveragePct: manualOverrides.coveragePct,
       minimumLiquidityPct: manualOverrides.minimumLiquidityPct,
@@ -944,9 +907,7 @@ export default function DayV3Summary({
       apy: scenario.liquidityApy,
       holds: !exitEnabled
         ? "No immediate exit pool is funded"
-        : canonicalEngineOverrides === null
-          ? "Exit pool awaiting validation"
-          : "The pool Sr exits into",
+        : "The pool Sr exits into",
       role: !exitEnabled
         ? "Disabled by the issuer"
         : "Supplies exit liquidity, paid a premium for it",
@@ -955,10 +916,10 @@ export default function DayV3Summary({
       risk: !exitEnabled
         ? "No one-trade exit is promised"
         : canonicalEngineOverrides === null
-          ? "Complete the Senior exit to validate SLP capital and returns"
+          ? "Uses the disclosed illustrative SLP capital basis until deployment sizing"
           : "Holds Sr shares when Sr sells",
       funded: resolved.minLiquidity > 0,
-      pending: exitEnabled && canonicalEngineOverrides === null,
+      pending: false,
     },
   ];
 
@@ -1026,6 +987,8 @@ export default function DayV3Summary({
       ? "missing-goal"
       : hasPoolOverride
         ? "unresolved"
+        : activePoolDesign.status === "resolving"
+          ? "resolving"
         : activePoolDesign.status === "infeasible"
           ? "infeasible"
           : activePoolDesign.status === "resolved" && liquidityResolved
@@ -1036,13 +999,15 @@ export default function DayV3Summary({
     message: exitDisabled
       ? "Immediate Senior exit is off. No SLP capital, pool quote, or E-CLP parameters are required for this scenario."
       : !exitGoalsComplete
-        ? "Complete the required input highlighted above to resolve the exact pool design. Forward APYs remain available in the meantime."
+        ? "Choose an exit amount and payout to check the exact pool design. Forward APYs remain available in the meantime."
         : hasPoolOverride
           ? "This link contains manual pool overrides. Outcomes are withheld until the canonical service revalidates those exact fields."
           : activePoolDesign.status === "resolved" && !liquidityResolved
             ? (liquidityRecommendation?.reason ??
               "The pool was resolved, but its Minimum Liquidity mapping is unavailable.")
-            : `${activePoolDesign.message}${canonicalOutcomes ? " Refill economics use the timing and stressed conversion cost entered above." : ""}`,
+            : activePoolDesign.status === "resolving"
+              ? "Checking exact E-CLP sizing. Scenario APYs continue on the disclosed illustrative SLP basis."
+              : "Exact E-CLP sizing is unavailable here. Scenario APYs continue on the disclosed illustrative SLP basis.",
     sellablePer100: exitDisabled
       ? 0
       : (canonicalOutcomes?.amountSellablePer100Senior ?? null),
@@ -1054,7 +1019,8 @@ export default function DayV3Summary({
       : (canonicalOutcomes?.lowestModeledPayoutPer100 ?? null),
     slpPer100: exitDisabled
       ? 0
-      : (canonicalOutcomes?.requiredPoolFundingPer100Senior ?? null),
+      : (canonicalOutcomes?.requiredPoolFundingPer100Senior ??
+        model.balances.lt),
     restockPoint: canonicalOutcomes?.restockEconomicFromSoldPct ?? null,
     restockOperationalHurdleBps:
       canonicalOutcomes?.restockOperationalHurdleBps ?? null,
@@ -1064,7 +1030,7 @@ export default function DayV3Summary({
     minimumLiquidityPct: exitDisabled
       ? 0
       : (exitOverrides?.minimumLiquidityPct ??
-        liquidityRecommendation?.minimumLiquidity.value ?? null),
+        liquidityRecommendation?.minimumLiquidity.value ?? liquidityPct),
     maximumDiscountPct:
       exitOverrides?.maximumDiscountPct ??
       (canonicalExitRecommendation
@@ -1122,7 +1088,8 @@ export default function DayV3Summary({
         })}
         slpModeledApy={scenario.liquidityApy}
         slpEnabled={exitEnabled}
-        slpPending={exitEnabled && canonicalEngineOverrides === null}
+        slpCapitalPer100={model.balances.lt}
+        slpMinimumLiquidityPct={liquidityPct}
         targetUtilization={DAY_TARGET_UTILIZATION}
         validationIssues={startingCurveIssues}
       />
@@ -1139,12 +1106,7 @@ export default function DayV3Summary({
   const advancedProtectionReady =
     advancedProtectionComplete &&
     (protectedDrawdownPct === 0 || recoveryDaysInput !== null);
-  const advancedExitComplete =
-    exitInputReadiness.complete &&
-    (exitDisabled ||
-      (entryPointSettlementDays !== null &&
-        collateralToExitDays !== null &&
-        collateralToExitCostBps !== null));
+  const advancedExitComplete = exitInputReadiness.complete;
   const simulationSourceComplete = sourceApyPct !== null;
   const simulationCurveComplete = startingCurveIssues.length === 0;
   const yieldSplitVisible = protectionEnabled || exitEnabled;
@@ -1163,8 +1125,6 @@ export default function DayV3Summary({
   const missingSectionCount = activeSectionStates.filter(
     (state) => state === "missing",
   ).length;
-  const pendingValidationCount =
-    exitEnabled && exitView.status !== "recommended" ? 1 : 0;
   const inputSteps = [
     {
       complete: simulationSourceComplete,
@@ -1231,11 +1191,6 @@ export default function DayV3Summary({
           {missingSectionCount > 0 ? (
             <span className="font-mono text-[11px] tabular-nums text-[var(--red-emphasis)]">
               {missingSectionCount} missing
-            </span>
-          ) : null}
-          {pendingValidationCount > 0 ? (
-            <span className="font-mono text-[11px] tabular-nums text-[var(--secondary)]">
-              {pendingValidationCount} awaiting validation
             </span>
           ) : null}
           <span aria-hidden="true" className="flex min-w-24 flex-1 gap-1.5 sm:max-w-36">
@@ -1349,20 +1304,11 @@ export default function DayV3Summary({
             ) : null}
           </DayV3Group>
           <DayV3Goals
-            conversionCostBps={collateralToExitCostBps}
-            conversionDays={collateralToExitDays}
             drawdownPct={protectedDrawdownPct}
-            entryPointSettlementDays={entryPointSettlementDays}
             exit={exitView}
             exitSharePct={immediateExitSharePct}
             indexOffset={1}
             inputOrigins={{
-              conversionCost: starterFields.has("conversion-cost")
-                ? "illustrative"
-                : "model-assumption",
-              conversionDays: starterFields.has("conversion-days")
-                ? "illustrative"
-                : "source-fact",
               drawdown: starterFields.has("drawdown")
                 ? "illustrative"
                 : "your-answer",
@@ -1372,19 +1318,8 @@ export default function DayV3Summary({
               payout: starterFields.has("payout")
                 ? "illustrative"
                 : "your-answer",
-              settlement: starterFields.has("settlement")
-                ? "illustrative"
-                : "your-answer",
             }}
             minimumProceedsPer100={minimumProceedsPer100}
-            onConversionCostBps={(value) => {
-              markStarterFieldEdited("conversion-cost");
-              setCollateralToExitCostBps(value);
-            }}
-            onConversionDays={(value) => {
-              markStarterFieldEdited("conversion-days");
-              setCollateralToExitDays(value);
-            }}
             onDrawdownPct={(value) => {
               markStarterFieldEdited("drawdown");
               if (value === 0) {
@@ -1394,24 +1329,10 @@ export default function DayV3Summary({
               }
               setProtectedDrawdownPct(value);
             }}
-            onEntryPointSettlementDays={(value) => {
-              markStarterFieldEdited("settlement");
-              setEntryPointSettlementDays(value);
-            }}
             onExitSharePct={(value) => {
               markStarterFieldEdited("exit-amount");
               if (value === 0) {
                 setMinimumProceedsPer100(0);
-              } else {
-                setEntryPointSettlementDays((current) =>
-                  current ?? DAY_V3_STARTER_DEFAULTS.entryPointSettlementDays,
-                );
-                setCollateralToExitDays((current) =>
-                  current ?? DAY_V3_STARTER_DEFAULTS.collateralToExitDays,
-                );
-                setCollateralToExitCostBps((current) =>
-                  current ?? DAY_V3_STARTER_DEFAULTS.collateralToExitCostBps,
-                );
               }
               setImmediateExitSharePct(value);
             }}
@@ -1428,18 +1349,11 @@ export default function DayV3Summary({
               setRecoveryMode(value);
               setRecoveryDaysInput(value === "none" ? 0 : null);
             }}
-            onRetryPoolDesign={poolDesign.retry}
             onResetExit={() => {
               markStarterFieldEdited("exit-amount");
               markStarterFieldEdited("payout");
-              markStarterFieldEdited("settlement");
-              markStarterFieldEdited("conversion-days");
-              markStarterFieldEdited("conversion-cost");
               setImmediateExitSharePct(null);
               setMinimumProceedsPer100(null);
-              setEntryPointSettlementDays(null);
-              setCollateralToExitDays(null);
-              setCollateralToExitCostBps(null);
             }}
             onResetProtection={() => {
               markStarterFieldEdited("drawdown");
@@ -1474,7 +1388,7 @@ export default function DayV3Summary({
         </div>
         <p aria-live="polite" className="sr-only" role="status">
           {!modelUpdating && displayedReturnState === "ready"
-            ? `Scenario returns updated. Senior ${pct(positions[0].apy)}. Junior ${positions[1].funded ? pct(positions[1].apy) : "off"}. SLP ${positions[2].pending ? "awaiting exit validation" : positions[2].funded ? pct(positions[2].apy) : "off"}.`
+            ? `Scenario returns updated. Senior ${pct(positions[0].apy)}. Junior ${positions[1].funded ? pct(positions[1].apy) : "off"}. SLP ${positions[2].funded ? pct(positions[2].apy) : "off"}.`
             : modelUpdating
               ? "Scenario returns updating."
               : "Enter a source yield to calculate scenario returns."}
@@ -1597,14 +1511,14 @@ export default function DayV3Summary({
           At 90% utilization: {protectionEnabled
             ? `Junior receives ${(resolved.riskYieldShare * 100).toFixed(1)}% of Senior yield`
             : "Junior is off"}; {exitEnabled
-            ? canonicalEngineOverrides
-              ? `SLP receives ${(resolved.liquidityYieldShare * 100).toFixed(1)}% of Senior yield`
-              : "SLP share awaits exit validation"
+            ? `SLP receives ${(resolved.liquidityYieldShare * 100).toFixed(1)}% of Senior yield`
             : "SLP is off"}.
-          {!canonicalEngineOverrides && exitEnabled ? (
-            <span className="ml-1 font-medium text-[var(--red-emphasis)]">
-              {" "}
-              SLP capital and fee inputs are awaiting Senior exit validation.
+          {exitEnabled ? (
+            <span className="ml-1">
+              {" "}SLP APY uses the shared {liquidityPct.toFixed(1)}%
+              illustrative Minimum Liquidity basis
+              ({dollars(model.balances.lt)} SLP per $100 Senior). Exact E-CLP
+              sizing is finalized in Royco Deploy.
             </span>
           ) : null}
         </div>
@@ -1640,7 +1554,7 @@ export default function DayV3Summary({
                     protectionView.status === "missing-goal" &&
                     exitView.status === "missing-goal"
                       ? "Complete Senior protection and the exit promise above to size Junior and SLP capital."
-                      : `${protectedDrawdownPct === null ? "Protection pending" : `${protectedDrawdownPct.toFixed(1)}% source drawdown`} + ${immediateExitSharePct === null ? "exit pending" : `$${immediateExitSharePct.toFixed(1)} exit`} → ${!protectionEnabled ? "$0 Junior" : `$${model.balances.jt.toFixed(1)} Junior`} + ${!exitEnabled ? "$0 SLP" : exitView.slpPer100 === null ? "SLP pending" : `$${exitView.slpPer100.toFixed(1)} SLP`}`
+                      : `${protectedDrawdownPct === null ? "Protection pending" : `${protectedDrawdownPct.toFixed(1)}% source drawdown`} + ${immediateExitSharePct === null ? "exit pending" : `$${immediateExitSharePct.toFixed(1)} exit`} → ${!protectionEnabled ? "$0 Junior" : `$${model.balances.jt.toFixed(1)} Junior`} + ${!exitEnabled ? "$0 SLP" : exitView.slpPer100 === null ? "SLP basis unavailable" : `$${exitView.slpPer100.toFixed(1)} SLP`}`
                   }
                   title="Capital stack"
                 >
@@ -1684,11 +1598,10 @@ export default function DayV3Summary({
                         ? "Complete the required input highlighted above to model capacity, proceeds, and pool depth."
                         : exitView.status === "infeasible"
                           ? "No feasible pool at the current exit size, payout floor, timing, and external spread assumption."
-                          : exitView.status === "unresolved"
-                            ? "Pool validation is unavailable · your inputs remain saved."
-                            : exitView.status === "resolving"
-                              ? "Checking the pool terms and rebuilding the exit curve…"
-                              : `${immediateExitSharePct === null ? "Exit pending" : `$${immediateExitSharePct.toFixed(2)} selected sale`} → ${exitView.proceeds === null ? "proceeds pending" : `$${exitView.proceeds.toFixed(2)} proceeds`} → ${exitView.slpPer100 === null ? "SLP pending" : `$${exitView.slpPer100.toFixed(2)} SLP`}`
+                            : exitView.status === "unresolved" ||
+                                exitView.status === "resolving"
+                              ? `${immediateExitSharePct === null ? "Exit pending" : `$${immediateExitSharePct.toFixed(2)} selected sale`} → ${exitView.slpPer100 === null ? "illustrative SLP unavailable" : `$${exitView.slpPer100.toFixed(2)} illustrative SLP`} · exact E-CLP quote in Royco Deploy`
+                              : `${immediateExitSharePct === null ? "Exit pending" : `$${immediateExitSharePct.toFixed(2)} selected sale`} → ${exitView.proceeds === null ? "proceeds unavailable" : `$${exitView.proceeds.toFixed(2)} proceeds`} → ${exitView.slpPer100 === null ? "SLP basis unavailable" : `$${exitView.slpPer100.toFixed(2)} SLP`}`
                   }
                   title="Senior exit and pool depth"
                 >
@@ -1742,7 +1655,7 @@ export default function DayV3Summary({
                   ? "Enter the source yield above to calculate Senior, Junior, and SLP APYs."
                   : displayedReturnState !== "ready"
                     ? "Complete the exit choices or retry market validation to inspect growth, composition, and premium curves."
-                    : `${sourceApyPct.toFixed(1)}% source → Senior ${pct(scenario.seniorApy)} · Junior ${!protectionEnabled ? "not funded" : pct(scenario.juniorApy)} · SLP ${!exitEnabled ? "not funded" : canonicalEngineOverrides === null ? "pending" : pct(scenario.liquidityApy)}.`
+                    : `${sourceApyPct.toFixed(1)}% source → Senior ${pct(scenario.seniorApy)} · Junior ${!protectionEnabled ? "not funded" : pct(scenario.juniorApy)} · SLP ${!exitEnabled ? "not funded" : pct(scenario.liquidityApy)}.`
               }
               title="How the returns are produced"
             >
