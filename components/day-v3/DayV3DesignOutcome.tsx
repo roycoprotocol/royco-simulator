@@ -31,7 +31,7 @@ const percent = (value: number | null, digits = 1) =>
   value === null ? "—" : `${value.toFixed(digits)}%`;
 
 /** Compact terms footer for the scenario-return cards. The return cards remain
- * the answer; this row supplies the capital and promise that produced them. */
+ * the answer; this row supplies the capital and settings that produced them. */
 export default function DayV3DesignOutcome({
   current,
 }: {
@@ -73,7 +73,7 @@ export default function DayV3DesignOutcome({
       value: money(current.minimumProceedsPer100, 0),
       note:
         current.minimumProceedsPer100 === null
-          ? "Choose an exit promise"
+          ? "Choose the exit terms"
           : "Minimum received per $100 Senior",
     },
   ];

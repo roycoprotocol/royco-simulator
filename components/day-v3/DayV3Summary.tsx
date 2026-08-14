@@ -55,6 +55,7 @@ import {
 } from "@/lib/day-v3";
 import {
   createDayV3ModelSnapshot,
+  dayV3IllustrativeExitMetrics,
   dayV3ReturnDisplayState,
 } from "@/lib/day-v3/model-state";
 import {
@@ -567,7 +568,11 @@ export default function DayV3Summary({
       pool: {
         concentration: cfg.eclpParams?.lambda ?? DAY_ECLP_SIMULATION_LAMBDA,
         stableYield: cfg.stableYield,
-        swapFeeBps: inputs.engineOverrides?.swapFeeBps ?? null,
+        // The shared engine always prices the illustrative pool with the
+        // disclosed simulation fee. A canonical response replaces it through
+        // `engineOverrides`; service availability must not erase a valid local
+        // quote and the entire exit-cost curve.
+        swapFeeBps: cfg.swapFeeBps,
         turnoverPerYear: cfg.poolTurnoverPerYear,
         seniorWeight: dayPoolSeniorWeight(cfg),
       },
@@ -914,7 +919,7 @@ export default function DayV3Summary({
       holdsSource: false,
       ...breakdown("liquidityApy"),
       risk: !exitEnabled
-        ? "No one-trade exit is promised"
+        ? "No one-trade exit is configured"
         : canonicalEngineOverrides === null
           ? "Uses the disclosed illustrative SLP capital basis"
           : "Holds Sr shares when Sr sells",
@@ -978,6 +983,11 @@ export default function DayV3Summary({
   const canonicalExit = canonicalPoolDesign;
   const canonicalExitRecommendation = canonicalExit?.recommendation ?? null;
   const canonicalOutcomes = canonicalExitRecommendation?.outcomes ?? null;
+  const illustrativeExitMetrics = dayV3IllustrativeExitMetrics({
+    boundaryQuote: model.explainer.liquidity.boundaryQuote,
+    openingSeniorNAV: model.illustrativeExit.openingSeniorNAV,
+    selectedQuote: model.illustrativeExit.quote,
+  });
   const liquidityResolved =
     liquidityRecommendation?.status === "recommended" &&
     liquidityRecommendation.minimumLiquidity.value !== null;
@@ -987,13 +997,15 @@ export default function DayV3Summary({
       ? "missing-goal"
       : hasPoolOverride
         ? "unresolved"
-        : activePoolDesign.status === "resolving"
-          ? "resolving"
         : activePoolDesign.status === "infeasible"
           ? "infeasible"
           : activePoolDesign.status === "resolved" && liquidityResolved
             ? "recommended"
-            : "unresolved";
+            : illustrativeExitMetrics !== null
+              ? "illustrative"
+              : activePoolDesign.status === "resolving"
+                ? "resolving"
+                : "unresolved";
   const exitView: DayV3ExitView = {
     status: exitStatus,
     message: exitDisabled
@@ -1010,13 +1022,16 @@ export default function DayV3Summary({
               : "",
     sellablePer100: exitDisabled
       ? 0
-      : (canonicalOutcomes?.amountSellablePer100Senior ?? null),
+      : (canonicalOutcomes?.amountSellablePer100Senior ??
+        illustrativeExitMetrics?.sellablePer100Senior ?? null),
     proceeds: exitDisabled
       ? 0
-      : (canonicalOutcomes?.proceedsForPromisedExit ?? null),
+      : (canonicalOutcomes?.proceedsForPromisedExit ??
+        illustrativeExitMetrics?.proceedsPer100Senior ?? null),
     lowestPayoutPer100: exitDisabled
       ? 0
-      : (canonicalOutcomes?.lowestModeledPayoutPer100 ?? null),
+      : (canonicalOutcomes?.lowestModeledPayoutPer100 ??
+        illustrativeExitMetrics?.lowestPayoutPer100 ?? null),
     slpPer100: exitDisabled
       ? 0
       : (canonicalOutcomes?.requiredPoolFundingPer100Senior ??
@@ -1035,10 +1050,11 @@ export default function DayV3Summary({
       exitOverrides?.maximumDiscountPct ??
       (canonicalExitRecommendation
         ? canonicalExitRecommendation.fields.maximumDiscountBps.value / 100
-        : null),
+        : effectiveBandPct),
     lambda:
       exitOverrides?.depthAtNav ??
-      canonicalExitRecommendation?.fields.depthAtNavLambda.value ?? null,
+      canonicalExitRecommendation?.fields.depthAtNavLambda.value ??
+      model.pool.concentration,
     maximumPremiumBps:
       exitOverrides?.maximumPremiumPct !== null &&
       exitOverrides?.maximumPremiumPct !== undefined
@@ -1048,8 +1064,7 @@ export default function DayV3Summary({
       canonicalOutcomes?.exitAssetShareAtNavPct ?? null,
     restingSeniorPct:
       canonicalOutcomes?.seniorShareAtNavPct ?? null,
-    swapFeeBps:
-      canonicalExit?.policy.swapFeeBps ?? null,
+    swapFeeBps: canonicalExit?.policy.swapFeeBps ?? model.pool.swapFeeBps,
     feeSource: canonicalExit
       ? `${canonicalExit.policy.templateName} on ${canonicalExit.policy.chainName}, block ${canonicalExit.policy.blockNumber}. Protocol fees: ST ${(Number(BigInt(canonicalExit.policy.protocolFees.stProtocolFeeWad)) / 1e16).toFixed(1)}%, JT ${(Number(BigInt(canonicalExit.policy.protocolFees.jtProtocolFeeWad)) / 1e16).toFixed(1)}%, JT premium ${(Number(BigInt(canonicalExit.policy.protocolFees.jtYieldShareProtocolFeeWad)) / 1e16).toFixed(1)}%, SLP premium ${(Number(BigInt(canonicalExit.policy.protocolFees.lptYieldShareProtocolFeeWad)) / 1e16).toFixed(1)}%. Resolved ${canonicalExit.policy.resolvedAt}`
       : null,
@@ -1539,7 +1554,7 @@ export default function DayV3Summary({
                   preview={
                     protectionView.status === "missing-goal" &&
                     exitView.status === "missing-goal"
-                      ? "Complete Senior protection and the exit promise above to size Junior and SLP capital."
+                      ? "Complete Senior protection and the exit terms above to size Junior and SLP capital."
                       : `${protectedDrawdownPct === null ? "Protection pending" : `${protectedDrawdownPct.toFixed(1)}% source drawdown`} + ${immediateExitSharePct === null ? "exit pending" : `$${immediateExitSharePct.toFixed(1)} exit`} → ${!protectionEnabled ? "$0 Junior" : `$${model.balances.jt.toFixed(1)} Junior`} + ${!exitEnabled ? "$0 SLP" : exitView.slpPer100 === null ? "SLP basis unavailable" : `$${exitView.slpPer100.toFixed(1)} SLP`}`
                   }
                   title="Capital stack"

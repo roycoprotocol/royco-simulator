@@ -153,7 +153,7 @@ export function useDayV3SimulationPoolDesign(
               message: dayV3PoolDesignIssueMessage(
                 body.issues,
                 body.status === "infeasible"
-                  ? "The exit promise is not feasible under the live simulation policy."
+                  ? "The exit terms are not feasible under the live simulation policy."
                   : "The live simulation policy could not be resolved.",
               ),
             },
@@ -186,7 +186,7 @@ export function useDayV3SimulationPoolDesign(
       status: "missing-goal",
       result: null,
       message:
-        "Set the source yield, protection goal, and exit promise. Recovery timing is optional for forward simulation.",
+        "Set the source yield, protection goal, and exit terms. Recovery timing is optional for forward simulation.",
     };
   }
   const previous =

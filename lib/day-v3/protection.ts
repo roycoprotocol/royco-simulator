@@ -18,7 +18,7 @@ export type DayV3CoverageRecommendationStatus =
 
 export interface DayV3CoverageRecommendationInput {
   protectedDrawdownPct: number;
-  /** Omit while the exit promise is unresolved; V3 will not invent it. */
+  /** Omit while the exit terms are unresolved; V3 will not invent them. */
   minimumLiquidityPct?: number;
   /** Deployment precision for the recommendation. Defaults to one basis point. */
   coverageResolutionBps?: number;
@@ -138,7 +138,7 @@ function evaluateCoverage(
     coveragePct,
     minimumLiquidityPct: modeledLiquidityPct,
   });
-  // The issuer's protection promise must survive the contract boundary, not
+  // The issuer's protection setting must survive the contract boundary, not
   // only the preferred 90% opening target. Seed the loss test at 100%
   // coverage utilization, where Junior has no operating headroom left. The
   // capital returned to the UI remains the recommended 90%-target opening

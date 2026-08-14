@@ -222,26 +222,28 @@ function DayV3CapitalStack({
         </div>
       </CardHeader>
 
-      <CardContent className="flex flex-col gap-4 lg:flex-row lg:items-center">
-        <div className="mx-auto w-full max-w-[260px] shrink-0 lg:mx-0 lg:w-[260px]">
-          {/* Per 100 of Senior, exactly like the table beside it. Passing the
-              raw balances printed $40000000.0 on the Senior block: `initialST`
-              is a modelling basis, not anybody's raise. */}
-          <DayV3StackDiagram
-            jt={per100(jt)}
-            jtFloor={per100(floor.jt)}
-            lt={per100(lt)}
-            ltFloor={per100(floor.lt)}
-            st={100}
-            unit={unit}
-          />
-          <p className="mt-2 max-w-[46ch] text-[10.5px] leading-snug text-[var(--tertiary)]">
-            Dashed markers show the 100%-utilized minimum; lighter caps show
-            opening headroom.
-          </p>
+      <CardContent className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:items-stretch">
+        <div className="flex min-w-0 flex-col justify-center rounded-xl border border-[var(--border-subtle)] bg-[var(--foundation)] px-5 py-4">
+          <div className="mx-auto w-full max-w-[420px]">
+            {/* Per 100 of Senior, exactly like the table beside it. Passing the
+                raw balances printed $40000000.0 on the Senior block: `initialST`
+                is a modelling basis, not anybody's raise. */}
+            <DayV3StackDiagram
+              jt={per100(jt)}
+              jtFloor={per100(floor.jt)}
+              lt={per100(lt)}
+              ltFloor={per100(floor.lt)}
+              st={100}
+              unit={unit}
+            />
+            <p className="mt-2 max-w-[46ch] text-[10.5px] leading-snug text-[var(--tertiary)]">
+              Dashed markers show the 100%-utilized minimum; lighter caps show
+              opening headroom.
+            </p>
+          </div>
         </div>
 
-        <div className="flex min-w-0 flex-1 flex-col gap-2">
+        <div className="flex min-w-0 flex-col gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--card)] p-4">
           {/* One column rhythm for the whole block, set once here and reused by
             every row and the total, so the three numeric columns line up
             without any row restating a width. */}

@@ -18,7 +18,7 @@ const markup = renderToStaticMarkup(
       juniorApyPct: null,
       slpApyPct: null,
       basis: "blocked",
-      message: "No feasible pool satisfies this promise.",
+      message: "No feasible pool satisfies these exit terms.",
     }}
   />,
 );

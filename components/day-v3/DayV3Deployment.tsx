@@ -193,7 +193,7 @@ function DayV3Deployment({
       scope: "v3-handoff" as const,
       missing:
         exit.status === "infeasible"
-          ? "These exit terms do not produce a deployable pool. Change the exit promise or operational costs."
+          ? "These exit terms do not produce a deployable pool. Change the exit settings or operational costs."
           : "Resolve the pool fee, parameters, and exit outcomes.",
     },
     {
@@ -208,7 +208,7 @@ function DayV3Deployment({
         goals.collateralToExitDays !== null &&
         goals.collateralToExitCostBps !== null
           ? exit.status === "infeasible"
-            ? "Conversion facts are complete, but this exit promise fails the restock hurdle. Change Section 3 or shorten/lower the conversion assumptions."
+            ? "Conversion facts are complete, but these exit settings fail the restock hurdle. Change Section 3 or shorten/lower the conversion assumptions."
             : "Re-run the live pool design to resolve the restock point."
           : "Add underlying conversion time and cost, then resolve the scenario restock point.",
     },
@@ -246,7 +246,7 @@ function DayV3Deployment({
       scope: "v3-handoff" as const,
       missing:
         exit.status === "infeasible"
-          ? "Minimum Liquidity cannot be derived because the current exit promise has no feasible pool."
+          ? "Minimum Liquidity cannot be derived because the current exit settings have no feasible pool."
           : "Resolve the pool-funding-to-liquidity mapping.",
     },
     {

@@ -43,7 +43,7 @@ assert.doesNotMatch(
 assert.match(
   summary,
   /data-model-column="exit"[\s\S]*<DayV3ExitModel[\s\S]*<DayV3ExitCost/,
-  "Exit cost and depth must stay directly beneath the exit promise model",
+  "Exit cost and depth must stay directly beneath the exit model",
 );
 assert.match(
   summary,

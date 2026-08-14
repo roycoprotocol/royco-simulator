@@ -19,6 +19,7 @@ import {
   isUsdUnit,
   pct,
   type DayV3Unit,
+  unitAmount,
 } from "@/components/day-v3/format";
 import { dayV3RangeStyle } from "@/components/day-v3/range";
 import {
@@ -57,7 +58,10 @@ export default function DayV3ExitCost({
   // figure here was printed with a hard "$". The same defect was found and
   // fixed once already in the backtest: the rule is to drop the symbol rather
   // than assert a currency nobody quoted the market in.
-  const amount = (value: number) => compactAmount(value, unit);
+  const amount = (value: number) =>
+    Math.abs(value) < 1_000
+      ? unitAmount(value, unit)
+      : compactAmount(value, unit);
   const points = useMemo<DayV3ExitPoint[]>(
     () =>
       metrics.curve.map((point) => ({

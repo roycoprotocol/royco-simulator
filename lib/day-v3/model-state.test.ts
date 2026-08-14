@@ -5,6 +5,7 @@ import { runDayHistoricalBacktest } from "@/lib/day-simulator-template/backtest"
 import { runDayTargetScenario } from "@/lib/day-simulator-template/runtime";
 import {
   createDayV3ModelSnapshot,
+  dayV3IllustrativeExitMetrics,
   dayV3ReturnDisplayState,
 } from "@/lib/day-v3/model-state";
 
@@ -20,6 +21,45 @@ assert.deepEqual(snapshot, {
   engineOverrides: policy,
 });
 assert.equal(snapshot.engineOverrides, policy);
+
+assert.deepEqual(
+  dayV3IllustrativeExitMetrics({
+    openingSeniorNAV: 200,
+    selectedQuote: {
+      filledNAV: 20,
+      stableOutNAV: 19.72,
+      executionPrice: 0.986,
+    },
+    boundaryQuote: {
+      filledNAV: 30,
+      stableOutNAV: 29.4,
+      executionPrice: 0.98,
+    },
+  }),
+  {
+    sellablePer100Senior: 10,
+    proceedsPer100Senior: 9.86,
+    lowestPayoutPer100: 98,
+  },
+  "engine quotes are normalized to the public per-$100 Senior basis",
+);
+assert.equal(
+  dayV3IllustrativeExitMetrics({
+    openingSeniorNAV: 0,
+    selectedQuote: {
+      filledNAV: 0,
+      stableOutNAV: 0,
+      executionPrice: 0,
+    },
+    boundaryQuote: {
+      filledNAV: 0,
+      stableOutNAV: 0,
+      executionPrice: 0,
+    },
+  }),
+  null,
+  "a missing Senior basis never becomes a misleading zero quote",
+);
 
 // A deferred snapshot remains a valid shared-accountant answer while the next
 // one is calculating. The UI labels it as updating rather than replacing a

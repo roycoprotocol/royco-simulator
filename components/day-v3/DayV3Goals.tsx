@@ -46,7 +46,7 @@ export type DayV3ExitView = {
   restockOperationalHurdleBps: MaybeNumber;
   /** All-in hurdle used by the canonical pool-design calculation. */
   restockHurdleBps: MaybeNumber;
-  /** Net refill margin at the state reached by the promised sale. */
+  /** Net refill margin at the state reached by the selected sale. */
   restockMarginBps: MaybeNumber;
   minimumLiquidityPct: MaybeNumber;
   maximumDiscountPct: MaybeNumber;
@@ -452,7 +452,7 @@ export default function DayV3Goals({
                 Should Senior have an immediate pool exit?
               </h4>
               <p className="mt-1 text-[10.5px] leading-relaxed text-[var(--tertiary)]">
-                Turning this off removes the SLP and its one-trade exit promise.
+                Turning this off removes the SLP and immediate pool exit.
               </p>
             </div>
             <DayV3Origin origin={inputOrigin(inputOrigins.exitAmount)} />
