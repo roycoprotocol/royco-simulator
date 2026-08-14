@@ -211,13 +211,13 @@ export default function DayV3ExitModel({
               curve without a row of empty values.
             </p>
           </div>
-        ) : (
+        ) : exit.status === "resolving" || exit.message ? (
           <p className="rounded-lg border border-dashed border-[var(--border-subtle)] px-3.5 py-3 text-[11.5px] leading-relaxed text-[var(--secondary)]">
             {exit.status === "resolving"
               ? "Refreshing the live template and recalculating this model…"
               : exit.message}
           </p>
-        )}
+        ) : null}
 
         {!disabled ? (
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-[var(--border-subtle)] pt-3 text-[10px] text-[var(--tertiary)]">

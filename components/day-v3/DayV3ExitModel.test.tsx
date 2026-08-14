@@ -341,9 +341,9 @@ const unavailableMarkup = renderToStaticMarkup(
 );
 assert.match(unavailableMarkup, /Section status: Set/);
 assert.match(unavailableMarkup, /data-section-status="complete">Set/);
-assert.match(unavailableMarkup, /exact sizing unavailable/);
-assert.match(unavailableMarkup, /Scenario APYs continue/);
-assert.match(unavailableMarkup, /Finalize in Royco Deploy/);
+assert.doesNotMatch(unavailableMarkup, /Exact E-CLP sizing/);
+assert.doesNotMatch(unavailableMarkup, /Scenario APYs continue/);
+assert.doesNotMatch(unavailableMarkup, /Finalize in Royco Deploy/);
 assert.doesNotMatch(unavailableMarkup, /Retry validation/);
 
 console.log("Day V3 exit-model presentation: PASS");

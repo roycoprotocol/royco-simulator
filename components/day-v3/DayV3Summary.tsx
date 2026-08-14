@@ -916,7 +916,7 @@ export default function DayV3Summary({
       risk: !exitEnabled
         ? "No one-trade exit is promised"
         : canonicalEngineOverrides === null
-          ? "Uses the disclosed illustrative SLP capital basis until deployment sizing"
+          ? "Uses the disclosed illustrative SLP capital basis"
           : "Holds Sr shares when Sr sells",
       funded: resolved.minLiquidity > 0,
       pending: false,
@@ -1006,8 +1006,8 @@ export default function DayV3Summary({
             ? (liquidityRecommendation?.reason ??
               "The pool was resolved, but its Minimum Liquidity mapping is unavailable.")
             : activePoolDesign.status === "resolving"
-              ? "Checking exact E-CLP sizing. Scenario APYs continue on the disclosed illustrative SLP basis."
-              : "Exact E-CLP sizing is unavailable here. Scenario APYs continue on the disclosed illustrative SLP basis.",
+              ? "Checking pool sizing."
+              : "",
     sellablePer100: exitDisabled
       ? 0
       : (canonicalOutcomes?.amountSellablePer100Senior ?? null),
@@ -1504,8 +1504,7 @@ export default function DayV3Summary({
             <span className="ml-1">
               {" "}SLP APY uses the shared {liquidityPct.toFixed(1)}%
               illustrative Minimum Liquidity basis
-              ({dollars(model.balances.lt)} SLP per $100 Senior). Exact E-CLP
-              sizing is finalized in Royco Deploy.
+              ({dollars(model.balances.lt)} SLP per $100 Senior).
             </span>
           ) : null}
         </div>
@@ -1587,7 +1586,7 @@ export default function DayV3Summary({
                           ? "No feasible pool at the current exit size, payout floor, timing, and external spread assumption."
                             : exitView.status === "unresolved" ||
                                 exitView.status === "resolving"
-                              ? `${immediateExitSharePct === null ? "Exit pending" : `$${immediateExitSharePct.toFixed(2)} selected sale`} → ${exitView.slpPer100 === null ? "illustrative SLP unavailable" : `$${exitView.slpPer100.toFixed(2)} illustrative SLP`} · exact E-CLP quote in Royco Deploy`
+                              ? `${immediateExitSharePct === null ? "Exit pending" : `$${immediateExitSharePct.toFixed(2)} selected sale`} → ${exitView.slpPer100 === null ? "illustrative SLP unavailable" : `$${exitView.slpPer100.toFixed(2)} illustrative SLP`}`
                               : `${immediateExitSharePct === null ? "Exit pending" : `$${immediateExitSharePct.toFixed(2)} selected sale`} → ${exitView.proceeds === null ? "proceeds unavailable" : `$${exitView.proceeds.toFixed(2)} proceeds`} → ${exitView.slpPer100 === null ? "SLP basis unavailable" : `$${exitView.slpPer100.toFixed(2)} SLP`}`
                   }
                   title="Senior exit and pool depth"

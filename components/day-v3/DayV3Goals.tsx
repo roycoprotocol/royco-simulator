@@ -1,8 +1,6 @@
 "use client";
 
-import DayV3Button, {
-  dayV3ButtonVariants,
-} from "@/components/day-v3/DayV3Button";
+import DayV3Button from "@/components/day-v3/DayV3Button";
 import DayV3Group from "@/components/day-v3/DayV3Group";
 import DayV3NumberField from "@/components/day-v3/DayV3NumberField";
 import DayV3Origin, {
@@ -442,9 +440,7 @@ export default function DayV3Goals({
                   ? ` · missing ${dayV3MissingPreview(exitInputReadiness.missing)}`
                   : exit.status === "infeasible"
                     ? " · no feasible pool"
-                    : exit.status === "unresolved"
-                      ? " · exact sizing unavailable"
-                      : ""
+                    : ""
               }`
         }
         title="Senior exit"
@@ -585,27 +581,6 @@ export default function DayV3Goals({
             These inputs do not produce a viable immediate exit. Reduce the
             exit size, lower the payout floor, or turn off the immediate exit.
           </p>
-        ) : exit.status === "unresolved" ? (
-          <div
-            aria-live="polite"
-            className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-dashed border-[var(--border-subtle)] px-3 py-2.5"
-          >
-            <span className="text-[10.5px] leading-relaxed text-[var(--secondary)]">
-              Exact E-CLP sizing is unavailable here. Scenario APYs continue
-              using the disclosed illustrative SLP basis.
-            </span>
-            <a
-              className={dayV3ButtonVariants({
-                size: "sm",
-                variant: "secondary",
-              })}
-              href="https://www.royco.org/deploy-market"
-              rel="noreferrer"
-              target="_blank"
-            >
-              Finalize in Royco Deploy
-            </a>
-          </div>
         ) : null}
       </DayV3Group>
     </>

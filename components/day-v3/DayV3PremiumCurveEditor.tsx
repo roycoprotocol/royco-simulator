@@ -274,8 +274,7 @@ function DayV3PremiumCurveEditor({
           </strong>{" "}
           {slpMinimumLiquidityPct.toFixed(1)}% illustrative Minimum Liquidity,
           which funds ${slpCapitalPer100.toFixed(1)} SLP per $100 Senior at the{" "}
-          {pct(targetUtilization)} operating target. Exact E-CLP sizing is
-          finalized in Royco Deploy.
+          {pct(targetUtilization)} operating target.
         </p>
       ) : null}
 

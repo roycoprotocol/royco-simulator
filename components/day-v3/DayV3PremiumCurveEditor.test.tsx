@@ -39,6 +39,7 @@ assert.match(markup, /Projected Jr APY/);
 assert.match(markup, /Projected SLP APY/);
 assert.match(markup, /SLP APY basis:/);
 assert.match(markup, /10\.0% illustrative Minimum Liquidity/);
+assert.doesNotMatch(markup, /Exact E-CLP sizing/);
 assert.match(markup, /\$11\.1 SLP per \$100 Senior/);
 assert.match(markup, /8\.5%/);
 assert.match(markup, /2\.4%/);
