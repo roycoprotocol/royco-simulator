@@ -376,12 +376,12 @@ export default function DayV3RestockCheck({
                 before the answer existed anywhere on screen. */}
             {stale ? (
               <p className="rounded-lg border border-dashed border-[var(--border-subtle)] px-3 py-3 text-[10.5px] leading-snug text-[var(--secondary)]">
-                The live template is re-pricing this pool. Everything below
-                still describes the previous exit design
-                {selectedSalePer100 === null
-                  ? ""
-                  : ` — a ${dollars(selectedSalePer100)} sale`}
-                , not the one you are editing.
+                The live template has not sized this exact pool yet, so the
+                worst case below is the{" "}
+                {dollars(worstPayoutPer100)} payout floor you set — the deepest
+                the design is allowed to go. It moves as you change the floor.
+                The discount one specific sale reaches needs the sized pool, so
+                it is withheld rather than guessed.
               </p>
             ) : null}
 

@@ -1173,15 +1173,32 @@ export default function DayV3Summary({
   // deployed pool still has to honour. It is deliberately not a quote off the
   // shared engine's fallback pool: that pool is far shallower than any real
   // design and reported 50 bps where a $95 floor permits 500.
+  // While the template re-prices, its previous lowest payout describes a design
+  // the reader is no longer looking at, so moving the payout floor moved
+  // nothing. The floor is a live answer and the deployed pool must honour it,
+  // so it takes over until the exact sizing catches up.
+  const restockStale =
+    !exitDisabled &&
+    (activePoolDesign.status === "resolving" ||
+      (exitView.sellablePer100 !== null &&
+        modeledImmediateExitSharePct !== null &&
+        Math.abs(exitView.sellablePer100 - modeledImmediateExitSharePct) >
+          0.001));
   const restockWorstPayoutPer100 = exitDisabled
     ? null
-    : (exitView.lowestPayoutPer100 ?? minimumProceedsPer100);
+    : restockStale
+      ? minimumProceedsPer100
+      : (exitView.lowestPayoutPer100 ?? minimumProceedsPer100);
   // Both halves of this division must come from the same response. Dividing
   // the canonical proceeds by the live exit input mixed a figure priced for the
   // previous goal with the number now on screen: moving the sale from $10 to
   // $50 while the service re-resolved produced $10 / $50, a 8,000 bps discount,
   // in a panel whose banner still read 60 bps from the same stale result.
-  const restockSalePer100 = exitDisabled ? 0 : exitView.sellablePer100;
+  // A selected-sale discount needs proceeds and the size they were priced for
+  // from one response. Mid-reprice there is no such pair, so the panel shows
+  // the worst case the floor guarantees and nothing else.
+  const restockSalePer100 =
+    exitDisabled || restockStale ? null : exitView.sellablePer100;
   const restockView: DayV3RestockView = {
     check:
       restockHurdle === null || restockWorstPayoutPer100 === null
@@ -1189,7 +1206,7 @@ export default function DayV3Summary({
         : dayV3RestockCheck({
             hurdle: restockHurdle,
             selectedSalePer100: restockSalePer100,
-            selectedSaleProceeds: exitView.proceeds,
+            selectedSaleProceeds: restockStale ? null : exitView.proceeds,
             worstPayoutPer100: restockWorstPayoutPer100,
           }),
     hurdle: restockHurdle,
@@ -1197,17 +1214,11 @@ export default function DayV3Summary({
     // While the service re-prices, the last valid result stays on screen. It
     // describes the previous design, so the panel says so rather than passing
     // it off as a verdict on the market currently being edited.
-    stale:
-      !exitDisabled &&
-      (activePoolDesign.status === "resolving" ||
-        (exitView.sellablePer100 !== null &&
-          modeledImmediateExitSharePct !== null &&
-          Math.abs(exitView.sellablePer100 - modeledImmediateExitSharePct) >
-            0.001)),
+    stale: restockStale,
     worstCaseBasis:
       restockWorstPayoutPer100 === null
         ? "unresolved"
-        : exitView.lowestPayoutPer100 !== null
+        : !restockStale && exitView.lowestPayoutPer100 !== null
           ? "modeled"
           : "floor",
     worstPayoutPer100: restockWorstPayoutPer100,

@@ -475,7 +475,11 @@ const staleMarkup = renderToStaticMarkup(
 );
 assert.match(staleMarkup, /data-restock-stale="true"/);
 assert.match(staleMarkup, /re-pricing/);
-assert.match(staleMarkup, /still describes the previous exit design/);
+// Mid-reprice the panel falls back to the live payout floor rather than
+// showing the previous design's numbers, so changing the floor still moves the
+// answer instead of appearing frozen.
+assert.match(staleMarkup, /payout floor you set/);
+assert.match(staleMarkup, /It moves as you change the floor/);
 
 const freshMarkup = renderToStaticMarkup(
   <DayV3RestockCheck
@@ -487,6 +491,6 @@ const freshMarkup = renderToStaticMarkup(
   />,
 );
 assert.doesNotMatch(freshMarkup, /data-restock-stale/);
-assert.doesNotMatch(freshMarkup, /still describes the previous exit design/);
+assert.doesNotMatch(freshMarkup, /has not sized this exact pool yet/);
 
 console.log("Day V3 exit-model presentation: PASS");
