@@ -150,7 +150,7 @@ export default function DayV3ExitModel({
         ) : null}
 
         {disabled ? (
-          <div className="grid grid-cols-1 gap-x-5 gap-y-4 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <Outcome
               label="Immediate exit"
               note="no immediate pool exit"
@@ -187,7 +187,7 @@ export default function DayV3ExitModel({
         ) : null}
 
         {!disabled ? (
-          <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-[var(--border-subtle)] pt-3 text-[10px] text-[var(--tertiary)]">
+          <div className="flex flex-wrap items-center gap-2 border-t border-[var(--border-subtle)] pt-3 text-[10px] text-[var(--tertiary)]">
             {modeled ? (
               <span className="font-semibold text-[var(--secondary)]">
                 Proceeds: {dollars(exit.proceeds, 2)}{" "}

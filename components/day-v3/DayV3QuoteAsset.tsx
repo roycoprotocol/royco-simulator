@@ -62,8 +62,8 @@ export default function DayV3QuoteAsset({
 
   return (
     <>
-      <div className="flex min-w-0 flex-col gap-1.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--card)] px-3 py-3 transition-[border-color,box-shadow] hover:border-[var(--secondary)] focus-within:border-[var(--foreground)] focus-within:shadow-[0_2px_10px_-4px_rgba(23,25,31,0.24)]">
-        <label className="flex min-w-0 flex-col gap-1.5">
+      <div className="flex min-w-0 flex-col gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--card)] px-3 py-3 transition-[border-color,box-shadow] hover:border-[var(--secondary)] focus-within:border-[var(--foreground)] focus-within:shadow-[0_2px_10px_-4px_rgba(23,25,31,0.24)]">
+        <label className="flex min-w-0 flex-col gap-2">
           <span className="flex items-start justify-between gap-3">
             <span className="cursor-pointer text-[12px] font-semibold leading-snug">
               What is Senior sold for?

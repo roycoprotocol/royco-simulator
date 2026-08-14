@@ -208,7 +208,7 @@ export default function DayV3ExitCost({
 
             {/* Outputs. Unfilled, hairline rule, mono figures. */}
             <div className="grid grid-cols-1 gap-3 border-t border-[var(--border-subtle)] pt-3 sm:grid-cols-3">
-              <div className="flex flex-col gap-0.5">
+              <div className="flex flex-col gap-1">
                 <span className="text-[9.5px] font-semibold uppercase tracking-[0.1em] text-[var(--tertiary)]">
                   Exit discount
                 </span>
@@ -219,7 +219,7 @@ export default function DayV3ExitCost({
                   below NAV
                 </span>
               </div>
-              <div className="flex flex-col gap-0.5">
+              <div className="flex flex-col gap-1">
                 <span className="text-[9.5px] font-semibold uppercase tracking-[0.1em] text-[var(--tertiary)]">
                   Given up
                 </span>
@@ -235,7 +235,7 @@ export default function DayV3ExitCost({
                   {amount(selected.swapFeeNAV)} fee + {amount(curveCost)} price impact
                 </span>
               </div>
-              <div className="flex flex-col gap-0.5">
+              <div className="flex flex-col gap-1">
                 <span className="text-[9.5px] font-semibold uppercase tracking-[0.1em] text-[var(--tertiary)]">
                   Received
                 </span>
@@ -296,7 +296,7 @@ export default function DayV3ExitCost({
             </div>
 
             <div
-              className="flex flex-col gap-1.5 rounded-lg border px-3 py-3"
+              className="flex flex-col gap-2 rounded-lg border px-3 py-3"
               style={{
                 background:
                   "color-mix(in srgb, var(--theme-green) 7%, transparent)",

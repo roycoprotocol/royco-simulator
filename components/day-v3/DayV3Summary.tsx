@@ -70,6 +70,7 @@ import {
   dayV3InputReadiness,
 } from "@/lib/day-v3/input-readiness";
 import {
+  dayV3QuoteDiscountBps,
   dayV3RestockCheck,
   dayV3RestockHurdle,
 } from "@/lib/day-v3/restock-arbitrage";
@@ -435,9 +436,21 @@ export default function DayV3Summary({
   const liquidityPct = exitDisabled
     ? 0
     : defaults.minLiquidity * 100;
+  // The band IS the pool's maximum discount — when the template resolves this
+  // reads its `maximumDiscountBps` directly. The fallback used the market's own
+  // fixed `eclpBandWidth`, so with no live template the payout floor shaped
+  // nothing: an issuer could drag it from $99 to $50 and the pool, the exit
+  // curve and the arbitrage economics would not move at all. Measured on the
+  // shared engine, the band moves the deepest fill exactly as you would expect
+  // — 1% band gives 0.60% discount, 5% gives 2.63%, 20% gives 10.59% — so the
+  // floor the issuer set is the honest local band.
+  const floorBandPct =
+    exitEnabled && minimumProceedsPer100 !== null
+      ? Math.min(99, Math.max(0.01, 100 - minimumProceedsPer100))
+      : defaults.eclpBandWidth * 100;
   const effectiveBandPct = canonicalPoolRecommendation
     ? canonicalPoolRecommendation.fields.maximumDiscountBps.value / 100
-    : defaults.eclpBandWidth * 100;
+    : floorBandPct;
 
   // Defer one stable, complete accountant input rather than an inline object.
   // The former version deferred the terms but read the live E-CLP and fee
@@ -1173,55 +1186,27 @@ export default function DayV3Summary({
   // deployed pool still has to honour. It is deliberately not a quote off the
   // shared engine's fallback pool: that pool is far shallower than any real
   // design and reported 50 bps where a $95 floor permits 500.
-  // While the template re-prices, its previous lowest payout describes a design
-  // the reader is no longer looking at, so moving the payout floor moved
-  // nothing. The floor is a live answer and the deployed pool must honour it,
-  // so it takes over until the exact sizing catches up.
-  const restockStale =
-    !exitDisabled &&
-    (activePoolDesign.status === "resolving" ||
-      (exitView.sellablePer100 !== null &&
-        modeledImmediateExitSharePct !== null &&
-        Math.abs(exitView.sellablePer100 - modeledImmediateExitSharePct) >
-          0.001));
-  const restockWorstPayoutPer100 = exitDisabled
-    ? null
-    : restockStale
-      ? minimumProceedsPer100
-      : (exitView.lowestPayoutPer100 ?? minimumProceedsPer100);
-  // Both halves of this division must come from the same response. Dividing
-  // the canonical proceeds by the live exit input mixed a figure priced for the
-  // previous goal with the number now on screen: moving the sale from $10 to
-  // $50 while the service re-resolved produced $10 / $50, a 8,000 bps discount,
-  // in a panel whose banner still read 60 bps from the same stale result.
-  // A selected-sale discount needs proceeds and the size they were priced for
-  // from one response. Mid-reprice there is no such pair, so the panel shows
-  // the worst case the floor guarantees and nothing else.
-  const restockSalePer100 =
-    exitDisabled || restockStale ? null : exitView.sellablePer100;
+  // Both discounts come from one engine run against one pool: the deepest fill
+  // it can do, and the fill the promised exit takes. That is what an
+  // arbitrageur trades against, it responds to the payout floor through the
+  // band above, and the two can never describe different markets.
   const restockView: DayV3RestockView = {
     check:
-      restockHurdle === null || restockWorstPayoutPer100 === null
+      restockHurdle === null || exitDisabled
         ? null
         : dayV3RestockCheck({
             hurdle: restockHurdle,
-            selectedSalePer100: restockSalePer100,
-            selectedSaleProceeds: restockStale ? null : exitView.proceeds,
-            worstPayoutPer100: restockWorstPayoutPer100,
+            selectedDiscountBps: dayV3QuoteDiscountBps(
+              model.illustrativeExit.quote,
+            ),
+            worstCaseDiscountBps: dayV3QuoteDiscountBps(
+              model.explainer.liquidity.boundaryQuote,
+            ),
           }),
     hurdle: restockHurdle,
-    selectedSalePer100: restockSalePer100,
-    // While the service re-prices, the last valid result stays on screen. It
-    // describes the previous design, so the panel says so rather than passing
-    // it off as a verdict on the market currently being edited.
-    stale: restockStale,
-    worstCaseBasis:
-      restockWorstPayoutPer100 === null
-        ? "unresolved"
-        : !restockStale && exitView.lowestPayoutPer100 !== null
-          ? "modeled"
-          : "floor",
-    worstPayoutPer100: restockWorstPayoutPer100,
+    maximumDiscountPct: inputs.bandPct,
+    policyBasis: inputs.policyBasis,
+    selectedSalePer100: modeledImmediateExitSharePct,
   };
 
   const displayedReturnState = returnDisplayState;
@@ -1327,8 +1312,8 @@ export default function DayV3Summary({
         aria-labelledby="day-v3-inputs-heading"
         className="flex flex-col gap-3 rounded-2xl border border-[var(--border-subtle)] bg-[var(--foundation)] px-4 py-4 shadow-[0_6px_22px_-14px_rgba(23,25,31,0.4)]"
       >
-        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
-          <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <h2
               className="text-[11px] font-semibold uppercase tracking-[0.14em]"
               id="day-v3-inputs-heading"
@@ -1505,7 +1490,7 @@ export default function DayV3Summary({
         aria-labelledby="day-v3-positions-heading"
         className="overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--foundation)] shadow-[0_6px_22px_-14px_rgba(23,25,31,0.4)]"
       >
-        <div className="flex flex-wrap items-center justify-between gap-3 px-4 pb-3 pt-4">
+        <div className="flex flex-wrap items-center justify-between gap-3 px-4 pt-4">
           <div className="flex items-center gap-2">
             <h2
               className="text-[13px] font-semibold tracking-[-0.01em]"
@@ -1534,7 +1519,7 @@ export default function DayV3Summary({
               className={`min-w-0 px-3 py-3 ${index === 0 ? "" : "border-l border-[var(--border-subtle)]"}`}
               key={`compact-${position.short}`}
             >
-              <div className="flex items-center gap-1.5">
+              <div className="flex items-center gap-1">
                 <span
                   aria-hidden="true"
                   className="size-2 shrink-0 rounded-full"
@@ -1599,7 +1584,7 @@ export default function DayV3Summary({
                 <CardNote>{position.holds}</CardNote>
               </CardHeader>
               <CardContent className="flex flex-col gap-3">
-                <div className="flex items-baseline gap-1.5">
+                <div className="flex items-baseline gap-1">
                   <span
                     className="font-mono text-[clamp(34px,3.2vw,44px)] font-bold leading-[0.92] tracking-[-0.03em] tabular-nums"
                     style={
@@ -1636,7 +1621,7 @@ export default function DayV3Summary({
 
       <section
         aria-labelledby="day-v3-models-heading"
-        className="flex flex-col gap-4"
+        className="flex flex-col gap-3"
         data-accountant-source="runDayTargetScenario-and-buildDayExplainerMetrics"
       >
         <div className="flex flex-col gap-1">
@@ -1940,7 +1925,7 @@ export default function DayV3Summary({
           </DayV3ModelAccordion>
       </section>
 
-      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[var(--border-subtle)] bg-[var(--foundation)] px-5 py-4">
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[var(--border-subtle)] bg-[var(--foundation)] px-4 py-4">
           <div className="min-w-0">
             <strong className="text-[13px] font-semibold">
               Finish in Royco Deploy

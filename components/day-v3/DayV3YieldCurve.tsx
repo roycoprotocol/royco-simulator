@@ -67,7 +67,7 @@ function CurveTooltip({
     ],
   ];
   return (
-    <div className="rounded-lg border border-[#e4e0d6] bg-[#fcfbf8] px-2.5 py-2 text-[11px] shadow-[0_4px_14px_-8px_rgba(23,25,31,0.4)]">
+    <div className="rounded-lg border border-[#e4e0d6] bg-[#fcfbf8] px-2 py-2 text-[11px] shadow-[0_4px_14px_-8px_rgba(23,25,31,0.4)]">
       <p className="font-semibold text-[#17191f]">
         {paidTo} at {label}% utilization
       </p>

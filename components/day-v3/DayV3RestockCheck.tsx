@@ -17,13 +17,12 @@ import type {
 export type DayV3RestockView = {
   check: DayV3RestockResult | null;
   hurdle: DayV3RestockHurdle | null;
-  /** Where the worst case came from, so the panel never overstates it. */
-  worstCaseBasis: "modeled" | "floor" | "unresolved";
-  worstPayoutPer100: number | null;
+  /** The pool's maximum discount, which the payout floor sets locally. */
+  maximumDiscountPct: number;
+  /** Whether the pool priced here is the live template's or the disclosed
+   *  illustrative one. Both are real pools; only their provenance differs. */
+  policyBasis: "live" | "unresolved";
   selectedSalePer100: number | null;
-  /** The live template is re-pricing, so these figures describe the design as
-   *  it was a moment ago rather than the one on screen. */
-  stale: boolean;
 };
 
 const bps = (value: number | null, digits = 0) =>
@@ -174,7 +173,7 @@ function ArbitrageWaterfall({
   };
 
   return (
-    <div className="flex flex-col gap-2.5">
+    <div className="flex flex-col gap-2">
       {bars.map((bar) => (
         <WaterfallRow
           key={bar.label}
@@ -185,7 +184,7 @@ function ArbitrageWaterfall({
           {...geometry(bar.from, bar.to)}
         />
       ))}
-      <div className="border-t border-[var(--border-subtle)] pt-2.5">
+      <div className="border-t border-[var(--border-subtle)] pt-3">
         <WaterfallRow
           emphasis
           label={totalLabel}
@@ -226,7 +225,7 @@ export default function DayV3RestockCheck({
   redemptionDays: number | null;
   view: DayV3RestockView;
 }) {
-  const { check, hurdle, selectedSalePer100, stale, worstCaseBasis, worstPayoutPer100 } =
+  const { check, hurdle, maximumDiscountPct, policyBasis, selectedSalePer100 } =
     view;
   const missingInputs = costOfCapitalPct === null || redemptionDays === null;
   const resolved =
@@ -246,11 +245,10 @@ export default function DayV3RestockCheck({
   return (
     <Card
       data-model-source={
-        worstCaseBasis === "modeled"
+        policyBasis === "live"
           ? "canonical-rwa-eclp-service"
-          : "issuer-payout-floor"
+          : "shared-day-engine-illustrative-default"
       }
-      data-restock-stale={stale || undefined}
       data-restock-status={
         missingInputs ? "missing-inputs" : (check?.status ?? "unavailable")
       }
@@ -260,7 +258,9 @@ export default function DayV3RestockCheck({
           <CardTitle className="text-[13.5px]">
             Test whether this works for arbitrageurs
           </CardTitle>
-          {stale ? <Badge tone="neutral">re-pricing</Badge> : null}
+          {policyBasis === "live" ? null : (
+            <Badge tone="neutral">illustrative pool</Badge>
+          )}
         </span>
         <CardNote>
           A sale leaves the pool below NAV, and it stays there until an
@@ -358,10 +358,6 @@ export default function DayV3RestockCheck({
                 {!worstCasePays
                   ? `Even fully drawn down this design only lets Senior trade ${bps(check.worstCaseDiscountBps)} below NAV, and an arbitrageur needs ${bps(hurdle.hurdleBps)} to break even. Nothing brings one in at any depth. Shorten the redemption wait, allow a deeper payout floor, or expect the SLP to carry the position rather than see it arbitraged back.`
                   : `At its deepest this design lets Senior trade ${bps(check.worstCaseDiscountBps)} below NAV, against the ${bps(hurdle.hurdleBps)} an arbitrageur needs to break even. They are paid to buy that Senior and redeem it, which is what puts the pool back and restores capacity for the next seller.${
-                      worstCaseBasis === "floor"
-                        ? " That is the deepest your payout floor permits, not a depth the pool has been shown to reach: a sized pool usually prices nearer to NAV, so treat this as provisional until the live template resolves."
-                        : ""
-                    }${
                       unpriced
                         ? " The selected sale has not been priced yet, so it is not yet known whether it reaches that depth on its own."
                         : selectedPays
@@ -374,19 +370,8 @@ export default function DayV3RestockCheck({
             {/* One trade, top to bottom. The two-column split asked a reader
                 to subtract a column of costs from a bar in the other column
                 before the answer existed anywhere on screen. */}
-            {stale ? (
-              <p className="rounded-lg border border-dashed border-[var(--border-subtle)] px-3 py-3 text-[10.5px] leading-snug text-[var(--secondary)]">
-                The live template has not sized this exact pool yet, so the
-                worst case below is the{" "}
-                {dollars(worstPayoutPer100)} payout floor you set — the deepest
-                the design is allowed to go. It moves as you change the floor.
-                The discount one specific sale reaches needs the sized pool, so
-                it is withheld rather than guessed.
-              </p>
-            ) : null}
-
             <section className="rounded-lg border border-[var(--border-subtle)] bg-[var(--background)] px-3 py-3">
-              <h4 className="mb-3 border-b border-[var(--border-subtle)] pb-1.5 text-[9.5px] font-semibold uppercase tracking-[0.11em] text-[var(--tertiary)]">
+              <h4 className="mb-3 border-b border-[var(--border-subtle)] pb-2 text-[9.5px] font-semibold uppercase tracking-[0.11em] text-[var(--tertiary)]">
                 One arbitrageur&apos;s trade, per $100 of Senior they buy
               </h4>
               <ArbitrageWaterfall
@@ -424,7 +409,7 @@ export default function DayV3RestockCheck({
                     : "below zero, so nobody buys and the pool stays where the seller left it"
                 }
               />
-              <p className="mt-3 border-t border-[var(--border-subtle)] pt-2.5 text-[9.5px] leading-snug text-[var(--tertiary)]">
+              <p className="mt-3 border-t border-[var(--border-subtle)] pt-3 text-[9.5px] leading-snug text-[var(--tertiary)]">
                 {deeperExists ? (
                   <>
                     Drawn down further this design lets Senior fall to{" "}
@@ -439,13 +424,14 @@ export default function DayV3RestockCheck({
                     the trade ever looks.{" "}
                   </>
                 )}
-                The discount comes from{" "}
-                {worstCaseBasis === "modeled"
-                  ? "the live template's lowest modeled payout"
-                  : `the ${dollars(worstPayoutPer100)} payout floor you set`}
-                ; the Senior offset assumes the source performs at its modeled
-                rate. Royco Deploy revalidates against the real settlement
-                schedule.
+Both discounts are quotes from{" "}
+                {policyBasis === "live"
+                  ? "the live template's pool"
+                  : "the disclosed illustrative pool"}
+                , whose {maximumDiscountPct.toFixed(2)}% maximum discount is set
+                by your payout floor. The Senior offset assumes the source
+                performs at its modeled rate. Royco Deploy revalidates against
+                the real settlement schedule.
               </p>
             </section>
 

@@ -409,7 +409,7 @@ function DayV3Backtest({
             read against each other, and it gives the set a name out of context. */}
         <div
           aria-label="Backtest result by position"
-          className="grid grid-cols-2 gap-x-5 gap-y-3 border-t border-[var(--border-subtle)] pt-3 sm:grid-cols-4"
+          className="grid grid-cols-2 gap-3 border-t border-[var(--border-subtle)] pt-3 sm:grid-cols-4"
           role="group"
         >
           {(
@@ -420,7 +420,7 @@ function DayV3Backtest({
               ["SLP", result.liquidityApy, result.liquidityMaxDrawdown],
             ] as const
           ).map(([label, apy, drawdown]) => (
-            <div className="flex flex-col gap-0.5" key={label}>
+            <div className="flex flex-col gap-1" key={label}>
               <span className="text-[9.5px] font-semibold uppercase tracking-[0.1em] text-[var(--tertiary)]">
                 {label}
               </span>

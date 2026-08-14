@@ -19,7 +19,7 @@ export const DAY_V3_CONTROL_MOTION =
  */
 export const dayV3ButtonVariants = cva(
   cn(
-    "inline-flex shrink-0 cursor-pointer select-none items-center justify-center gap-1.5 whitespace-nowrap rounded-lg border text-[12px] font-semibold leading-none",
+    "inline-flex shrink-0 cursor-pointer select-none items-center justify-center gap-1 whitespace-nowrap rounded-lg border text-[12px] font-semibold leading-none",
     DAY_V3_CONTROL_MOTION,
     DAY_V3_CONTROL_FOCUS,
     "hover:-translate-y-px active:translate-y-0 disabled:cursor-not-allowed disabled:opacity-45 disabled:hover:translate-y-0",

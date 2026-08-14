@@ -7,17 +7,18 @@
  * only when the discount pays for the desk's money over the redemption wait,
  * plus the fee it pays to trade back in.
  *
- * **The discount here is the design's own worst case, not a reading off the
- * illustrative pool.** An earlier version priced it by quoting sales into the
- * shared engine's fallback pool, which is far shallower than any real design:
- * at a $95 payout floor it reported 50 bps where the floor itself permits 500.
- * The floor is the promise the deployed pool has to honour, so it is what an
- * arbitrageur can expect to be paid at the deepest point.
+ * **The discount is read off the pool, because that is what an arbitrageur
+ * actually trades against.** Two earlier versions got this wrong in opposite
+ * directions: one quoted the shared engine's fallback pool while the fallback
+ * band was pinned to a market constant, so the payout floor moved nothing; the
+ * other used the canonical service's lowest modeled payout, a scalar that
+ * barely moves because the solver returns the *cheapest* pool clearing the
+ * floor. Either way an issuer could drag the floor from $99 to $50 and watch
+ * the arbitrage economics sit still.
  *
- * Nothing here re-derives pool prices. Both discounts come from figures the
- * exit design already produced — the live template's lowest modeled payout and
- * its proceeds for the selected sale, or the issuer's own payout floor until
- * that resolves. This module only turns them into a desk's return on capital.
+ * Both discounts now come from one engine run against one pool: the deepest
+ * fill it can do, and the fill the promised exit actually takes. Nothing here
+ * re-derives a price.
  * The canonical RWA service answers the same question at deployment as
  * `restockHurdleBps` / `restockMarginAfterPromisedExitBps`, using real
  * settlement and conversion facts; this is the scenario version, with the
@@ -35,6 +36,37 @@ export const DAY_V3_RESTOCK_SENIOR_BASIS = 100;
  * the gap between them is the discount. Both figures come from the exit design;
  * nothing is priced here.
  */
+/** The fields this module reads off a shared-engine secondary-sale quote. */
+export interface DayV3RestockQuote {
+  effectiveInputNAV: number;
+  stableOutNAV: number;
+}
+
+/**
+ * The discount to NAV the pool's own curve created, in basis points.
+ *
+ * The swap fee is deliberately excluded. `slippage` on an engine quote is what
+ * the *seller* gave up, and part of that is the fee, which stays in the pool
+ * rather than sitting there as a mispricing anyone can buy. The engine charges
+ * the fee on the way in and prices `effectiveInputNAV` against the curve, so
+ * the curve's own move is exactly `1 - stableOutNAV / effectiveInputNAV`. The
+ * fee the arbitrageur pays to trade back in is on the cost side of the hurdle,
+ * which is how the canonical service decomposes it too.
+ */
+export function dayV3QuoteDiscountBps(
+  quote: DayV3RestockQuote | null,
+): number | null {
+  if (
+    quote === null ||
+    !(quote.effectiveInputNAV > 0) ||
+    !Number.isFinite(quote.stableOutNAV)
+  ) {
+    return null;
+  }
+  const discount = 1 - quote.stableOutNAV / quote.effectiveInputNAV;
+  return Number.isFinite(discount) ? Math.max(0, discount) * 10_000 : null;
+}
+
 export function dayV3DiscountBps(
   payoutPer100: number | null,
   soldPer100: number = DAY_V3_RESTOCK_SENIOR_BASIS,
@@ -105,16 +137,10 @@ export function dayV3RestockHurdle(
 }
 
 export interface DayV3RestockCheckInputs {
-  /**
-   * The lowest fee-inclusive payout per $100 of Senior the design permits. The
-   * live template's modeled worst case when it has resolved, otherwise the
-   * issuer's own payout floor, which the deployed pool must still honour.
-   */
-  worstPayoutPer100: number | null;
-  /** Proceeds actually received for the selected sale, when the pool is sized. */
-  selectedSaleProceeds: number | null;
-  /** The selected immediate exit, per $100 Senior. */
-  selectedSalePer100: number | null;
+  /** Discount at the deepest fill the pool can do, from its own quote. */
+  worstCaseDiscountBps: number | null;
+  /** Discount at the fill the promised exit takes, from the same pool. */
+  selectedDiscountBps: number | null;
   hurdle: DayV3RestockHurdle;
 }
 
@@ -152,9 +178,7 @@ export interface DayV3RestockCheck {
 export function dayV3RestockCheck(
   inputs: DayV3RestockCheckInputs,
 ): DayV3RestockCheck {
-  const { hurdle, selectedSalePer100, selectedSaleProceeds, worstPayoutPer100 } =
-    inputs;
-  const worstCaseDiscountBps = dayV3DiscountBps(worstPayoutPer100);
+  const { hurdle, selectedDiscountBps, worstCaseDiscountBps } = inputs;
   if (worstCaseDiscountBps === null || !Number.isFinite(hurdle.hurdleBps)) {
     return {
       status: "unavailable",
@@ -164,11 +188,6 @@ export function dayV3RestockCheck(
       selectedMarginBps: null,
     };
   }
-
-  const selectedDiscountBps =
-    selectedSalePer100 === null || selectedSalePer100 <= 0
-      ? null
-      : dayV3DiscountBps(selectedSaleProceeds, selectedSalePer100);
 
   return {
     status:

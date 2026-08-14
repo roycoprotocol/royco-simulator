@@ -138,7 +138,7 @@ export default function DayV3LossWaterfall({
       </CardHeader>
 
       <CardContent className="grid grid-cols-1 gap-3 md:grid-cols-2 md:items-start">
-        <div className="flex min-w-0 flex-col gap-4">
+        <div className="flex min-w-0 flex-col gap-3">
           {/* The claim, stated once and large, so the section answers its own
               question before any detail is read. */}
           <p className="max-w-[64ch] text-[14.5px] leading-relaxed text-[var(--foreground)]">
@@ -228,7 +228,7 @@ export default function DayV3LossWaterfall({
 
           {/* Outputs. No fill, hairline rule, mono figures: read, not moved. */}
           <div className="grid grid-cols-1 gap-3 border-t border-[var(--border-subtle)] pt-3 sm:grid-cols-3">
-            <div className="flex flex-col gap-0.5">
+            <div className="flex flex-col gap-1">
               <span className="text-[9.5px] font-semibold uppercase tracking-[0.1em] text-[var(--tertiary)]">
                 Sr keeps
               </span>
@@ -239,7 +239,7 @@ export default function DayV3LossWaterfall({
                 of every {stake100(unit)} held
               </span>
             </div>
-            <div className="flex flex-col gap-0.5">
+            <div className="flex flex-col gap-1">
               <span className="text-[9.5px] font-semibold uppercase tracking-[0.1em] text-[var(--tertiary)]">
                 Sr loses
               </span>
@@ -259,7 +259,7 @@ export default function DayV3LossWaterfall({
                     : "the source has not fallen"}
               </span>
             </div>
-            <div className="flex flex-col gap-0.5">
+            <div className="flex flex-col gap-1">
               <span className="text-[9.5px] font-semibold uppercase tracking-[0.1em] text-[var(--tertiary)]">
                 Cover left
               </span>
@@ -277,7 +277,7 @@ export default function DayV3LossWaterfall({
           </div>
         </div>
 
-        <div className="flex min-w-0 flex-col gap-4">
+        <div className="flex min-w-0 flex-col gap-3">
           <DayV3LossChart
             limit={limit}
             marker={selected}

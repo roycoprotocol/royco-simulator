@@ -80,7 +80,7 @@ function DayV3CapitalStack({
           </div>
         </CardHeader>
         <CardContent className="grid grid-cols-1 gap-3 md:grid-cols-2 md:items-stretch">
-          <div className="flex min-w-0 flex-col justify-center rounded-xl border border-[var(--border-subtle)] bg-[var(--foundation)] px-5 py-4">
+          <div className="flex min-w-0 flex-col justify-center rounded-xl border border-[var(--border-subtle)] bg-[var(--foundation)] px-3 py-3">
             <div className="mx-auto w-full max-w-[360px]">
               <DayV3StackDiagram
                 jt={per100(jt)}
@@ -99,7 +99,7 @@ function DayV3CapitalStack({
 
           <div className="flex min-w-0 flex-col gap-4">
             <div className="flex min-w-0 flex-1 flex-col gap-3">
-              <div className="flex min-w-0 flex-1 items-center justify-between gap-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--foundation)] px-4 py-3">
+              <div className="flex min-w-0 flex-1 items-center justify-between gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--foundation)] px-3 py-3">
                 <span className="flex min-w-0 flex-col gap-1">
                   <span className="text-[9px] font-semibold uppercase tracking-[0.1em] text-[var(--tertiary)]">
                     Senior
@@ -112,7 +112,7 @@ function DayV3CapitalStack({
                   {unitRatio(100, unit)}
                 </strong>
               </div>
-              <div className="flex min-w-0 flex-1 items-center justify-between gap-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--foundation)] px-4 py-3">
+              <div className="flex min-w-0 flex-1 items-center justify-between gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--foundation)] px-3 py-3">
                 <span className="flex min-w-0 flex-col gap-1">
                   <span className="text-[9px] font-semibold uppercase tracking-[0.1em] text-[var(--tertiary)]">
                     Junior
@@ -127,7 +127,7 @@ function DayV3CapitalStack({
                     : unitRatio(0, unit)}
                 </strong>
               </div>
-              <div className="flex min-w-0 flex-1 items-center justify-between gap-4 rounded-xl border border-dashed border-[var(--border-subtle)] px-4 py-3">
+              <div className="flex min-w-0 flex-1 items-center justify-between gap-3 rounded-xl border border-dashed border-[var(--border-subtle)] px-3 py-3">
                 <span className="flex min-w-0 flex-col gap-1">
                   <span className="text-[9px] font-semibold uppercase tracking-[0.1em] text-[var(--tertiary)]">
                     SLP
@@ -223,7 +223,7 @@ function DayV3CapitalStack({
       </CardHeader>
 
       <CardContent className="grid grid-cols-1 gap-3 lg:grid-cols-2 lg:items-stretch">
-        <div className="flex min-w-0 flex-col justify-center rounded-xl border border-[var(--border-subtle)] bg-[var(--foundation)] px-5 py-4">
+        <div className="flex min-w-0 flex-col justify-center rounded-xl border border-[var(--border-subtle)] bg-[var(--foundation)] px-3 py-3">
           <div className="mx-auto w-full max-w-[420px]">
             {/* Per 100 of Senior, exactly like the table beside it. Passing the
                 raw balances printed $40000000.0 on the Senior block: `initialST`
@@ -243,11 +243,11 @@ function DayV3CapitalStack({
           </div>
         </div>
 
-        <div className="flex min-w-0 flex-col gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--card)] p-4">
+        <div className="flex min-w-0 flex-col gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--card)] p-3">
           {/* One column rhythm for the whole block, set once here and reused by
             every row and the total, so the three numeric columns line up
             without any row restating a width. */}
-          <div className="hidden items-baseline gap-3 pl-3.5 pr-3.5 text-[9px] font-semibold uppercase tracking-[0.08em] text-[var(--tertiary)] sm:flex">
+          <div className="hidden items-baseline gap-3 px-3 text-[9px] font-semibold uppercase tracking-[0.08em] text-[var(--tertiary)] sm:flex">
             <span className="min-w-0 flex-1">Leg</span>
             <span className="w-[86px] shrink-0 text-right">Opening target</span>
             <span className="w-[86px] shrink-0 text-right">100% floor</span>
@@ -257,7 +257,7 @@ function DayV3CapitalStack({
           <ul className="flex flex-col gap-2">
             {legs.map((leg) => (
               <li
-                className={`flex min-w-0 flex-col gap-0.5 rounded-lg border px-3 py-3 ${
+                className={`flex min-w-0 flex-col gap-2 rounded-lg border px-3 py-3 ${
                   leg.funded
                     ? "border-[var(--border-subtle)] bg-[var(--foundation)]"
                     : "border-dashed border-[var(--border-subtle)]"
@@ -272,8 +272,8 @@ function DayV3CapitalStack({
                     : undefined
                 }
               >
-                <span className="grid grid-cols-3 items-start gap-x-3 gap-y-2 sm:flex sm:items-center sm:gap-3">
-                  <span className="col-span-3 flex min-w-0 flex-wrap items-baseline gap-x-2 gap-y-0.5 sm:flex-1">
+                <span className="grid grid-cols-3 items-start gap-3 sm:flex sm:items-center sm:gap-3">
+                  <span className="col-span-3 flex min-w-0 flex-wrap items-baseline gap-2 sm:flex-1">
                     <span className="shrink-0 text-[11px] font-semibold uppercase tracking-[0.1em] text-[var(--tertiary)]">
                       {leg.name}
                     </span>
@@ -328,8 +328,8 @@ function DayV3CapitalStack({
 
           {/* Totals are grouped away from the three funded positions so summary
             rows cannot be mistaken for additional tranches. */}
-          <div className="mt-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--card)] px-3.5">
-            <div className="grid grid-cols-3 items-start gap-x-3 gap-y-2 py-2.5 sm:flex sm:items-center sm:gap-3">
+          <div className="mt-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--card)] px-3">
+            <div className="grid grid-cols-3 items-start gap-3 py-3 sm:flex sm:items-center sm:gap-3">
               <span className="col-span-3 flex min-w-0 flex-col gap-0.5 sm:flex-1">
                 <span className="text-[11px] font-semibold text-[var(--secondary)]">
                   In the yield source
@@ -382,7 +382,7 @@ function DayV3CapitalStack({
               </span>
             </div>
 
-            <div className="grid grid-cols-3 items-baseline gap-x-3 gap-y-2 border-t border-[var(--border-subtle)] py-2.5 sm:flex sm:gap-3">
+            <div className="grid grid-cols-3 items-baseline gap-3 border-t border-[var(--border-subtle)] py-3 sm:flex sm:gap-3">
               <span className="col-span-3 min-w-0 text-[11px] font-semibold text-[var(--secondary)] sm:flex-1">
                 Total capital
               </span>

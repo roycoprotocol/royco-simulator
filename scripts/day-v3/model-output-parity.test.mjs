@@ -184,18 +184,27 @@ assert.doesNotMatch(
   /<DayV3RestockCheck/,
   "The refill check is a model, not another input to answer",
 );
-// The worst case an arbitrageur sees is the design's own promise. Reading it
-// off the shared engine's shallow fallback pool reported 50 bps where a $95
-// payout floor permits 500.
+// An arbitrageur trades against the pool, so both discounts are quotes from one
+// engine run against one pool: the deepest fill it can do, and the fill the
+// promised exit takes. Two earlier versions stitched a canonical scalar to a
+// live input, which let the payout floor move nothing at all.
 assert.match(
   summary,
-  /restockWorstPayoutPer100 = exitDisabled[\s\S]*exitView\.lowestPayoutPer100 \?\? minimumProceedsPer100/,
-  "The refill worst case must come from the modeled payout or the issuer floor",
+  /dayV3QuoteDiscountBps\(\s*model\.illustrativeExit\.quote,?\s*\)/,
+  "The selected-sale discount must be a quote for the fill that exit takes",
 );
-assert.doesNotMatch(
+assert.match(
   summary,
-  /quoteSell|boundarySellNAV[\s\S]{0,200}restock/,
-  "The refill check must not reprice sales against the illustrative pool",
+  /dayV3QuoteDiscountBps\(\s*model\.explainer\.liquidity\.boundaryQuote,?\s*\)/,
+  "The worst case must be a quote for the deepest fill the pool can do",
+);
+// The band IS the pool's maximum discount. Pinned to the market's constant, an
+// issuer could drag the payout floor from $99 to $50 and the pool would not
+// move; measured on the shared engine, that range is 0.60% to 28% of discount.
+assert.match(
+  summary,
+  /const floorBandPct =[\s\S]*100 - minimumProceedsPer100/,
+  "With no live template the payout floor must set the pool's maximum discount",
 );
 assert.doesNotMatch(
   goals,

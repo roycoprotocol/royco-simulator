@@ -175,7 +175,7 @@ export default function DayV3MarketSelect({
         aria-expanded={open}
         aria-haspopup="listbox"
         className={cn(
-          "group flex min-h-[76px] w-full cursor-pointer items-center justify-between gap-4 rounded-xl border bg-[var(--card)] px-4 py-3 text-left hover:border-[var(--secondary)]",
+          "group flex w-full cursor-pointer items-center justify-between gap-3 rounded-xl border bg-[var(--card)] px-3 py-3 text-left hover:border-[var(--secondary)]",
           DAY_V3_CONTROL_MOTION,
           DAY_V3_CONTROL_FOCUS,
           open
@@ -212,7 +212,7 @@ export default function DayV3MarketSelect({
           </span>
         </span>
         <span className="flex shrink-0 items-center gap-3">
-          <span className="flex flex-col items-end gap-0.5">
+          <span className="flex flex-col items-end gap-1">
             <span className="font-mono text-[15px] font-bold leading-none tabular-nums">
               {percent(selectedMarket.defaults.sourceApy)}
             </span>
@@ -239,7 +239,7 @@ export default function DayV3MarketSelect({
 
       {open ? (
         <div className="absolute inset-x-0 top-[calc(100%+8px)] z-50 overflow-hidden rounded-xl border border-[var(--border-subtle)] bg-[var(--background)] shadow-[0_18px_45px_-18px_rgba(23,25,31,0.55)]">
-          <div className="flex items-center justify-between border-b border-[var(--border-subtle)] px-4 py-2.5">
+          <div className="flex items-center justify-between border-b border-[var(--border-subtle)] px-3 py-3">
             <span className="text-[10px] font-semibold uppercase tracking-[0.11em] text-[var(--tertiary)]">
               Choose a source
             </span>
@@ -251,7 +251,7 @@ export default function DayV3MarketSelect({
             aria-activedescendant={`${listboxId}-option-${activeIndex}`}
             aria-label="Listed yield sources"
             className={cn(
-              "max-h-[330px] overflow-y-auto rounded-lg p-1.5 focus:outline-none",
+              "max-h-[330px] overflow-y-auto rounded-lg p-1 focus:outline-none",
               DAY_V3_CONTROL_FOCUS,
             )}
             id={listboxId}
@@ -267,7 +267,7 @@ export default function DayV3MarketSelect({
                 <button
                   aria-selected={selected}
                   className={cn(
-                    "grid min-h-14 w-full cursor-pointer grid-cols-[24px_minmax(0,1fr)_auto] items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors focus:outline-none",
+                    "grid min-h-11 w-full cursor-pointer grid-cols-[24px_minmax(0,1fr)_auto] items-center gap-2 rounded-lg px-2 py-2 text-left transition-colors focus:outline-none",
                     selected
                       ? "bg-[#fff1bd]"
                       : "hover:bg-[var(--foundation)]",
@@ -305,7 +305,7 @@ export default function DayV3MarketSelect({
                       />
                     </svg>
                   </span>
-                  <span className="flex min-w-0 flex-col gap-0.5">
+                  <span className="flex min-w-0 flex-col gap-1">
                     <span className="truncate text-[12.5px] font-semibold leading-tight">
                       {sourceName(market)}
                     </span>
@@ -316,7 +316,7 @@ export default function DayV3MarketSelect({
                       {historyLabel(market)}
                     </span>
                   </span>
-                  <span className="flex flex-col items-end gap-0.5 pl-2">
+                  <span className="flex flex-col items-end gap-1 pl-2">
                     <span className="font-mono text-[12px] font-bold leading-none tabular-nums">
                       {percent(market.defaults.sourceApy)}
                     </span>

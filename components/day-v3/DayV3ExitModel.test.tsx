@@ -426,45 +426,27 @@ assert.doesNotMatch(unavailableMarkup, /Scenario APYs continue/);
 assert.doesNotMatch(unavailableMarkup, /Finalize in Royco Deploy/);
 assert.doesNotMatch(unavailableMarkup, /Retry validation/);
 
-// Both halves of the arbitrage discount must come from one response. Dividing
-// canonical proceeds by the live exit input mixed a figure priced for the
-// previous goal with the number on screen: $10 of proceeds over a $50 sale
-// reported an 8,000 bps discount in a panel whose banner read 60 bps.
+// The arbitrage panel prices one pool: the deepest fill it can do, and the
+// fill the promised exit takes. Nothing is stitched from two sources.
+const restockHurdle = dayV3RestockHurdle({
+  costOfCapitalPct: 20,
+  redemptionDays: 30,
+  seniorApyPct: 4,
+  swapFeeBps: 10,
+});
 const restockView = {
   check: dayV3RestockCheck({
-    hurdle: dayV3RestockHurdle({
-      costOfCapitalPct: 20,
-      redemptionDays: 30,
-      seniorApyPct: 4,
-      swapFeeBps: 10,
-    }),
-    // The canonical response's own sale size, not the input being edited.
-    selectedSalePer100: 10,
-    selectedSaleProceeds: 9.94,
-    worstPayoutPer100: 99.4,
+    hurdle: restockHurdle,
+    selectedDiscountBps: 260,
+    worstCaseDiscountBps: 263,
   }),
-  hurdle: dayV3RestockHurdle({
-    costOfCapitalPct: 20,
-    redemptionDays: 30,
-    seniorApyPct: 4,
-    swapFeeBps: 10,
-  }),
+  hurdle: restockHurdle,
+  maximumDiscountPct: 5,
+  policyBasis: "unresolved" as const,
   selectedSalePer100: 10,
-  stale: true,
-  worstCaseBasis: "modeled" as const,
-  worstPayoutPer100: 99.4,
 };
-assert.equal(
-  restockView.check.selectedDiscountBps?.toFixed(0),
-  "60",
-  "proceeds are measured against the sale they were priced for",
-);
-assert.ok(
-  (restockView.check.worstCaseDiscountBps ?? 0) < 100,
-  "the worst case and the selected sale agree because they share a response",
-);
 
-const staleMarkup = renderToStaticMarkup(
+const restockMarkup = renderToStaticMarkup(
   <DayV3RestockCheck
     costOfCapitalPct={20}
     onCostOfCapitalPct={noop}
@@ -473,24 +455,24 @@ const staleMarkup = renderToStaticMarkup(
     view={restockView}
   />,
 );
-assert.match(staleMarkup, /data-restock-stale="true"/);
-assert.match(staleMarkup, /re-pricing/);
-// Mid-reprice the panel falls back to the live payout floor rather than
-// showing the previous design's numbers, so changing the floor still moves the
-// answer instead of appearing frozen.
-assert.match(staleMarkup, /payout floor you set/);
-assert.match(staleMarkup, /It moves as you change the floor/);
+assert.match(restockMarkup, /data-model-source="shared-day-engine-illustrative-default"/);
+assert.match(restockMarkup, /illustrative pool/);
+// The band the payout floor set is named, because it is the reason the
+// discount is what it is.
+assert.match(restockMarkup, /5\.00% maximum discount is set\s+by your payout floor/);
+assert.match(restockMarkup, /Buys Senior below NAV/);
+assert.match(restockMarkup, /They keep/);
 
-const freshMarkup = renderToStaticMarkup(
+const liveMarkup = renderToStaticMarkup(
   <DayV3RestockCheck
     costOfCapitalPct={20}
     onCostOfCapitalPct={noop}
     onRedemptionDays={noop}
     redemptionDays={30}
-    view={{ ...restockView, stale: false }}
+    view={{ ...restockView, policyBasis: "live" }}
   />,
 );
-assert.doesNotMatch(freshMarkup, /data-restock-stale/);
-assert.doesNotMatch(freshMarkup, /has not sized this exact pool yet/);
+assert.match(liveMarkup, /data-model-source="canonical-rwa-eclp-service"/);
+assert.doesNotMatch(liveMarkup, /illustrative pool/);
 
 console.log("Day V3 exit-model presentation: PASS");

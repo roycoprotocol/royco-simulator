@@ -109,7 +109,7 @@ function Line({
 }) {
   return (
     <div
-      className={`grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-4 py-2 ${
+      className={`grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-3 py-2 ${
         total
           ? "mt-1 border-t border-[var(--border-subtle)]"
           : "border-b border-[var(--border-subtle)] last:border-b-0"
@@ -154,7 +154,7 @@ function BreakdownGroup({
   label: string;
 }) {
   return (
-    <section className="rounded-lg border border-[var(--border-subtle)] bg-[var(--background)] px-3 py-2">
+    <section className="rounded-lg border border-[var(--border-subtle)] bg-[var(--background)] px-3 py-3">
       <h4 className="border-b border-[var(--border-subtle)] pb-2 text-[9.5px] font-semibold uppercase tracking-[0.11em] text-[var(--tertiary)]">
         {label}
       </h4>
