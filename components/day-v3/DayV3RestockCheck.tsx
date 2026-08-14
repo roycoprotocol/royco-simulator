@@ -30,124 +30,167 @@ const bps = (value: number | null, digits = 0) =>
 const dollars = (value: number | null, digits = 2) =>
   value === null || !Number.isFinite(value) ? "—" : `$${value.toFixed(digits)}`;
 
-function Line({
+/**
+ * One arbitrageur's trade, top to bottom, ending in what they keep.
+ *
+ * This was two bars against a threshold line, which is the comparison but not
+ * the reasoning: a reader still had to subtract three costs in their head to
+ * see why the line sat where it did. The trade is revenue minus costs, so it is
+ * drawn as a waterfall — each bar starts where the last one ended, and the
+ * final bar is the answer. Above zero, the trade happens and the pool refills.
+ */
+type WaterfallStep = {
+  deltaBps: number;
+  label: string;
+  note: string;
+};
+
+/** Hoisted rather than declared inside the chart: a component defined during
+ *  render remounts its subtree on every tick. Geometry arrives as percentages
+ *  so this row never needs the scale. */
+function WaterfallRow({
+  emphasis = false,
+  leftPct,
   label,
   note,
-  value,
+  valueBps,
+  widthPct,
+  zeroPct,
 }: {
+  emphasis?: boolean;
+  leftPct: number;
   label: string;
-  note?: string;
-  value: string;
+  note: string;
+  valueBps: number;
+  widthPct: number;
+  zeroPct: number;
 }) {
+  const gain = valueBps >= 0;
   return (
-    <div className="grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-4 border-b border-[var(--border-subtle)] py-1.5 last:border-b-0">
-      <span className="text-[11px] font-medium text-[var(--secondary)]">
-        {label}
-      </span>
-      <span className="row-span-2 font-mono text-[11.5px] font-semibold tabular-nums whitespace-nowrap">
-        {value}
-      </span>
-      {note ? (
-        <span className="mt-0.5 text-[9.5px] leading-snug text-[var(--tertiary)]">
-          {note}
+    <div className="flex flex-col gap-1">
+      <span className="flex items-baseline justify-between gap-3">
+        <span
+          className={
+            emphasis
+              ? "text-[11px] font-semibold"
+              : "text-[10.5px] font-medium text-[var(--secondary)]"
+          }
+        >
+          {label}
         </span>
-      ) : null}
+        <span
+          className={`font-mono tabular-nums whitespace-nowrap ${emphasis ? "text-[12.5px] font-bold" : "text-[11px] font-semibold"}`}
+          style={
+            emphasis
+              ? {
+                  color: gain
+                    ? "var(--green-emphasis)"
+                    : "var(--gold-emphasis)",
+                }
+              : undefined
+          }
+        >
+          {gain ? "+" : "−"}
+          {Math.abs(valueBps).toFixed(0)} bps
+        </span>
+      </span>
+      <span
+        aria-hidden="true"
+        className={`relative block overflow-hidden rounded-[3px] bg-[var(--foundation)] ${emphasis ? "h-4" : "h-3"}`}
+      >
+        {/* Zero is the only reference that matters, so it is drawn on every
+            track rather than described once underneath. */}
+        <span
+          className="absolute inset-y-0 w-px bg-[var(--foreground)] opacity-25"
+          style={{ left: `${zeroPct}%` }}
+        />
+        <span
+          className="absolute inset-y-0 rounded-[3px]"
+          style={{
+            background: gain
+              ? emphasis
+                ? "var(--theme-green)"
+                : "color-mix(in srgb, var(--theme-green) 78%, transparent)"
+              : emphasis
+                ? "var(--theme-gold)"
+                : "color-mix(in srgb, var(--theme-gold) 72%, transparent)",
+            left: `${leftPct}%`,
+            width: `${widthPct}%`,
+          }}
+        />
+      </span>
+      <span className="text-[9.5px] leading-snug text-[var(--tertiary)]">
+        {note}
+      </span>
     </div>
   );
 }
 
-
 /**
- * The whole question in one picture: what the trade earns against what it
- * needs to earn.
+ * One arbitrageur's trade, top to bottom, ending in what they keep.
  *
- * The threshold used to be explained in a footnote under the bars — "the 56 bps
- * this desk needs" — which asked a reader to map a sentence back onto an
- * unlabelled line. The line labels itself now, and the caption says what
- * crossing it means rather than restating the number.
+ * This was two bars against a threshold line, which is the comparison but not
+ * the reasoning: a reader still had to subtract three costs in their head to
+ * see why the line sat where it did. The trade is revenue minus costs, so it is
+ * drawn as a waterfall — each bar starts where the last one ended, and the
+ * final bar is the answer. Above zero, the trade happens and the pool refills.
  */
-function DiscountBars({
-  hurdleBps,
-  rows,
+function ArbitrageWaterfall({
+  steps,
+  totalBps,
+  totalLabel,
+  totalNote,
 }: {
-  hurdleBps: number;
-  rows: { clears: boolean; label: string; note: string; valueBps: number | null }[];
+  steps: WaterfallStep[];
+  totalBps: number;
+  totalLabel: string;
+  totalNote: string;
 }) {
-  const measured = rows
-    .map((row) => row.valueBps)
-    .filter((value): value is number => value !== null);
-  // Leave headroom past whichever is larger so neither the tallest bar nor the
-  // threshold ever sits flush against the edge, where it stops reading.
-  const scale = Math.max(hurdleBps, ...measured, 1) * 1.18;
-  const hurdleLeft = Math.min(97, (hurdleBps / scale) * 100);
-  // Near either end the centred label would run outside the card, so it
-  // anchors to whichever side has room.
-  const anchor =
-    hurdleLeft > 72
-      ? "translateX(-100%)"
-      : hurdleLeft < 14
-        ? "translateX(0)"
-        : "translateX(-50%)";
+  const bars = steps.reduce<(WaterfallStep & { from: number; to: number })[]>(
+    (acc, step) => {
+      const from = acc.length === 0 ? 0 : acc[acc.length - 1].to;
+      return [...acc, { ...step, from, to: from + step.deltaBps }];
+    },
+    [],
+  );
+
+  const marks = [0, totalBps, ...bars.flatMap((bar) => [bar.from, bar.to])];
+  const low = Math.min(...marks);
+  const high = Math.max(...marks);
+  // A flat span still needs a domain, and every bar needs room to sit inside
+  // the track rather than flush against its edge.
+  const pad = Math.max((high - low) * 0.08, 1);
+  const lo = low - pad;
+  const hi = high + pad;
+  const at = (value: number) => ((value - lo) / (hi - lo)) * 100;
+  const zeroPct = at(0);
+  const geometry = (from: number, to: number) => {
+    const leftPct = at(Math.min(from, to));
+    return { leftPct, widthPct: Math.max(at(Math.max(from, to)) - leftPct, 0.6) };
+  };
 
   return (
-    <div className="flex flex-col gap-2">
-      <div className="relative h-4">
-        <span
-          className="absolute bottom-0 whitespace-nowrap text-[9px] font-semibold uppercase tracking-[0.08em] text-[var(--secondary)]"
-          style={{ left: `${hurdleLeft}%`, transform: anchor }}
-        >
-          Break even · {hurdleBps.toFixed(0)} bps
-        </span>
+    <div className="flex flex-col gap-2.5">
+      {bars.map((bar) => (
+        <WaterfallRow
+          key={bar.label}
+          label={bar.label}
+          note={bar.note}
+          valueBps={bar.deltaBps}
+          zeroPct={zeroPct}
+          {...geometry(bar.from, bar.to)}
+        />
+      ))}
+      <div className="border-t border-[var(--border-subtle)] pt-2.5">
+        <WaterfallRow
+          emphasis
+          label={totalLabel}
+          note={totalNote}
+          valueBps={totalBps}
+          zeroPct={zeroPct}
+          {...geometry(0, totalBps)}
+        />
       </div>
-
-      <div className="relative flex flex-col gap-2.5">
-        {rows.map((row) => (
-          <div className="flex flex-col gap-1" key={row.label}>
-            <span className="flex items-baseline justify-between gap-3">
-              <span className="text-[10.5px] font-medium text-[var(--secondary)]">
-                {row.label}
-              </span>
-              <span className="font-mono text-[11px] font-semibold tabular-nums">
-                {row.valueBps === null
-                  ? "—"
-                  : `${row.valueBps.toFixed(0)} bps`}
-              </span>
-            </span>
-            <span
-              aria-hidden="true"
-              className="relative block h-3 overflow-hidden rounded-full bg-[var(--foundation)]"
-            >
-              <span
-                className="absolute inset-y-0 left-0 rounded-full"
-                style={{
-                  background: row.clears
-                    ? "var(--theme-green)"
-                    : "color-mix(in srgb, var(--theme-gold) 70%, transparent)",
-                  width: `${Math.min(100, ((row.valueBps ?? 0) / scale) * 100)}%`,
-                }}
-              />
-            </span>
-            <span className="text-[9.5px] leading-snug text-[var(--tertiary)]">
-              {row.note}
-            </span>
-          </div>
-        ))}
-
-        {/* One threshold across both bars, so the comparison is spatial. */}
-        <span
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-y-0"
-          style={{ left: `${hurdleLeft}%` }}
-        >
-          <span className="absolute inset-y-0 block w-px bg-[var(--foreground)] opacity-45" />
-        </span>
-      </div>
-
-      <p className="text-[9.5px] leading-snug text-[var(--tertiary)]">
-        A bar that reaches past the line earns more than the trade costs, so an
-        arbitrageur buys the discounted Senior and the pool refills. A bar short
-        of it does not, and the pool stays where the seller left it.
-      </p>
     </div>
   );
 }
@@ -190,10 +233,11 @@ export default function DayV3RestockCheck({
   const worstCasePays = resolved && (check.worstCaseMarginBps ?? -1) >= 0;
   const selectedPays = resolved && check.status === "profitable";
   const unpriced = resolved && check.status === "no-selected-sale";
-  const worstCaseSource =
-    worstCaseBasis === "modeled"
-      ? "the live template's lowest modeled payout"
-      : `your ${dollars(worstPayoutPer100)} payout floor per $100`;
+  // The live template sizes the pool to the promised sale, so the deepest point
+  // and the selected sale usually coincide.
+  const deeperExists =
+    resolved &&
+    (check.worstCaseDiscountBps ?? 0) - (check.selectedDiscountBps ?? 0) >= 0.5;
 
   return (
     <Card
@@ -319,71 +363,73 @@ export default function DayV3RestockCheck({
               </p>
             </div>
 
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <section className="rounded-lg border border-[var(--border-subtle)] bg-[var(--background)] px-3 py-2.5">
-                <h4 className="mb-2.5 border-b border-[var(--border-subtle)] pb-1.5 text-[9.5px] font-semibold uppercase tracking-[0.11em] text-[var(--tertiary)]">
-                  What an arbitrageur earns
-                </h4>
-                <DiscountBars
-                  hurdleBps={hurdle.hurdleBps}
-                  rows={[
-                    {
-                      clears: (check.worstCaseMarginBps ?? -1) >= 0,
-                      label: "If the pool is fully drawn down",
-                      note: `the deepest discount this design allows, from ${worstCaseSource}`,
-                      valueBps: check.worstCaseDiscountBps,
-                    },
-                    {
-                      clears: (check.selectedMarginBps ?? -1) >= 0,
-                      label: "After the exit you promised",
-                      note: unpriced
-                        ? "priced once the live template sizes the pool"
-                        : `the discount left by selling ${dollars(selectedSalePer100)} of every $100 Senior at once`,
-                      valueBps: check.selectedDiscountBps,
-                    },
-                  ]}
-                />
-              </section>
+            {/* One trade, top to bottom. The two-column split asked a reader
+                to subtract a column of costs from a bar in the other column
+                before the answer existed anywhere on screen. */}
+            <section className="rounded-lg border border-[var(--border-subtle)] bg-[var(--background)] px-3.5 py-3">
+              <h4 className="mb-3 border-b border-[var(--border-subtle)] pb-1.5 text-[9.5px] font-semibold uppercase tracking-[0.11em] text-[var(--tertiary)]">
+                One arbitrageur&apos;s trade, per $100 of Senior they buy
+              </h4>
+              <ArbitrageWaterfall
+                steps={[
+                  {
+                    deltaBps: check.selectedDiscountBps ?? 0,
+                    label: "Buys Senior below NAV",
+                    note: unpriced
+                      ? "priced once the live template sizes the pool"
+                      : `the discount left by selling ${dollars(selectedSalePer100)} of every $100 Senior at once`,
+                  },
+                  {
+                    deltaBps: -hurdle.financingBps,
+                    label: `Funds the ${redemptionDays}-day wait`,
+                    note: `${costOfCapitalPct.toFixed(1)}% a year on the money tied up until NAV comes back`,
+                  },
+                  {
+                    deltaBps: hurdle.seniorCarryBps,
+                    label: "Collects Senior's yield while waiting",
+                    note: "they hold Senior until it redeems, so the wait pays for part of itself",
+                  },
+                  {
+                    deltaBps: -hurdle.swapFeeBps,
+                    label: "Pays the pool fee to buy in",
+                    note: "the live swap fee, charged on the way in",
+                  },
+                ]}
+                totalBps={check.selectedMarginBps ?? 0}
+                totalLabel={
+                  selectedPays ? "They keep" : "They lose"
+                }
+                totalNote={
+                  selectedPays
+                    ? "above zero, so the trade happens and the pool refills"
+                    : "below zero, so nobody buys and the pool stays where the seller left it"
+                }
+              />
+              <p className="mt-3 border-t border-[var(--border-subtle)] pt-2.5 text-[9.5px] leading-snug text-[var(--tertiary)]">
+                {deeperExists ? (
+                  <>
+                    Drawn down further this design lets Senior fall to{" "}
+                    {bps(check.worstCaseDiscountBps)} below NAV, leaving{" "}
+                    {bps(check.worstCaseMarginBps)} on the same trade. That is
+                    the best it ever gets, so if that is negative no sale
+                    attracts an arbitrageur at any depth.{" "}
+                  </>
+                ) : (
+                  <>
+                    This is also as deep as the design goes, so it is the best
+                    the trade ever looks.{" "}
+                  </>
+                )}
+                The discount comes from{" "}
+                {worstCaseBasis === "modeled"
+                  ? "the live template's lowest modeled payout"
+                  : `the ${dollars(worstPayoutPer100)} payout floor you set`}
+                ; the Senior offset assumes the source performs at its modeled
+                rate. Royco Deploy revalidates against the real settlement
+                schedule.
+              </p>
+            </section>
 
-              <section className="rounded-lg border border-[var(--border-subtle)] bg-[var(--background)] px-3 py-2">
-                <h4 className="border-b border-[var(--border-subtle)] pb-1.5 text-[9.5px] font-semibold uppercase tracking-[0.11em] text-[var(--tertiary)]">
-                  What that trade costs them
-                </h4>
-                <Line
-                  label="Cost of capital over the wait"
-                  note={`${costOfCapitalPct.toFixed(1)}% a year for ${redemptionDays} ${redemptionDays === 1 ? "day" : "days"}`}
-                  value={bps(hurdle.financingBps)}
-                />
-                <Line
-                  label="Senior yield earned while waiting"
-                  note="they hold Senior until it redeems, so they collect Senior's rate"
-                  value={`-${bps(hurdle.seniorCarryBps)}`}
-                />
-                <Line
-                  label="Fee to trade back in"
-                  note="the live pool fee, paid on the way in"
-                  value={bps(hurdle.swapFeeBps)}
-                />
-                <div className="flex items-center justify-between gap-3 pt-2">
-                  <span className="text-[11px] font-semibold">
-                    Break-even discount
-                  </span>
-                  <span className="font-mono text-[12.5px] font-bold tabular-nums">
-                    {bps(hurdle.hurdleBps)}
-                  </span>
-                </div>
-              </section>
-            </div>
-
-            <p className="text-[9.5px] leading-snug text-[var(--tertiary)]">
-              Both discounts are fee-inclusive payouts from the exit design
-              above.{" "}
-              {worstCaseBasis === "modeled"
-                ? "The worst case is the live template's lowest modeled payout."
-                : "Until the template sizes the pool, it is the floor you set."}{" "}
-              The Senior offset assumes the source performs at its modeled rate.
-              Royco Deploy revalidates against the real settlement schedule.
-            </p>
           </>
         )}
       </CardContent>
