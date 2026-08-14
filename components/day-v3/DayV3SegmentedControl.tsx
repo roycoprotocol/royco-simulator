@@ -3,16 +3,12 @@
 import DayV3Button from "@/components/day-v3/DayV3Button";
 import { cn } from "@/lib/utils";
 
-const CONTROL_SIZES = {
-  sm: "min-h-11",
-  md: "min-h-14",
-  lg: "min-h-16",
-} as const;
-
+// One 44px pressable item at every size, so `size` changes type and nothing
+// else. The container used to declare 44/56/64 and render 54/58/58.
 const ITEM_SIZES = {
-  sm: "min-h-11 min-w-16 px-3 py-2 text-[12px]",
-  md: "min-h-12 px-3 py-2 text-[12px]",
-  lg: "min-h-12 px-4 py-2 text-[15px]",
+  sm: "min-h-11 px-3 py-2 text-[12px]",
+  md: "min-h-11 px-3 py-2 text-[12px]",
+  lg: "min-h-11 px-3 py-2 text-[15px]",
 } as const;
 
 /** One visual and keyboard pattern for every short, mutually exclusive choice. */
@@ -29,7 +25,7 @@ export default function DayV3SegmentedControl<Value extends string>({
   className?: string;
   onValueChange: (value: Value) => void;
   options: readonly { label: string; value: Value }[];
-  size?: keyof typeof CONTROL_SIZES;
+  size?: keyof typeof ITEM_SIZES;
   /** A two-way switch changes sides even when its selected half is clicked. */
   toggleOnSelected?: boolean;
   value: Value;
@@ -39,7 +35,6 @@ export default function DayV3SegmentedControl<Value extends string>({
       aria-label={ariaLabel}
       className={cn(
         "grid gap-1 rounded-xl border border-[var(--border-subtle)] bg-[var(--foundation)] p-1 shadow-inner",
-        CONTROL_SIZES[size],
         className,
       )}
       role="group"

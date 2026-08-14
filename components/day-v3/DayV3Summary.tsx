@@ -76,7 +76,10 @@ import {
 import type { DayV3Overrides } from "@/lib/day-v3/types";
 import type { DayV3SimulationPoolDesignGoals } from "@/lib/day-v3/simulation-pool-design";
 import { buildDayYieldDraftMarket } from "@/lib/day-simulator-template/explorer-market";
-import { dayPoolSeniorWeight } from "@/lib/day-simulator-template/capital-sizing";
+import {
+  dayCapitalAtUtilization,
+  dayPoolSeniorWeight,
+} from "@/lib/day-simulator-template/capital-sizing";
 import type { EclpParams } from "@/lib/day/engine/eclp";
 import { DAY_ECLP_SIMULATION_LAMBDA } from "@/lib/day/engine/engine";
 import { Sim } from "@/lib/day/engine/runner";
@@ -636,6 +639,15 @@ export default function DayV3Summary({
         quote: opening.previewSecondarySell(requestedExitNAV),
       },
       explainer: buildDayExplainerMetrics(cfg, balances),
+      // Coverage is read at 100% utilization, where Junior has no operating
+      // headroom left. The opening stack above carries headroom above the
+      // requirement, so drawing the loss path on it overstates protection by
+      // the size of that headroom. Liquidity stays on the opening pool, which
+      // is the pool a seller actually trades into.
+      coverageExplainer: buildDayExplainerMetrics(
+        cfg,
+        dayCapitalAtUtilization(effective, terms, 1),
+      ).coverage,
     };
   }, [
     inputs.bandPct,
@@ -1164,18 +1176,34 @@ export default function DayV3Summary({
   const restockWorstPayoutPer100 = exitDisabled
     ? null
     : (exitView.lowestPayoutPer100 ?? minimumProceedsPer100);
+  // Both halves of this division must come from the same response. Dividing
+  // the canonical proceeds by the live exit input mixed a figure priced for the
+  // previous goal with the number now on screen: moving the sale from $10 to
+  // $50 while the service re-resolved produced $10 / $50, a 8,000 bps discount,
+  // in a panel whose banner still read 60 bps from the same stale result.
+  const restockSalePer100 = exitDisabled ? 0 : exitView.sellablePer100;
   const restockView: DayV3RestockView = {
     check:
       restockHurdle === null || restockWorstPayoutPer100 === null
         ? null
         : dayV3RestockCheck({
             hurdle: restockHurdle,
-            selectedSalePer100: modeledImmediateExitSharePct,
+            selectedSalePer100: restockSalePer100,
             selectedSaleProceeds: exitView.proceeds,
             worstPayoutPer100: restockWorstPayoutPer100,
           }),
     hurdle: restockHurdle,
-    selectedSalePer100: modeledImmediateExitSharePct,
+    selectedSalePer100: restockSalePer100,
+    // While the service re-prices, the last valid result stays on screen. It
+    // describes the previous design, so the panel says so rather than passing
+    // it off as a verdict on the market currently being edited.
+    stale:
+      !exitDisabled &&
+      (activePoolDesign.status === "resolving" ||
+        (exitView.sellablePer100 !== null &&
+          modeledImmediateExitSharePct !== null &&
+          Math.abs(exitView.sellablePer100 - modeledImmediateExitSharePct) >
+            0.001)),
     worstCaseBasis:
       restockWorstPayoutPer100 === null
         ? "unresolved"
@@ -1280,13 +1308,13 @@ export default function DayV3Summary({
     // gave each control a 644px cell to hold three characters, so every field
     // read as a banner. At 1180px a cell is about 545px, which is a control
     // with its label and its note on one comfortable measure.
-    <main className="royco-v3 mx-auto flex w-full max-w-[1180px] flex-col gap-5 px-5 py-6 sm:px-6 sm:py-7">
+    <main className="royco-v3 mx-auto flex w-full max-w-[1180px] flex-col gap-6 px-6 py-6">
       <DayV3Hero />
 
       {/* One short questionnaire owns every visible model input. */}
       <section
         aria-labelledby="day-v3-inputs-heading"
-        className="flex flex-col gap-3 rounded-2xl border border-[var(--border-subtle)] bg-[var(--foundation)] px-5 py-4 shadow-[0_6px_22px_-14px_rgba(23,25,31,0.4)]"
+        className="flex flex-col gap-3 rounded-2xl border border-[var(--border-subtle)] bg-[var(--foundation)] px-4 py-4 shadow-[0_6px_22px_-14px_rgba(23,25,31,0.4)]"
       >
         <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1">
           <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
@@ -1466,7 +1494,7 @@ export default function DayV3Summary({
         aria-labelledby="day-v3-positions-heading"
         className="overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--foundation)] shadow-[0_6px_22px_-14px_rgba(23,25,31,0.4)]"
       >
-        <div className="flex flex-wrap items-center justify-between gap-3 px-5 pb-2 pt-4">
+        <div className="flex flex-wrap items-center justify-between gap-3 px-4 pb-3 pt-4">
           <div className="flex items-center gap-2">
             <h2
               className="text-[13px] font-semibold tracking-[-0.01em]"
@@ -1526,10 +1554,10 @@ export default function DayV3Summary({
             </div>
           ))}
         </div>
-        <div className="hidden grid-cols-1 gap-3 px-4 pb-4 pt-2 md:grid md:grid-cols-3">
+        <div className="hidden grid-cols-1 gap-3 px-4 pb-4 pt-0 md:grid md:grid-cols-3">
           {positions.map((position) => (
             <Card
-              className="overflow-hidden px-0"
+              className="overflow-hidden"
               key={position.short}
               style={position.funded ? undefined : { borderStyle: "dashed" }}
               weight={position.funded ? "primary" : "default"}
@@ -1543,7 +1571,7 @@ export default function DayV3Summary({
                   height: 3,
                 }}
               />
-              <CardHeader className="px-6 pb-4">
+              <CardHeader>
                 <div className="flex items-center justify-between gap-2">
                   <CardTitle
                     className="text-[11px] font-semibold uppercase tracking-[0.1em] text-[var(--tertiary)]"
@@ -1559,7 +1587,7 @@ export default function DayV3Summary({
                 </div>
                 <CardNote>{position.holds}</CardNote>
               </CardHeader>
-              <CardContent className="px-4 pb-4 flex flex-col gap-2 px-6">
+              <CardContent className="flex flex-col gap-3">
                 <div className="flex items-baseline gap-1.5">
                   <span
                     className="font-mono text-[clamp(34px,3.2vw,44px)] font-bold leading-[0.92] tracking-[-0.03em] tabular-nums"
@@ -1600,7 +1628,7 @@ export default function DayV3Summary({
         className="flex flex-col gap-4"
         data-accountant-source="runDayTargetScenario-and-buildDayExplainerMetrics"
       >
-        <div className="flex flex-col gap-1 px-1 pb-1">
+        <div className="flex flex-col gap-1">
           <span className="text-[9px] font-semibold uppercase tracking-[0.12em] text-[var(--tertiary)]">
             {inputs.policyBasis === "live"
               ? "Live market models"
@@ -1657,7 +1685,7 @@ export default function DayV3Summary({
                   title="Senior protection"
                 >
                   <DayV3LossWaterfall
-                    metrics={model.explainer.coverage}
+                    metrics={model.coverageExplainer}
                     unit={returnUnit}
                   />
                 </DayV3ModelGroup>
@@ -1687,7 +1715,7 @@ export default function DayV3Summary({
                       their content needs, and the refill check grew from 700px
                       to 889px for the privilege. */}
                   <div
-                    className="flex min-w-0 flex-col gap-4"
+                    className="flex min-w-0 flex-col gap-3"
                     data-model-column="exit"
                   >
                     <DayV3ExitModel
@@ -1713,7 +1741,7 @@ export default function DayV3Summary({
                         data-prerequisite-state="exit-inputs"
                         weight="quiet"
                       >
-                        <CardHeader className="gap-0.5 px-4 pt-3.5">
+                        <CardHeader>
                           <CardTitle className="text-[13.5px]">
                             Complete the exit setup above
                           </CardTitle>
@@ -1777,7 +1805,7 @@ export default function DayV3Summary({
           stack of differently proportioned slabs. */}
               {sourceApyPct === null ? (
                 <Card weight="quiet">
-                  <CardHeader className="gap-0.5 px-4 pt-3.5">
+                  <CardHeader>
                     <CardTitle>Source yield required</CardTitle>
                     <CardNote>
                       Enter the custom source&apos;s net annual yield to
@@ -1788,7 +1816,7 @@ export default function DayV3Summary({
                 </Card>
               ) : displayedReturnState !== "ready" ? (
                 <Card data-model-state={displayedReturnState} weight="quiet">
-                  <CardHeader className="gap-0.5 px-4 pt-3.5">
+                  <CardHeader>
                     <CardTitle>Return models are waiting for market terms</CardTitle>
                     <CardNote>
                       Complete or revise the Senior exit above. Return charts do not use fallback fees or pool parameters.
@@ -1801,15 +1829,15 @@ export default function DayV3Summary({
                 // was tried and is worse — the two premium curves go vertical
                 // at 541px and the column runs to 783px. The chart is simply
                 // taller instead, which fills the row with signal.
-                <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-2">
+                <div className="grid grid-cols-1 items-start gap-3 lg:grid-cols-2">
                   <Card weight="quiet">
-                    <CardHeader className="gap-0.5 px-4 pt-3.5">
+                    <CardHeader>
                       <CardTitle>Growth over a year</CardTitle>
                       <CardNote>
                         Compounded from the scenario annual rates above.
                       </CardNote>
                     </CardHeader>
-                    <CardContent className="px-4 pb-4">
+                    <CardContent>
                       <DayV3Chart data={chartData} unit={returnUnit} />
                     </CardContent>
                   </Card>

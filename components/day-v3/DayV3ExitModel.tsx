@@ -117,7 +117,7 @@ export default function DayV3ExitModel({
             : "canonical-rwa-eclp-service"
       }
     >
-      <CardHeader className="gap-0.5 px-4 pt-3.5">
+      <CardHeader>
         <div className="flex items-baseline justify-between gap-2">
           <CardTitle className="text-[13.5px]">Exit model</CardTitle>
           <DayV3DocsLink label="SLP mechanics" topic="slpTranche" />
@@ -131,9 +131,9 @@ export default function DayV3ExitModel({
         </CardNote>
       </CardHeader>
 
-      <CardContent className="px-4 pb-4 flex flex-col gap-4">
+      <CardContent className="flex flex-col gap-3">
         {!disabled ? (
-          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <ComparisonBar
               requested={promisedExitSharePct}
               requestedLabel="Selected sale / $100"
@@ -168,7 +168,7 @@ export default function DayV3ExitModel({
             />
           </div>
         ) : modeled ? null : needsInputs ? (
-          <div className="rounded-xl border border-dashed border-[var(--border-subtle)] bg-[var(--foundation)] px-4 py-5 text-center">
+          <div className="rounded-xl border border-dashed border-[var(--border-subtle)] bg-[var(--foundation)] px-3 py-3 text-center">
             <strong className="text-[13px] font-semibold">
               Complete the exit terms above
             </strong>
@@ -179,7 +179,7 @@ export default function DayV3ExitModel({
             </p>
           </div>
         ) : exit.status === "resolving" || exit.message ? (
-          <p className="rounded-lg border border-dashed border-[var(--border-subtle)] px-3.5 py-3 text-[11.5px] leading-relaxed text-[var(--secondary)]">
+          <p className="rounded-lg border border-dashed border-[var(--border-subtle)] px-3 py-3 text-[11.5px] leading-relaxed text-[var(--secondary)]">
             {exit.status === "resolving"
               ? "Refreshing the live template and recalculating this model…"
               : exit.message}

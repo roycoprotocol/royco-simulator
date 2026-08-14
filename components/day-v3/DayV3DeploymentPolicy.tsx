@@ -291,7 +291,7 @@ export default function DayV3DeploymentPolicy({
           variant="inline"
         >
           <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-            <p className="rounded-xl border border-dashed border-[var(--border-subtle)] px-4 py-3 text-[10.5px] leading-relaxed text-[var(--secondary)]">
+            <p className="rounded-xl border border-dashed border-[var(--border-subtle)] px-3 py-3 text-[10.5px] leading-relaxed text-[var(--secondary)]">
               <strong className="block text-[11px] text-[var(--foreground)]">
                 Oracle dependency
               </strong>
@@ -301,7 +301,7 @@ export default function DayV3DeploymentPolicy({
               remains a modeling fact, not an EntryPoint contract field.
             </p>
             {slpEnabled ? (
-            <p className="rounded-xl border border-dashed border-[var(--border-subtle)] px-4 py-3 text-[10.5px] leading-relaxed text-[var(--secondary)]">
+            <p className="rounded-xl border border-dashed border-[var(--border-subtle)] px-3 py-3 text-[10.5px] leading-relaxed text-[var(--secondary)]">
               <strong className="block text-[11px] text-[var(--foreground)]">
                 Exit-asset dependency
               </strong>
@@ -315,7 +315,7 @@ export default function DayV3DeploymentPolicy({
         </DayV3Disclosure>
 
         {missing > 0 ? (
-          <p className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--foundation)] px-4 py-3 text-[10.5px] text-[var(--secondary)]">
+          <p className="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--foundation)] px-3 py-3 text-[10.5px] text-[var(--secondary)]">
             <span>
               Resolve every field here before the V3 handoff can continue to
               deployment revalidation.

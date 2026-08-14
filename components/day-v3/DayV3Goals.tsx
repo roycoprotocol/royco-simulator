@@ -235,7 +235,7 @@ export default function DayV3Goals({
         }
         title="Senior protection"
       >
-        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--foundation)] px-3.5 py-2.5">
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--foundation)] px-3 py-3">
           <div className="min-w-0 flex-1">
             <h4 className="text-[12px] font-semibold leading-tight">
               Should Senior have first-loss protection?
@@ -288,7 +288,7 @@ export default function DayV3Goals({
               required
             />
 
-            <div className="flex min-w-0 flex-col gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--foundation)] px-3.5 py-2.5">
+            <div className="flex min-w-0 flex-col gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--foundation)] px-3 py-3">
               <div>
                 <h4 className="text-[12px] font-semibold leading-tight">
                   How should temporary losses be observed?
@@ -339,7 +339,7 @@ export default function DayV3Goals({
             elsewhere is whether the goal was met, so that is all that stays. */}
         <p
           aria-live="polite"
-          className="rounded-xl border border-dashed border-[var(--border-subtle)] px-3.5 py-2.5 text-[10.5px] leading-snug text-[var(--secondary)]"
+          className="rounded-xl border border-dashed border-[var(--border-subtle)] px-3 py-3 text-[10.5px] leading-snug text-[var(--secondary)]"
           data-status={protection.status}
           role="status"
         >
@@ -396,7 +396,7 @@ export default function DayV3Goals({
         }
         title="Senior exit"
       >
-        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--foundation)] px-3.5 py-2.5">
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--foundation)] px-3 py-3">
           <div className="min-w-0 flex-1">
             <h4 className="text-[12px] font-semibold leading-tight">
               Should Senior have an immediate pool exit?
@@ -485,11 +485,11 @@ export default function DayV3Goals({
             capital stack, the payout floor and proceeds in the exit model. Only
             the status of the design belongs beside the inputs. */}
         {exitDisabled ? (
-          <p className="rounded-xl border border-dashed border-[var(--border-subtle)] px-3.5 py-2.5 text-[10.5px] leading-snug text-[var(--secondary)]">
+          <p className="rounded-xl border border-dashed border-[var(--border-subtle)] px-3 py-3 text-[10.5px] leading-snug text-[var(--secondary)]">
             Immediate exit is off, so this design requires no SLP funding.
           </p>
         ) : exit.status === "missing-goal" ? (
-          <p className="rounded-xl border border-dashed border-[var(--border-subtle)] px-3.5 py-2.5 text-[10.5px] leading-snug text-[var(--secondary)]">
+          <p className="rounded-xl border border-dashed border-[var(--border-subtle)] px-3 py-3 text-[10.5px] leading-snug text-[var(--secondary)]">
             Choose the exit amount and payout above to size the pool.
           </p>
         ) : null}
@@ -497,7 +497,7 @@ export default function DayV3Goals({
         {exit.status === "infeasible" ? (
           <p
             aria-live="polite"
-            className="rounded-lg border border-[color-mix(in_srgb,var(--theme-gold)_45%,transparent)] bg-[color-mix(in_srgb,var(--theme-gold)_10%,transparent)] px-3 py-2.5 text-[10.5px] font-medium leading-relaxed text-[var(--gold-emphasis)]"
+            className="rounded-lg border border-[color-mix(in_srgb,var(--theme-gold)_45%,transparent)] bg-[color-mix(in_srgb,var(--theme-gold)_10%,transparent)] px-3 py-3 text-[10.5px] font-medium leading-relaxed text-[var(--gold-emphasis)]"
           >
             These inputs do not produce a viable immediate exit. Reduce the
             exit size, lower the payout floor, or turn off the immediate exit.

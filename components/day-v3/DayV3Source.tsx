@@ -139,7 +139,7 @@ export default function DayV3Source({
         continue without it.
       </p>
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-        <div className="flex flex-col gap-1.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--card)] px-4 py-3.5">
+        <div className="flex flex-col gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--card)] px-3 py-3">
           <span className="flex items-center justify-between gap-2 text-[9.5px] font-semibold uppercase tracking-[0.1em] text-[var(--tertiary)]">
             Upload a file
             <span className="rounded-full border border-[var(--border-subtle)] px-2 py-0.5 text-[8.5px]">Optional</span>
@@ -181,7 +181,7 @@ export default function DayV3Source({
           </span>
         </div>
 
-        <div className="flex flex-col gap-1.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--card)] px-4 py-3.5">
+        <div className="flex flex-col gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--card)] px-3 py-3">
           <label
             className="flex items-center justify-between gap-2 text-[9.5px] font-semibold uppercase tracking-[0.1em] text-[var(--tertiary)]"
             htmlFor={urlInputId}

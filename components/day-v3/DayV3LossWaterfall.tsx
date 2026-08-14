@@ -119,7 +119,7 @@ export default function DayV3LossWaterfall({
 
   return (
     <Card data-accountant-source="buildDayExplainerMetrics.coverage">
-      <CardHeader className="gap-0.5 px-4 pt-3.5">
+      <CardHeader>
         <div className="flex items-center justify-between gap-2">
           <CardTitle className="text-[13.5px]">Loss waterfall</CardTitle>
           <span className="flex items-baseline gap-2">
@@ -129,10 +129,15 @@ export default function DayV3LossWaterfall({
             <DayV3DocsLink label="Impermanent loss" topic="impermanentLoss" />
           </span>
         </div>
-        <CardNote>How losses move from Jr to Sr.</CardNote>
+        <CardNote>
+          How losses move from Jr to Sr, at 100% coverage utilization — the
+          contract boundary, where Junior has no operating headroom left. The
+          opening stack carries more than this, so this is the floor of the
+          protection, not the expected case.
+        </CardNote>
       </CardHeader>
 
-      <CardContent className="px-4 pb-4 grid grid-cols-1 gap-5 md:grid-cols-2 md:items-start">
+      <CardContent className="grid grid-cols-1 gap-3 md:grid-cols-2 md:items-start">
         <div className="flex min-w-0 flex-col gap-4">
           {/* The claim, stated once and large, so the section answers its own
               question before any detail is read. */}
@@ -195,7 +200,7 @@ export default function DayV3LossWaterfall({
 
           {/* Input. The filled well marks it as something to move, matching the
               terms panel, and keeps it visually apart from the readouts below. */}
-          <label className="flex flex-col gap-1.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--foundation)] px-4 py-3">
+          <label className="flex flex-col gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--foundation)] px-3 py-3">
             <span className="flex items-baseline justify-between gap-2">
               <span className="text-[9.5px] font-semibold uppercase tracking-[0.1em] text-[var(--tertiary)]">
                 Source drawdown
@@ -222,7 +227,7 @@ export default function DayV3LossWaterfall({
           </label>
 
           {/* Outputs. No fill, hairline rule, mono figures: read, not moved. */}
-          <div className="grid grid-cols-1 gap-x-5 gap-y-3 border-t border-[var(--border-subtle)] pt-3 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3 border-t border-[var(--border-subtle)] pt-3 sm:grid-cols-3">
             <div className="flex flex-col gap-0.5">
               <span className="text-[9.5px] font-semibold uppercase tracking-[0.1em] text-[var(--tertiary)]">
                 Sr keeps

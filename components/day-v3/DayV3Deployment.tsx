@@ -606,7 +606,7 @@ function DayV3Deployment({
         hidden={!open}
         id={contentId}
       >
-        <CardHeader className="gap-0.5 px-4 pt-3.5">
+        <CardHeader>
           <div className="flex flex-wrap items-center justify-between gap-2">
             <CardTitle className="text-[13.5px]">Deployment handoff details</CardTitle>
             <Badge tone={handoffReady ? "liquidity" : "caution"}>
@@ -622,7 +622,7 @@ function DayV3Deployment({
           </CardNote>
         </CardHeader>
 
-        <CardContent className="px-4 pb-4 flex flex-col gap-5">
+        <CardContent className="flex flex-col gap-5">
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
             <section className="rounded-xl border border-[var(--border-subtle)] bg-[var(--foundation)] px-4 py-3">
               <h3 className="mb-1 text-[10px] font-semibold uppercase tracking-[0.1em]">

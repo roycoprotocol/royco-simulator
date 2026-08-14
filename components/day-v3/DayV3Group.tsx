@@ -164,7 +164,7 @@ export default function DayV3Group({
     <>
       <span
         aria-hidden="true"
-        className="flex size-[18px] shrink-0 items-center justify-center rounded-full bg-[var(--foreground)] font-mono text-[10px] font-bold leading-none text-[var(--background)]"
+        className="flex size-7 shrink-0 items-center justify-center rounded-full bg-[var(--foreground)] font-mono text-[10px] font-bold leading-none text-[var(--background)]"
       >
         {index}
       </span>
@@ -198,7 +198,7 @@ export default function DayV3Group({
       {deployOnly || status ? (
         <span className="flex shrink-0 items-center gap-2 self-center">
           {deployOnly ? (
-            <span className="rounded-full border border-[var(--border-subtle)] px-1.5 py-px text-[9px] font-semibold uppercase tracking-[0.08em] text-[var(--tertiary)]">
+            <span className="rounded-full border border-[var(--border-subtle)] px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.08em] text-[var(--tertiary)]">
               advanced only
             </span>
           ) : null}
@@ -239,12 +239,12 @@ export default function DayV3Group({
       data-section-complete={status?.tone === "complete" || undefined}
       id={id}
     >
-      <div className="flex flex-col items-stretch gap-2.5 sm:flex-row sm:flex-wrap sm:items-center">
+      <div className="flex flex-col items-stretch gap-3 sm:flex-row sm:flex-wrap sm:items-center">
         {collapsible ? (
           <button
             aria-controls={contentId}
             aria-expanded={open}
-            className="flex min-h-11 min-w-0 flex-1 cursor-pointer items-start gap-2.5 rounded-lg text-left outline-none transition-colors hover:bg-[var(--foundation)] focus-visible:ring-2 focus-visible:ring-[var(--foreground)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--card)] sm:min-w-[220px] sm:items-center"
+            className="flex min-h-11 min-w-0 flex-1 cursor-pointer items-start gap-3 rounded-lg text-left outline-none transition-colors hover:bg-[var(--foundation)] focus-visible:ring-2 focus-visible:ring-[var(--foreground)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--card)] sm:min-w-[220px] sm:items-center"
             onClick={toggleOpen}
             type="button"
           >
@@ -252,7 +252,7 @@ export default function DayV3Group({
             <span
               aria-hidden="true"
               className={cn(
-                "mr-1 flex size-7 shrink-0 items-center justify-center rounded-md border border-[var(--border-subtle)] bg-[var(--foundation)] text-[var(--tertiary)] transition-transform",
+                "mr-1 flex size-8 shrink-0 items-center justify-center rounded-md border border-[var(--border-subtle)] bg-[var(--foundation)] text-[var(--tertiary)] transition-transform",
                 open && "rotate-180",
               )}
             >
@@ -268,7 +268,7 @@ export default function DayV3Group({
             </span>
           </button>
         ) : (
-          <div className="flex min-w-0 flex-1 items-center gap-2.5">
+          <div className="flex min-w-0 flex-1 items-center gap-3">
             {heading}
           </div>
         )}
@@ -276,7 +276,7 @@ export default function DayV3Group({
       {status?.tone === "incomplete" && missingCount > 0 && open ? (
         <p
           aria-live="polite"
-          className="mt-2 rounded-lg border border-[color-mix(in_srgb,var(--theme-red)_24%,var(--border-subtle))] bg-[color-mix(in_srgb,var(--theme-red)_5%,transparent)] px-3 py-2 text-[10.5px] font-medium leading-snug text-[var(--red-emphasis)]"
+          className="rounded-lg border border-[color-mix(in_srgb,var(--theme-red)_24%,var(--border-subtle))] bg-[color-mix(in_srgb,var(--theme-red)_5%,transparent)] px-3 py-3 text-[10.5px] font-medium leading-snug text-[var(--red-emphasis)]"
         >
           Missing {missingCount === 1 ? "answer" : `${missingCount} answers`}: {status.missing?.join(", ")}
         </p>
@@ -284,7 +284,7 @@ export default function DayV3Group({
       <div
         className={cn(
           "flex flex-col gap-3",
-          collapsible && "mt-3 border-t border-[var(--border-subtle)] pt-4",
+          collapsible && "mt-3 border-t border-[var(--border-subtle)] pt-3",
         )}
         hidden={collapsible && !open}
         id={contentId}

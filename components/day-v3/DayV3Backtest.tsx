@@ -257,7 +257,7 @@ function DayV3Backtest({
   if (market.series.length < 3 || !result || !active) {
     return (
       <Card>
-        <CardHeader className="gap-0.5 px-4 pt-3.5">
+        <CardHeader>
           <div className="flex items-center justify-between gap-2">
             <CardTitle className="text-[13.5px]" level={3}>
               Historical backtest
@@ -270,13 +270,13 @@ function DayV3Backtest({
               : "No dated history is available; results above are forward projections at the selected source yield."}
           </CardNote>
         </CardHeader>
-        <CardContent className="px-4 pb-4">
+        <CardContent>
           {/* The markets without history are the forward-modeled ones, which is
               exactly where this disclosure lives. Dropping it on this branch
               would hide it on every market that declares one. */}
           {tailRisk ? (
             <p
-              className="rounded-lg border px-3.5 py-2.5 text-[11.5px] leading-relaxed"
+              className="rounded-lg border px-3 py-3 text-[11.5px] leading-relaxed"
               style={{
                 background:
                   "color-mix(in srgb, var(--theme-red) 8%, transparent)",
@@ -321,7 +321,7 @@ function DayV3Backtest({
 
   return (
     <Card data-accountant-source="runDayHistoricalBacktest">
-      <CardHeader className="gap-0.5 px-4 pt-3.5">
+      <CardHeader>
         <div className="flex flex-wrap items-center justify-between gap-2">
           <CardTitle className="text-[13.5px]" level={3}>
             Historical backtest
@@ -337,7 +337,7 @@ function DayV3Backtest({
         </CardNote>
       </CardHeader>
 
-      <CardContent className="px-4 pb-4 flex flex-col gap-4">
+      <CardContent className="flex flex-col gap-3">
         <p className="max-w-[68ch] text-[14.5px] leading-relaxed text-[var(--foreground)]">
           Worst drawdown: source{" "}
           <strong className="font-mono text-[16px] font-bold tabular-nums">
@@ -441,13 +441,13 @@ function DayV3Backtest({
             used everywhere is what makes the page read as a system rather than
             a stack of differently sized slabs, and a 1.3fr/1fr here was the
             only place breaking it. */}
-        <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
           <div className="flex min-w-0 flex-col gap-3">
             <DayV3BacktestChart data={chartData} unit={returnUnit} />
 
             {/* The window controls the chart immediately above it, so it lives
                 with that chart rather than interrupting the result summary. */}
-            <label className="flex flex-col gap-1.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--foundation)] px-4 py-3">
+            <label className="flex flex-col gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--foundation)] px-3 py-3">
               <span className="text-[9.5px] font-semibold uppercase tracking-[0.1em] text-[var(--tertiary)]">
                 Backtest window
               </span>
@@ -518,7 +518,7 @@ function DayV3Backtest({
           </div>
         </div>
 
-        <div className="flex max-w-[520px] flex-col gap-1.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--foundation)] px-4 py-3">
+        <div className="flex max-w-[520px] flex-col gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--foundation)] px-3 py-3">
           <span className="text-[9.5px] font-semibold uppercase tracking-[0.1em] text-[var(--tertiary)]">
             Coverage restoration
           </span>
@@ -544,7 +544,7 @@ function DayV3Backtest({
             property of someone else's money, so it sits with the figures. */}
         {outsideCapitalMatters ? (
           <p
-            className="rounded-lg border px-3.5 py-2.5 text-[11.5px] leading-relaxed"
+            className="rounded-lg border px-3 py-3 text-[11.5px] leading-relaxed"
             style={{
               background:
                 "color-mix(in srgb, var(--theme-gold) 12%, transparent)",
@@ -574,7 +574,7 @@ function DayV3Backtest({
 
         {tailRisk ? (
           <p
-            className="rounded-lg border px-3.5 py-2.5 text-[11.5px] leading-relaxed"
+            className="rounded-lg border px-3 py-3 text-[11.5px] leading-relaxed"
             style={{
               background:
                 "color-mix(in srgb, var(--theme-red) 8%, transparent)",

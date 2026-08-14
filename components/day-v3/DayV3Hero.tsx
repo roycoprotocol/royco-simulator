@@ -28,7 +28,7 @@ export default function DayV3Hero() {
   return (
     <header className="overflow-hidden rounded-2xl border border-[var(--foreground)] bg-[var(--foreground)] text-[var(--background)] shadow-[0_12px_36px_-28px_rgba(23,25,31,0.75)]">
       <div className="grid lg:grid-cols-[minmax(0,1.35fr)_minmax(390px,0.65fr)]">
-        <div className="flex flex-col justify-center px-5 py-4 sm:px-6 sm:py-5">
+        <div className="flex flex-col justify-center px-6 py-6">
           <span className="text-[9px] font-medium uppercase tracking-[0.16em] text-[#999990]">
             Royco Day · Market simulator
           </span>
@@ -49,7 +49,7 @@ export default function DayV3Hero() {
         <dl className="hidden grid-cols-3 border-t border-white/12 sm:grid lg:border-l lg:border-t-0">
           {MARKET_ROLES.map((role, index) => (
             <div
-              className={`flex flex-col justify-center px-3 py-3 sm:px-3.5 ${
+              className={`flex flex-col justify-center px-4 py-4 ${
                 index === 0 ? "" : "border-l border-white/12"
               }`}
               key={role.label}

@@ -1,6 +1,7 @@
 "use client";
 
 import DayV3NumberField from "@/components/day-v3/DayV3NumberField";
+import { Badge } from "@/components/ui/badge";
 import {
   Card,
   CardContent,
@@ -20,6 +21,9 @@ export type DayV3RestockView = {
   worstCaseBasis: "modeled" | "floor" | "unresolved";
   worstPayoutPer100: number | null;
   selectedSalePer100: number | null;
+  /** The live template is re-pricing, so these figures describe the design as
+   *  it was a moment ago rather than the one on screen. */
+  stale: boolean;
 };
 
 const bps = (value: number | null, digits = 0) =>
@@ -222,7 +226,7 @@ export default function DayV3RestockCheck({
   redemptionDays: number | null;
   view: DayV3RestockView;
 }) {
-  const { check, hurdle, selectedSalePer100, worstCaseBasis, worstPayoutPer100 } =
+  const { check, hurdle, selectedSalePer100, stale, worstCaseBasis, worstPayoutPer100 } =
     view;
   const missingInputs = costOfCapitalPct === null || redemptionDays === null;
   const resolved =
@@ -246,14 +250,18 @@ export default function DayV3RestockCheck({
           ? "canonical-rwa-eclp-service"
           : "issuer-payout-floor"
       }
+      data-restock-stale={stale || undefined}
       data-restock-status={
         missingInputs ? "missing-inputs" : (check?.status ?? "unavailable")
       }
     >
-      <CardHeader className="gap-0.5 px-4 pt-3.5">
-        <CardTitle className="text-[13.5px]">
-          Test whether this works for arbitrageurs
-        </CardTitle>
+      <CardHeader>
+        <span className="flex flex-wrap items-center justify-between gap-2">
+          <CardTitle className="text-[13.5px]">
+            Test whether this works for arbitrageurs
+          </CardTitle>
+          {stale ? <Badge tone="neutral">re-pricing</Badge> : null}
+        </span>
         <CardNote>
           A sale leaves the pool below NAV, and it stays there until an
           arbitrageur buys that discounted Senior and redeems it at NAV.
@@ -262,7 +270,7 @@ export default function DayV3RestockCheck({
         </CardNote>
       </CardHeader>
 
-      <CardContent className="px-4 pb-4 flex flex-col gap-4">
+      <CardContent className="flex flex-col gap-3">
         <div className="grid grid-cols-1 items-start gap-3 sm:grid-cols-2">
           <DayV3NumberField
             className="bg-[var(--foundation)]"
@@ -284,10 +292,10 @@ export default function DayV3RestockCheck({
           />
           <DayV3NumberField
             className="bg-[var(--foundation)]"
-            label="How long until they get NAV back for that Senior?"
+            label="How long is their money tied up?"
             max={365}
             min={0}
-            note="Queue plus settlement, from buying the Senior share to holding the underlying."
+            note="From buying the discounted Senior to being paid full NAV for it: the redemption queue plus settlement. The longer the wait, the more discount they need."
             onChange={onRedemptionDays}
             placeholder="Enter days"
             presets={[
@@ -303,12 +311,12 @@ export default function DayV3RestockCheck({
         </div>
 
         {missingInputs ? (
-          <p className="rounded-lg border border-dashed border-[var(--border-subtle)] px-3 py-2.5 text-[11px] leading-relaxed text-[var(--secondary)]">
+          <p className="rounded-lg border border-dashed border-[var(--border-subtle)] px-3 py-3 text-[11px] leading-relaxed text-[var(--secondary)]">
             Enter a cost of capital and a redemption wait to check whether the
             discount this design creates is enough to attract a refill.
           </p>
         ) : !resolved ? (
-          <p className="rounded-lg border border-dashed border-[var(--border-subtle)] px-3 py-2.5 text-[11px] leading-relaxed text-[var(--secondary)]">
+          <p className="rounded-lg border border-dashed border-[var(--border-subtle)] px-3 py-3 text-[11px] leading-relaxed text-[var(--secondary)]">
             Set the exit amount and payout floor above. The worst-case discount
             they define is what an arbitrageur would be buying.
           </p>
@@ -316,7 +324,7 @@ export default function DayV3RestockCheck({
           <>
             <div
               aria-live="polite"
-              className="rounded-lg border px-3.5 py-3"
+              className="rounded-lg border px-3 py-3"
               role="status"
               style={
                 worstCasePays
@@ -366,7 +374,18 @@ export default function DayV3RestockCheck({
             {/* One trade, top to bottom. The two-column split asked a reader
                 to subtract a column of costs from a bar in the other column
                 before the answer existed anywhere on screen. */}
-            <section className="rounded-lg border border-[var(--border-subtle)] bg-[var(--background)] px-3.5 py-3">
+            {stale ? (
+              <p className="rounded-lg border border-dashed border-[var(--border-subtle)] px-3 py-3 text-[10.5px] leading-snug text-[var(--secondary)]">
+                The live template is re-pricing this pool. Everything below
+                still describes the previous exit design
+                {selectedSalePer100 === null
+                  ? ""
+                  : ` — a ${dollars(selectedSalePer100)} sale`}
+                , not the one you are editing.
+              </p>
+            ) : null}
+
+            <section className="rounded-lg border border-[var(--border-subtle)] bg-[var(--background)] px-3 py-3">
               <h4 className="mb-3 border-b border-[var(--border-subtle)] pb-1.5 text-[9.5px] font-semibold uppercase tracking-[0.11em] text-[var(--tertiary)]">
                 One arbitrageur&apos;s trade, per $100 of Senior they buy
               </h4>

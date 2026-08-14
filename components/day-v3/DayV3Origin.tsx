@@ -33,7 +33,7 @@ export default function DayV3Origin({
   return (
     <span
       className={cn(
-        "inline-flex shrink-0 items-center rounded-full border border-[var(--border-subtle)] bg-[var(--foundation)] px-2 py-1 text-[8.5px] font-semibold uppercase tracking-[0.08em] text-[var(--tertiary)]",
+        "inline-flex shrink-0 items-center rounded-full border border-[var(--border-subtle)] bg-[var(--foundation)] px-2 py-0.5 text-[8.5px] font-semibold uppercase tracking-[0.08em] text-[var(--tertiary)]",
         origin === "manual-override" &&
           "border-[color-mix(in_srgb,var(--theme-gold)_45%,transparent)] text-[var(--gold-emphasis)]",
         className,

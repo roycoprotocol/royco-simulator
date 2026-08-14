@@ -73,13 +73,13 @@ function DayV3CapitalStack({
   if (liquidityPending) {
     return (
       <Card weight="primary">
-        <CardHeader className="gap-0.5 px-4 pt-3.5">
+        <CardHeader>
           <div className="flex items-baseline justify-between gap-2">
             <CardTitle className="text-[13.5px]">Capital stack</CardTitle>
             <DayV3DocsLink label="How tranching works" topic="tranching" />
           </div>
         </CardHeader>
-        <CardContent className="px-4 pb-4 grid grid-cols-1 gap-4 md:grid-cols-2 md:items-stretch">
+        <CardContent className="grid grid-cols-1 gap-3 md:grid-cols-2 md:items-stretch">
           <div className="flex min-w-0 flex-col justify-center rounded-xl border border-[var(--border-subtle)] bg-[var(--foundation)] px-5 py-4">
             <div className="mx-auto w-full max-w-[360px]">
               <DayV3StackDiagram
@@ -141,7 +141,7 @@ function DayV3CapitalStack({
                 </strong>
               </div>
             </div>
-            <p className="rounded-lg border border-dashed border-[var(--border-subtle)] px-3.5 py-3 text-[11px] leading-relaxed text-[var(--secondary)]">
+            <p className="rounded-lg border border-dashed border-[var(--border-subtle)] px-3 py-3 text-[11px] leading-relaxed text-[var(--secondary)]">
               SLP capital and total market capital appear after the Senior exit
               is validated; no zero or fallback pool size is assumed.
             </p>
@@ -215,14 +215,14 @@ function DayV3CapitalStack({
 
   return (
     <Card weight="primary">
-      <CardHeader className="gap-0.5 px-4 pt-3.5">
+      <CardHeader>
         <div className="flex items-baseline justify-between gap-2">
           <CardTitle className="text-[13.5px]">Capital stack</CardTitle>
           <DayV3DocsLink label="How tranching works" topic="tranching" />
         </div>
       </CardHeader>
 
-      <CardContent className="px-4 pb-4 grid grid-cols-1 gap-4 lg:grid-cols-2 lg:items-stretch">
+      <CardContent className="grid grid-cols-1 gap-3 lg:grid-cols-2 lg:items-stretch">
         <div className="flex min-w-0 flex-col justify-center rounded-xl border border-[var(--border-subtle)] bg-[var(--foundation)] px-5 py-4">
           <div className="mx-auto w-full max-w-[420px]">
             {/* Per 100 of Senior, exactly like the table beside it. Passing the
@@ -257,7 +257,7 @@ function DayV3CapitalStack({
           <ul className="flex flex-col gap-2">
             {legs.map((leg) => (
               <li
-                className={`flex min-w-0 flex-col gap-0.5 rounded-lg border px-3.5 py-2.5 ${
+                className={`flex min-w-0 flex-col gap-0.5 rounded-lg border px-3 py-3 ${
                   leg.funded
                     ? "border-[var(--border-subtle)] bg-[var(--foundation)]"
                     : "border-dashed border-[var(--border-subtle)]"

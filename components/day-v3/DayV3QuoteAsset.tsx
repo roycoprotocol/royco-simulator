@@ -62,7 +62,7 @@ export default function DayV3QuoteAsset({
 
   return (
     <>
-      <div className="flex min-w-0 flex-col gap-1.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--card)] px-3.5 py-2.5 transition-[border-color,box-shadow] hover:border-[var(--secondary)] focus-within:border-[var(--foreground)] focus-within:shadow-[0_2px_10px_-4px_rgba(23,25,31,0.24)]">
+      <div className="flex min-w-0 flex-col gap-1.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--card)] px-3 py-3 transition-[border-color,box-shadow] hover:border-[var(--secondary)] focus-within:border-[var(--foreground)] focus-within:shadow-[0_2px_10px_-4px_rgba(23,25,31,0.24)]">
         <label className="flex min-w-0 flex-col gap-1.5">
           <span className="flex items-start justify-between gap-3">
             <span className="cursor-pointer text-[12px] font-semibold leading-snug">
@@ -70,7 +70,7 @@ export default function DayV3QuoteAsset({
             </span>
             <DayV3Origin origin={yieldOrigin} />
           </span>
-          <span className="flex items-center gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--foundation)] px-2.5 py-1.5 focus-within:border-[var(--foreground)]">
+          <span className="flex items-center gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--foundation)] px-2 py-2 focus-within:border-[var(--foreground)]">
             <input
               className="min-w-0 flex-1 bg-transparent font-mono text-[17px] font-bold leading-none outline-none placeholder:font-sans placeholder:text-[12px] placeholder:font-normal placeholder:text-[var(--tertiary)]"
               maxLength={24}
@@ -97,7 +97,7 @@ export default function DayV3QuoteAsset({
         </label>
         {/* Outside the label: a button nested in one steals the label's click
             and ends up focusing the text field instead. */}
-        <div aria-label="Common quote assets" className="flex flex-wrap gap-1">
+        <div aria-label="Common quote assets" className="flex flex-wrap gap-2">
           {QUOTE_ASSET_SUGGESTIONS.map((suggestion) => (
             <DayV3Button
               aria-pressed={label === suggestion}
@@ -106,7 +106,12 @@ export default function DayV3QuoteAsset({
                 setDraft({ text: suggestion, source: suggestion });
                 onLabel(suggestion);
               }}
-              size="sm"
+              className={
+                label === suggestion
+                  ? undefined
+                  : "border-[var(--border-subtle)] bg-[var(--foundation)]"
+              }
+              size="chip"
               variant={label === suggestion ? "primary" : "quiet"}
             >
               {suggestion}

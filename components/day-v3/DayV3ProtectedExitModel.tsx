@@ -37,7 +37,7 @@ export default function DayV3ProtectedExitModel({
       data-model-state={protectedExit.status}
       data-model-source="runDayV3ProtectedExitScenarios"
     >
-      <CardHeader className="gap-0.5 px-4 pt-3.5">
+      <CardHeader>
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <CardTitle className="text-[13.5px]">
             Protected Exit redemption model
@@ -50,7 +50,7 @@ export default function DayV3ProtectedExitModel({
         </CardNote>
       </CardHeader>
 
-      <CardContent className="px-4 pb-4 flex flex-col gap-4">
+      <CardContent className="flex flex-col gap-4">
         {hasScenarios ? (
           <div className="overflow-x-auto rounded-lg border border-[var(--border-subtle)]">
             <Table className="min-w-[720px]">
@@ -134,7 +134,7 @@ export default function DayV3ProtectedExitModel({
             </div>
           </div>
         ) : (
-          <p className="rounded-lg border border-dashed border-[var(--border-subtle)] px-3.5 py-3 text-[11.5px] leading-relaxed text-[var(--secondary)]">
+          <p className="rounded-lg border border-dashed border-[var(--border-subtle)] px-3 py-3 text-[11.5px] leading-relaxed text-[var(--secondary)]">
             {protectedExit.message ||
               "Resolve the trigger to run the 25%, 50%, and 100% redemption model."}
           </p>

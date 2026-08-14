@@ -37,7 +37,7 @@ export default function DayV3Presets({
               aria-pressed={active}
               // They read as cards, so nobody pressed them. A raised surface, a
               // pointer, a hover lift and an explicit affordance on each one.
-              className={`group flex cursor-pointer flex-col gap-0.5 rounded-xl border px-3.5 py-2.5 text-left transition-[transform,box-shadow,border-color] hover:-translate-y-px ${
+              className={`group flex cursor-pointer flex-col gap-0.5 rounded-xl border px-3 py-3 text-left transition-[transform,box-shadow,border-color] hover:-translate-y-px ${
                 active
                   ? "border-[var(--foreground)] bg-[var(--card)] shadow-[0_2px_10px_-4px_rgba(23,25,31,0.22)]"
                   : "border-[var(--border-subtle)] bg-[var(--card)] hover:border-[var(--secondary)] hover:shadow-[0_2px_10px_-4px_rgba(23,25,31,0.16)]"

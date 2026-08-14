@@ -30,7 +30,7 @@ export default function DayV3YieldModels({
       data-model-source="runDayTargetScenario-yield-share-curves"
       weight="quiet"
     >
-      <CardHeader className="gap-0.5 px-4 pt-3.5">
+      <CardHeader>
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <CardTitle className="text-[13.5px]">Premium curves</CardTitle>
           <DayV3DocsLink label="Yield split" topic="yieldSplit" />
@@ -41,7 +41,7 @@ export default function DayV3YieldModels({
             : "How each tranche's share of Senior yield moves as its capital is used. Adjust them in the yield split."}
         </CardNote>
       </CardHeader>
-      <CardContent className="px-4 pb-4 grid grid-cols-1 gap-4 xl:grid-cols-2">
+      <CardContent className="grid grid-cols-1 gap-3 lg:grid-cols-2">
         <section className="rounded-xl border border-[var(--border-subtle)] bg-[var(--card)] px-4 py-3">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <strong className="text-[12px] font-semibold">

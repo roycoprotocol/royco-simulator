@@ -5,6 +5,11 @@ import { renderToStaticMarkup } from "react-dom/server";
 import DayV3ExitCost from "@/components/day-v3/DayV3ExitCost";
 import DayV3ExitModel from "@/components/day-v3/DayV3ExitModel";
 import DayV3Goals, { type DayV3ExitView } from "@/components/day-v3/DayV3Goals";
+import DayV3RestockCheck from "@/components/day-v3/DayV3RestockCheck";
+import {
+  dayV3RestockCheck,
+  dayV3RestockHurdle,
+} from "@/lib/day-v3/restock-arbitrage";
 import type { DayExplainerMetrics } from "@/lib/day-simulator-template/explainer";
 
 const resolved: DayV3ExitView = {
@@ -420,5 +425,68 @@ assert.doesNotMatch(unavailableMarkup, /Exact E-CLP sizing/);
 assert.doesNotMatch(unavailableMarkup, /Scenario APYs continue/);
 assert.doesNotMatch(unavailableMarkup, /Finalize in Royco Deploy/);
 assert.doesNotMatch(unavailableMarkup, /Retry validation/);
+
+// Both halves of the arbitrage discount must come from one response. Dividing
+// canonical proceeds by the live exit input mixed a figure priced for the
+// previous goal with the number on screen: $10 of proceeds over a $50 sale
+// reported an 8,000 bps discount in a panel whose banner read 60 bps.
+const restockView = {
+  check: dayV3RestockCheck({
+    hurdle: dayV3RestockHurdle({
+      costOfCapitalPct: 20,
+      redemptionDays: 30,
+      seniorApyPct: 4,
+      swapFeeBps: 10,
+    }),
+    // The canonical response's own sale size, not the input being edited.
+    selectedSalePer100: 10,
+    selectedSaleProceeds: 9.94,
+    worstPayoutPer100: 99.4,
+  }),
+  hurdle: dayV3RestockHurdle({
+    costOfCapitalPct: 20,
+    redemptionDays: 30,
+    seniorApyPct: 4,
+    swapFeeBps: 10,
+  }),
+  selectedSalePer100: 10,
+  stale: true,
+  worstCaseBasis: "modeled" as const,
+  worstPayoutPer100: 99.4,
+};
+assert.equal(
+  restockView.check.selectedDiscountBps?.toFixed(0),
+  "60",
+  "proceeds are measured against the sale they were priced for",
+);
+assert.ok(
+  (restockView.check.worstCaseDiscountBps ?? 0) < 100,
+  "the worst case and the selected sale agree because they share a response",
+);
+
+const staleMarkup = renderToStaticMarkup(
+  <DayV3RestockCheck
+    costOfCapitalPct={20}
+    onCostOfCapitalPct={noop}
+    onRedemptionDays={noop}
+    redemptionDays={30}
+    view={restockView}
+  />,
+);
+assert.match(staleMarkup, /data-restock-stale="true"/);
+assert.match(staleMarkup, /re-pricing/);
+assert.match(staleMarkup, /still describes the previous exit design/);
+
+const freshMarkup = renderToStaticMarkup(
+  <DayV3RestockCheck
+    costOfCapitalPct={20}
+    onCostOfCapitalPct={noop}
+    onRedemptionDays={noop}
+    redemptionDays={30}
+    view={{ ...restockView, stale: false }}
+  />,
+);
+assert.doesNotMatch(freshMarkup, /data-restock-stale/);
+assert.doesNotMatch(freshMarkup, /still describes the previous exit design/);
 
 console.log("Day V3 exit-model presentation: PASS");

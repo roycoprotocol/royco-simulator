@@ -138,14 +138,14 @@ function StableDayV3NumberField({
   return (
     <div
       className={cn(
-        "flex min-w-0 flex-col gap-1.5 rounded-xl border bg-[var(--card)] px-3.5 py-2.5 transition-[border-color,box-shadow]",
+        "flex min-w-0 flex-col gap-2 rounded-xl border bg-[var(--card)] px-3 py-3 transition-[border-color,box-shadow]",
         parsed.status === "invalid" || missing
           ? "border-[color-mix(in_srgb,var(--theme-brown)_60%,var(--border-subtle))]"
           : "border-[var(--border-subtle)] hover:border-[var(--secondary)] focus-within:border-[var(--foreground)] focus-within:shadow-[0_2px_10px_-4px_rgba(23,25,31,0.24)]",
         className,
       )}
     >
-      <div className="flex min-w-0 flex-col gap-1.5">
+      <div className="flex min-w-0 flex-col gap-2">
         <span className="flex items-start justify-between gap-3">
           <label
             className="cursor-pointer text-[12px] font-semibold leading-snug"
@@ -174,7 +174,7 @@ function StableDayV3NumberField({
             <DayV3Origin origin={origin} />
           </span>
         </span>
-        <span className="flex items-center gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--foundation)] px-2.5 py-1.5 focus-within:border-[var(--foreground)]">
+        <span className="flex items-center gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--foundation)] px-2 py-2 focus-within:border-[var(--foreground)]">
           {prefix ? (
             <span
               aria-hidden="true"
@@ -251,13 +251,18 @@ function StableDayV3NumberField({
       </div>
 
       {presets.length > 0 ? (
-        <div aria-label={`${label} common choices`} className="flex flex-wrap gap-1">
+        <div aria-label={`${label} common choices`} className="flex flex-wrap gap-2">
           {presets.map((preset) => (
             <DayV3Button
               aria-pressed={parsed.status === "valid" && parsed.value === preset.value}
               key={`${preset.label}-${preset.value}`}
+              className={
+                parsed.status === "valid" && parsed.value === preset.value
+                  ? undefined
+                  : "border-[var(--border-subtle)] bg-[var(--foundation)]"
+              }
               onClick={() => choose(preset.value)}
-              size="sm"
+              size="chip"
               variant={
                 parsed.status === "valid" && parsed.value === preset.value
                   ? "primary"

@@ -37,9 +37,14 @@ export const dayV3ButtonVariants = cva(
           "border-transparent bg-transparent text-[var(--foreground)] underline decoration-dotted underline-offset-2 hover:translate-y-0 hover:text-[var(--secondary)]",
       },
       size: {
+        // A preset shortcut is not a primary control. At `sm` it inherited the
+        // 44px touch target, so "8%" rendered as a 44px-tall box; unselected
+        // ones are transparent, so a row of them read as one dark block beside
+        // three floating labels. The field itself keeps the 44px target.
+        chip: "min-h-8 rounded-md px-2 py-1 text-[11px]",
         sm: "min-h-11 px-3 py-2",
-        md: "min-h-11 px-4 py-2.5",
-        lg: "min-h-12 px-5 py-3 text-[13px]",
+        md: "min-h-11 px-4 py-2",
+        lg: "min-h-11 px-4 py-3 text-[13px]",
         icon: "size-11 p-0",
         inline: "min-h-0 p-0 text-[length:inherit] leading-[inherit]",
       },

@@ -108,7 +108,7 @@ export default function DayV3ModelGroup({
   return (
     <section
       className={cn(
-        "flex scroll-mt-6 flex-col rounded-xl border border-[var(--border-subtle)] px-4 py-2.5",
+        "flex scroll-mt-6 flex-col rounded-xl border border-[var(--border-subtle)] px-4 py-3",
         disabled
           ? "bg-[var(--background)] opacity-55"
           : "bg-[var(--card)] shadow-[0_4px_18px_-16px_rgba(23,25,31,0.55)]",
@@ -121,7 +121,7 @@ export default function DayV3ModelGroup({
         // Not a disabled button but no button at all: an inert control that
         // still looks pressable is a worse answer than a section that plainly
         // has nothing behind it.
-        <div className="flex min-h-12 w-full items-center gap-3">
+        <div className="flex min-h-11 w-full items-center gap-3">
           {heading}
           <span className="mr-1 shrink-0 rounded-full border border-[var(--border-subtle)] px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.08em] text-[var(--tertiary)]">
             off
@@ -131,7 +131,7 @@ export default function DayV3ModelGroup({
         <button
           aria-controls={contentId}
           aria-expanded={open}
-          className="flex min-h-12 w-full cursor-pointer items-center gap-3 rounded-lg text-left outline-none transition-colors hover:bg-[var(--foundation)] focus-visible:ring-2 focus-visible:ring-[var(--foreground)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--card)]"
+          className="flex min-h-11 w-full cursor-pointer items-center gap-3 rounded-lg text-left outline-none transition-colors hover:bg-[var(--foundation)] focus-visible:ring-2 focus-visible:ring-[var(--foreground)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--card)]"
           onClick={toggle}
           type="button"
         >
@@ -157,7 +157,7 @@ export default function DayV3ModelGroup({
       )}
       <div id={contentId}>
         {open ? (
-          <div className="mt-3 flex flex-col gap-4 border-t border-[var(--border-subtle)] pt-4">
+          <div className="mt-3 flex flex-col gap-3 border-t border-[var(--border-subtle)] pt-3">
             {children}
           </div>
         ) : null}

@@ -41,7 +41,7 @@ export default function DayV3ProtectionSensitivity({
   if (selectedDrawdownPct === null) {
     return (
       <Card data-accountant-source="recommendDayV3Coverage">
-        <CardHeader className="gap-0.5 px-4 pt-3.5">
+        <CardHeader>
           <CardTitle className="text-[13.5px]">Protection sensitivity</CardTitle>
           <CardNote>
             Choose a protected source drawdown to compare the Junior capital
@@ -85,7 +85,7 @@ export default function DayV3ProtectionSensitivity({
       data-accountant-source="recommendDayV3Coverage"
       data-model-source="recommendDayV3Coverage"
     >
-      <CardHeader className="gap-0.5 px-4 pt-3.5">
+      <CardHeader>
         <div className="flex flex-wrap items-baseline justify-between gap-2">
           <CardTitle className="text-[13.5px]">
             Protection sensitivity
@@ -98,7 +98,7 @@ export default function DayV3ProtectionSensitivity({
         </CardNote>
       </CardHeader>
 
-      <CardContent className="px-4 pb-4 flex flex-col gap-4">
+      <CardContent className="flex flex-col gap-4">
         <div className="flex flex-col gap-2" aria-label="Protection sensitivity bars">
           {points.map((point) => (
             <div

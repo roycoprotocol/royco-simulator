@@ -57,11 +57,9 @@ export default function DayV3Slider({
     // can sit in the footer without nesting an anchor inside a label, where a
     // click would both navigate and focus the range.
     <div
-      className={`flex flex-col rounded-xl border border-[var(--border-subtle)] bg-[var(--card)] transition-[border-color,box-shadow] hover:border-[var(--secondary)] focus-within:border-[var(--foreground)] focus-within:shadow-[0_2px_10px_-4px_rgba(23,25,31,0.24)] ${
-        big ? "gap-2.5 px-4 py-3" : "gap-2 px-3 py-2.5"
-      }`}
+      className={`flex flex-col rounded-xl border border-[var(--border-subtle)] bg-[var(--card)] transition-[border-color,box-shadow] hover:border-[var(--secondary)] focus-within:border-[var(--foreground)] focus-within:shadow-[0_2px_10px_-4px_rgba(23,25,31,0.24)] gap-2 px-3 py-3`}
     >
-      <label className={`flex cursor-pointer flex-col ${big ? "gap-2.5" : "gap-2"}`}>
+      <label className={"flex cursor-pointer flex-col gap-2"}>
       <span className="flex items-baseline justify-between gap-3">
         <span className="min-w-0 truncate text-[10px] font-semibold uppercase tracking-[0.1em] text-[var(--tertiary)]">
           {label}
@@ -82,7 +80,7 @@ export default function DayV3Slider({
           {display}
         </span>
       </span>
-      <span className="flex items-center gap-2.5">
+      <span className="flex items-center gap-2">
         <span className="w-7 shrink-0 text-right font-mono text-[9.5px] tabular-nums text-[var(--tertiary)]">
           {minLabel}
         </span>

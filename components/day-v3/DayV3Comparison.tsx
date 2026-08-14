@@ -253,7 +253,7 @@ export default function DayV3Comparison({
 
   return (
     <Card weight="quiet">
-      <CardHeader className="gap-0.5 px-4 pt-3.5">
+      <CardHeader>
         <div className="flex items-baseline justify-between gap-2">
           <CardTitle className="text-[13.5px]">Position comparison</CardTitle>
           <DayV3DocsLink label="How yield is split" topic="yieldSplit" />
@@ -264,7 +264,7 @@ export default function DayV3Comparison({
           breakdown.
         </CardNote>
       </CardHeader>
-      <CardContent className="px-4 pb-4 flex flex-col gap-3">
+      <CardContent className="flex flex-col gap-3">
         {/* Simulate has no control for either share, so it has to say where they
             came from. Otherwise the two premiums are numbers that appear from
             nowhere and the reader cannot tell whether they were chosen. */}

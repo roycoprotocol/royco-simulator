@@ -126,7 +126,7 @@ export default function DayV3ExitCost({
 
   return (
     <Card data-accountant-source="buildDayExplainerMetrics.liquidity">
-      <CardHeader className="gap-0.5 px-4 pt-3.5">
+      <CardHeader>
         <div className="flex items-center justify-between gap-2">
           <CardTitle className="text-[13.5px]">Exit cost and depth</CardTitle>
           <DayV3DocsLink label="SLP mechanics" topic="slpTranche" />
@@ -139,7 +139,7 @@ export default function DayV3ExitCost({
         </CardNote>
       </CardHeader>
 
-      <CardContent className="px-4 pb-4 flex flex-col gap-4">
+      <CardContent className="flex flex-col gap-3">
         <p className="max-w-[64ch] text-[14.5px] leading-relaxed text-[var(--foreground)]">
           {metrics.boundarySellNAV <= 0 ? (
             <>
@@ -180,7 +180,7 @@ export default function DayV3ExitCost({
         {poolFunded ? (
           <>
             {/* Input. Same filled well as every other control on the page. */}
-            <label className="flex flex-col gap-1.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--foundation)] px-4 py-3">
+            <label className="flex flex-col gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--foundation)] px-3 py-3">
               <span className="flex items-baseline justify-between gap-2">
                 <span className="text-[9.5px] font-semibold uppercase tracking-[0.1em] text-[var(--tertiary)]">
                   Sr sells
@@ -207,7 +207,7 @@ export default function DayV3ExitCost({
             </label>
 
             {/* Outputs. Unfilled, hairline rule, mono figures. */}
-            <div className="grid grid-cols-1 gap-x-5 gap-y-3 border-t border-[var(--border-subtle)] pt-3 sm:grid-cols-3">
+            <div className="grid grid-cols-1 gap-3 border-t border-[var(--border-subtle)] pt-3 sm:grid-cols-3">
               <div className="flex flex-col gap-0.5">
                 <span className="text-[9.5px] font-semibold uppercase tracking-[0.1em] text-[var(--tertiary)]">
                   Exit discount
@@ -254,7 +254,7 @@ export default function DayV3ExitCost({
             {/* Chart and table read side by side at this width, the same
                 pairing the backtest uses: stacked they added about 300px of
                 scroll for two views of one curve. */}
-            <div className="grid min-w-0 grid-cols-1 items-start gap-4 xl:grid-cols-2">
+            <div className="grid min-w-0 grid-cols-1 items-start gap-3 lg:grid-cols-2">
             <DayV3ExitChart
               compactUsd={amount}
               marker={points[index]}
@@ -296,7 +296,7 @@ export default function DayV3ExitCost({
             </div>
 
             <div
-              className="flex flex-col gap-1.5 rounded-lg border px-3.5 py-3"
+              className="flex flex-col gap-1.5 rounded-lg border px-3 py-3"
               style={{
                 background:
                   "color-mix(in srgb, var(--theme-green) 7%, transparent)",

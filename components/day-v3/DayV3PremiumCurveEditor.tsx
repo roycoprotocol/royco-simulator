@@ -74,7 +74,7 @@ function CurveCard({
 
   return (
     <section
-      className="flex min-w-0 flex-col gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--card)] px-4 py-3.5"
+      className="flex min-w-0 flex-col gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--card)] px-3 py-3"
       data-premium-curve={paidTo.toLowerCase()}
     >
       <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -101,15 +101,15 @@ function CurveCard({
           step={0.1}
           value={bounded(ytPct, ytMin, ytMax)}
         />
-        <div className="flex flex-col justify-between rounded-xl border border-[var(--border-subtle)] bg-[var(--foundation)] px-3 py-2.5">
+        <div className="flex flex-col justify-between rounded-xl border border-[var(--border-subtle)] bg-[var(--foundation)] px-3 py-3">
           <span className="flex items-center justify-between gap-2 text-[9px] font-semibold uppercase tracking-[0.08em] text-[var(--tertiary)]">
             Projected {paidTo} APY
             <DayV3Origin origin="derived" />
           </span>
-          <strong className="mt-3 font-mono text-[22px] leading-none tabular-nums">
+          <strong className="font-mono text-[18px] leading-none tabular-nums">
             {pct(modeledApy)}
           </strong>
-          <span className="mt-1 text-[9.5px] text-[var(--tertiary)]">
+          <span className="text-[9.5px] text-[var(--tertiary)]">
             Updates from the shared accountant
           </span>
         </div>
@@ -273,7 +273,7 @@ function DayV3PremiumCurveEditor({
         // said what the reader was supposed to do with it. What matters is that
         // the SLP rate is a premium divided by pool size, and the pool size in
         // front of them is a placeholder.
-        <p className="rounded-xl border border-[var(--border-subtle)] bg-[var(--foundation)] px-4 py-3 text-[10.5px] leading-relaxed text-[var(--secondary)]">
+        <p className="rounded-xl border border-[var(--border-subtle)] bg-[var(--foundation)] px-3 py-3 text-[10.5px] leading-relaxed text-[var(--secondary)]">
           <strong className="font-semibold text-[var(--foreground)]">
             Why the SLP rate is what it is:
           </strong>{" "}
@@ -289,7 +289,7 @@ function DayV3PremiumCurveEditor({
       ) : null}
 
       <div
-        className={`grid grid-cols-1 items-start gap-4 ${juniorEnabled && slpEnabled ? "xl:grid-cols-2" : ""}`}
+        className={`grid grid-cols-1 items-start gap-3 ${juniorEnabled && slpEnabled ? "lg:grid-cols-2" : ""}`}
       >
         {juniorEnabled ? (
           <CurveCard
