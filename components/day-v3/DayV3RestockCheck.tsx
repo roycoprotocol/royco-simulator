@@ -19,6 +19,12 @@ export type DayV3RestockView = {
   hurdle: DayV3RestockHurdle | null;
   /** The pool's maximum discount, which the payout floor sets locally. */
   maximumDiscountPct: number;
+  /** The two operands the discount is actually computed from, so the note can
+   *  show its own arithmetic instead of asserting a number. Using the sale size
+   *  as the denominator would be the seller's all-in slippage, which includes
+   *  the fee and does not match the bar. */
+  selectedCurveInputPer100: number | null;
+  selectedProceedsPer100: number | null;
   /** Which pool priced these quotes. `issuer-fee` is not a lesser answer than
    *  `unresolved` — it is the reader's own fee, which is exactly what they
    *  asked to model — but it is not the live template's pool either. */
@@ -53,6 +59,7 @@ type WaterfallStep = {
  *  render remounts its subtree on every tick. Geometry arrives as percentages
  *  so this row never needs the scale. */
 function WaterfallRow({
+  carryPct,
   emphasis = false,
   leftPct,
   label,
@@ -61,6 +68,8 @@ function WaterfallRow({
   widthPct,
   zeroPct,
 }: {
+  /** Where this bar ends, so the next one can be seen starting there. */
+  carryPct?: number;
   emphasis?: boolean;
   leftPct: number;
   label: string;
@@ -98,10 +107,18 @@ function WaterfallRow({
           {Math.abs(valueBps).toFixed(0)} bps
         </span>
       </span>
-      <span
-        aria-hidden="true"
-        className={`relative block overflow-hidden rounded-[3px] bg-[var(--foundation)] ${emphasis ? "h-4" : "h-3"}`}
-      >
+      <span aria-hidden="true" className="relative block">
+        {/* Runs from this bar's end into the row below, so the eye can follow
+            the running total instead of taking the arithmetic on trust. */}
+        {carryPct === undefined ? null : (
+          <span
+            className="absolute -bottom-2 top-0 w-px bg-[var(--foreground)] opacity-30"
+            style={{ left: `${carryPct}%` }}
+          />
+        )}
+        <span
+          className={`relative block overflow-hidden rounded-[3px] bg-[var(--foundation)] ${emphasis ? "h-4" : "h-3"}`}
+        >
         {/* Zero is the only reference that matters, so it is drawn on every
             track rather than described once underneath. */}
         <span
@@ -121,7 +138,8 @@ function WaterfallRow({
             left: `${leftPct}%`,
             width: `${widthPct}%`,
           }}
-        />
+          />
+        </span>
       </span>
       <span className="text-[9.5px] leading-snug text-[var(--tertiary)]">
         {note}
@@ -177,6 +195,7 @@ function ArbitrageWaterfall({
     <div className="flex flex-col gap-2">
       {bars.map((bar) => (
         <WaterfallRow
+          carryPct={at(bar.to)}
           key={bar.label}
           label={bar.label}
           note={bar.note}
@@ -226,8 +245,15 @@ export default function DayV3RestockCheck({
   redemptionDays: number | null;
   view: DayV3RestockView;
 }) {
-  const { check, hurdle, maximumDiscountPct, policyBasis, selectedSalePer100 } =
-    view;
+  const {
+    check,
+    hurdle,
+    maximumDiscountPct,
+    policyBasis,
+    selectedCurveInputPer100,
+    selectedProceedsPer100,
+    selectedSalePer100,
+  } = view;
   const missingInputs = costOfCapitalPct === null || redemptionDays === null;
   const resolved =
     !missingInputs &&
@@ -386,7 +412,7 @@ export default function DayV3RestockCheck({
                     label: "Buys Senior below NAV",
                     note: unpriced
                       ? "priced once the live template sizes the pool"
-                      : `the discount left by selling ${dollars(selectedSalePer100)} of every $100 Senior at once`,
+                      : `of the ${dollars(selectedSalePer100)} sold at once, ${dollars(selectedCurveInputPer100, 4)} reaches the curve after the pool's fee and comes back as ${dollars(selectedProceedsPer100, 4)} — a gap of 1 − ${dollars(selectedProceedsPer100, 4)}/${dollars(selectedCurveInputPer100, 4)}, which is what an arbitrageur buys`,
                   },
                   {
                     deltaBps: -hurdle.financingBps,

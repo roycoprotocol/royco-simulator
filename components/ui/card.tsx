@@ -33,8 +33,17 @@ export function Card({
   );
 }
 
+/**
+ * `pb-3` is load-bearing. The header and the content are adjacent siblings with
+ * nothing between them, so when padding moved into this primitive and the
+ * per-card `pb-4` overrides were deleted with it, every heading ended up
+ * touching the first line of its own content — most visibly on the three
+ * position cards, where a 44px APY sat flush against its caption.
+ */
 export function CardHeader({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("flex flex-col gap-1 px-4 pt-4", className)} {...props} />;
+  return (
+    <div className={cn("flex flex-col gap-1 px-4 pb-3 pt-4", className)} {...props} />
+  );
 }
 
 /**

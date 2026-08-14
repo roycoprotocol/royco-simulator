@@ -1294,6 +1294,8 @@ export default function DayV3Summary({
           }),
     hurdle: restockHurdle,
     maximumDiscountPct: inputs.bandPct,
+    selectedCurveInputPer100: model.illustrativeExit.quote.effectiveInputNAV,
+    selectedProceedsPer100: model.illustrativeExit.quote.stableOutNAV,
     policyBasis: inputs.policyBasis,
     selectedSalePer100: modeledImmediateExitSharePct,
   };
