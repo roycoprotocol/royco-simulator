@@ -1744,7 +1744,7 @@ export default function DayV3Summary({
                     restockView.check === null ||
                     restockView.check.status === "unavailable"
                       ? "Describe an arbitrageur's cost of capital and redemption wait to test whether a refill pays."
-                      : `${(restockView.check.worstCaseMarginBps ?? 0) >= 0 ? "Refill pays" : "No refill pays"} at the worst case · ${(restockView.check.worstCaseDiscountBps ?? 0).toFixed(0)} bps discount against a ${(restockView.hurdle?.hurdleBps ?? 0).toFixed(0)} bps hurdle`
+                      : `${(restockView.check.worstCaseMarginBps ?? 0) >= 0 ? "Worth doing" : "Not worth doing"} · up to ${(restockView.check.worstCaseDiscountBps ?? 0).toFixed(0)} bps on offer against a ${(restockView.hurdle?.hurdleBps ?? 0).toFixed(0)} bps break-even`
                   }
                   title="Will arbitrage refill the pool?"
                 >

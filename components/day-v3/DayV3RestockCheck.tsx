@@ -58,12 +58,13 @@ function Line({
 
 
 /**
- * The whole question in one picture: two discounts against one threshold.
+ * The whole question in one picture: what the trade earns against what it
+ * needs to earn.
  *
- * The section was four columns of basis points, which is the arithmetic but not
- * the answer. A reader wants to see whether the bar clears the line, and how
- * much room is left either way, so the hurdle is drawn as a threshold across a
- * shared scale rather than stated as a fourth number to hold in your head.
+ * The threshold used to be explained in a footnote under the bars — "the 56 bps
+ * this desk needs" — which asked a reader to map a sentence back onto an
+ * unlabelled line. The line labels itself now, and the caption says what
+ * crossing it means rather than restating the number.
  */
 function DiscountBars({
   hurdleBps,
@@ -78,10 +79,27 @@ function DiscountBars({
   // Leave headroom past whichever is larger so neither the tallest bar nor the
   // threshold ever sits flush against the edge, where it stops reading.
   const scale = Math.max(hurdleBps, ...measured, 1) * 1.18;
-  const hurdleLeft = (hurdleBps / scale) * 100;
+  const hurdleLeft = Math.min(97, (hurdleBps / scale) * 100);
+  // Near either end the centred label would run outside the card, so it
+  // anchors to whichever side has room.
+  const anchor =
+    hurdleLeft > 72
+      ? "translateX(-100%)"
+      : hurdleLeft < 14
+        ? "translateX(0)"
+        : "translateX(-50%)";
 
   return (
-    <div className="flex flex-col gap-2.5">
+    <div className="flex flex-col gap-2">
+      <div className="relative h-4">
+        <span
+          className="absolute bottom-0 whitespace-nowrap text-[9px] font-semibold uppercase tracking-[0.08em] text-[var(--secondary)]"
+          style={{ left: `${hurdleLeft}%`, transform: anchor }}
+        >
+          Break even · {hurdleBps.toFixed(0)} bps
+        </span>
+      </div>
+
       <div className="relative flex flex-col gap-2.5">
         {rows.map((row) => (
           <div className="flex flex-col gap-1" key={row.label}>
@@ -119,22 +137,17 @@ function DiscountBars({
         <span
           aria-hidden="true"
           className="pointer-events-none absolute inset-y-0"
-          style={{ left: `${Math.min(99, hurdleLeft)}%` }}
+          style={{ left: `${hurdleLeft}%` }}
         >
           <span className="absolute inset-y-0 block w-px bg-[var(--foreground)] opacity-45" />
         </span>
       </div>
 
-      <div className="flex items-center gap-2 text-[9.5px] text-[var(--tertiary)]">
-        <span
-          aria-hidden="true"
-          className="inline-block h-3 w-px bg-[var(--foreground)] opacity-45"
-        />
-        <span>
-          The {hurdleBps.toFixed(0)} bps this desk needs. A bar past the line is
-          a refill worth doing.
-        </span>
-      </div>
+      <p className="text-[9.5px] leading-snug text-[var(--tertiary)]">
+        A bar that reaches past the line earns more than the trade costs, so an
+        arbitrageur buys the discounted Senior and the pool refills. A bar short
+        of it does not, and the pool stays where the seller left it.
+      </p>
     </div>
   );
 }
@@ -198,9 +211,10 @@ export default function DayV3RestockCheck({
           Test whether this works for arbitrageurs
         </CardTitle>
         <CardNote>
-          A sale leaves the pool below NAV until an outside desk buys the
-          discounted Senior and redeems it at NAV. Describe that desk; this
-          checks whether the trade pays and changes nothing above.
+          A sale leaves the pool below NAV, and it stays there until an
+          arbitrageur buys that discounted Senior and redeems it at NAV.
+          Describe one, and this checks whether the trade is worth their while.
+          It changes nothing above.
         </CardNote>
       </CardHeader>
 
@@ -208,10 +222,10 @@ export default function DayV3RestockCheck({
         <div className="grid grid-cols-1 items-start gap-3 sm:grid-cols-2">
           <DayV3NumberField
             className="bg-[var(--foundation)]"
-            label="What does that desk's capital cost, a year?"
+            label="What does an arbitrageur's capital cost, a year?"
             max={100}
             min={0}
-            note="What it needs on money tied up in the trade. Higher cost, deeper discount before it bothers."
+            note="What they need on money tied up in the trade. Higher cost, deeper discount before they bother."
             onChange={onCostOfCapitalPct}
             placeholder="Enter a rate"
             presets={[
@@ -226,7 +240,7 @@ export default function DayV3RestockCheck({
           />
           <DayV3NumberField
             className="bg-[var(--foundation)]"
-            label="How long until it gets NAV back for that Senior?"
+            label="How long until they get NAV back for that Senior?"
             max={365}
             min={0}
             note="Queue plus settlement, from buying the Senior share to holding the underlying."
@@ -247,12 +261,12 @@ export default function DayV3RestockCheck({
         {missingInputs ? (
           <p className="rounded-lg border border-dashed border-[var(--border-subtle)] px-3 py-2.5 text-[11px] leading-relaxed text-[var(--secondary)]">
             Enter a cost of capital and a redemption wait to check whether the
-            discount this design permits is enough to attract a refill.
+            discount this design creates is enough to attract a refill.
           </p>
         ) : !resolved ? (
           <p className="rounded-lg border border-dashed border-[var(--border-subtle)] px-3 py-2.5 text-[11px] leading-relaxed text-[var(--secondary)]">
             Set the exit amount and payout floor above. The worst-case discount
-            they define is what a desk would be arbitraging.
+            they define is what an arbitrageur would be buying.
           </p>
         ) : (
           <>
@@ -285,13 +299,13 @@ export default function DayV3RestockCheck({
                 }}
               >
                 {!worstCasePays
-                  ? "No discount this design permits pays for a refill"
-                  : `Arbitrage pays by ${bps(check.worstCaseMarginBps)} at the worst case`}
+                  ? "No discount this design creates is worth an arbitrageur's time"
+                  : `Arbitrage is worth doing${(check.worstCaseMarginBps ?? 0) < 0.5 ? ", but only just" : `, by ${bps(check.worstCaseMarginBps)}`}`}
               </strong>
               <p className="mt-1 text-[11px] leading-relaxed text-[var(--secondary)]">
                 {!worstCasePays
-                  ? `At its deepest this design lets Senior trade ${bps(check.worstCaseDiscountBps)} below NAV, against a ${bps(hurdle.hurdleBps)} hurdle. Nothing brings this desk in at any depth. Shorten the redemption wait, allow a deeper payout floor, or expect the SLP to carry the position rather than see it arbitraged back.`
-                  : `At its deepest this design lets Senior trade ${bps(check.worstCaseDiscountBps)} below NAV, which clears the ${bps(hurdle.hurdleBps)} this desk needs. It is paid to buy that Senior and redeem it, which is what puts the pool back and restores capacity for the next seller.${
+                  ? `Even fully drawn down this design only lets Senior trade ${bps(check.worstCaseDiscountBps)} below NAV, and an arbitrageur needs ${bps(hurdle.hurdleBps)} to break even. Nothing brings one in at any depth. Shorten the redemption wait, allow a deeper payout floor, or expect the SLP to carry the position rather than see it arbitraged back.`
+                  : `At its deepest this design lets Senior trade ${bps(check.worstCaseDiscountBps)} below NAV, against the ${bps(hurdle.hurdleBps)} an arbitrageur needs to break even. They are paid to buy that Senior and redeem it, which is what puts the pool back and restores capacity for the next seller.${
                       worstCaseBasis === "floor"
                         ? " That is the deepest your payout floor permits, not a depth the pool has been shown to reach: a sized pool usually prices nearer to NAV, so treat this as provisional until the live template resolves."
                         : ""
@@ -299,8 +313,8 @@ export default function DayV3RestockCheck({
                       unpriced
                         ? " The selected sale has not been priced yet, so it is not yet known whether it reaches that depth on its own."
                         : selectedPays
-                          ? ` The selected ${dollars(selectedSalePer100)} sale already clears it by ${bps(check.selectedMarginBps)}, so the pool resets without waiting for a deeper seller.`
-                          : ` The selected ${dollars(selectedSalePer100)} sale only reaches ${bps(check.selectedDiscountBps)}, short of the hurdle, so a single exit of that size does not attract a refill on its own.`
+                          ? ` The ${dollars(selectedSalePer100)} exit you promised ${(check.selectedMarginBps ?? 0) < 0.5 ? "only just covers that" : `beats it by ${bps(check.selectedMarginBps)}`}, so the pool resets without waiting for a deeper seller.`
+                          : ` The ${dollars(selectedSalePer100)} exit you promised only reaches ${bps(check.selectedDiscountBps)}, short of break-even, so one exit of that size does not attract a refill on its own.`
                     }`}
               </p>
             </div>
@@ -308,23 +322,23 @@ export default function DayV3RestockCheck({
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <section className="rounded-lg border border-[var(--border-subtle)] bg-[var(--background)] px-3 py-2.5">
                 <h4 className="mb-2.5 border-b border-[var(--border-subtle)] pb-1.5 text-[9.5px] font-semibold uppercase tracking-[0.11em] text-[var(--tertiary)]">
-                  What the desk is paid
+                  What an arbitrageur earns
                 </h4>
                 <DiscountBars
                   hurdleBps={hurdle.hurdleBps}
                   rows={[
                     {
                       clears: (check.worstCaseMarginBps ?? -1) >= 0,
-                      label: "Worst-case Senior discount",
-                      note: `the deepest this design permits, from ${worstCaseSource}`,
+                      label: "If the pool is fully drawn down",
+                      note: `the deepest discount this design allows, from ${worstCaseSource}`,
                       valueBps: check.worstCaseDiscountBps,
                     },
                     {
                       clears: (check.selectedMarginBps ?? -1) >= 0,
-                      label: "Discount at the selected sale",
+                      label: "After the exit you promised",
                       note: unpriced
                         ? "priced once the live template sizes the pool"
-                        : `${dollars(selectedSalePer100)} of every $100 Senior, sold at once`,
+                        : `the discount left by selling ${dollars(selectedSalePer100)} of every $100 Senior at once`,
                       valueBps: check.selectedDiscountBps,
                     },
                   ]}
@@ -333,7 +347,7 @@ export default function DayV3RestockCheck({
 
               <section className="rounded-lg border border-[var(--border-subtle)] bg-[var(--background)] px-3 py-2">
                 <h4 className="border-b border-[var(--border-subtle)] pb-1.5 text-[9.5px] font-semibold uppercase tracking-[0.11em] text-[var(--tertiary)]">
-                  What the trade costs it
+                  What that trade costs them
                 </h4>
                 <Line
                   label="Cost of capital over the wait"
@@ -342,7 +356,7 @@ export default function DayV3RestockCheck({
                 />
                 <Line
                   label="Senior yield earned while waiting"
-                  note="the desk holds Senior until it redeems, so it collects Senior's rate"
+                  note="they hold Senior until it redeems, so they collect Senior's rate"
                   value={`-${bps(hurdle.seniorCarryBps)}`}
                 />
                 <Line
@@ -352,7 +366,7 @@ export default function DayV3RestockCheck({
                 />
                 <div className="flex items-center justify-between gap-3 pt-2">
                   <span className="text-[11px] font-semibold">
-                    Discount it needs
+                    Break-even discount
                   </span>
                   <span className="font-mono text-[12.5px] font-bold tabular-nums">
                     {bps(hurdle.hurdleBps)}
