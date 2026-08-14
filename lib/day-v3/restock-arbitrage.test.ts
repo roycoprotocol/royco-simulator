@@ -61,10 +61,14 @@ const funded = dayV3RestockHurdle({
   swapFeeBps: 10,
 });
 assert.ok(funded.netCarryBps < 0, "a well-paid wait shows negative net carry");
+assert.ok(
+  funded.hurdleBps < 0,
+  "the hurdle follows net carry below zero rather than being floored: the wait more than pays for itself, and the waterfall's bars must sum to the total it prints",
+);
 assert.equal(
-  funded.hurdleBps,
-  0,
-  "excess Senior carry covers the fee, so any discount at all is enough",
+  funded.hurdleBps.toFixed(4),
+  (funded.netCarryBps + funded.swapFeeBps).toFixed(4),
+  "the hurdle is exactly the components the card draws",
 );
 
 // Zero wait removes both time legs and leaves the fee.
@@ -77,6 +81,34 @@ assert.equal(
   }).hurdleBps,
   10,
 );
+
+// The bars a reader adds up must equal the total printed beneath them, in every
+// sign combination. This is the invariant that a floored hurdle broke.
+for (const [cost, days, senior, fee] of [
+  [8, 90, 12, 10],
+  [30, 90, 4, 100],
+  [12, 7, 6, 10],
+  [4, 365, 20, 1],
+] as [number, number, number, number][]) {
+  const h = dayV3RestockHurdle({
+    costOfCapitalPct: cost,
+    redemptionDays: days,
+    seniorApyPct: senior,
+    swapFeeBps: fee,
+  });
+  const discount = 57.7;
+  const drawn = discount - h.financingBps + h.seniorCarryBps - h.swapFeeBps;
+  const stated = dayV3RestockCheck({
+    hurdle: h,
+    selectedDiscountBps: discount,
+    worstCaseDiscountBps: discount,
+  }).selectedMarginBps as number;
+  assert.equal(
+    drawn.toFixed(4),
+    stated.toFixed(4),
+    `bars must sum to the total at ${cost}% / ${days}d / ${senior}% Sr / ${fee}bps`,
+  );
+}
 
 // A quote's discount is the curve's own move, excluding the fee the seller
 // already paid — that fee stays in the pool rather than sitting there as a

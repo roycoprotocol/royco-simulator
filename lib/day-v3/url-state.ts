@@ -322,13 +322,14 @@ export function readDayV3UrlState(search: string): DayV3UrlState {
   const hasCompleteCurveOverride = curveValues.every((value) => value !== null);
   const protectedDrawdownPct = finite(params.get("protect"), 0, 95);
   const immediateExitSharePct = finite(params.get("exit"), 0, 100);
-  const juniorTargetRequired = protectedDrawdownPct !== 0;
-  const slpTargetRequired = immediateExitSharePct !== 0;
+  // Deliberately NOT "both targets must be present when both tranches are on".
+  // The writer only serializes a target the reader actually overrode, so moving
+  // the Junior slider alone on a market with an exit produced a link carrying
+  // `jr90` and no `slp90` — which that rule rejected, dropping the one override
+  // the link existed to carry. A tranche with no target in the link keeps its
+  // default, which is what an absent parameter has always meant everywhere else
+  // in this contract.
   const hasTargetOnlyCurveOverride =
-    (!juniorTargetRequired ||
-      curveOverrides.jrYieldShareAtTargetPct !== null) &&
-    (!slpTargetRequired ||
-      curveOverrides.slpYieldShareAtTargetPct !== null) &&
     (curveOverrides.jrYieldShareAtTargetPct !== null ||
       curveOverrides.slpYieldShareAtTargetPct !== null) &&
     curveOverrides.jrYieldShareAtZeroPct === null &&
@@ -389,7 +390,10 @@ export function readDayV3UrlState(search: string): DayV3UrlState {
     // `previewSecondarySell` throws outside 0–10000 bps, inside a render-time
     // memo with no error boundary above it, so this bound is what keeps a
     // hand-edited link from crashing the page rather than a cosmetic range.
-    swapFeeBps: finite(params.get("fee"), 0.01, 10_000),
+    // Matches the field's own bound. A link is a way into the app, not a way
+    // around it: 10000 bps arrived here and compounded modeled fee income past
+    // what the engine can hold, taking the backtest down.
+    swapFeeBps: finite(params.get("fee"), 0.01, 1_000),
     marketMakerCostOfCapitalPct: finite(params.get("mmCost"), 0, 100),
     redemptionDays: integer(params.get("mmDays"), 0, 365),
     protectedDrawdownPct,

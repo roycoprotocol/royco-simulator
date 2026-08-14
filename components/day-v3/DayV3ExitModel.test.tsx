@@ -372,7 +372,10 @@ assert.doesNotMatch(handSetFeeMarkup, /Live template|Product policy/);
 // These two bounds are the only guard against `previewSecondarySell` throwing
 // INVALID_SWAP_FEE inside a render-time memo with no error boundary above it.
 assert.match(handSetFeeMarkup, /min="0\.01"/);
-assert.match(handSetFeeMarkup, /max="10000"/);
+// 10% is an order of magnitude above any pool anyone runs, and well clear of
+// the corner where turnover x fee compounds modeled income past what the engine
+// can hold — measured: JBBB threw at 100x turnover and a 100% fee.
+assert.match(handSetFeeMarkup, /max="1000"/);
 
 const protectionStart = goalsMarkup.indexOf('id="day-v3-protection-inputs"');
 const observationMode = goalsMarkup.indexOf('aria-label="Observation mode"');
@@ -465,10 +468,14 @@ const restockView = {
   }),
   hurdle: restockHurdle,
   maximumDiscountPct: 5,
+  maximumDiscountSource: "payout-floor" as const,
   policyBasis: "unresolved" as const,
   selectedCurveInputPer100: 9.995,
   selectedProceedsPer100: 9.735,
   selectedSalePer100: 10,
+  selectedFilledPer100: 10,
+  selectedUnfilledPer100: 0,
+  unit: "USD",
 };
 
 const restockMarkup = renderToStaticMarkup(
@@ -484,9 +491,77 @@ assert.match(restockMarkup, /data-model-source="shared-day-engine-illustrative-d
 assert.match(restockMarkup, /illustrative pool/);
 // The band the payout floor set is named, because it is the reason the
 // discount is what it is.
-assert.match(restockMarkup, /5\.00% maximum discount is set\s+by your payout floor/);
+assert.match(restockMarkup, /5\.00% maximum discount/);
+assert.match(restockMarkup, /is set by your payout floor/);
 assert.match(restockMarkup, /Buys Senior below NAV/);
 assert.match(restockMarkup, /They keep/);
+
+// A live template solved its own band; saying the payout floor set it named the
+// wrong pool, and it was named beside quotes taken off the template's curve.
+assert.match(
+  renderToStaticMarkup(
+    <DayV3RestockCheck
+      costOfCapitalPct={20}
+      onCostOfCapitalPct={noop}
+      onRedemptionDays={noop}
+      redemptionDays={30}
+      view={{ ...restockView, maximumDiscountSource: "live-template" }}
+    />,
+  ),
+  /the live template solved for/,
+);
+
+// A sale the pool cannot absorb is priced for the slice that fills, so it is
+// described as that slice rather than as the exit the issuer promised.
+const partialMarkup = renderToStaticMarkup(
+  <DayV3RestockCheck
+    costOfCapitalPct={20}
+    onCostOfCapitalPct={noop}
+    onRedemptionDays={noop}
+    redemptionDays={30}
+    view={{
+      ...restockView,
+      selectedFilledPer100: 4,
+      selectedUnfilledPer100: 6,
+    }}
+  />,
+);
+assert.match(partialMarkup, /the part that fills/);
+assert.match(partialMarkup, /only \$4\.00 fits in the pool/);
+
+// A market quoted in ETH never gets a dollar sign in front of a number of ETH.
+const ethMarkup = renderToStaticMarkup(
+  <DayV3RestockCheck
+    costOfCapitalPct={20}
+    onCostOfCapitalPct={noop}
+    onRedemptionDays={noop}
+    redemptionDays={30}
+    view={{ ...restockView, unit: "ETH" }}
+  />,
+);
+assert.doesNotMatch(ethMarkup, /\$/);
+assert.match(ethMarkup, /per 100 of Senior/);
+
+// An exit with no quote has no margin. Substituting zero rendered a green
+// "+0 bps" under the words "They lose ... below zero".
+const unpricedMarkup = renderToStaticMarkup(
+  <DayV3RestockCheck
+    costOfCapitalPct={20}
+    onCostOfCapitalPct={noop}
+    onRedemptionDays={noop}
+    redemptionDays={30}
+    view={{
+      ...restockView,
+      check: dayV3RestockCheck({
+        hurdle: restockHurdle,
+        selectedDiscountBps: null,
+        worstCaseDiscountBps: 500,
+      }),
+    }}
+  />,
+);
+assert.doesNotMatch(unpricedMarkup, /They lose/);
+assert.doesNotMatch(unpricedMarkup, /\+0\.0 bps/);
 
 const liveMarkup = renderToStaticMarkup(
   <DayV3RestockCheck

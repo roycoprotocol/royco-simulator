@@ -172,9 +172,12 @@ export default function DayV3QuoteAsset({
       <div className="flex min-w-0 flex-col gap-2">
         <DayV3NumberField
           label="What swap fee should the pool charge on a sale?"
-          max={10000}
+          // 1000 bps is 10%, an order of magnitude above any pool anyone runs
+          // and well clear of the corner where modeled fee income compounds
+          // past what the engine can hold.
+          max={1000}
           min={0.01}
-          note="Empty charges whatever the live template charges, or the market's declared fee until it resolves. A fee set here prices every quote on this page and withholds the canonical pool result, which was solved at the template's own fee. From 100 bps the fee alone exceeds the near-NAV reference, so no positive trade can meet it."
+          note="Empty charges whatever the live template charges, or the market's declared fee until it resolves. A fee set here prices every quote on this page and keeps the live template's curve while replacing what it charges to trade on it, so the canonical pool result — solved at the template's own fee — is withheld. From 100 bps the fee alone exceeds the near-NAV reference, so no positive trade can meet it."
           onChange={onSwapFeeBps}
           origin={feeOrigin}
           placeholder="Use the live fee"

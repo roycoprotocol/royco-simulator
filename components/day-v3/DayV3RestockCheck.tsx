@@ -1,6 +1,7 @@
 "use client";
 
 import DayV3NumberField from "@/components/day-v3/DayV3NumberField";
+import { stake100, type DayV3Unit } from "@/components/day-v3/format";
 import { Badge } from "@/components/ui/badge";
 import {
   Card,
@@ -17,8 +18,10 @@ import type {
 export type DayV3RestockView = {
   check: DayV3RestockResult | null;
   hurdle: DayV3RestockHurdle | null;
-  /** The pool's maximum discount, which the payout floor sets locally. */
+  /** The maximum discount the engine actually priced against. */
   maximumDiscountPct: number;
+  /** Where that number came from, which is not always the payout floor. */
+  maximumDiscountSource: "live-template" | "payout-floor" | "your-answer";
   /** The two operands the discount is actually computed from, so the note can
    *  show its own arithmetic instead of asserting a number. Using the sale size
    *  as the denominator would be the seller's all-in slippage, which includes
@@ -30,6 +33,11 @@ export type DayV3RestockView = {
    *  asked to model — but it is not the live template's pool either. */
   policyBasis: "live" | "unresolved" | "issuer-fee";
   selectedSalePer100: number | null;
+  /** How much of that sale the pool could actually take in one trade. */
+  selectedFilledPer100: number | null;
+  /** The rest, which was never priced and never traded. */
+  selectedUnfilledPer100: number | null;
+  unit: DayV3Unit;
 };
 
 const bps = (value: number | null, digits = 0) =>
@@ -37,8 +45,14 @@ const bps = (value: number | null, digits = 0) =>
     ? "—"
     : `${value.toFixed(digits)} bps`;
 
-const dollars = (value: number | null, digits = 2) =>
-  value === null || !Number.isFinite(value) ? "—" : `$${value.toFixed(digits)}`;
+/** The same rule the exit-cost card follows: a market quoted in ETH never gets
+ *  a dollar sign in front of a number of ETH. */
+const amount = (value: number | null, unit: DayV3Unit, digits = 2) =>
+  value === null || !Number.isFinite(value)
+    ? "—"
+    : unit === "USD"
+      ? `$${value.toFixed(digits)}`
+      : value.toFixed(digits);
 
 /**
  * One arbitrageur's trade, top to bottom, ending in what they keep.
@@ -164,7 +178,9 @@ function ArbitrageWaterfall({
   totalNote,
 }: {
   steps: WaterfallStep[];
-  totalBps: number;
+  /** Null when the selected sale has no quote. Substituting 0 rendered a green
+   *  "+0 bps" under the label "They lose … below zero". */
+  totalBps: number | null;
   totalLabel: string;
   totalNote: string;
 }) {
@@ -176,7 +192,11 @@ function ArbitrageWaterfall({
     [],
   );
 
-  const marks = [0, totalBps, ...bars.flatMap((bar) => [bar.from, bar.to])];
+  const marks = [
+    0,
+    ...(totalBps === null ? [] : [totalBps]),
+    ...bars.flatMap((bar) => [bar.from, bar.to]),
+  ];
   const low = Math.min(...marks);
   const high = Math.max(...marks);
   // A flat span still needs a domain, and every bar needs room to sit inside
@@ -205,14 +225,28 @@ function ArbitrageWaterfall({
         />
       ))}
       <div className="border-t border-[var(--border-subtle)] pt-3">
-        <WaterfallRow
-          emphasis
-          label={totalLabel}
-          note={totalNote}
-          valueBps={totalBps}
-          zeroPct={zeroPct}
-          {...geometry(0, totalBps)}
-        />
+        {totalBps === null ? (
+          <span className="flex items-baseline justify-between gap-3">
+            <span className="text-[11px] font-semibold">{totalLabel}</span>
+            <span className="font-mono text-[12.5px] font-bold tabular-nums text-[var(--tertiary)]">
+              —
+            </span>
+          </span>
+        ) : (
+          <WaterfallRow
+            emphasis
+            label={totalLabel}
+            note={totalNote}
+            valueBps={totalBps}
+            zeroPct={zeroPct}
+            {...geometry(0, totalBps)}
+          />
+        )}
+        {totalBps === null ? (
+          <span className="mt-1 block text-[9.5px] leading-snug text-[var(--tertiary)]">
+            {totalNote}
+          </span>
+        ) : null}
       </div>
     </div>
   );
@@ -249,7 +283,11 @@ export default function DayV3RestockCheck({
     check,
     hurdle,
     maximumDiscountPct,
+    maximumDiscountSource,
     policyBasis,
+    selectedFilledPer100,
+    selectedUnfilledPer100,
+    unit,
     selectedCurveInputPer100,
     selectedProceedsPer100,
     selectedSalePer100,
@@ -265,6 +303,13 @@ export default function DayV3RestockCheck({
   const unpriced = resolved && check.status === "no-selected-sale";
   // The live template sizes the pool to the promised sale, so the deepest point
   // and the selected sale usually coincide.
+  // A quote for less than the sale is a quote for a different trade.
+  const partialFill =
+    resolved &&
+    selectedUnfilledPer100 !== null &&
+    selectedUnfilledPer100 > 0.005 &&
+    selectedFilledPer100 !== null &&
+    selectedFilledPer100 > 0;
   const deeperExists =
     resolved &&
     (check.worstCaseDiscountBps ?? 0) - (check.selectedDiscountBps ?? 0) >= 0.5;
@@ -392,8 +437,8 @@ export default function DayV3RestockCheck({
                       unpriced
                         ? " The selected sale has not been priced yet, so it is not yet known whether it reaches that depth on its own."
                         : selectedPays
-                          ? ` The ${dollars(selectedSalePer100)} exit you promised ${(check.selectedMarginBps ?? 0) < 0.5 ? "only just covers that" : `beats it by ${bps(check.selectedMarginBps)}`}, so the pool resets without waiting for a deeper seller.`
-                          : ` The ${dollars(selectedSalePer100)} exit you promised only reaches ${bps(check.selectedDiscountBps)}, short of break-even, so one exit of that size does not attract a refill on its own.`
+                          ? ` The ${partialFill ? `${amount(selectedFilledPer100, unit)} of the ${amount(selectedSalePer100, unit)} exit the pool can actually take` : `${amount(selectedSalePer100, unit)} exit you promised`} ${(check.selectedMarginBps ?? 0) < 0.5 ? "only just covers that" : `beats it by ${bps(check.selectedMarginBps)}`}, so the pool resets without waiting for a deeper seller.${partialFill ? ` The other ${amount(selectedUnfilledPer100, unit)} does not fill at any price, so nothing about it is priced here.` : ""}`
+                          : ` The ${partialFill ? `${amount(selectedFilledPer100, unit)} of the ${amount(selectedSalePer100, unit)} exit the pool can actually take` : `${amount(selectedSalePer100, unit)} exit you promised`} only reaches ${bps(check.selectedDiscountBps)}, short of break-even, so one exit of that size does not attract a refill on its own.${partialFill ? ` The other ${amount(selectedUnfilledPer100, unit)} does not fill at any price.` : ""}`
                     }`}
               </p>
             </div>
@@ -403,16 +448,19 @@ export default function DayV3RestockCheck({
                 before the answer existed anywhere on screen. */}
             <section className="rounded-lg border border-[var(--border-subtle)] bg-[var(--background)] px-3 py-3">
               <h4 className="mb-3 border-b border-[var(--border-subtle)] pb-2 text-[9.5px] font-semibold uppercase tracking-[0.11em] text-[var(--tertiary)]">
-                One arbitrageur&apos;s trade, per $100 of Senior they buy
+                One arbitrageur&apos;s trade, per {stake100(unit)} of Senior
+                they buy
               </h4>
               <ArbitrageWaterfall
                 steps={[
                   {
                     deltaBps: check.selectedDiscountBps ?? 0,
-                    label: "Buys Senior below NAV",
+                    label: partialFill
+                      ? "Buys Senior below NAV (the part that fills)"
+                      : "Buys Senior below NAV",
                     note: unpriced
                       ? "priced once the live template sizes the pool"
-                      : `of the ${dollars(selectedSalePer100)} sold at once, ${dollars(selectedCurveInputPer100, 4)} reaches the curve after the pool's fee and comes back as ${dollars(selectedProceedsPer100, 4)} — a gap of 1 − ${dollars(selectedProceedsPer100, 4)}/${dollars(selectedCurveInputPer100, 4)}, which is what an arbitrageur buys`,
+                      : `of the ${amount(selectedSalePer100, unit)} sold at once${partialFill ? `, only ${amount(selectedFilledPer100, unit)} fits in the pool;` : ","} ${amount(selectedCurveInputPer100, unit, 4)} reaches the curve after the pool's fee and comes back as ${amount(selectedProceedsPer100, unit, 4)} — a gap of 1 − ${amount(selectedProceedsPer100, unit, 4)}/${amount(selectedCurveInputPer100, unit, 4)}, which is what an arbitrageur buys`,
                   },
                   {
                     deltaBps: -hurdle.financingBps,
@@ -427,17 +475,24 @@ export default function DayV3RestockCheck({
                   {
                     deltaBps: -hurdle.swapFeeBps,
                     label: "Pays the pool fee to buy in",
-                    note: "the live swap fee, charged on the way in",
+                    note:
+                      policyBasis === "issuer-fee"
+                        ? "the swap fee you set, charged on the way in"
+                        : policyBasis === "live"
+                          ? "the live template's swap fee, charged on the way in"
+                          : "the disclosed simulation swap fee, charged on the way in",
                   },
                 ]}
-                totalBps={check.selectedMarginBps ?? 0}
+                totalBps={check.selectedMarginBps}
                 totalLabel={
-                  selectedPays ? "They keep" : "They lose"
+                  unpriced ? "They keep" : selectedPays ? "They keep" : "They lose"
                 }
                 totalNote={
-                  selectedPays
-                    ? "above zero, so the trade happens and the pool refills"
-                    : "below zero, so nobody buys and the pool stays where the seller left it"
+                  unpriced
+                    ? "priced once this exit can be quoted against the pool"
+                    : selectedPays
+                      ? "above zero, so the trade happens and the pool refills"
+                      : "below zero, so nobody buys and the pool stays where the seller left it"
                 }
               />
               <p className="mt-3 border-t border-[var(--border-subtle)] pt-3 text-[9.5px] leading-snug text-[var(--tertiary)]">
@@ -461,8 +516,13 @@ Both discounts are quotes from{" "}
                   : policyBasis === "issuer-fee"
                     ? "a pool priced at the swap fee you set"
                     : "the disclosed illustrative pool"}
-                , whose {maximumDiscountPct.toFixed(2)}% maximum discount is set
-                by your payout floor. The Senior offset assumes the source
+                , whose {maximumDiscountPct.toFixed(2)}% maximum discount{" "}
+                {maximumDiscountSource === "payout-floor"
+                  ? "is set by your payout floor"
+                  : maximumDiscountSource === "your-answer"
+                    ? "you set yourself"
+                    : "the live template solved for"}
+                . The Senior offset assumes the source
                 performs at its modeled rate. Royco Deploy revalidates against
                 the real settlement schedule.
               </p>

@@ -114,10 +114,13 @@ export interface DayV3RestockHurdle {
  * operational hurdle + `restockSwapFeeBps`). Keeping the same split means the
  * two models line up when Royco Deploy resolves the real one.
  *
- * Net carry can go negative when Senior out-earns the desk's cost of capital.
- * That is a real result — the wait pays for itself — so it is not floored here;
- * only the resulting hurdle is, because a desk still will not pay a fee to make
- * nothing.
+ * Nothing is floored. Net carry goes negative when Senior out-earns the cost of
+ * capital, and the hurdle follows it below zero, which is the true statement:
+ * the wait more than pays for itself and the trade is worth doing at any
+ * discount at all. Flooring the hurdle at zero while the card drew the raw
+ * components made the bars and the total describe different arithmetic — at 8%
+ * cost of capital over 90 days against a 12% Senior, the steps summed to 146
+ * bps under a total reading 58.
  */
 export function dayV3RestockHurdle(
   inputs: DayV3RestockHurdleInputs,
@@ -132,7 +135,7 @@ export function dayV3RestockHurdle(
     seniorCarryBps,
     netCarryBps,
     swapFeeBps,
-    hurdleBps: Math.max(0, netCarryBps + swapFeeBps),
+    hurdleBps: netCarryBps + swapFeeBps,
   };
 }
 

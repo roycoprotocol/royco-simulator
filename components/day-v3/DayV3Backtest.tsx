@@ -23,7 +23,10 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { runDayHistoricalBacktest } from "@/lib/day-simulator-template/backtest";
+import {
+  runDayHistoricalBacktest,
+  type DayBacktestResult,
+} from "@/lib/day-simulator-template/backtest";
 import type { MarketConfig } from "@/lib/day/engine/types";
 import type { DayMarket } from "@/lib/day-simulator-template/market";
 import { calibrateSeriesApy } from "@/lib/day-simulator-template/series";
@@ -188,9 +191,19 @@ function DayV3Backtest({
     [active, series],
   );
 
-  const result = useMemo(() => {
-    if (view.length < 3) return null;
-    return runDayHistoricalBacktest({
+  // The engine is template code under the byte lock, so a pool assumption it
+  // cannot integrate is caught here rather than fixed there. Modeled fee income
+  // is `turnover x fee`, compounded every step: JBBB at 100x turnover and a
+  // 100% swap fee runs `pool.stable` to Infinity and the run throws
+  // `cannot convert non-finite number to WAD`, which took the page down. The
+  // fee bound below keeps real inputs well clear of that; this makes it
+  // impossible to reach by any route at all.
+  const [result, resultError] = useMemo<
+    [DayBacktestResult | null, string | null]
+  >(() => {
+    if (view.length < 3) return [null, null];
+    try {
+      return [runDayHistoricalBacktest({
       defaults,
       series: view,
       terms: {
@@ -220,7 +233,13 @@ function DayV3Backtest({
       // the opening period even when a market does declare the flag.
       monthlyBaselineDate: series[0]?.date,
       configOverrides: poolConfigOverrides,
-    });
+      }), null];
+    } catch (error) {
+      return [
+        null,
+        error instanceof Error ? error.message : "unknown engine error",
+      ];
+    }
   }, [
     bandPct,
     coveragePct,
@@ -262,12 +281,16 @@ function DayV3Backtest({
             <CardTitle className="text-[13.5px]" level={3}>
               Historical backtest
             </CardTitle>
-            <Badge tone="caution">no history</Badge>
+            <Badge tone="caution">
+              {resultError ? "cannot be run" : "no history"}
+            </Badge>
           </div>
           <CardNote>
-            {customSource
+            {resultError
+              ? `These pool assumptions cannot be carried across this history: the modeled fee income compounds past what the engine can hold (${resultError}). Lower the swap fee or the yearly turnover in Section 3 and the history runs again.`
+              : customSource
               ? "Add dated NAV or price history in Section 1. That is the only missing input for this backtest; the current market terms will be applied automatically."
-              : "No dated history is available; results above are forward projections at the selected source yield."}
+                : "No dated history is available; results above are forward projections at the selected source yield."}
           </CardNote>
         </CardHeader>
         <CardContent>

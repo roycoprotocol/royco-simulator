@@ -463,13 +463,27 @@ export default function DayV3Summary({
   // Built by OMITTING keys rather than setting them `undefined`. Both the
   // structural run and the backtest merge this by spread, so an `undefined`
   // `eclpParams` would erase the market's own curve instead of leaving it be.
+  // Overrides that redraw the curve itself, as opposed to policy sitting on top
+  // of it. A hand-set fee is policy: the template's geometry is still the right
+  // geometry, it is just being charged differently. A hand-set maximum discount,
+  // depth or premium IS the geometry, and the canonical `eclpParams` would win
+  // the spread below and silently discard it — the reader would drag "maximum
+  // discount" from 1% to 20% and watch every quote on the page stay put.
+  const hasCurveOverride =
+    activeManualOverrides.maximumDiscountPct !== null ||
+    activeManualOverrides.depthAtNav !== null ||
+    activeManualOverrides.maximumPremiumPct !== null;
   const engineOverrides = useMemo<DayV3EngineOverrides | null>(() => {
     if (!canonicalEngineOverrides && !feeOverridden) return null;
+    const canonical = canonicalEngineOverrides ?? {};
+    const canonicalPolicy = Object.fromEntries(
+      Object.entries(canonical).filter(([key]) => key !== "eclpParams"),
+    );
     return {
-      ...(canonicalEngineOverrides ?? {}),
+      ...(hasCurveOverride ? canonicalPolicy : canonical),
       ...(feeOverridden ? { swapFeeBps: swapFeeBps as number } : {}),
-    };
-  }, [canonicalEngineOverrides, feeOverridden, swapFeeBps]);
+    } as DayV3EngineOverrides;
+  }, [canonicalEngineOverrides, feeOverridden, hasCurveOverride, swapFeeBps]);
   const canonicalPoolRecommendation =
     canonicalPoolDesign?.recommendation ?? null;
   const liquidityRecommendation = useMemo(
@@ -506,6 +520,25 @@ export default function DayV3Summary({
   const effectiveBandPct = canonicalPoolRecommendation
     ? canonicalPoolRecommendation.fields.maximumDiscountBps.value / 100
     : floorBandPct;
+  // The maximum discount the engine ACTUALLY priced, which is not always the one
+  // above. `canonicalPoolRecommendation` is withheld by any pool override
+  // including a hand-set fee, but the canonical `eclpParams` keep pricing unless
+  // the override was to the curve — so a page that read `effectiveBandPct` there
+  // named the payout floor's band beside quotes taken off the template's curve.
+  const pricedBand: {
+    pct: number;
+    source: "live-template" | "payout-floor" | "your-answer";
+  } =
+    activeManualOverrides.maximumDiscountPct !== null
+      ? { pct: activeManualOverrides.maximumDiscountPct, source: "your-answer" }
+      : canonicalEngineOverrides && rawCanonicalPoolDesign && !hasCurveOverride
+        ? {
+            pct:
+              rawCanonicalPoolDesign.recommendation.fields.maximumDiscountBps
+                .value / 100,
+            source: "live-template",
+          }
+        : { pct: floorBandPct, source: "payout-floor" };
 
   // Defer one stable, complete accountant input rather than an inline object.
   // The former version deferred the terms but read the live E-CLP and fee
@@ -1299,12 +1332,6 @@ export default function DayV3Summary({
         ? `${canonicalExit.policy.templateName} on ${canonicalExit.policy.chainName}, block ${canonicalExit.policy.blockNumber}. Protocol fees: ST ${(Number(BigInt(canonicalExit.policy.protocolFees.stProtocolFeeWad)) / 1e16).toFixed(1)}%, JT ${(Number(BigInt(canonicalExit.policy.protocolFees.jtProtocolFeeWad)) / 1e16).toFixed(1)}%, JT premium ${(Number(BigInt(canonicalExit.policy.protocolFees.jtYieldShareProtocolFeeWad)) / 1e16).toFixed(1)}%, SLP premium ${(Number(BigInt(canonicalExit.policy.protocolFees.lptYieldShareProtocolFeeWad)) / 1e16).toFixed(1)}%. Resolved ${canonicalExit.policy.resolvedAt}`
         : null,
   };
-  // The worst case an arbitrageur can be paid is the deepest this design lets
-  // Senior trade below NAV. That is the live template's lowest modeled payout
-  // once it resolves, and until then the issuer's own payout floor, which the
-  // deployed pool still has to honour. It is deliberately not a quote off the
-  // shared engine's fallback pool: that pool is far shallower than any real
-  // design and reported 50 bps where a $95 floor permits 500.
   // Both discounts come from one engine run against one pool: the deepest fill
   // it can do, and the fill the promised exit takes. That is what an
   // arbitrageur trades against, it responds to the payout floor through the
@@ -1323,11 +1350,31 @@ export default function DayV3Summary({
             ),
           }),
     hurdle: restockHurdle,
-    maximumDiscountPct: inputs.bandPct,
+    maximumDiscountPct: pricedBand.pct,
+    maximumDiscountSource: pricedBand.source,
     selectedCurveInputPer100: model.illustrativeExit.quote.effectiveInputNAV,
     selectedProceedsPer100: model.illustrativeExit.quote.stableOutNAV,
+    // `previewSecondarySell` clamps to what the pool can absorb, so on a sale
+    // larger than the pool the quote prices the fillable slice. Calling that
+    // "the exit you promised" told the reader an exit had been arbitraged that
+    // the pool never took in the first place.
+    selectedFilledPer100:
+      modeledImmediateExitSharePct === null ||
+      model.illustrativeExit.openingSeniorNAV <= 0
+        ? null
+        : (model.illustrativeExit.quote.filledNAV /
+            model.illustrativeExit.openingSeniorNAV) *
+          100,
+    selectedUnfilledPer100:
+      modeledImmediateExitSharePct === null ||
+      model.illustrativeExit.openingSeniorNAV <= 0
+        ? null
+        : (model.illustrativeExit.quote.unfilledNAV /
+            model.illustrativeExit.openingSeniorNAV) *
+          100,
     policyBasis: inputs.policyBasis,
     selectedSalePer100: modeledImmediateExitSharePct,
+    unit: returnUnit,
   };
 
   const displayedReturnState = returnDisplayState;
@@ -1796,7 +1843,15 @@ export default function DayV3Summary({
                     protectionDisabled
                       ? "Protection is off. No Junior is funded, so there is no loss waterfall to draw — Senior absorbs source losses from the first dollar."
                       : model.coverageExplainer === null
-                        ? `No protection model exists at these terms. A ${minimumProceedsPer100 === null ? "" : `$${minimumProceedsPer100.toFixed(2)} `}payout floor asks the exit pool for almost no price impact, and at the 100%-utilized boundary no pool can hold that and still meet its own liquidity requirement. Lower the payout floor to model the loss path.`
+                        // Deliberately names no cause. This branch was written
+                        // when the payout floor really did break the boundary
+                        // stack, and it told the reader to lower it. That was
+                        // fixed by taking Junior to the boundary and leaving the
+                        // pool on its opening stack; measured after the fix, all
+                        // 13 markets build at every floor from $100 to $50. The
+                        // guard stays as a backstop, but a backstop that has no
+                        // known trigger cannot name a remedy.
+                        ? "No protection model exists at these terms. The loss path is drawn at the 100%-utilized boundary, and this stack cannot be built there. Every other result on this page is unaffected; change the coverage or the payout floor to move off it."
                         : null
                   }
                   id="day-v3-risk-models"

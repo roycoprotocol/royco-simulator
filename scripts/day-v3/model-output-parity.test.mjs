@@ -399,8 +399,8 @@ assert.match(
 );
 assert.match(
   summary,
-  /\.\.\.\(canonicalEngineOverrides \?\? \{\}\),\s*\.\.\.\(feeOverridden \? \{ swapFeeBps: swapFeeBps as number \} : \{\}\),/,
-  "The engine override must keep the live E-CLP and protocol fees while replacing only the fee",
+  /\.\.\.\(hasCurveOverride \? canonicalPolicy : canonical\),\s*\.\.\.\(feeOverridden \? \{ swapFeeBps: swapFeeBps as number \} : \{\}\),/,
+  "The engine override must keep the live E-CLP and protocol fees while replacing only the fee — except when the reader drew the curve themselves",
 );
 assert.match(
   summary,
@@ -468,7 +468,7 @@ assert.match(
 );
 assert.match(
   quoteAsset,
-  /max=\{10000\}\s*min=\{0\.01\}/,
+  /max=\{1000\}\s*min=\{0\.01\}/,
   "The fee field's bounds are what keep previewSecondarySell from throwing",
 );
 assert.doesNotMatch(
@@ -526,6 +526,52 @@ assert.match(
   summary,
   /dayCapitalAtUtilization\(sized, terms, 1\)[\s\S]{0,220}lt: balances\.lt/,
   "The loss waterfall takes Junior to the boundary and leaves the pool on its admissible opening size",
+);
+
+// The canonical curve must not silently outrank a curve the reader set. Both
+// halves of the guard matter: the override list has to be consulted, and the
+// spread has to drop `eclpParams` when it fires. Without this, dragging
+// "maximum discount" from 1% to 20% left every quote on the page unchanged.
+assert.match(
+  summary,
+  /const hasCurveOverride\s*=\s*\n?\s*activeManualOverrides\.maximumDiscountPct !== null/,
+  "a reader-set curve must be detected before the canonical one is applied",
+);
+assert.match(
+  summary,
+  /\.\.\.\(hasCurveOverride \? canonicalPolicy : canonical\)/,
+  "a reader-set curve must drop the canonical eclpParams from the engine overrides",
+);
+
+// The band the page names has to be the band the engine priced. A hand-set fee
+// withholds the canonical recommendation but keeps the canonical curve, so
+// reading `effectiveBandPct` there named the payout floor's band beside quotes
+// taken off the template's curve.
+assert.match(
+  summary,
+  /maximumDiscountPct: pricedBand\.pct,\s*\n\s*maximumDiscountSource: pricedBand\.source,/,
+  "the restock card must be given the band that actually priced, and its source",
+);
+assert.doesNotMatch(
+  summary,
+  /maximumDiscountPct: inputs\.bandPct,/,
+  "the requested band is not always the priced band, so it must not be reported as one",
+);
+
+// A sale larger than the pool is quoted for the slice that fills. Calling that
+// "the exit you promised" claimed an arbitrage on volume that never traded.
+assert.match(
+  summary,
+  /selectedUnfilledPer100:[\s\S]{0,320}?quote\.unfilledNAV/,
+  "the restock card must be told how much of the selected sale went unfilled",
+);
+
+// The engine is byte-locked template code, so a pool assumption it cannot
+// integrate is caught at the caller.
+assert.match(
+  backtest,
+  /try \{\s*\n\s*return \[runDayHistoricalBacktest\(\{/,
+  "the historical backtest must not be able to take the page down",
 );
 
 console.log(

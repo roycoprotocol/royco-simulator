@@ -508,8 +508,8 @@ assert.equal(readDayV3UrlState("quoteApy=-1&mmCost=101&mmDays=400").quoteAssetYi
 assert.equal(readDayV3UrlState("fee=30").swapFeeBps, 30);
 assert.equal(readDayV3UrlState("fee=0").swapFeeBps, null);
 assert.equal(readDayV3UrlState("fee=0.01").swapFeeBps, 0.01);
-assert.equal(readDayV3UrlState("fee=10000").swapFeeBps, 10_000);
-assert.equal(readDayV3UrlState("fee=10001").swapFeeBps, null);
+assert.equal(readDayV3UrlState("fee=1000").swapFeeBps, 1_000);
+assert.equal(readDayV3UrlState("fee=1001").swapFeeBps, null);
 assert.equal(readDayV3UrlState("fee=-5").swapFeeBps, null);
 assert.equal(readDayV3UrlState("fee=abc").swapFeeBps, null);
 assert.equal(readDayV3UrlState("").swapFeeBps, null);
@@ -541,5 +541,39 @@ for (const dropped of ["quote", "quoteApy", "fee", "mmCost", "mmDays"]) {
     `${dropped} must not survive an exit-off design`,
   );
 }
+
+// Moving one yield-split slider writes one parameter, because the writer only
+// serializes an override the reader actually made. Requiring the other tranche's
+// target to be present threw that link's only override away on reload.
+{
+  const jrOnly = readDayV3UrlState("m=custom&apy=8&protect=20&exit=10&jr90=20");
+  assert.equal(
+    jrOnly.overrides.jrYieldShareAtTargetPct,
+    20,
+    "a Junior-only target must survive a market that also has an exit",
+  );
+  assert.equal(jrOnly.overrides.slpYieldShareAtTargetPct, null);
+
+  const slpOnly = readDayV3UrlState("m=custom&apy=8&protect=20&exit=10&slp90=15");
+  assert.equal(
+    slpOnly.overrides.slpYieldShareAtTargetPct,
+    15,
+    "an SLP-only target must survive a market that also has protection",
+  );
+  assert.equal(slpOnly.overrides.jrYieldShareAtTargetPct, null);
+
+  // The over-budget guard still applies to whatever the link does carry.
+  assert.equal(
+    readDayV3UrlState("m=custom&apy=8&protect=20&exit=10&jr90=120")
+      .overrides.jrYieldShareAtTargetPct,
+    null,
+    "an out-of-range target is still rejected",
+  );
+}
+
+// A swap fee arriving by link is bounded exactly like the field, because a link
+// is a way into the app and not a way around it. 10000 bps compounded modeled
+// fee income past what the engine can hold and took the backtest down.
+assert.equal(readDayV3UrlState("m=custom&apy=8&fee=10000").swapFeeBps, null);
 
 console.log("Day V3 independent goal URL state: PASS");
