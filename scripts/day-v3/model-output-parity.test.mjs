@@ -170,9 +170,27 @@ assert.match(
 // their design creates is worth arbitraging, and those answers reach only the
 // local scenario check. Assert that boundary, not the absence of the words.
 assert.match(
-  exitGroup,
-  /<DayV3RestockCheck[\s\S]*view=\{restock\}/,
-  "Senior exit must show whether a refill trade pays at the terms on screen",
+  summary,
+  /data-model-column="exit"[\s\S]*<DayV3ExitModel[\s\S]*<DayV3RestockCheck[\s\S]*view=\{restockView\}/,
+  "The refill verdict is a result of the exit design and reads beside it",
+);
+assert.doesNotMatch(
+  goals,
+  /<DayV3RestockCheck/,
+  "The refill check is a model, not another input to answer",
+);
+// The worst case an arbitrageur sees is the design's own promise. Reading it
+// off the shared engine's shallow fallback pool reported 50 bps where a $95
+// payout floor permits 500.
+assert.match(
+  summary,
+  /restockWorstPayoutPer100 = exitDisabled[\s\S]*exitView\.lowestPayoutPer100 \?\? minimumProceedsPer100/,
+  "The refill worst case must come from the modeled payout or the issuer floor",
+);
+assert.doesNotMatch(
+  summary,
+  /quoteSell|boundarySellNAV[\s\S]{0,200}restock/,
+  "The refill check must not reprice sales against the illustrative pool",
 );
 assert.doesNotMatch(
   goals,

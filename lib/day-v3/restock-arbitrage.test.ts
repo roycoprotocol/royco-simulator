@@ -1,40 +1,32 @@
 import assert from "node:assert/strict";
 
 import {
-  dayV3PoolDiscountBps,
+  dayV3DiscountBps,
   dayV3RestockCheck,
   dayV3RestockHurdle,
 } from "@/lib/day-v3/restock-arbitrage";
-import { normalizeDayV3Defaults } from "@/lib/day-v3/normalization";
-import { buildDayYieldDraftMarket } from "@/lib/day-simulator-template/explorer-market";
-import {
-  buildDayInitialBalances,
-  buildDayMarketConfig,
-} from "@/lib/day-simulator-template/runtime";
-import { Sim } from "@/lib/day/engine/runner";
 
-// The discount is the curve's own move, not the seller's all-in cost. A quote
-// whose fee has already been taken out of `effectiveInputNAV` must report only
-// what a refilling desk could actually capture.
+// A payout is a discount stated the other way round. Both figures come from the
+// exit design, so nothing here reprices a pool.
 assert.equal(
-  dayV3PoolDiscountBps({
-    filledNAV: 10,
-    effectiveInputNAV: 9.99,
-    stableOutNAV: 9.94,
-    unfilledNAV: 0,
-  })?.toFixed(2),
-  "50.05",
+  dayV3DiscountBps(95)?.toFixed(4),
+  "500.0000",
+  "a $95 floor is a 5% discount",
 );
+assert.equal(dayV3DiscountBps(96.2)?.toFixed(0), "380");
 assert.equal(
-  dayV3PoolDiscountBps({
-    filledNAV: 0,
-    effectiveInputNAV: 0,
-    stableOutNAV: 0,
-    unfilledNAV: 5,
-  }),
-  null,
-  "an unfillable quote has no discount to report",
+  dayV3DiscountBps(9.94, 10)?.toFixed(0),
+  "60",
+  "proceeds are measured against what was sold, not against 100",
 );
+assert.equal(dayV3DiscountBps(100), 0, "a payout at NAV is no discount");
+assert.equal(
+  dayV3DiscountBps(101),
+  0,
+  "a payout above NAV is not a negative discount anyone can bank",
+);
+assert.equal(dayV3DiscountBps(null), null);
+assert.equal(dayV3DiscountBps(95, 0), null, "nothing sold, nothing to discount");
 
 // A wait costs the desk its own money and pays it Senior's yield. Both legs are
 // stated so neither can be quietly assumed away.
@@ -50,7 +42,7 @@ assert.equal(week.netCarryBps.toFixed(2), "11.51");
 assert.equal(week.hurdleBps.toFixed(2), "21.51");
 
 // Senior out-earning the desk's cost of capital is a real outcome, and the
-// hurdle then falls to the fee alone rather than going negative.
+// hurdle then falls to zero rather than going negative.
 const funded = dayV3RestockHurdle({
   costOfCapitalPct: 4,
   redemptionDays: 90,
@@ -75,156 +67,92 @@ assert.equal(
   10,
 );
 
-// Against the shared engine's own pool, not a reconstructed curve.
-const market = buildDayYieldDraftMarket({ label: "Custom", sourceApy: 0.08 });
-const defaults = normalizeDayV3Defaults(market.defaults);
-const terms = {
-  coverage: 0.135,
-  minLiquidity: defaults.minLiquidity,
-  eclpBandWidth: defaults.eclpBandWidth,
-  observationDays: 0,
-  riskYieldShare: defaults.riskYDM.yTarget,
-  liquidityYieldShare: defaults.liqYDM.yTarget,
-};
-const effective = {
-  ...defaults,
-  ...terms,
-  sourceApy: 0.08,
-  stableYield: 0,
-  poolTurnoverPerYear: 0,
-};
-const sim = new Sim(
-  buildDayMarketConfig(effective, terms),
-  buildDayInitialBalances(effective, terms),
-);
-const openingSeniorNAV = sim.last().stEffectiveNAV;
-const quoteSell = (nav: number) => sim.previewSecondarySell(nav);
-// The pool fills until its quote leg is gone; that boundary is the deepest
-// discount the design can reach.
-let capacityNAV = openingSeniorNAV;
-for (let step = 0; step < 64; step += 1) {
-  if (quoteSell(capacityNAV).unfilledNAV <= 1e-9) capacityNAV *= 2;
-  else break;
-}
-capacityNAV = quoteSell(capacityNAV).filledNAV;
-assert.ok(capacityNAV > 0, "the illustrative pool can absorb a sale");
-
-const short = dayV3RestockCheck({
-  quoteSell,
-  openingSeniorNAV,
-  capacityNAV,
-  selectedSalePer100: 10,
-  hurdle: dayV3RestockHurdle({
-    costOfCapitalPct: 12,
-    redemptionDays: 7,
+const hurdleAt = (costOfCapitalPct: number, redemptionDays: number) =>
+  dayV3RestockHurdle({
+    costOfCapitalPct,
+    redemptionDays,
     seniorApyPct: 6,
     swapFeeBps: 10,
-  }),
+  });
+
+// The worst case is the design's own promise. A $95 floor is 500 bps, which is
+// what a desk can expect at the deepest point — not the ~50 bps the shared
+// engine's shallow fallback pool used to report here.
+const week95 = dayV3RestockCheck({
+  hurdle: hurdleAt(12, 7),
+  selectedSalePer100: 10,
+  selectedSaleProceeds: 9.94,
+  worstPayoutPer100: 95,
 });
-assert.equal(short.status, "profitable");
-assert.ok(
-  (short.selectedDiscountBps ?? 0) > 40,
-  "a $10 sale into the illustrative pool moves the curve tens of bps",
-);
-assert.ok((short.selectedMarginBps ?? 0) > 0);
-assert.ok(
-  (short.breakEvenSalePer100 ?? Infinity) < 10,
-  "a one-week wait is covered before the selected sale is complete",
-);
+assert.equal(week95.worstCaseDiscountBps?.toFixed(4), "500.0000");
+assert.equal(week95.worstCaseMarginBps?.toFixed(2), "478.49");
+assert.equal(week95.selectedDiscountBps?.toFixed(0), "60");
+assert.equal(week95.status, "profitable");
+assert.ok((week95.selectedMarginBps ?? 0) > 0);
 
-// A long redemption queue is what actually breaks the refill loop: the same
-// pool, the same discount, and no desk willing to fund the wait.
+// A long queue is what breaks the refill loop: the same design, the same
+// discount, and no desk willing to fund the wait.
 const slow = dayV3RestockCheck({
-  quoteSell,
-  openingSeniorNAV,
-  capacityNAV,
+  hurdle: hurdleAt(30, 365),
   selectedSalePer100: 10,
-  hurdle: dayV3RestockHurdle({
-    costOfCapitalPct: 12,
-    redemptionDays: 90,
-    seniorApyPct: 6,
-    swapFeeBps: 10,
-  }),
+  selectedSaleProceeds: 9.94,
+  worstPayoutPer100: 95,
 });
 assert.equal(slow.status, "unprofitable");
-assert.equal(
-  slow.breakEvenSalePer100,
-  null,
-  "no sale the pool can absorb pays for a 90-day wait",
+assert.ok(
+  (slow.worstCaseMarginBps ?? 0) < 0,
+  "a 2,410 bps hurdle is not covered by a 500 bps floor",
 );
-assert.ok((slow.worstCaseMarginBps ?? 0) < 0);
 assert.equal(
   slow.worstCaseDiscountBps,
-  short.worstCaseDiscountBps,
-  "the pool is unchanged; only the desk's hurdle moved",
+  week95.worstCaseDiscountBps,
+  "the design is unchanged; only the desk's hurdle moved",
 );
 
-// The break-even sale is the crossing point, so the discount there matches the
-// hurdle rather than merely clearing it.
-const crossing = dayV3RestockCheck({
-  quoteSell,
-  openingSeniorNAV,
-  capacityNAV,
+// The selected sale can fall short while the worst case clears, because a
+// smaller sale prices nearer to NAV. That is the case worth naming separately.
+const shallowSale = dayV3RestockCheck({
+  hurdle: hurdleAt(20, 30),
   selectedSalePer100: 10,
-  hurdle: dayV3RestockHurdle({
-    costOfCapitalPct: 12,
-    redemptionDays: 4,
-    seniorApyPct: 6,
-    swapFeeBps: 10,
-  }),
+  selectedSaleProceeds: 9.94,
+  worstPayoutPer100: 95,
 });
-const crossingNAV =
-  ((crossing.breakEvenSalePer100 as number) / 100) * openingSeniorNAV;
-const crossingDiscount = dayV3PoolDiscountBps(quoteSell(crossingNAV)) as number;
-const crossingHurdle = dayV3RestockHurdle({
-  costOfCapitalPct: 12,
-  redemptionDays: 4,
-  seniorApyPct: 6,
-  swapFeeBps: 10,
-}).hurdleBps;
 assert.ok(
-  Math.abs(crossingDiscount - crossingHurdle) < 0.5,
-  `break-even discount ${crossingDiscount} should meet the ${crossingHurdle} bps hurdle`,
+  (shallowSale.worstCaseMarginBps ?? 0) > 0,
+  "a 500 bps floor still clears a one-month wait at 20% cost of capital",
 );
-
-// An unfunded pool has nothing to arbitrage and must not invent a verdict.
-assert.equal(
-  dayV3RestockCheck({
-    quoteSell,
-    openingSeniorNAV,
-    capacityNAV: 0,
-    selectedSalePer100: 10,
-    hurdle: dayV3RestockHurdle({
-      costOfCapitalPct: 12,
-      redemptionDays: 7,
-      seniorApyPct: 6,
-      swapFeeBps: 10,
-    }),
-  }).status,
-  "unavailable",
+assert.ok(
+  (shallowSale.selectedMarginBps ?? 0) < 0,
+  "but the 60 bps a $10 sale reaches does not",
 );
+assert.equal(shallowSale.status, "unprofitable");
 
-// With no exit amount chosen there is no trade to price. Reporting that as an
-// unprofitable refill would answer a question the reader has not asked yet.
+// Until the pool is sized there are no proceeds for the selected sale, and
+// reporting that as a failed refill would answer a question nobody asked.
 const unpriced = dayV3RestockCheck({
-  quoteSell,
-  openingSeniorNAV,
-  capacityNAV,
-  selectedSalePer100: null,
-  hurdle: dayV3RestockHurdle({
-    costOfCapitalPct: 12,
-    redemptionDays: 7,
-    seniorApyPct: 6,
-    swapFeeBps: 10,
-  }),
+  hurdle: hurdleAt(12, 7),
+  selectedSalePer100: 10,
+  selectedSaleProceeds: null,
+  worstPayoutPer100: 95,
 });
 assert.equal(unpriced.status, "no-selected-sale");
 assert.equal(unpriced.selectedDiscountBps, null);
 assert.equal(unpriced.selectedMarginBps, null);
-assert.ok(
-  (unpriced.breakEvenSalePer100 ?? 0) > 0,
-  "the depth a refill needs is still answerable without a chosen exit",
+assert.equal(
+  unpriced.worstCaseDiscountBps?.toFixed(4),
+  "500.0000",
+  "the deepest point is still answerable from the floor alone",
 );
-assert.equal(unpriced.worstCaseDiscountBps, short.worstCaseDiscountBps);
+
+// No exit design, no discount to arbitrage, and no verdict invented.
+assert.equal(
+  dayV3RestockCheck({
+    hurdle: hurdleAt(12, 7),
+    selectedSalePer100: null,
+    selectedSaleProceeds: null,
+    worstPayoutPer100: null,
+  }).status,
+  "unavailable",
+);
 
 console.log("Day V3 restock arbitrage check: PASS");

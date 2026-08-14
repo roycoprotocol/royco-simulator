@@ -98,18 +98,37 @@ const exact = (value: number) => `${(value * 100).toFixed(2)}%`;
 function Line({
   label,
   note,
+  total = false,
   value,
 }: {
   label: string;
   note?: string;
+  /** The line a group adds up to, set apart by weight rather than by a box. */
+  total?: boolean;
   value: string;
 }) {
   return (
-    <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 border-b border-[var(--border-subtle)] py-2 last:border-b-0">
-      <span className="text-[11.5px] font-medium text-[var(--secondary)]">
+    <div
+      className={`grid grid-cols-[minmax(0,1fr)_auto] items-baseline gap-x-4 py-2 ${
+        total
+          ? "mt-1 border-t border-[var(--border-subtle)]"
+          : "border-b border-[var(--border-subtle)] last:border-b-0"
+      }`}
+    >
+      <span
+        className={
+          total
+            ? "text-[11.5px] font-semibold"
+            : "text-[11.5px] font-medium text-[var(--secondary)]"
+        }
+      >
         {label}
       </span>
-      <span className="row-span-2 font-mono text-[11.5px] font-semibold tabular-nums whitespace-nowrap">
+      <span
+        className={`row-span-2 font-mono tabular-nums whitespace-nowrap ${
+          total ? "text-[12.5px] font-bold" : "text-[11.5px] font-semibold"
+        }`}
+      >
         {value}
       </span>
       {note ? (
@@ -121,6 +140,12 @@ function Line({
   );
 }
 
+/**
+ * The build-up used three shapes for three groups: a single unnoted line, a
+ * pair of noted lines, and a differently-filled slab for the total. Same rows,
+ * same boxes, and a total set apart by weight rather than by its own container
+ * is what makes the column read as one arithmetic instead of three panels.
+ */
 function BreakdownGroup({
   children,
   label,
@@ -135,17 +160,6 @@ function BreakdownGroup({
       </h4>
       {children}
     </section>
-  );
-}
-
-function ResultLine({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="flex items-center justify-between gap-4 rounded-lg border border-[var(--border-subtle)] bg-[var(--foundation)] px-3 py-2.5">
-      <span className="text-[12px] font-semibold">{label}</span>
-      <span className="font-mono text-[13px] font-bold tabular-nums">
-        {value}
-      </span>
-    </div>
   );
 }
 
@@ -204,12 +218,7 @@ export function DayV3PoolCarryLines({
         note={swapFeeNote}
         value={signed(breakdown.swapFeeIncome)}
       />
-      <div className="flex items-center justify-between gap-3 pt-2">
-        <span className="text-[11.5px] font-semibold">Pool carry subtotal</span>
-        <span className="font-mono text-[12.5px] font-bold tabular-nums">
-          {exact(total)}
-        </span>
-      </div>
+      <Line label="Pool carry subtotal" total value={exact(total)} />
     </BreakdownGroup>
   );
 }
@@ -397,6 +406,7 @@ export default function DayV3Comparison({
                           <BreakdownGroup label="Starting return">
                             <Line
                               label="Return before premiums"
+                              note="what this position earns holding the source alone"
                               value={exact(position.base)}
                             />
                           </BreakdownGroup>
@@ -420,10 +430,14 @@ export default function DayV3Comparison({
                             value={signed(position.liqDelta)}
                           />
                         </BreakdownGroup>
-                        <ResultLine
-                          label={`${position.name} keeps`}
-                          value={exact(position.apy)}
-                        />
+                        <BreakdownGroup label="What it keeps">
+                          <Line
+                            label={`${position.name} keeps`}
+                            note="starting return plus every premium above"
+                            total
+                            value={exact(position.apy)}
+                          />
+                        </BreakdownGroup>
                       </div>
                     </TableCell>
                   </TableRow>

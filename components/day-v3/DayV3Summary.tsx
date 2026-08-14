@@ -30,7 +30,9 @@ import DayV3ModelGroup, {
 } from "@/components/day-v3/DayV3ModelGroup";
 import DayV3NumberField from "@/components/day-v3/DayV3NumberField";
 import DayV3PremiumCurveEditor from "@/components/day-v3/DayV3PremiumCurveEditor";
-import type { DayV3RestockView } from "@/components/day-v3/DayV3RestockCheck";
+import DayV3RestockCheck, {
+  type DayV3RestockView,
+} from "@/components/day-v3/DayV3RestockCheck";
 import DayV3SegmentedControl from "@/components/day-v3/DayV3SegmentedControl";
 import DayV3Source from "@/components/day-v3/DayV3Source";
 import DayV3YieldModels from "@/components/day-v3/DayV3YieldModels";
@@ -93,8 +95,9 @@ import {
 const pct = (value: number) => `${(value * 100).toFixed(1)}%`;
 const DAY_TARGET_UTILIZATION = 0.9;
 const CUSTOM_SOURCE_ID = "custom";
-/** A non-accruing stablecoin, so the model opens where it always has: at 0%. */
-const DAY_V3_DEFAULT_QUOTE_ASSET = "USDC";
+/** Royco's own Senior-tranche USDC vault, the quote asset a Day pool opens on. */
+const DAY_V3_DEFAULT_QUOTE_ASSET = "sr-srRoyUSDC";
+const DAY_V3_DEFAULT_QUOTE_ASSET_YIELD_PCT = 4;
 const CUSTOM_SOURCE_MARKET = buildDayYieldDraftMarket({
   label: "Custom yield source",
   sourceApy: 0.12,
@@ -184,7 +187,7 @@ export default function DayV3Summary({
     linked?.quoteAssetLabel ?? DAY_V3_DEFAULT_QUOTE_ASSET,
   );
   const [quoteAssetYieldPct, setQuoteAssetYieldPct] = useState<number | null>(
-    linked?.quoteAssetYieldPct ?? 0,
+    linked?.quoteAssetYieldPct ?? DAY_V3_DEFAULT_QUOTE_ASSET_YIELD_PCT,
   );
   // An outside desk's terms. These describe who might arbitrage the pool back
   // to NAV; they price nothing in the market itself and never gate a result.
@@ -243,7 +246,7 @@ export default function DayV3Summary({
     // The quote asset belongs to the exit design, not to the source, so it is
     // cleared with the rest of the exit rather than carried across markets.
     setQuoteAssetLabel(DAY_V3_DEFAULT_QUOTE_ASSET);
-    setQuoteAssetYieldPct(0);
+    setQuoteAssetYieldPct(DAY_V3_DEFAULT_QUOTE_ASSET_YIELD_PCT);
     setImportedMarket(null);
     setManualOverrides(EMPTY_DAY_V3_OVERRIDES);
   };
@@ -614,11 +617,6 @@ export default function DayV3Summary({
         quote: opening.previewSecondarySell(requestedExitNAV),
       },
       explainer: buildDayExplainerMetrics(cfg, balances),
-      // `previewSecondarySell` is read-only, so the refill check can price any
-      // sale size against this same opening pool without a second engine run
-      // and without reconstructing a price curve of its own.
-      quoteSell: (nav: number) => opening.previewSecondarySell(nav),
-      openingSeniorNAV,
     };
   }, [
     inputs.bandPct,
@@ -794,23 +792,6 @@ export default function DayV3Summary({
       scenario.seniorApy,
     ],
   );
-  const restockView: DayV3RestockView = {
-    basis: inputs.policyBasis === "live" ? "live" : "illustrative",
-    check:
-      restockHurdle === null || exitDisabled
-        ? null
-        : dayV3RestockCheck({
-            capacityNAV: model.explainer.liquidity.boundarySellNAV,
-            hurdle: restockHurdle,
-            openingSeniorNAV: model.openingSeniorNAV,
-            selectedSalePer100: modeledImmediateExitSharePct,
-            quoteSell: model.quoteSell,
-          }),
-    hurdle: restockHurdle,
-    selectedSalePer100: modeledImmediateExitSharePct,
-    seniorApyPct: scenario.seniorApy * 100,
-  };
-
   const backtestConfigOverrides = useMemo(
     () =>
       inputs.engineOverrides
@@ -1151,6 +1132,36 @@ export default function DayV3Summary({
       ? `${canonicalExit.policy.templateName} on ${canonicalExit.policy.chainName}, block ${canonicalExit.policy.blockNumber}. Protocol fees: ST ${(Number(BigInt(canonicalExit.policy.protocolFees.stProtocolFeeWad)) / 1e16).toFixed(1)}%, JT ${(Number(BigInt(canonicalExit.policy.protocolFees.jtProtocolFeeWad)) / 1e16).toFixed(1)}%, JT premium ${(Number(BigInt(canonicalExit.policy.protocolFees.jtYieldShareProtocolFeeWad)) / 1e16).toFixed(1)}%, SLP premium ${(Number(BigInt(canonicalExit.policy.protocolFees.lptYieldShareProtocolFeeWad)) / 1e16).toFixed(1)}%. Resolved ${canonicalExit.policy.resolvedAt}`
       : null,
   };
+  // The worst case an arbitrageur can be paid is the deepest this design lets
+  // Senior trade below NAV. That is the live template's lowest modeled payout
+  // once it resolves, and until then the issuer's own payout floor, which the
+  // deployed pool still has to honour. It is deliberately not a quote off the
+  // shared engine's fallback pool: that pool is far shallower than any real
+  // design and reported 50 bps where a $95 floor permits 500.
+  const restockWorstPayoutPer100 = exitDisabled
+    ? null
+    : (exitView.lowestPayoutPer100 ?? minimumProceedsPer100);
+  const restockView: DayV3RestockView = {
+    check:
+      restockHurdle === null || restockWorstPayoutPer100 === null
+        ? null
+        : dayV3RestockCheck({
+            hurdle: restockHurdle,
+            selectedSalePer100: modeledImmediateExitSharePct,
+            selectedSaleProceeds: exitView.proceeds,
+            worstPayoutPer100: restockWorstPayoutPer100,
+          }),
+    hurdle: restockHurdle,
+    selectedSalePer100: modeledImmediateExitSharePct,
+    worstCaseBasis:
+      restockWorstPayoutPer100 === null
+        ? "unresolved"
+        : exitView.lowestPayoutPer100 !== null
+          ? "modeled"
+          : "floor",
+    worstPayoutPer100: restockWorstPayoutPer100,
+  };
+
   const displayedReturnState = returnDisplayState;
   const premiumCurveEditor =
     protectionEnabled || exitEnabled ? (
@@ -1403,7 +1414,6 @@ export default function DayV3Summary({
                 ? "illustrative"
                 : "your-answer",
             }}
-            marketMakerCostOfCapitalPct={marketMakerCostOfCapitalPct}
             minimumProceedsPer100={minimumProceedsPer100}
             onDrawdownPct={(value) => {
               markStarterFieldEdited("drawdown");
@@ -1421,7 +1431,6 @@ export default function DayV3Summary({
               }
               setImmediateExitSharePct(value);
             }}
-            onMarketMakerCostOfCapitalPct={setMarketMakerCostOfCapitalPct}
             onMinimumProceedsPer100={(value) => {
               markStarterFieldEdited("payout");
               setMinimumProceedsPer100(value);
@@ -1437,7 +1446,6 @@ export default function DayV3Summary({
               setRecoveryMode(value);
               setRecoveryDaysInput(value === "none" ? 0 : null);
             }}
-            onRedemptionDays={setRedemptionDays}
             onResetExit={() => {
               markStarterFieldEdited("exit-amount");
               markStarterFieldEdited("payout");
@@ -1456,8 +1464,6 @@ export default function DayV3Summary({
             quoteAssetYieldPct={quoteAssetYieldPct}
             recoveryDays={recoveryDaysInput}
             recoveryMode={recoveryMode}
-            redemptionDays={redemptionDays}
-            restock={restockView}
           />
           {premiumCurveEditor}
         </DayV3GroupAccordion>
@@ -1691,6 +1697,17 @@ export default function DayV3Summary({
                       exit={exitView}
                       minimumProceedsPer100={minimumProceedsPer100}
                       promisedExitSharePct={immediateExitSharePct}
+                    />
+
+                    {/* Whether anyone is paid to undo a sale is a result of the
+                        exit design, not another thing to design, so it reads
+                        here beside the pool it is judging. */}
+                    <DayV3RestockCheck
+                      costOfCapitalPct={marketMakerCostOfCapitalPct}
+                      onCostOfCapitalPct={setMarketMakerCostOfCapitalPct}
+                      onRedemptionDays={setRedemptionDays}
+                      redemptionDays={redemptionDays}
+                      view={restockView}
                     />
 
                     {exitDisabled ? null : model.pool.swapFeeBps !== null ? (

@@ -7,9 +7,6 @@ import DayV3Origin, {
   type DayV3VisibleOrigin,
 } from "@/components/day-v3/DayV3Origin";
 import DayV3QuoteAsset from "@/components/day-v3/DayV3QuoteAsset";
-import DayV3RestockCheck, {
-  type DayV3RestockView,
-} from "@/components/day-v3/DayV3RestockCheck";
 import DayV3SegmentedControl from "@/components/day-v3/DayV3SegmentedControl";
 import {
   dayV3ExitInputReadiness,
@@ -144,17 +141,14 @@ export default function DayV3Goals({
   exitSharePct,
   indexOffset = 0,
   inputOrigins = {},
-  marketMakerCostOfCapitalPct,
   minimumProceedsPer100,
   onDrawdownPct,
   onExitSharePct,
-  onMarketMakerCostOfCapitalPct,
   onMinimumProceedsPer100,
   onQuoteAssetLabel,
   onQuoteAssetYieldPct,
   onRecoveryDays,
   onRecoveryMode,
-  onRedemptionDays,
   onResetExit,
   onResetProtection,
   protection,
@@ -162,8 +156,6 @@ export default function DayV3Goals({
   quoteAssetYieldPct,
   recoveryDays,
   recoveryMode,
-  redemptionDays,
-  restock,
 }: {
   drawdownPct: MaybeNumber;
   exit: DayV3ExitView;
@@ -175,17 +167,14 @@ export default function DayV3Goals({
     payout: DayV3VisibleOrigin;
     quoteAsset: DayV3VisibleOrigin;
   }>;
-  marketMakerCostOfCapitalPct: MaybeNumber;
   minimumProceedsPer100: MaybeNumber;
   onDrawdownPct: (value: MaybeNumber) => void;
   onExitSharePct: (value: MaybeNumber) => void;
-  onMarketMakerCostOfCapitalPct: (value: MaybeNumber) => void;
   onMinimumProceedsPer100: (value: MaybeNumber) => void;
   onQuoteAssetLabel: (value: string) => void;
   onQuoteAssetYieldPct: (value: MaybeNumber) => void;
   onRecoveryDays: (value: MaybeNumber) => void;
   onRecoveryMode: (value: "none" | "window") => void;
-  onRedemptionDays: (value: MaybeNumber) => void;
   onResetExit: () => void;
   onResetProtection: () => void;
   protection: DayV3ProtectionView;
@@ -193,8 +182,6 @@ export default function DayV3Goals({
   quoteAssetYieldPct: MaybeNumber;
   recoveryDays: MaybeNumber;
   recoveryMode: "none" | "window" | null;
-  redemptionDays: MaybeNumber;
-  restock: DayV3RestockView;
 }) {
   const inputOrigin = (origin: DayV3VisibleOrigin | undefined) =>
     origin ?? "your-answer";
@@ -605,19 +592,6 @@ export default function DayV3Goals({
             Choose the exit amount and payout above to check the exact pool result.
           </p>
         ) : null}
-
-        {/* The design says what one sale costs. This says whether anyone is
-            paid to undo it, which is the only thing that gives the pool its
-            capacity back. */}
-        {exitDisabled ? null : (
-        <DayV3RestockCheck
-          costOfCapitalPct={marketMakerCostOfCapitalPct}
-          onCostOfCapitalPct={onMarketMakerCostOfCapitalPct}
-          onRedemptionDays={onRedemptionDays}
-          redemptionDays={redemptionDays}
-          view={restock}
-        />
-        )}
 
         {exit.status === "infeasible" ? (
           <p
