@@ -43,7 +43,10 @@ export type DayV3RestockView = {
 const bps = (value: number | null, digits = 0) =>
   value === null || !Number.isFinite(value)
     ? "—"
-    : `${value.toFixed(digits)} bps`;
+    // A true minus sign, matching the waterfall's own bars. `toFixed` writes a
+    // hyphen, so a negative hurdle printed "-83 bps" in a sentence beside a
+    // "−49 bps" bar describing the same kind of quantity.
+    : `${value.toFixed(digits).replace("-", "\u2212")} bps`;
 
 /** The same rule the exit-cost card follows: a market quoted in ETH never gets
  *  a dollar sign in front of a number of ETH. */
@@ -433,7 +436,7 @@ export default function DayV3RestockCheck({
               <p className="mt-1 text-[11px] leading-relaxed text-[var(--secondary)]">
                 {!worstCasePays
                   ? `Even fully drawn down this design only lets Senior trade ${bps(check.worstCaseDiscountBps)} below NAV, and an arbitrageur needs ${bps(hurdle.hurdleBps)} to break even. Nothing brings one in at any depth. Shorten the redemption wait, allow a deeper payout floor, or expect the SLP to carry the position rather than see it arbitraged back.`
-                  : `At its deepest this design lets Senior trade ${bps(check.worstCaseDiscountBps)} below NAV, against the ${bps(hurdle.hurdleBps)} an arbitrageur needs to break even. They are paid to buy that Senior and redeem it, which is what puts the pool back and restores capacity for the next seller.${
+                  : `At its deepest this design lets Senior trade ${bps(check.worstCaseDiscountBps)} below NAV, against ${hurdle.hurdleBps < 0 ? `a break-even of ${bps(hurdle.hurdleBps)} — Senior pays an arbitrageur more to wait than their money costs them, so any discount at all is worth taking` : `the ${bps(hurdle.hurdleBps)} an arbitrageur needs to break even`}. They are paid to buy that Senior and redeem it, which is what puts the pool back and restores capacity for the next seller.${
                       unpriced
                         ? " The selected sale has not been priced yet, so it is not yet known whether it reaches that depth on its own."
                         : selectedPays
