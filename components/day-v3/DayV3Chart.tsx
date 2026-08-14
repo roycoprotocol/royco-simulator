@@ -37,7 +37,7 @@ function DayV3Chart({ data, unit }: { data: DayV3Point[]; unit: DayV3Unit }) {
     // ResponsiveContainer resolves a percentage height against a parent that has
     // not sized itself yet and collapses the surface to a few pixels.
     <div style={{ width: "100%" }}>
-      <ResponsiveContainer height={200} width="100%">
+      <ResponsiveContainer height={300} width="100%">
         <LineChart data={data} margin={{ bottom: 4, left: -18, right: 8, top: 8 }}>
           <CartesianGrid stroke="#e4e0d6" vertical={false} />
           <XAxis

@@ -1787,6 +1787,11 @@ export default function DayV3Summary({
                   </CardHeader>
                 </Card>
               ) : (
+                // The growth chart was 272px beside a 468px table, leaving a
+                // 200px hole under it. Stacking both charts in the left column
+                // was tried and is worse — the two premium curves go vertical
+                // at 541px and the column runs to 783px. The chart is simply
+                // taller instead, which fills the row with signal.
                 <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-2">
                   <Card weight="quiet">
                     <CardHeader className="gap-0.5 px-4 pt-3.5">
@@ -1799,7 +1804,6 @@ export default function DayV3Summary({
                       <DayV3Chart data={chartData} unit={returnUnit} />
                     </CardContent>
                   </Card>
-
                   <DayV3Comparison
                     poolCarry={model.poolCarry}
                     poolEconomics={{
@@ -1850,6 +1854,7 @@ export default function DayV3Summary({
                   target={DAY_TARGET_UTILIZATION}
                 />
               ) : null}
+
             </DayV3ModelGroup>
 
             <DayV3ModelGroup
