@@ -71,9 +71,9 @@ check('engine emits a structured Observation Period exit reason', observationExi
 check('display text formatting is not used as accounting data', erasure?.msg.includes('$10') === true);
 
 const numerator =
-  coverage * (sim.state.stRawNAV + sim.state.jtRawNAV * cfg.beta) -
+  coverage * (sim.state.stRawNAV + sim.state.jtRawNAV) -
   cfg.targetUtilization * sim.state.jtEffectiveNAV;
-const denominator = cfg.targetUtilization - coverage * cfg.beta;
+const denominator = cfg.targetUtilization - coverage;
 const refill = numerator / denominator;
 sim.step({
   dtSec: 0,

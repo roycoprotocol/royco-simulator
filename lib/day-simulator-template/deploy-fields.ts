@@ -36,8 +36,9 @@ export const DAY_UINT24_DAYS = 16_777_215 / 86_400;
 export const DAY_UINT32_DAYS = 4_294_967_295 / 86_400;
 
 /** The T+1 withdrawal floor, enforced in both places. The deploy flow mandates
- *  it, and the Day deployment template rejects a tranche configured below it
- *  with REDEMPTION_DELAY_BELOW_MIN.
+ *  it, and the Day deployment template also rejects any tranche configured
+ *  below it (MIN_REDEMPTION_DELAY_SECONDS = 24 hours, reverting with
+ *  REDEMPTION_DELAY_BELOW_MIN), so a sub-24h exit delay is not deployable.
  *  Source: constants.ts MIN_REDEMPTION_DELAY_SECONDS = 86_400. */
 export const DAY_MIN_WITHDRAWAL_DELAY_DAYS = 1;
 

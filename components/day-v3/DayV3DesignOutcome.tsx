@@ -66,7 +66,7 @@ export default function DayV3DesignOutcome({
       note:
         current.immediateExitSharePct === 0
           ? "No immediate sale modeled"
-          : "From the promised sale",
+          : "Received for the selected sale",
     },
     {
       label: "Payout floor",
@@ -125,7 +125,7 @@ export default function DayV3DesignOutcome({
             className="text-[10.5px] font-semibold underline underline-offset-4"
             href="#day-v3-source-inputs"
           >
-            shortening or lowering conversion costs
+            shortening conversion time or lowering the external spread assumption
           </a>
         </div>
       ) : null}

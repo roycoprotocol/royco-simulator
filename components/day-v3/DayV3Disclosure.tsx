@@ -46,10 +46,17 @@ export default function DayV3Disclosure({
             : "inline-flex min-h-11 items-center gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--card)] px-3 text-[10.5px] font-semibold text-[var(--secondary)] transition-colors hover:border-[var(--secondary)] hover:text-[var(--foreground)]",
         )}
       >
-        <span className={cn(card && "flex min-w-0 flex-col gap-0.5")}>
+        <span
+          className={cn(
+            card
+              ? "flex min-w-0 flex-col gap-0.5"
+              : "inline-flex min-w-0 items-baseline gap-1.5",
+          )}
+        >
           <span>{summary}</span>
           {description ? (
             <span className="text-[10.5px] font-normal text-[var(--tertiary)]">
+              {!card ? "· " : null}
               {description}
             </span>
           ) : null}

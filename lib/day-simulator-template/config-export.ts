@@ -2,7 +2,7 @@ import type { DayIssuerPresetId } from "@/lib/day-simulator-template/issuer-pres
 import { DAY_ISSUER_PRESETS } from "@/lib/day-simulator-template/issuer-presets";
 import { DAY_ECLP_SIMULATION_LAMBDA } from "@/lib/day/engine/engine";
 
-export const DAY_CONFIG_EXPORT_SCHEMA_VERSION = 4;
+export const DAY_CONFIG_EXPORT_SCHEMA_VERSION = 5;
 
 export type DayDeploymentCompatibilityInput = {
   coveragePct: number;
@@ -25,14 +25,20 @@ export function dayDeploymentCompatibility(
   issues: string[];
 } {
   const coverageEnabled = values.coveragePct > 0;
-  const liquidityEnabled = values.minLiquidityPct > 0;
   const discountBps = values.eclpBandWidthPct * 100;
+  // Both yield models are initialized on every market, whatever its
+  // requirements are: the deployment validation rejects empty initialization
+  // data for either side, and StaticCurveYDM then requires a positive target
+  // share unconditionally — the clause does not consult minimum coverage or
+  // minimum liquidity. So a 0/0/0 curve is undeployable even on a side whose
+  // requirement is zero, and the check cannot be skipped when the requirement
+  // is off. A zero requirement still pays a zero premium, because the curve is
+  // read at zero utilization; it just cannot be *initialized* at zero.
   const orderedCurve = (
-    enabled: boolean,
     y0: number,
     yTarget: number,
     y100: number,
-  ) => !enabled || (yTarget > 0 && y0 <= yTarget && yTarget <= y100);
+  ) => yTarget > 0 && y0 <= yTarget && yTarget <= y100;
   const riskCap = Math.max(
     values.riskY0Pct,
     values.riskSharePct,
@@ -48,20 +54,18 @@ export function dayDeploymentCompatibility(
       ? ["Maximum discount must be 50–500 bps."]
       : []),
     ...(!orderedCurve(
-      coverageEnabled,
       values.riskY0Pct,
       values.riskSharePct,
       values.riskY100Pct,
     )
-      ? ["Jr static curve must satisfy Y0 ≤ YT ≤ Y100 with a positive YT."]
+      ? ["Jr static curve must satisfy Y0 ≤ YT ≤ Y100 with a positive YT, even at 0% coverage."]
       : []),
     ...(!orderedCurve(
-      liquidityEnabled,
       values.liqY0Pct,
       values.liqSharePct,
       values.liqY100Pct,
     )
-      ? ["SLP static curve must satisfy Y0 ≤ YT ≤ Y100 with a positive YT."]
+      ? ["SLP static curve must satisfy Y0 ≤ YT ≤ Y100 with a positive YT, even at 0% minimum liquidity."]
       : []),
     ...(riskCap + liquidityCap > 100 + 1e-9
       ? ["The Jr and SLP curve caps must sum to 100% or less."]
@@ -251,7 +255,19 @@ export type DayConfigExportInput = {
     y100SharePct: number;
     exitBufferPct: number;
     selfLiquidationBonusPct: number;
+    fixedTermGracePeriodDays?: number;
     poolConcentration?: number;
+    poolSeniorWeightPct?: number;
+    maxJTYieldSharePct?: number;
+    maxLTYieldSharePct?: number;
+    riskYDMMode?: "static" | "adaptive";
+    liqYDMMode?: "static" | "adaptive";
+    riskAdaptationSpeedPerYear?: number;
+    liqAdaptationSpeedPerYear?: number;
+    riskMinYTargetPct?: number;
+    riskMaxYTargetPct?: number;
+    liqMinYTargetPct?: number;
+    liqMaxYTargetPct?: number;
   };
   // Conditions the modeled outcomes were produced under. Kept out of `terms`
   // because a hypothetical shock is not a deployable market parameter — but it
@@ -285,6 +301,7 @@ export type DayConfigExportPayload = {
     liquidityYieldShare: number;
     observationDays: number;
     fixedTermDurationSec: number;
+    fixedTermGracePeriodSec: number;
     sourceApy: number;
     riskYieldShareAtFullUtilization: number;
     exitBufferPct: number;
@@ -297,6 +314,7 @@ export type DayConfigExportPayload = {
     riskSharePct: number;
     liqSharePct: number;
     observationDays: number;
+    fixedTermGracePeriodDays: number;
     sourceApyPct: number;
     y100SharePct: number;
     exitBufferPct: number;
@@ -331,6 +349,7 @@ export type DayConfigExportPayload = {
       enabled: boolean;
       minimumCoveragePct: number;
       observationPeriodSeconds: number;
+      gracePeriodSeconds: number;
       protectedExitRemainingCoveragePct: number;
       selfLiquidationBonusPct: number;
     };
@@ -341,26 +360,32 @@ export type DayConfigExportPayload = {
     yieldModels: {
       targetUtilizationPct: 90;
       junior: {
-        model: "STATIC_CURVE";
+        model: "STATIC_CURVE" | "ADAPTIVE_CURVE_V2";
         y0Pct: number;
         yTargetPct: number;
         y100Pct: number;
         capPct: number;
+        adaptationSpeedPerYear?: number;
+        minYTargetPct?: number;
+        maxYTargetPct?: number;
       };
       seniorLp: {
-        model: "STATIC_CURVE";
+        model: "STATIC_CURVE" | "ADAPTIVE_CURVE_V2";
         y0Pct: number;
         yTargetPct: number;
         y100Pct: number;
         capPct: number;
+        adaptationSpeedPerYear?: number;
+        minYTargetPct?: number;
+        maxYTargetPct?: number;
       };
     };
     exitPool: {
-      pegCompositionPct: { exitAsset: 90; senior: 10 };
+      pegCompositionPct: { exitAsset: number; senior: number };
       maximumDiscountBps: number;
       maximumDiscountWithinDeployRange: boolean;
       simulationConcentration: number;
-      deploymentDefaultConcentration: 300;
+      deploymentDefaultConcentration: number;
       maximumPremium: "derived in deploy flow";
     };
     settlementDefaults: {
@@ -404,6 +429,7 @@ export function buildDayConfigExport(
     riskY100Pct,
     selfLiquidationBonusPct,
   });
+  const poolSeniorWeightPct = input.terms.poolSeniorWeightPct ?? 10;
   return {
     schemaVersion: DAY_CONFIG_EXPORT_SCHEMA_VERSION,
     source: "day-simulator",
@@ -420,6 +446,9 @@ export function buildDayConfigExport(
       fixedTermDurationSec: coverageEnabled
         ? input.terms.observationDays * 86_400
         : 0,
+      fixedTermGracePeriodSec: coverageEnabled
+        ? (input.terms.fixedTermGracePeriodDays ?? 0) * 86_400
+        : 0,
       sourceApy: input.terms.sourceApyPct / 100,
       riskYieldShareAtFullUtilization: input.terms.y100SharePct / 100,
       exitBufferPct: coverageEnabled ? input.terms.exitBufferPct : 0,
@@ -432,6 +461,9 @@ export function buildDayConfigExport(
       riskSharePct: input.terms.riskSharePct,
       liqSharePct: input.terms.liqSharePct,
       observationDays: coverageEnabled ? input.terms.observationDays : 0,
+      fixedTermGracePeriodDays: coverageEnabled
+        ? input.terms.fixedTermGracePeriodDays ?? 0
+        : 0,
       sourceApyPct: input.terms.sourceApyPct,
       y100SharePct: input.terms.y100SharePct,
       exitBufferPct: coverageEnabled ? input.terms.exitBufferPct : 0,
@@ -464,6 +496,9 @@ export function buildDayConfigExport(
         observationPeriodSeconds: coverageEnabled
           ? input.terms.observationDays * 86_400
           : 0,
+        gracePeriodSeconds: coverageEnabled
+          ? (input.terms.fixedTermGracePeriodDays ?? 0) * 86_400
+          : 0,
         protectedExitRemainingCoveragePct,
         selfLiquidationBonusPct,
       },
@@ -474,29 +509,60 @@ export function buildDayConfigExport(
       yieldModels: {
         targetUtilizationPct: 90,
         junior: {
-          model: "STATIC_CURVE",
+          model: input.terms.riskYDMMode === "adaptive"
+            ? "ADAPTIVE_CURVE_V2"
+            : "STATIC_CURVE",
           y0Pct: riskY0Pct,
           yTargetPct: input.terms.riskSharePct,
           y100Pct: riskY100Pct,
-          capPct: Math.max(riskY0Pct, input.terms.riskSharePct, riskY100Pct),
+          capPct: input.terms.maxJTYieldSharePct ?? Math.max(
+            riskY0Pct,
+            input.terms.riskSharePct,
+            riskY100Pct,
+          ),
+          ...(input.terms.riskYDMMode === "adaptive"
+            ? {
+                adaptationSpeedPerYear:
+                  input.terms.riskAdaptationSpeedPerYear ?? 100,
+                minYTargetPct: input.terms.riskMinYTargetPct ?? 0.01,
+                maxYTargetPct: input.terms.riskMaxYTargetPct ?? 100,
+              }
+            : {}),
         },
         seniorLp: {
-          model: "STATIC_CURVE",
+          model: input.terms.liqYDMMode === "adaptive"
+            ? "ADAPTIVE_CURVE_V2"
+            : "STATIC_CURVE",
           y0Pct: liqY0Pct,
           yTargetPct: input.terms.liqSharePct,
           y100Pct: liqY100Pct,
-          capPct: Math.max(liqY0Pct, input.terms.liqSharePct, liqY100Pct),
+          capPct: input.terms.maxLTYieldSharePct ?? Math.max(
+            liqY0Pct,
+            input.terms.liqSharePct,
+            liqY100Pct,
+          ),
+          ...(input.terms.liqYDMMode === "adaptive"
+            ? {
+                adaptationSpeedPerYear:
+                  input.terms.liqAdaptationSpeedPerYear ?? 100,
+                minYTargetPct: input.terms.liqMinYTargetPct ?? 0.01,
+                maxYTargetPct: input.terms.liqMaxYTargetPct ?? 100,
+              }
+            : {}),
         },
       },
       exitPool: {
-        pegCompositionPct: { exitAsset: 90, senior: 10 },
+        pegCompositionPct: {
+          exitAsset: 100 - poolSeniorWeightPct,
+          senior: poolSeniorWeightPct,
+        },
         maximumDiscountBps: input.terms.eclpBandWidthPct * 100,
         maximumDiscountWithinDeployRange:
           input.terms.eclpBandWidthPct * 100 >= 50 &&
           input.terms.eclpBandWidthPct * 100 <= 500,
         simulationConcentration:
           input.terms.poolConcentration ?? DAY_ECLP_SIMULATION_LAMBDA,
-        deploymentDefaultConcentration: 300,
+        deploymentDefaultConcentration: DAY_ECLP_SIMULATION_LAMBDA,
         maximumPremium: "derived in deploy flow",
       },
       settlementDefaults: {
@@ -509,7 +575,6 @@ export function buildDayConfigExport(
       stillRequiredInFlow: [
         "Asset contract, chain, token metadata, and market listing details",
         "Collateral oracle recipe or compatible deployed oracle address",
-        "Observation grace period",
         "Exit asset and conditional rate-provider address",
         "Pool concentration if different from the deployment default",
         "Reinvestment slippage tolerance and genesis exit-asset seed",

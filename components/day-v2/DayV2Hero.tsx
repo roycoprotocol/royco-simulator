@@ -28,7 +28,7 @@ export default function DayV2Hero() {
             Royco Day · Market simulator
           </span>
           <h1
-            className="mt-5 max-w-[18ch] text-balance text-[clamp(38px,4.2vw,58px)] font-semibold leading-[1.05]"
+            className="mt-5 max-w-[18ch] text-balance text-[clamp(27px,2.95vw,41px)] font-semibold leading-[1.05]"
             style={{ fontFamily: ROYCO_DISPLAY_FONT }}
           >
             Design liquidity and drawdown protection around one yield source.

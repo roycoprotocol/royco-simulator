@@ -54,16 +54,13 @@ function solveCapital(
  * How much of a funded exit pool sits in Senior shares rather than in the exit
  * asset, read off the engine instead of restated.
  *
- * The pool is not a pile of stablecoin. `newMarket` seeds it at
- * `LT_WEIGHT_WAD` in Senior shares and the rest in the exit asset
- * (engine.ts:1099-1102), so a tenth of the pool is a claim on the yield source
- * and the other nine tenths are not. That matters the moment anything on the
- * page says "this much is in the strategy": counting the whole pool in
- * overstates it, and counting none of it out understates it.
+ * The pool is not a pile of stablecoin. `newMarket` derives the Senior/exit-
+ * asset mix from the configured E-CLP at the 1.0 mark. That matters the moment
+ * anything on the page says "this much is in the strategy": counting the whole
+ * pool in overstates it, and counting none of it understates it.
  *
- * `LT_WEIGHT_WAD` is a private constant in a byte-locked file, so this asks the
- * engine to build a market and measures the split it actually produced. A
- * change to that constant shows up here rather than silently disagreeing.
+ * This asks the engine to build a market and measures the split it actually
+ * produced, so a curve update cannot leave the capital table behind.
  */
 export function dayPoolSeniorWeight(cfg: MarketConfig): number {
   // Seed the probe through the same exact utilization inversion used by the
@@ -121,9 +118,9 @@ export function dayCapitalAtUtilization(
   const coverageWad = toWad(terms.coverage);
   const stRaw = toWad(st);
 
-  // beta is hardcoded 1 in `buildDayMarketConfig`, so the exposure the engine
-  // measures is `st + jt`. Passing the same 1 keeps this reading the same
-  // market the rest of the page runs.
+  // Current Day accounting uses one collateral NAV, so the exposure the engine
+  // measures is `st + jt`. The compatibility argument remains 1 for older
+  // callers, but the current engine ignores it.
   const jt =
     terms.coverage > 0
       ? solveCapital(

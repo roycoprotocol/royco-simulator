@@ -60,7 +60,7 @@ const jbbb = DAY_MARKETS.find((m) => m.id === 'jbbb')!.defaults;
 // Decimal requirements close to the 90% target used to be sized a few wei
 // short by the UI's float formula, even though the exact engine inversion found
 // a valid stack. These are the manual-override values that previously crashed
-// /v3 during server rendering.
+// during server rendering.
 for (const coverage of [0.5001, 0.8, 0.8999]) {
   const terms = {
     coverage,
@@ -76,7 +76,7 @@ for (const coverage of [0.5001, 0.8, 0.8999]) {
   assert.doesNotThrow(() => dayPoolSeniorWeight(cfg));
   check(
     `cov=${coverage}: exact target balances and pool probe initialize a valid market`,
-    balances.jt > 0 && Math.abs(dayPoolSeniorWeight(cfg) - 0.1) < 1e-12,
+    balances.jt > 0 && Math.abs(dayPoolSeniorWeight(cfg) - 0.1) < 1e-8,
   );
 }
 
@@ -145,9 +145,8 @@ console.log(`capital-sizing: ${passed} checks passed`);
 // ---------------------------------------------------------------------------
 // The pool is not all exit asset
 // ---------------------------------------------------------------------------
-// A tenth of a funded pool is Senior shares, so it is partly in the yield
-// source. Read from the engine rather than restated, because the constant that
-// sets it lives in a byte-locked file and could move.
+// A funded pool is partly Senior shares, so it is partly in the yield source.
+// Read the composition from the configured E-CLP rather than restating it.
 {
   const cfg = buildDayMarketConfig(jbbb, {
     coverage: 0.2,
@@ -160,13 +159,13 @@ console.log(`capital-sizing: ${passed} checks passed`);
     maintainCoverage: jbbb.maintainCoverage,
   } as never);
   const weight = dayPoolSeniorWeight(cfg);
-  check('the pool is one tenth Senior shares', Math.abs(weight - 0.1) < 1e-12, String(weight));
+  check('the fallback pool is approximately one tenth Senior shares', Math.abs(weight - 0.1) < 1e-8, String(weight));
 
   const balances = { st: 100, jt: 28.6, lt: 11.1 };
   const inSource = dayCapitalInYieldSource(balances, weight);
   check(
     'in-source capital counts Sr, Jr and the pool Senior leg only',
-    Math.abs(inSource - (100 + 28.6 + 1.11)) < 1e-9,
+    Math.abs(inSource - (100 + 28.6 + 11.1 * weight)) < 1e-9,
     String(inSource),
   );
   check(

@@ -90,7 +90,6 @@ function DayV3Deployment({
   sourceApyPct,
   yieldCurveDesign,
   yieldCurvePolicyResolved,
-  starterValuesConfirmed,
 }: {
   exit: DayV3ExitView;
   goals: GoalDraft;
@@ -103,7 +102,6 @@ function DayV3Deployment({
   sourceApyPct: number | null;
   yieldCurveDesign: DayV3YieldCurveDesign;
   yieldCurvePolicyResolved: boolean;
-  starterValuesConfirmed: boolean;
 }) {
   const [copied, setCopied] = useState(false);
   const [open, setOpen] = useState(false);
@@ -111,13 +109,6 @@ function DayV3Deployment({
   const protectionDisabled = protection.status === "disabled";
   const exitDisabled = exit.status === "disabled";
   const readinessChecks = [
-    {
-      label: "Illustrative starter values",
-      ready: starterValuesConfirmed,
-      scope: "v3-handoff" as const,
-      missing:
-        "Review the illustrative starter inputs above and confirm or replace them before creating a deployment handoff.",
-    },
     {
       label: "Source yield",
       ready: sourceApyPct !== null,
@@ -146,22 +137,23 @@ function DayV3Deployment({
       missing: "Choose no recovery window or enter its duration.",
     },
     {
-      label: "EntryPoint settlement",
+      label: "Underlying redemption delay",
       ready: goals.entryPointSettlementDays !== null,
       scope: "v3-handoff" as const,
       missing: "Enter the in-kind Senior redemption queue.",
     },
     {
-      label: "Collateral conversion time",
+      label: "Underlying conversion time",
       ready: exitDisabled || goals.collateralToExitDays !== null,
       scope: "v3-handoff" as const,
-      missing: "Enter the time from claimed collateral to exit asset.",
+      missing: "Enter the time from the redeemed underlying asset to the exit asset.",
     },
     {
-      label: "Collateral conversion cost",
+      label: "External spread assumption",
       ready: exitDisabled || goals.collateralToExitCostBps !== null,
       scope: "v3-handoff" as const,
-      missing: "Enter the all-in restock conversion cost.",
+      missing:
+        "Choose the conservative external conversion spread the refill test should withstand.",
     },
     {
       label: "Fixed-Term Grace Period",
@@ -192,7 +184,7 @@ function DayV3Deployment({
       label: "Deployment target",
       ready: goals.target !== null,
       scope: "v3-handoff" as const,
-      missing: "Choose a live chain and market template above.",
+      missing: "The supported deployment configuration is unavailable.",
     },
     {
       label: "Canonical pool design",
@@ -201,8 +193,8 @@ function DayV3Deployment({
       scope: "v3-handoff" as const,
       missing:
         exit.status === "infeasible"
-          ? "The live solver found no feasible pool. Change the exit promise or operational costs in Section 3."
-          : "Resolve the live fee, E-CLP parameters, and exit outcomes.",
+          ? "These exit terms do not produce a deployable pool. Change the exit promise or operational costs."
+          : "Resolve the pool fee, parameters, and exit outcomes.",
     },
     {
       label: "Restock scenario",
@@ -218,7 +210,7 @@ function DayV3Deployment({
           ? exit.status === "infeasible"
             ? "Conversion facts are complete, but this exit promise fails the restock hurdle. Change Section 3 or shorten/lower the conversion assumptions."
             : "Re-run the live pool design to resolve the restock point."
-          : "Add collateral conversion time and cost, then resolve the scenario restock point.",
+          : "Add underlying conversion time and cost, then resolve the scenario restock point.",
     },
     {
       label: "Live protocol fee policy",
@@ -226,26 +218,8 @@ function DayV3Deployment({
       scope: "v3-handoff" as const,
       missing:
         exit.status === "infeasible"
-          ? "The live policy was checked, but no feasible pool recommendation can be exported for these inputs."
-          : "Resolve all four current template protocol fee rates.",
-    },
-    {
-      label: "Settlement policy",
-      ready:
-        deploymentPolicy.depositDelaySeconds !== null &&
-        deploymentPolicy.depositExpirySeconds !== null &&
-        deploymentPolicy.withdrawalExpirySeconds !== null &&
-        deploymentPolicy.gateByOracleUpdate !== null,
-      scope: "v3-handoff" as const,
-      missing:
-        "Resolve the market-level deposit, withdrawal, expiry, and oracle-gate policy.",
-    },
-    {
-      label: "Reinvestment slippage",
-      ready:
-        exitDisabled || deploymentPolicy.maxReinvestmentSlippageBps !== null,
-      scope: "v3-handoff" as const,
-      missing: "Enter the maximum SLP reinvestment slippage ceiling.",
+          ? "The market terms were checked, but no feasible pool recommendation can be exported for these inputs."
+          : "Resolve the current market fee terms.",
     },
     {
       label: "Registered yield-share models",
@@ -300,12 +274,11 @@ function DayV3Deployment({
   const issuerChecks = readinessChecks.filter((check) =>
     [
       "Source yield",
-      "Illustrative starter values",
       "Protected drawdown",
       "Recovery time",
-      "EntryPoint settlement",
-      "Collateral conversion time",
-      "Collateral conversion cost",
+      "Underlying redemption delay",
+      "Underlying conversion time",
+      "External spread assumption",
       "Fixed-Term Grace Period",
       "NAV refresh cadence",
       "Immediate exit amount",
@@ -313,8 +286,6 @@ function DayV3Deployment({
       "Deployment target",
       "Protected Exit trigger",
       "Protected Exit bonus",
-      "Settlement policy",
-      "Reinvestment slippage",
     ].includes(check.label),
   );
   const calculationChecks = readinessChecks.filter(
@@ -323,22 +294,34 @@ function DayV3Deployment({
   // Deployment-owned identity, addresses, oracle construction, administrators,
   // seed amounts, and approvals are intentionally collected and validated only
   // after import in Royco Deploy.
-  const deploymentChecks: typeof readinessChecks = [];
+  const deploymentChecks: typeof readinessChecks = [
+    {
+      label: "Request scheduling",
+      ready: false,
+      scope: "v3-handoff" as const,
+      missing:
+        "Royco Deploy sets deposit timing, request expiry, and the post-request price-update gate.",
+    },
+    {
+      label: "SLP reinvestment limit",
+      ready: false,
+      scope: "v3-handoff" as const,
+      missing:
+        "Royco Deploy sets the maximum value an SLP premium reinvestment may give up.",
+    },
+  ];
   const hrefFor = (label: string) => {
-    if (label === "Illustrative starter values") return "#day-v3-inputs";
     if (["Source yield"].includes(label)) return "#day-v3-source-inputs";
     if (["Deployment target", "Live protocol fee policy"].includes(label))
-      return "#day-v3-deployment-target";
+      return "#day-v3-source-inputs";
     if (
       [
-        "EntryPoint settlement",
-        "Collateral conversion time",
-        "Collateral conversion cost",
+        "Underlying redemption delay",
+        "Underlying conversion time",
+        "External spread assumption",
         "Fixed-Term Grace Period",
         "NAV refresh cadence",
         "Restock scenario",
-        "Settlement policy",
-        "Reinvestment slippage",
       ].includes(label)
     )
       return "#day-v3-source-operations";
@@ -363,6 +346,10 @@ function DayV3Deployment({
   };
   const handoffReady = isDayV3HandoffReady(readinessChecks);
   const primaryCta = dayV3DeploymentCta(handoffReady);
+  const confirmedCount = handoffChecks.filter((check) => check.ready).length;
+  const reviewCount = calculationChecks.filter((check) => !check.ready).length;
+  const missingCount = issuerChecks.filter((check) => !check.ready).length;
+  const firstMissing = issuerChecks.find((check) => !check.ready);
   const exportedExit: DayV3ExitView =
     exit.status === "recommended"
       ? exit
@@ -439,7 +426,6 @@ function DayV3Deployment({
   const openDeployment = () => {
     if (
       !handoffReady ||
-      !starterValuesConfirmed ||
       goals.protectedDrawdownPct === null ||
       (!protectionDisabled && goals.recoveryDays === null) ||
       goals.immediateExitSharePct === null ||
@@ -457,15 +443,33 @@ function DayV3Deployment({
           protectedExit.bonusPct === null)) ||
       (!exitDisabled && poolDesign === null) ||
       yieldTarget === null ||
-      deploymentPolicy.depositDelaySeconds === null ||
-      deploymentPolicy.depositExpirySeconds === null ||
-      deploymentPolicy.withdrawalExpirySeconds === null ||
-      deploymentPolicy.gateByOracleUpdate === null ||
-      (!exitDisabled &&
-        deploymentPolicy.maxReinvestmentSlippageBps === null) ||
       sourceApyPct === null
     ) {
       return;
+    }
+    const {
+      depositDelaySeconds,
+      depositExpirySeconds,
+      gateByOracleUpdate,
+      maxReinvestmentSlippageBps,
+      withdrawalExpirySeconds,
+    } = deploymentPolicy;
+    if (
+      depositDelaySeconds === null ||
+      depositExpirySeconds === null ||
+      withdrawalExpirySeconds === null ||
+      gateByOracleUpdate === null
+    ) {
+      window.open(DEPLOY_URL, "_blank", "noopener,noreferrer");
+      return;
+    }
+    let resolvedMaxReinvestmentSlippageBps = 0;
+    if (!exitDisabled) {
+      if (maxReinvestmentSlippageBps === null) {
+        window.open(DEPLOY_URL, "_blank", "noopener,noreferrer");
+        return;
+      }
+      resolvedMaxReinvestmentSlippageBps = maxReinvestmentSlippageBps;
     }
     const resolvedGoals: DayV3Goals = {
       protectedDrawdownPct: protectionDisabled ? 0 : goals.protectedDrawdownPct,
@@ -499,16 +503,14 @@ function DayV3Deployment({
       deploymentPolicy: {
         settlement: {
           appliesTo: "all-tranches",
-          depositDelaySeconds: deploymentPolicy.depositDelaySeconds,
-          depositExpirySeconds: deploymentPolicy.depositExpirySeconds,
+          depositDelaySeconds,
+          depositExpirySeconds,
           withdrawalDelaySeconds:
             resolvedGoals.entryPointSettlementDays * 86_400,
-          withdrawalExpirySeconds: deploymentPolicy.withdrawalExpirySeconds,
-          gateByOracleUpdate: deploymentPolicy.gateByOracleUpdate,
+          withdrawalExpirySeconds,
+          gateByOracleUpdate,
         },
-        maxReinvestmentSlippageBps: exitDisabled
-          ? 0
-          : (deploymentPolicy.maxReinvestmentSlippageBps as number),
+        maxReinvestmentSlippageBps: resolvedMaxReinvestmentSlippageBps,
       },
       minimumCoveragePct: protectionDisabled ? 0 : protection.coveragePct,
       minimumLiquidityPct: exitDisabled ? 0 : exit.minimumLiquidityPct,
@@ -554,10 +556,8 @@ function DayV3Deployment({
                   : "draft · incomplete"}
               </Badge>
             </span>
-            <span className="text-[11px] leading-snug text-[var(--secondary)]">
-              {handoffChecks.filter((check) => check.ready).length}/
-              {handoffChecks.length} fields resolved · normalized to $100 Senior
-              · open for goals, mappings, and readiness
+            <span className="text-[10.5px] leading-snug text-[var(--secondary)]">
+              {confirmedCount} confirmed · {reviewCount} review · {missingCount} missing · normalized to $100 Senior
             </span>
           </span>
           <span
@@ -578,14 +578,27 @@ function DayV3Deployment({
             </svg>
           </span>
         </button>
-        <a
-          className={dayV3ButtonVariants({ size: "md", variant: "primary" })}
-          href={DEPLOY_URL}
-          rel="noreferrer"
-          target="_blank"
-        >
-          Open Royco Deploy <span aria-hidden="true">↗</span>
-        </a>
+        <nav aria-label="Deployment readiness counts" className="flex shrink-0 items-center gap-1.5">
+          <a className="rounded-full border border-[var(--border-subtle)] px-2 py-1 font-mono text-[9.5px] font-semibold underline decoration-dotted underline-offset-2" href="#day-v3-readiness-heading">{confirmedCount} confirmed</a>
+          <a className="rounded-full border border-[var(--border-subtle)] px-2 py-1 font-mono text-[9.5px] font-semibold text-[var(--gold-emphasis)] underline decoration-dotted underline-offset-2" href="#day-v3-readiness-heading">{reviewCount} review</a>
+          <a className="rounded-full border border-[var(--border-subtle)] px-2 py-1 font-mono text-[9.5px] font-semibold text-[var(--red-emphasis)] underline decoration-dotted underline-offset-2" href={firstMissing ? hrefFor(firstMissing.label) : "#day-v3-readiness-heading"}>{missingCount} missing</a>
+        </nav>
+        {handoffReady ? (
+          <DayV3Button onClick={openDeployment} size="md" variant="primary">
+            Open Royco Deploy <span aria-hidden="true">↗</span>
+          </DayV3Button>
+        ) : (
+          <span
+            aria-disabled="true"
+            className={cn(
+              dayV3ButtonVariants({ size: "md", variant: "secondary" }),
+              "cursor-not-allowed opacity-55",
+            )}
+            title="Complete the missing issuer decisions before opening Royco Deploy"
+          >
+            Complete setup to deploy
+          </span>
+        )}
       </div>
 
       <div
@@ -613,7 +626,7 @@ function DayV3Deployment({
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
             <section className="rounded-xl border border-[var(--border-subtle)] bg-[var(--foundation)] px-4 py-3">
               <h3 className="mb-1 text-[10px] font-semibold uppercase tracking-[0.1em]">
-                Issuer goals
+                Issuer choices
               </h3>
               <Row
                 label="Protected drawdown"
@@ -660,7 +673,7 @@ function DayV3Deployment({
 
             <section className="rounded-xl border border-[var(--border-subtle)] bg-[var(--foundation)] px-4 py-3">
               <h3 className="mb-1 text-[10px] font-semibold uppercase tracking-[0.1em]">
-                Live-policy checks
+                Market checks
               </h3>
               <Row
                 label="Deployment target"
@@ -679,15 +692,15 @@ function DayV3Deployment({
                 value={shown(exit.swapFeeBps, " bps")}
               />
               <Row
-                label="EntryPoint settlement"
+                label="Underlying redemption delay"
                 value={shown(goals.entryPointSettlementDays, " days")}
               />
               <Row
-                label="Collateral conversion"
+                label="Underlying conversion"
                 value={shown(goals.collateralToExitDays, " days")}
               />
               <Row
-                label="Conversion cost"
+                label="External spread assumption"
                 value={shown(goals.collateralToExitCostBps, " bps")}
               />
               <Row
@@ -717,8 +730,7 @@ function DayV3Deployment({
                 V3 handoff readiness
               </h3>
               <Badge tone={handoffReady ? "liquidity" : "caution"}>
-                {handoffChecks.filter((check) => check.ready).length}/
-                {handoffChecks.length} handoff fields resolved
+                {confirmedCount} confirmed · {reviewCount} review · {missingCount} missing
               </Badge>
             </div>
             <div className="mt-3 grid grid-cols-1 gap-3 lg:grid-cols-3">
@@ -726,7 +738,8 @@ function DayV3Deployment({
                 {
                   title: "Your decisions left",
                   checks: issuerChecks,
-                  empty: "All issuer goals and source facts are answered.",
+                  empty:
+                    "All issuer choices, source facts, and stress assumptions are answered.",
                 },
                 {
                   title: "Calculations waiting",

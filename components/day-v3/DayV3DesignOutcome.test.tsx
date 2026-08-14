@@ -33,7 +33,10 @@ assert.match(markup, /\$99/);
 assert.match(markup, /Needs changes/);
 assert.match(markup, /reducing exit size/);
 assert.match(markup, /lowering the payout floor/);
-assert.match(markup, /shortening or lowering conversion costs/);
+assert.match(
+  markup,
+  /shortening conversion time or lowering the external spread assumption/,
+);
 assert.doesNotMatch(markup, /Design outcome/);
 assert.doesNotMatch(markup, /Saved designs/);
 assert.doesNotMatch(markup, /Save for comparison/);

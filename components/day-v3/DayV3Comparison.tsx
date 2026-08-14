@@ -265,7 +265,7 @@ export default function DayV3Comparison({
           at {pct(shares.liquidityPct / 100)} minimum liquidity.{" "}
           {shares.curveOverridden
             ? "These anchors drive every model here. RWA deployment must still validate the final registered YDM policy."
-            : "These are visible assumptions inherited from the V3 modeling basis—not facts supplied by the custom source. Customize them in Deploy."}
+            : "These are visible starting assumptions—not facts supplied by the custom source. Adjust the yield split above."}
         </p>
         <Table>
           <TableHeader>

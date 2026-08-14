@@ -990,6 +990,7 @@ export default function DayV2Summary({
             stableYield: model.pool.stableYield,
             swapFeeBps: model.pool.swapFeeBps,
             turnoverPerYear: model.pool.turnoverPerYear,
+            seniorWeight: model.pool.seniorWeight,
           }}
           metrics={model.explainer.liquidity}
           unit={returnUnit}
@@ -1118,6 +1119,7 @@ export default function DayV2Summary({
               maintainCoverage: inputs.maintainCoverage,
               y100SharePct: resolved.y100 * 100,
               poolConcentration: model.pool.concentration,
+              poolSeniorWeightPct: model.pool.seniorWeight * 100,
               presetId: matchedPresetId,
             }}
           />

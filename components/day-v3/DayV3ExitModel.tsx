@@ -17,13 +17,13 @@ const width = (value: MaybeNumber) =>
   value === null ? "0%" : `${Math.max(0, Math.min(100, value))}%`;
 
 function ComparisonBar({
-  goal,
-  goalLabel,
+  requested,
+  requestedLabel,
   modeled,
   modeledLabel,
 }: {
-  goal: MaybeNumber;
-  goalLabel: string;
+  requested: MaybeNumber;
+  requestedLabel: string;
   modeled: MaybeNumber;
   modeledLabel: string;
 }) {
@@ -31,10 +31,10 @@ function ComparisonBar({
     <div className="flex flex-col gap-2">
       <div className="flex items-baseline justify-between gap-3 text-[10.5px]">
         <span className="font-semibold text-[var(--secondary)]">
-          {goalLabel}
+          {requestedLabel}
         </span>
         <span className="font-mono tabular-nums text-[var(--tertiary)]">
-          {dollars(goal)}
+          {dollars(requested)}
         </span>
       </div>
       <div
@@ -43,7 +43,7 @@ function ComparisonBar({
       >
         <span
           className="absolute inset-y-0 left-0 rounded-full bg-[color-mix(in_srgb,var(--theme-navy)_32%,transparent)]"
-          style={{ width: width(goal) }}
+          style={{ width: width(requested) }}
         />
         <span
           className="absolute inset-y-[3px] left-0 rounded-full bg-[var(--theme-green)]"
@@ -92,16 +92,12 @@ function Outcome({
  * presentation-only on the already normalized 0–100 Senior basis.
  */
 export default function DayV3ExitModel({
-  deploying = false,
   exit,
   minimumProceedsPer100,
-  policyProvenance = null,
   promisedExitSharePct,
 }: {
-  deploying?: boolean;
   exit: DayV3ExitView;
   minimumProceedsPer100: MaybeNumber;
-  policyProvenance?: string | null;
   promisedExitSharePct: MaybeNumber;
 }) {
   const modeled =
@@ -130,8 +126,8 @@ export default function DayV3ExitModel({
           {disabled
             ? "Immediate Senior exit is off, so this design has no SLP or pool execution promise."
             : illustrative
-              ? "Compares the issuer promise with the shared Day engine's illustrative starter pool, per $100 Senior."
-              : `Compares the issuer promise with the fee-inclusive result from the ${deploying ? "selected live" : "disclosed simulation"} E-CLP policy, per $100 Senior.`}
+              ? "Shows how the selected exit size and payout affect one trade, per $100 Senior."
+              : "Shows the fee-inclusive result for one Senior sale using the selected market terms, per $100 Senior. Larger sales move farther through the pool and receive a larger discount. Arbitrageurs can later buy discounted Senior, redeem it for the underlying asset, and refill the SLP when that trade covers their time, costs, and fees."}
         </CardDescription>
       </CardHeader>
 
@@ -139,14 +135,14 @@ export default function DayV3ExitModel({
         {!disabled ? (
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
             <ComparisonBar
-              goal={promisedExitSharePct}
-              goalLabel="Sell-now goal / $100"
+              requested={promisedExitSharePct}
+              requestedLabel="Selected sale / $100"
               modeled={modeled ? exit.sellablePer100 : null}
               modeledLabel="Modeled capacity / $100"
             />
             <ComparisonBar
-              goal={minimumProceedsPer100}
-              goalLabel="Minimum payout / $100"
+              requested={minimumProceedsPer100}
+              requestedLabel="Minimum payout / $100"
               modeled={modeled ? exit.lowestPayoutPer100 : null}
               modeledLabel="Lowest modeled payout / $100"
             />
@@ -200,7 +196,7 @@ export default function DayV3ExitModel({
               value={
                 exit.restockPoint === null
                   ? illustrative
-                    ? "Deploy-only"
+                    ? "Needs market terms"
                     : "unresolved"
                   : `${exit.restockPoint.toFixed(1)}%`
               }
@@ -246,11 +242,6 @@ export default function DayV3ExitModel({
                 : `${exit.maximumDiscountPct.toFixed(2)}%`}
             </span>
           </div>
-        ) : null}
-        {exit.status === "recommended" && policyProvenance ? (
-          <p className="text-[10px] leading-relaxed text-[var(--tertiary)]">
-            Live policy: {policyProvenance}
-          </p>
         ) : null}
       </CardContent>
     </Card>

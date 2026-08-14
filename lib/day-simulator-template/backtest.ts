@@ -215,9 +215,9 @@ export function runDayHistoricalBacktest(input: DayBacktestInput) {
       shouldRefillJunior(maintainCoverage, previousSnapshot.state, postReturn.state)
     ) {
       const numerator =
-        coverage * (sim.state.stRawNAV + sim.state.jtRawNAV * cfg.beta) -
+        coverage * (sim.state.stRawNAV + sim.state.jtRawNAV) -
         cfg.targetUtilization * sim.state.jtEffectiveNAV;
-      const denominator = cfg.targetUtilization - coverage * cfg.beta;
+      const denominator = cfg.targetUtilization - coverage;
       const refill = denominator > 0 ? numerator / denominator : 0;
       if (refill > cfg.dustTolerance) {
         sim.step({

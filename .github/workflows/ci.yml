@@ -30,7 +30,22 @@ jobs:
         run: npx tsc --noEmit
 
       - name: Build
-        run: npm run build
+        shell: bash
+        run: |
+          # next/font downloads Google font assets during the build. GitHub's
+          # runners occasionally fail to reach fonts.gstatic.com, so retry the
+          # complete build while still failing CI after the final attempt.
+          for attempt in 1 2 3; do
+            if npm run build; then
+              exit 0
+            fi
+            if [ "$attempt" -eq 3 ]; then
+              echo "::error::Build failed after 3 attempts"
+              exit 1
+            fi
+            echo "::warning::Build attempt $attempt failed; retrying in 15 seconds"
+            sleep 15
+          done
 
       - name: V2 math audit
         run: npm run audit:v2-math

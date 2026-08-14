@@ -5,7 +5,6 @@ import {
   useCallback,
   useContext,
   useMemo,
-  useRef,
   useState,
 } from "react";
 
@@ -23,7 +22,7 @@ export type DayV3GroupStatus = {
 
 type DayV3GroupAccordionValue = {
   openId: string | null;
-  open: (id: string, options?: { focus?: boolean }) => void;
+  open: (id: string) => void;
   toggle: (id: string) => void;
 };
 
@@ -51,24 +50,8 @@ export function DayV3GroupAccordion({
   } | null;
 }) {
   const [openId, setOpenId] = useState<string | null>(defaultOpenId);
-  const open = useCallback((id: string, options?: { focus?: boolean }) => {
+  const open = useCallback((id: string) => {
     setOpenId(id);
-    window.requestAnimationFrame(() => {
-      window.requestAnimationFrame(() => {
-        const section = document.getElementById(id);
-        section?.scrollIntoView({
-          behavior: window.matchMedia("(prefers-reduced-motion: reduce)").matches
-            ? "auto"
-            : "smooth",
-          block: "start",
-        });
-        if (options?.focus) {
-          section
-            ?.querySelector<HTMLButtonElement>("button[aria-controls]")
-            ?.focus({ preventScroll: true });
-        }
-      });
-    });
   }, []);
   const value = useMemo<DayV3GroupAccordionValue>(
     () => ({
@@ -99,7 +82,7 @@ export function DayV3GroupAccordion({
           </div>
           <button
             className="inline-flex min-h-11 shrink-0 cursor-pointer items-center justify-center rounded-lg bg-[var(--foreground)] px-4 py-2 text-[12px] font-semibold text-[var(--background)] transition-opacity hover:opacity-90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--foreground)]"
-            onClick={() => open(guidedTarget.id, { focus: true })}
+            onClick={() => open(guidedTarget.id)}
             type="button"
           >
             Continue setup
@@ -135,6 +118,8 @@ export default function DayV3Group({
   docsLabel,
   id,
   index,
+  impactHref,
+  impactLabel = "See impact",
   status,
   subtitle,
   summary,
@@ -150,6 +135,8 @@ export default function DayV3Group({
   docsLabel?: string;
   id?: string;
   index: number;
+  impactHref?: string;
+  impactLabel?: string;
   status?: DayV3GroupStatus;
   subtitle: string;
   summary?: React.ReactNode;
@@ -162,7 +149,6 @@ export default function DayV3Group({
   const groupId = id ?? generatedId;
   const contentId = `${groupId}-content`;
   const accordion = useContext(DayV3GroupAccordionContext);
-  const groupRef = useRef<HTMLElement>(null);
   const [localOpen, setLocalOpen] = useState(defaultOpen);
   const open = accordion ? accordion.openId === groupId : localOpen;
   const toggleOpen = () => {
@@ -187,7 +173,7 @@ export default function DayV3Group({
         {index}
       </span>
       <span className="flex min-w-0 flex-1 flex-col gap-1">
-        <span className="grid min-w-0 grid-cols-1 items-baseline gap-x-3 gap-y-1 sm:grid-cols-[180px_minmax(0,1fr)_auto]">
+        <span className="grid min-w-0 grid-cols-1 items-baseline gap-x-3 gap-y-1 sm:grid-cols-[180px_minmax(0,1fr)]">
           <span className="text-[13px] font-semibold leading-tight">
             {status?.tone === "incomplete" && status.missing?.length ? (
               <span
@@ -202,11 +188,6 @@ export default function DayV3Group({
           <span className="text-[11px] font-normal leading-tight text-[var(--tertiary)]">
             {subtitle}
           </span>
-          {deployOnly ? (
-            <span className="rounded-full border border-[var(--border-subtle)] px-1.5 py-px text-[9px] font-semibold uppercase tracking-[0.08em] text-[var(--tertiary)]">
-              deploy only
-            </span>
-          ) : null}
         </span>
         {summary ? (
           <span className="text-[10.5px] font-normal leading-snug text-[var(--secondary)]">
@@ -214,32 +195,40 @@ export default function DayV3Group({
           </span>
         ) : null}
       </span>
-      {status ? (
-        <Badge
-          aria-label={`Section status: ${status.label}`}
-          data-section-status={status.tone}
-          tone={
-            status.tone === "complete"
-              ? "liquidity"
-              : status.tone === "incomplete"
-                ? "caution"
-                : "neutral"
-          }
-          className={
-            status.tone === "incomplete" && status.missing?.length
-              ? "border-[color-mix(in_srgb,var(--theme-red)_40%,transparent)] bg-[color-mix(in_srgb,var(--theme-red)_8%,transparent)] text-[var(--red-emphasis)]"
-              : undefined
-          }
-        >
-          {status.label}
-        </Badge>
+      {deployOnly || status ? (
+        <span className="flex shrink-0 items-center gap-2 self-center">
+          {deployOnly ? (
+            <span className="rounded-full border border-[var(--border-subtle)] px-1.5 py-px text-[9px] font-semibold uppercase tracking-[0.08em] text-[var(--tertiary)]">
+              advanced only
+            </span>
+          ) : null}
+          {status ? (
+            <Badge
+              aria-label={`Section status: ${status.label}`}
+              data-section-status={status.tone}
+              tone={
+                status.tone === "complete"
+                  ? "liquidity"
+                  : status.tone === "incomplete"
+                    ? "caution"
+                    : "neutral"
+              }
+              className={
+                status.tone === "incomplete" && status.missing?.length
+                  ? "border-[color-mix(in_srgb,var(--theme-red)_40%,transparent)] bg-[color-mix(in_srgb,var(--theme-red)_8%,transparent)] text-[var(--red-emphasis)]"
+                  : undefined
+              }
+            >
+              {status.label}
+            </Badge>
+          ) : null}
+        </span>
       ) : null}
     </>
   );
 
   return (
     <section
-      ref={groupRef}
       className={cn(
         "flex scroll-mt-6 flex-col",
         collapsible
@@ -250,7 +239,7 @@ export default function DayV3Group({
       data-section-complete={status?.tone === "complete" || undefined}
       id={id}
     >
-      <div className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-2.5 sm:flex sm:flex-wrap sm:items-center">
+      <div className="flex flex-col items-stretch gap-2.5 sm:flex-row sm:flex-wrap sm:items-center">
         {collapsible ? (
           <button
             aria-controls={contentId}
@@ -283,6 +272,14 @@ export default function DayV3Group({
             {heading}
           </div>
         )}
+        {impactHref ? (
+          <a
+            className="inline-flex min-h-9 shrink-0 self-end items-center rounded-md px-2 text-[10.5px] font-semibold text-[var(--secondary)] underline decoration-dotted underline-offset-2 transition-colors hover:text-[var(--foreground)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--foreground)] sm:self-auto"
+            href={impactHref}
+          >
+            {impactLabel} <span aria-hidden="true">↓</span>
+          </a>
+        ) : null}
       </div>
       {status?.tone === "incomplete" && missingCount > 0 && open ? (
         <p

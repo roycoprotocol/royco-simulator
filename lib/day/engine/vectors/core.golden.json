@@ -1,0 +1,805 @@
+{
+  "schemaVersion": 1,
+  "provenance": {
+    "repository": "https://github.com/roycoprotocol/royco-day",
+    "commit": "9764c9e20c8e8af7df1358f228c4be83b78be97f",
+    "solc": "0.8.35",
+    "harness": "lib/day/engine/harness/DayVectorGen.t.sol",
+    "harnessSha256": "60510a9ab95e60ae65edc8cd4c2f04bfd7291a18d1e3eaa6c255f28ef012aa42",
+    "generator": "scripts/day-simulator/generate-day-vectors.mjs"
+  },
+  "requiredGroups": [
+    "A",
+    "B",
+    "C",
+    "D",
+    "E"
+  ],
+  "vectors": [
+    {
+      "group": "A",
+      "label": "ydm_U_0",
+      "inputs": {},
+      "outputs": {
+        "value": "530000000000000000"
+      }
+    },
+    {
+      "group": "A",
+      "label": "ydm_U_450000000000000000",
+      "inputs": {},
+      "outputs": {
+        "value": "530000000000000000"
+      }
+    },
+    {
+      "group": "A",
+      "label": "ydm_U_900000000000000000",
+      "inputs": {},
+      "outputs": {
+        "value": "530000000000000000"
+      }
+    },
+    {
+      "group": "A",
+      "label": "ydm_U_950000000000000000",
+      "inputs": {},
+      "outputs": {
+        "value": "530000000000000000"
+      }
+    },
+    {
+      "group": "A",
+      "label": "ydm_U_1000000000000000000",
+      "inputs": {},
+      "outputs": {
+        "value": "530000000000000000"
+      }
+    },
+    {
+      "group": "A",
+      "label": "ydm_U_1500000000000000000",
+      "inputs": {},
+      "outputs": {
+        "value": "530000000000000000"
+      }
+    },
+    {
+      "group": "B",
+      "label": "cov_1000_500_500",
+      "inputs": {},
+      "outputs": {
+        "value": "900000000000000000"
+      }
+    },
+    {
+      "group": "B",
+      "label": "cov_700_300_300",
+      "inputs": {},
+      "outputs": {
+        "value": "1000000000000000000"
+      }
+    },
+    {
+      "group": "B",
+      "label": "cov_minCov0",
+      "inputs": {},
+      "outputs": {
+        "value": "0"
+      }
+    },
+    {
+      "group": "B",
+      "label": "cov_jtEff0_exposure",
+      "inputs": {},
+      "outputs": {
+        "value": "115792089237316195423570985008687907853269984665640564039457584007913129639935"
+      }
+    },
+    {
+      "group": "B",
+      "label": "cov_zero_exposure",
+      "inputs": {},
+      "outputs": {
+        "value": "0"
+      }
+    },
+    {
+      "group": "C",
+      "label": "C0_genesis",
+      "inputs": {
+        "stRaw": "1000000000000000000000",
+        "jtRaw": "500000000000000000000",
+        "priceWad": "1000000000000000000",
+        "dtSec": "0"
+      },
+      "outputs": {
+        "stEff": "1000000000000000000000",
+        "jtEff": "500000000000000000000",
+        "il": "0",
+        "coverageUtilWad": "900000000000000000",
+        "marketState": "PERPETUAL"
+      }
+    },
+    {
+      "group": "C",
+      "label": "C1_flat_30d",
+      "inputs": {
+        "stRaw": "1000000000000000000000",
+        "jtRaw": "500000000000000000000",
+        "priceWad": "1000000000000000000",
+        "dtSec": "2592000"
+      },
+      "outputs": {
+        "stEff": "1000000000000000000000",
+        "jtEff": "500000000000000000000",
+        "il": "0",
+        "coverageUtilWad": "900000000000000000",
+        "marketState": "PERPETUAL"
+      }
+    },
+    {
+      "group": "C",
+      "label": "C2_up10_30d",
+      "inputs": {
+        "stRaw": "1100000000000000000000",
+        "jtRaw": "550000000000000000000",
+        "priceWad": "1100000000000000000",
+        "dtSec": "2592000"
+      },
+      "outputs": {
+        "stEff": "1047000000000000000000",
+        "jtEff": "603000000000000000000",
+        "il": "0",
+        "coverageUtilWad": "820895522388059702",
+        "marketState": "PERPETUAL"
+      }
+    },
+    {
+      "group": "C",
+      "label": "C3_down10_30d",
+      "inputs": {
+        "stRaw": "900000000000000000000",
+        "jtRaw": "450000000000000000000",
+        "priceWad": "900000000000000000",
+        "dtSec": "2592000"
+      },
+      "outputs": {
+        "stEff": "1000000000000000000000",
+        "jtEff": "350000000000000000000",
+        "il": "150000000000000000000",
+        "coverageUtilWad": "1157142857142857143",
+        "marketState": "FIXED_TERM"
+      }
+    },
+    {
+      "group": "C",
+      "label": "C4_down10_30d",
+      "inputs": {
+        "stRaw": "900000000000000000000",
+        "jtRaw": "450000000000000000000",
+        "priceWad": "900000000000000000",
+        "dtSec": "2592000"
+      },
+      "outputs": {
+        "stEff": "1000000000000000000000",
+        "jtEff": "350000000000000000000",
+        "il": "150000000000000000000",
+        "coverageUtilWad": "1157142857142857143",
+        "marketState": "FIXED_TERM"
+      }
+    },
+    {
+      "group": "C",
+      "label": "C4_recover95_5d",
+      "inputs": {
+        "stRaw": "950000000000000000000",
+        "jtRaw": "475000000000000000000",
+        "priceWad": "950000000000000000",
+        "dtSec": "432000"
+      },
+      "outputs": {
+        "stEff": "1000000000000000000000",
+        "jtEff": "425000000000000000000",
+        "il": "75000000000000000000",
+        "coverageUtilWad": "1005882352941176471",
+        "marketState": "FIXED_TERM"
+      }
+    },
+    {
+      "group": "C",
+      "label": "C6_down60_30d",
+      "inputs": {
+        "stRaw": "400000000000000000000",
+        "jtRaw": "200000000000000000000",
+        "priceWad": "400000000000000000",
+        "dtSec": "2592000"
+      },
+      "outputs": {
+        "stEff": "600000000000000000000",
+        "jtEff": "0",
+        "il": "0",
+        "coverageUtilWad": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+        "marketState": "PERPETUAL"
+      }
+    },
+    {
+      "group": "C",
+      "label": "C7_down10_30d",
+      "inputs": {
+        "stRaw": "900000000000000000000",
+        "jtRaw": "450000000000000000000",
+        "priceWad": "900000000000000000",
+        "dtSec": "2592000"
+      },
+      "outputs": {
+        "stEff": "1000000000000000000000",
+        "jtEff": "350000000000000000000",
+        "il": "150000000000000000000",
+        "coverageUtilWad": "1157142857142857143",
+        "marketState": "FIXED_TERM"
+      }
+    },
+    {
+      "group": "C",
+      "label": "C7_termElapsed_flat",
+      "inputs": {
+        "stRaw": "900000000000000000000",
+        "jtRaw": "450000000000000000000",
+        "priceWad": "900000000000000000",
+        "dtSec": "2678400"
+      },
+      "outputs": {
+        "stEff": "1000000000000000000000",
+        "jtEff": "350000000000000000000",
+        "il": "0",
+        "coverageUtilWad": "1157142857142857143",
+        "marketState": "PERPETUAL"
+      }
+    },
+    {
+      "group": "D",
+      "label": "D_step_1",
+      "inputs": {
+        "stRaw": "1000000000000000000000",
+        "jtRaw": "500000000000000000000",
+        "priceWad": "1000000000000000000",
+        "dtSec": "2592000"
+      },
+      "outputs": {
+        "stEff": "1000000000000000000000",
+        "jtEff": "500000000000000000000",
+        "il": "0",
+        "coverageUtilWad": "900000000000000000",
+        "marketState": "PERPETUAL"
+      }
+    },
+    {
+      "group": "D",
+      "label": "D_step_2",
+      "inputs": {
+        "stRaw": "1020000000000000000000",
+        "jtRaw": "510000000000000000000",
+        "priceWad": "1020000000000000000",
+        "dtSec": "2592000"
+      },
+      "outputs": {
+        "stEff": "1009400000000000000000",
+        "jtEff": "520600000000000000000",
+        "il": "0",
+        "coverageUtilWad": "881674990395697273",
+        "marketState": "PERPETUAL"
+      }
+    },
+    {
+      "group": "D",
+      "label": "D_step_3",
+      "inputs": {
+        "stRaw": "1050000000000000000000",
+        "jtRaw": "525000000000000000000",
+        "priceWad": "1050000000000000000",
+        "dtSec": "2592000"
+      },
+      "outputs": {
+        "stEff": "1023353470588235294118",
+        "jtEff": "551646529411764705882",
+        "il": "0",
+        "coverageUtilWad": "856526733710876882",
+        "marketState": "PERPETUAL"
+      }
+    },
+    {
+      "group": "D",
+      "label": "D_step_4",
+      "inputs": {
+        "stRaw": "1030000000000000000000",
+        "jtRaw": "515000000000000000000",
+        "priceWad": "1030000000000000000",
+        "dtSec": "2592000"
+      },
+      "outputs": {
+        "stEff": "1023353470588235294118",
+        "jtEff": "521646529411764705882",
+        "il": "30000000000000000000",
+        "coverageUtilWad": "888532701487856720",
+        "marketState": "FIXED_TERM"
+      }
+    },
+    {
+      "group": "D",
+      "label": "D_step_5",
+      "inputs": {
+        "stRaw": "1080000000000000000000",
+        "jtRaw": "540000000000000000000",
+        "priceWad": "1080000000000000000",
+        "dtSec": "2592000"
+      },
+      "outputs": {
+        "stEff": "1037095645764705882353",
+        "jtEff": "582904354235294117647",
+        "il": "0",
+        "coverageUtilWad": "833755995248273817",
+        "marketState": "PERPETUAL"
+      }
+    },
+    {
+      "group": "D",
+      "label": "D_step_6",
+      "inputs": {
+        "stRaw": "980000000000000000000",
+        "jtRaw": "490000000000000000000",
+        "priceWad": "980000000000000000",
+        "dtSec": "2592000"
+      },
+      "outputs": {
+        "stEff": "1037095645764705882353",
+        "jtEff": "432904354235294117647",
+        "il": "150000000000000000000",
+        "coverageUtilWad": "1018700772319572699",
+        "marketState": "FIXED_TERM"
+      }
+    },
+    {
+      "group": "D",
+      "label": "D_step_7",
+      "inputs": {
+        "stRaw": "950000000000000000000",
+        "jtRaw": "475000000000000000000",
+        "priceWad": "950000000000000000",
+        "dtSec": "2592000"
+      },
+      "outputs": {
+        "stEff": "1037095645764705882353",
+        "jtEff": "387904354235294117647",
+        "il": "0",
+        "coverageUtilWad": "1102075796088352358",
+        "marketState": "PERPETUAL"
+      }
+    },
+    {
+      "group": "D",
+      "label": "D_step_8",
+      "inputs": {
+        "stRaw": "1010000000000000000000",
+        "jtRaw": "505000000000000000000",
+        "priceWad": "1010000000000000000",
+        "dtSec": "2592000"
+      },
+      "outputs": {
+        "stEff": "1067881011249510835914",
+        "jtEff": "447118988750489164086",
+        "il": "0",
+        "coverageUtilWad": "1016507935102773604",
+        "marketState": "PERPETUAL"
+      }
+    },
+    {
+      "group": "D",
+      "label": "D_step_9",
+      "inputs": {
+        "stRaw": "1060000000000000000000",
+        "jtRaw": "530000000000000000000",
+        "priceWad": "1060000000000000000",
+        "dtSec": "2592000"
+      },
+      "outputs": {
+        "stEff": "1092727747649870741502",
+        "jtEff": "497272252350129258498",
+        "il": "0",
+        "coverageUtilWad": "959233091622704154",
+        "marketState": "PERPETUAL"
+      }
+    },
+    {
+      "group": "D",
+      "label": "D_step_10",
+      "inputs": {
+        "stRaw": "1100000000000000000000",
+        "jtRaw": "550000000000000000000",
+        "priceWad": "1100000000000000000",
+        "dtSec": "2592000"
+      },
+      "outputs": {
+        "stEff": "1112108202042151467861",
+        "jtEff": "537891797957848532139",
+        "il": "0",
+        "coverageUtilWad": "920259431133378773",
+        "marketState": "PERPETUAL"
+      }
+    },
+    {
+      "group": "D",
+      "label": "D_step_11",
+      "inputs": {
+        "stRaw": "1040000000000000000000",
+        "jtRaw": "520000000000000000000",
+        "priceWad": "1040000000000000000",
+        "dtSec": "2592000"
+      },
+      "outputs": {
+        "stEff": "1112108202042151467861",
+        "jtEff": "447891797957848532139",
+        "il": "90000000000000000000",
+        "coverageUtilWad": "1044895222761020213",
+        "marketState": "FIXED_TERM"
+      }
+    },
+    {
+      "group": "D",
+      "label": "D_step_12",
+      "inputs": {
+        "stRaw": "1120000000000000000000",
+        "jtRaw": "560000000000000000000",
+        "priceWad": "1120000000000000000",
+        "dtSec": "2592000"
+      },
+      "outputs": {
+        "stEff": "1121611672132329853132",
+        "jtEff": "558388327867670146868",
+        "il": "0",
+        "coverageUtilWad": "902597663394283228",
+        "marketState": "PERPETUAL"
+      }
+    },
+    {
+      "group": "C",
+      "label": "C5_down10_30d",
+      "inputs": {
+        "stRaw": "900000000000000000000",
+        "jtRaw": "450000000000000000000",
+        "priceWad": "900000000000000000",
+        "dtSec": "2592000"
+      },
+      "outputs": {
+        "stEff": "1000000000000000000000",
+        "jtEff": "350000000000000000000",
+        "il": "150000000000000000000",
+        "coverageUtilWad": "1157142857142857143",
+        "marketState": "FIXED_TERM"
+      }
+    },
+    {
+      "group": "C",
+      "label": "C5_recover105_5d",
+      "inputs": {
+        "stRaw": "1050000000000000000000",
+        "jtRaw": "525000000000000000000",
+        "priceWad": "1050000000000000000",
+        "dtSec": "432000"
+      },
+      "outputs": {
+        "stEff": "1023500000000000000000",
+        "jtEff": "551500000000000000000",
+        "il": "0",
+        "coverageUtilWad": "856754306436990028",
+        "marketState": "PERPETUAL"
+      }
+    },
+    {
+      "group": "E",
+      "label": "E1_enter_down10",
+      "inputs": {
+        "stRaw": "900000000000000000000",
+        "jtRaw": "450000000000000000000",
+        "priceWad": "900000000000000000",
+        "dtSec": "2592000"
+      },
+      "outputs": {
+        "stEff": "1000000000000000000000",
+        "jtEff": "350000000000000000000",
+        "il": "150000000000000000000",
+        "coverageUtilWad": "1157142857142857143",
+        "marketState": "FIXED_TERM"
+      }
+    },
+    {
+      "group": "E",
+      "label": "E1_flat_1",
+      "inputs": {
+        "stRaw": "900000000000000000000",
+        "jtRaw": "450000000000000000000",
+        "priceWad": "900000000000000000",
+        "dtSec": "2592000"
+      },
+      "outputs": {
+        "stEff": "1000000000000000000000",
+        "jtEff": "350000000000000000000",
+        "il": "0",
+        "coverageUtilWad": "1157142857142857143",
+        "marketState": "PERPETUAL"
+      }
+    },
+    {
+      "group": "E",
+      "label": "E1_flat_2",
+      "inputs": {
+        "stRaw": "900000000000000000000",
+        "jtRaw": "450000000000000000000",
+        "priceWad": "900000000000000000",
+        "dtSec": "2592000"
+      },
+      "outputs": {
+        "stEff": "1000000000000000000000",
+        "jtEff": "350000000000000000000",
+        "il": "0",
+        "coverageUtilWad": "1157142857142857143",
+        "marketState": "PERPETUAL"
+      }
+    },
+    {
+      "group": "E",
+      "label": "E1_flat_3",
+      "inputs": {
+        "stRaw": "900000000000000000000",
+        "jtRaw": "450000000000000000000",
+        "priceWad": "900000000000000000",
+        "dtSec": "2592000"
+      },
+      "outputs": {
+        "stEff": "1000000000000000000000",
+        "jtEff": "350000000000000000000",
+        "il": "0",
+        "coverageUtilWad": "1157142857142857143",
+        "marketState": "PERPETUAL"
+      }
+    },
+    {
+      "group": "E",
+      "label": "E1_flat_4",
+      "inputs": {
+        "stRaw": "900000000000000000000",
+        "jtRaw": "450000000000000000000",
+        "priceWad": "900000000000000000",
+        "dtSec": "2592000"
+      },
+      "outputs": {
+        "stEff": "1000000000000000000000",
+        "jtEff": "350000000000000000000",
+        "il": "0",
+        "coverageUtilWad": "1157142857142857143",
+        "marketState": "PERPETUAL"
+      }
+    },
+    {
+      "group": "E",
+      "label": "E1_flat_5",
+      "inputs": {
+        "stRaw": "900000000000000000000",
+        "jtRaw": "450000000000000000000",
+        "priceWad": "900000000000000000",
+        "dtSec": "2592000"
+      },
+      "outputs": {
+        "stEff": "1000000000000000000000",
+        "jtEff": "350000000000000000000",
+        "il": "0",
+        "coverageUtilWad": "1157142857142857143",
+        "marketState": "PERPETUAL"
+      }
+    },
+    {
+      "group": "E",
+      "label": "E2_enter_down10",
+      "inputs": {
+        "stRaw": "900000000000000000000",
+        "jtRaw": "450000000000000000000",
+        "priceWad": "900000000000000000",
+        "dtSec": "2592000"
+      },
+      "outputs": {
+        "stEff": "1000000000000000000000",
+        "jtEff": "350000000000000000000",
+        "il": "150000000000000000000",
+        "coverageUtilWad": "1157142857142857143",
+        "marketState": "FIXED_TERM"
+      }
+    },
+    {
+      "group": "E",
+      "label": "E2_before_end",
+      "inputs": {
+        "stRaw": "900000000000000000000",
+        "jtRaw": "450000000000000000000",
+        "priceWad": "900000000000000000",
+        "dtSec": "2591999"
+      },
+      "outputs": {
+        "stEff": "1000000000000000000000",
+        "jtEff": "350000000000000000000",
+        "il": "150000000000000000000",
+        "coverageUtilWad": "1157142857142857143",
+        "marketState": "FIXED_TERM"
+      }
+    },
+    {
+      "group": "E",
+      "label": "E3_enter_down10",
+      "inputs": {
+        "stRaw": "900000000000000000000",
+        "jtRaw": "450000000000000000000",
+        "priceWad": "900000000000000000",
+        "dtSec": "2592000"
+      },
+      "outputs": {
+        "stEff": "1000000000000000000000",
+        "jtEff": "350000000000000000000",
+        "il": "150000000000000000000",
+        "coverageUtilWad": "1157142857142857143",
+        "marketState": "FIXED_TERM"
+      }
+    },
+    {
+      "group": "E",
+      "label": "E3_at_end",
+      "inputs": {
+        "stRaw": "900000000000000000000",
+        "jtRaw": "450000000000000000000",
+        "priceWad": "900000000000000000",
+        "dtSec": "2592000"
+      },
+      "outputs": {
+        "stEff": "1000000000000000000000",
+        "jtEff": "350000000000000000000",
+        "il": "0",
+        "coverageUtilWad": "1157142857142857143",
+        "marketState": "PERPETUAL"
+      }
+    },
+    {
+      "group": "E",
+      "label": "E4_enter_down10",
+      "inputs": {
+        "stRaw": "900000000000000000000",
+        "jtRaw": "450000000000000000000",
+        "priceWad": "900000000000000000",
+        "dtSec": "2592000"
+      },
+      "outputs": {
+        "stEff": "1000000000000000000000",
+        "jtEff": "350000000000000000000",
+        "il": "150000000000000000000",
+        "coverageUtilWad": "1157142857142857143",
+        "marketState": "FIXED_TERM"
+      }
+    },
+    {
+      "group": "E",
+      "label": "E4_after_end",
+      "inputs": {
+        "stRaw": "900000000000000000000",
+        "jtRaw": "450000000000000000000",
+        "priceWad": "900000000000000000",
+        "dtSec": "2592001"
+      },
+      "outputs": {
+        "stEff": "1000000000000000000000",
+        "jtEff": "350000000000000000000",
+        "il": "0",
+        "coverageUtilWad": "1157142857142857143",
+        "marketState": "PERPETUAL"
+      }
+    },
+    {
+      "group": "E",
+      "label": "E5_enter_down10",
+      "inputs": {
+        "stRaw": "900000000000000000000",
+        "jtRaw": "450000000000000000000",
+        "priceWad": "900000000000000000",
+        "dtSec": "2592000"
+      },
+      "outputs": {
+        "stEff": "1000000000000000000000",
+        "jtEff": "350000000000000000000",
+        "il": "150000000000000000000",
+        "coverageUtilWad": "1157142857142857143",
+        "marketState": "FIXED_TERM"
+      }
+    },
+    {
+      "group": "E",
+      "label": "E5_partial_1e6",
+      "inputs": {
+        "stRaw": "900000000000000000000",
+        "jtRaw": "450000000000000000000",
+        "priceWad": "900000000000000000",
+        "dtSec": "1000000"
+      },
+      "outputs": {
+        "stEff": "1000000000000000000000",
+        "jtEff": "350000000000000000000",
+        "il": "150000000000000000000",
+        "coverageUtilWad": "1157142857142857143",
+        "marketState": "FIXED_TERM"
+      }
+    },
+    {
+      "group": "E",
+      "label": "E5_partial_2e6",
+      "inputs": {
+        "stRaw": "900000000000000000000",
+        "jtRaw": "450000000000000000000",
+        "priceWad": "900000000000000000",
+        "dtSec": "2000000"
+      },
+      "outputs": {
+        "stEff": "1000000000000000000000",
+        "jtEff": "350000000000000000000",
+        "il": "0",
+        "coverageUtilWad": "1157142857142857143",
+        "marketState": "PERPETUAL"
+      }
+    },
+    {
+      "group": "E",
+      "label": "E6_enter_down10",
+      "inputs": {
+        "stRaw": "900000000000000000000",
+        "jtRaw": "450000000000000000000",
+        "priceWad": "900000000000000000",
+        "dtSec": "2592000"
+      },
+      "outputs": {
+        "stEff": "1000000000000000000000",
+        "jtEff": "350000000000000000000",
+        "il": "150000000000000000000",
+        "coverageUtilWad": "1157142857142857143",
+        "marketState": "FIXED_TERM"
+      }
+    },
+    {
+      "group": "E",
+      "label": "E6_recover110",
+      "inputs": {
+        "stRaw": "1100000000000000000000",
+        "jtRaw": "550000000000000000000",
+        "priceWad": "1100000000000000000",
+        "dtSec": "2591999"
+      },
+      "outputs": {
+        "stEff": "1047000000000000000000",
+        "jtEff": "603000000000000000000",
+        "il": "0",
+        "coverageUtilWad": "820895522388059702",
+        "marketState": "PERPETUAL"
+      }
+    },
+    {
+      "group": "E",
+      "label": "E6_reenter_down10",
+      "inputs": {
+        "stRaw": "900000000000000000000",
+        "jtRaw": "450000000000000000000",
+        "priceWad": "900000000000000000",
+        "dtSec": "100"
+      },
+      "outputs": {
+        "stEff": "1047000000000000000000",
+        "jtEff": "303000000000000000000",
+        "il": "300000000000000000000",
+        "coverageUtilWad": "1336633663366336634",
+        "marketState": "FIXED_TERM"
+      }
+    }
+  ]
+}

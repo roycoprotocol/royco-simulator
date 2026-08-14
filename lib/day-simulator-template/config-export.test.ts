@@ -11,6 +11,7 @@ import {
   type DayConfigExportInput,
 } from "./config-export";
 import { DAY_ISSUER_PRESETS, matchDayIssuerPreset } from "./issuer-presets";
+import { DAY_ECLP_SIMULATION_LAMBDA } from "@/lib/day/engine/engine";
 
 const stability = DAY_ISSUER_PRESETS[0];
 
@@ -39,7 +40,10 @@ const input: DayConfigExportInput = {
     y100SharePct: 18,
     exitBufferPct: 1,
     selfLiquidationBonusPct: 1,
+    fixedTermGracePeriodDays: 7,
     poolConcentration: 1,
+    maxJTYieldSharePct: 50,
+    maxLTYieldSharePct: 50,
   },
   scenario: { hasHistoricalSeries: true, sourceStressPct: 0 },
   modeled: {
@@ -53,7 +57,7 @@ const input: DayConfigExportInput = {
 };
 
 const payload = buildDayConfigExport(input);
-assert.equal(payload.schemaVersion, 4);
+assert.equal(payload.schemaVersion, 5);
 // A shock must travel with the export, or `modeled` misattributes shocked
 // outcomes to unshocked terms.
 assert.equal(payload.scenario.sourceStressApplied, false);
@@ -102,6 +106,7 @@ assert.ok(Math.abs(payload.terms.riskYieldShare - 0.056) < 1e-12);
 assert.ok(Math.abs(payload.terms.liquidityYieldShare - 0.211) < 1e-12);
 assert.equal(payload.terms.observationDays, 7);
 assert.equal(payload.terms.fixedTermDurationSec, 7 * 86_400);
+assert.equal(payload.terms.fixedTermGracePeriodSec, 7 * 86_400);
 assert.ok(Math.abs(payload.terms.sourceApy - 0.114) < 1e-12);
 assert.ok(!("maintainCoverage" in payload.terms), "backtest restoration is not a deploy term");
 assert.ok(Math.abs(payload.terms.riskYieldShareAtFullUtilization - 0.18) < 1e-12);
@@ -116,6 +121,7 @@ assert.deepEqual(payload.termsPct, {
   riskSharePct: 5.6,
   liqSharePct: 21.1,
   observationDays: 7,
+  fixedTermGracePeriodDays: 7,
   sourceApyPct: 11.4,
   y100SharePct: 18,
   exitBufferPct: 1,
@@ -127,6 +133,7 @@ assert.deepEqual(payload.deploymentBrief.coverage, {
   enabled: true,
   minimumCoveragePct: 3,
   observationPeriodSeconds: 7 * 86_400,
+  gracePeriodSeconds: 7 * 86_400,
   protectedExitRemainingCoveragePct: 0.03,
   selfLiquidationBonusPct: 1,
 });
@@ -139,19 +146,22 @@ assert.deepEqual(payload.deploymentBrief.yieldModels.junior, {
   y0Pct: 2,
   yTargetPct: 5.6,
   y100Pct: 18,
-  capPct: 18,
+  capPct: 50,
 });
 assert.deepEqual(payload.deploymentBrief.yieldModels.seniorLp, {
   model: "STATIC_CURVE",
   y0Pct: 1,
   yTargetPct: 21.1,
   y100Pct: 30,
-  capPct: 30,
+  capPct: 50,
 });
 assert.equal(payload.deploymentBrief.exitPool.maximumDiscountBps, 1_000);
 assert.equal(payload.deploymentBrief.exitPool.maximumDiscountWithinDeployRange, false);
 assert.equal(payload.deploymentBrief.exitPool.simulationConcentration, 1);
-assert.equal(payload.deploymentBrief.exitPool.deploymentDefaultConcentration, 300);
+assert.equal(
+  payload.deploymentBrief.exitPool.deploymentDefaultConcentration,
+  DAY_ECLP_SIMULATION_LAMBDA,
+);
 assert.equal(payload.deploymentBrief.compatibility.modeledTermsCompatible, false);
 assert.ok(payload.deploymentBrief.compatibility.issues.length > 0);
 assert.equal(payload.deploymentBrief.settlementDefaults.depositDelaySeconds, 300);

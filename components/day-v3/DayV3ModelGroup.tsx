@@ -4,7 +4,6 @@ import {
   createContext,
   useContext,
   useMemo,
-  useRef,
   useState,
 } from "react";
 
@@ -64,32 +63,17 @@ export default function DayV3ModelGroup({
   title: string;
 }) {
   const accordion = useContext(ModelAccordionContext);
-  const groupRef = useRef<HTMLElement>(null);
   const [localOpen, setLocalOpen] = useState(false);
   const open = accordion ? accordion.openId === id : localOpen;
   const contentId = `${id}-content`;
   const toggle = () => {
     if (accordion) {
       accordion.toggle(id);
-      if (!open) {
-        window.requestAnimationFrame(() => {
-          window.requestAnimationFrame(() => {
-            groupRef.current?.scrollIntoView({
-              behavior: window.matchMedia("(prefers-reduced-motion: reduce)")
-                .matches
-                ? "auto"
-                : "smooth",
-              block: "start",
-            });
-          });
-        });
-      }
     } else setLocalOpen((current) => !current);
   };
 
   return (
     <section
-      ref={groupRef}
       className="flex scroll-mt-6 flex-col rounded-xl border border-[var(--border-subtle)] bg-[var(--card)] px-4 py-2.5 shadow-[0_4px_18px_-16px_rgba(23,25,31,0.55)]"
       data-model-group={id}
     >

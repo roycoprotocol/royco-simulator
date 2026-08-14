@@ -128,12 +128,10 @@ export default function DayV3ExitCost({
           <DayV3DocsLink label="SLP mechanics" topic="slpTranche" />
         </div>
         <CardDescription>
-          One-trade SLP capacity in a 90/10 Balancer E-CLP (λ
-          {assumptions.concentration}) with a {pct(assumptions.bandPct / 100)}{" "}
-          maximum discount. Every quote is all-in: the{" "}
-          {assumptions.swapFeeBps} bps exact-input swap fee is deducted before
-          E-CLP pricing and retained by SLP. The 1.0% level below is a near-NAV
-          reference, not the pool&apos;s full discount limit.
+          See how the seller&apos;s payout changes as one Senior sale uses more of
+          the SLP. Small sales stay near the published value; larger sales
+          receive a larger discount. The displayed payout includes the pool&apos;s
+          {" "}{assumptions.swapFeeBps} bps swap fee.
         </CardDescription>
       </CardHeader>
 

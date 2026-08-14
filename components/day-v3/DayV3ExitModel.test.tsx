@@ -32,14 +32,13 @@ const resolvedMarkup = renderToStaticMarkup(
   <DayV3ExitModel
     exit={resolved}
     minimumProceedsPer100={95}
-    policyProvenance="Balancer V3 ECLP · Ethereum · block 123 · refreshed today"
     promisedExitSharePct={10}
   />,
 );
 
 assert.match(resolvedMarkup, /data-model-state="recommended"/);
 assert.match(resolvedMarkup, /data-model-source="canonical-rwa-eclp-service"/);
-assert.match(resolvedMarkup, /Sell-now goal \/ \$100/);
+assert.match(resolvedMarkup, /Selected sale \/ \$100/);
 assert.match(resolvedMarkup, /Modeled capacity \/ \$100/);
 assert.match(resolvedMarkup, /Minimum payout \/ \$100/);
 assert.match(resolvedMarkup, /Lowest modeled payout \/ \$100/);
@@ -48,10 +47,7 @@ assert.match(resolvedMarkup, />\$12\.40</);
 assert.match(resolvedMarkup, />71\.0%?</);
 assert.match(resolvedMarkup, /Swap fee: 10 bps/);
 assert.match(resolvedMarkup, /Minimum liquidity: 10\.90%/);
-assert.match(
-  resolvedMarkup,
-  /Live policy: Balancer V3 ECLP · Ethereum · block 123 · refreshed today/,
-);
+assert.doesNotMatch(resolvedMarkup, /Live policy:/);
 
 const illustrative: DayV3ExitView = {
   ...resolved,
@@ -74,7 +70,10 @@ assert.match(
   illustrativeMarkup,
   /data-model-source="shared-day-engine-illustrative-default"/,
 );
-assert.match(illustrativeMarkup, /illustrative starter pool/);
+assert.match(
+  illustrativeMarkup,
+  /Shows how the selected exit size and payout affect one trade/,
+);
 assert.match(illustrativeMarkup, /Modeled capacity/);
 assert.match(illustrativeMarkup, /after the modeled swap fee/);
 assert.match(illustrativeMarkup, />\$9\.62</);
@@ -176,151 +175,148 @@ const exitCostMarkup = renderToStaticMarkup(
     unit="USD"
   />,
 );
-assert.match(exitCostMarkup, /Every quote is all-in/);
-assert.match(exitCostMarkup, /deducted before E-CLP pricing/);
-assert.match(exitCostMarkup, /retained by SLP/);
+assert.match(exitCostMarkup, /seller&#x27;s payout changes/);
+assert.match(exitCostMarkup, /includes the pool&#x27;s/);
 assert.match(exitCostMarkup, /no secondary pool route/);
 assert.match(exitCostMarkup, /primary in-kind redemption queue/);
 assert.doesNotMatch(exitCostMarkup, /early exit is unavailable/);
 
 const noop = () => undefined;
-const goalsMarkup = renderToStaticMarkup(
-  <DayV3Goals
-    deploying
-    drawdownPct={15}
-    exit={resolved}
-    exitSharePct={10}
-    incentiveBudgetPer100={0}
-    minimumProceedsPer100={95}
-    onDrawdownPct={noop}
-    onExitSharePct={noop}
-    onIncentiveBudgetPer100={noop}
-    onMinimumProceedsPer100={noop}
-    onProtectedExitThreshold={noop}
-    onRecoveryDays={noop}
-    onRecoveryMode={noop}
-    onResetExit={noop}
-    onResetProtection={noop}
-    protectedExit={{
-      thresholdPct: null,
-      bonusPct: 0,
-      status: "unresolved",
-      message: "History required.",
-      scenarios: [],
-    }}
-    protectedExitThresholdOverride={null}
-    protection={{
-      coveragePct: 13.5,
-      juniorPer100: 17,
-      juniorApy: 9,
-      status: "recommended",
-      message: "Senior remains whole.",
-    }}
-    recovery={{
-      status: "no-history",
-      suggestedDays: null,
-      recoveredEpisodeCount: 0,
-      observedDays: [],
-      message: "No history.",
-    }}
-    recoveryDays={20}
-    recoveryMode="window"
-  />,
-);
-assert.match(goalsMarkup, /Senior protection/);
-assert.match(
-  goalsMarkup,
-  /Choose the source loss Senior should survive and its recovery window/,
-);
-assert.match(goalsMarkup, /Senior exit/);
-assert.match(
-  goalsMarkup,
-  /Choose how much Senior can sell immediately and the minimum payout/,
-);
-assert.match(goalsMarkup, /aria-expanded="false"/);
-assert.equal(
-  (goalsMarkup.match(/<details[^>]*open=""/g) ?? []).length,
-  1,
-  "the nested Recovery timing disclosure starts open",
-);
-assert.doesNotMatch(goalsMarkup, /Deployment mapping/);
-assert.match(
-  goalsMarkup,
-  /15\.0% drop → 13\.5% minimum coverage · \$17\.0 Junior · 20-day recovery window/,
-);
-assert.match(
-  goalsMarkup,
-  /\$10\.0 immediate exit → \$12\.4 SLP · \$9\.6 proceeds · \$95\.0 floor/,
-);
-assert.match(goalsMarkup, /Section status: Complete/);
-assert.doesNotMatch(
-  goalsMarkup,
-  /Missing: Protected Exit trigger/,
-  "collapsed groups keep the detailed missing-field list out of the summary row",
-);
-assert.match(goalsMarkup, /aria-label="Required"/);
-assert.match(goalsMarkup, /Trigger missing · 0\.0% bonus/);
-assert.match(goalsMarkup, /Section status: Incomplete/);
-assert.match(goalsMarkup, />3A</);
-assert.match(goalsMarkup, /Size the exit pool/);
-assert.match(goalsMarkup, />3B</);
-assert.match(goalsMarkup, /Choose the minimum payout/);
-assert.match(goalsMarkup, /smallest pool that can do it/);
-assert.match(goalsMarkup, /Restock hurdle:/);
-assert.match(goalsMarkup, /50 bps/);
-assert.match(goalsMarkup, /40 bps operations/);
-assert.match(goalsMarkup, /10 bps live fee/);
-assert.match(goalsMarkup, /Net refill margin after the promised sale: 54 bps/);
-assert.match(goalsMarkup, /Out of every \$100 Senior/);
-assert.match(goalsMarkup, /least a seller should receive for \$100 Senior/);
-assert.match(goalsMarkup, />\$10\.0</);
-assert.match(goalsMarkup, />\$12\.4</);
-
-const exitStatusProps = {
-  deploying: true,
-  drawdownPct: 10,
-  exitSharePct: 5,
-  incentiveBudgetPer100: 0,
-  minimumProceedsPer100: 99,
+const goalsProps = {
+  conversionCostBps: 50,
+  conversionDays: 1,
+  drawdownPct: 15,
+  entryPointSettlementDays: 7,
+  exitSharePct: 10,
+  inputOrigins: {
+    conversionCost: "model-assumption",
+  },
+  minimumProceedsPer100: 95,
+  onConversionCostBps: noop,
+  onConversionDays: noop,
   onDrawdownPct: noop,
+  onEntryPointSettlementDays: noop,
   onExitSharePct: noop,
-  onIncentiveBudgetPer100: noop,
   onMinimumProceedsPer100: noop,
-  onProtectedExitThreshold: noop,
   onRecoveryDays: noop,
   onRecoveryMode: noop,
   onResetExit: noop,
   onResetProtection: noop,
   onRetryPoolDesign: noop,
-  protectedExit: {
-    thresholdPct: null,
-    bonusPct: 0,
-    status: "unresolved",
-    message: "History required.",
-    scenarios: [],
-  },
-  protectedExitThresholdOverride: null,
   protection: {
-    coveragePct: 9,
-    juniorPer100: 12,
-    juniorApy: 8,
+    coveragePct: 13.5,
+    juniorPer100: 17,
+    juniorApy: 9,
     status: "recommended",
     message: "Senior remains whole.",
   },
-  recovery: {
-    status: "no-history",
-    suggestedDays: null,
-    recoveredEpisodeCount: 0,
-    observedDays: [],
-    message: "No history.",
-  },
-  recoveryDays: 0,
-  recoveryMode: "none",
+  recoveryDays: 7,
+  recoveryMode: "window",
 } satisfies Omit<ComponentProps<typeof DayV3Goals>, "exit">;
+
+const goalsMarkup = renderToStaticMarkup(
+  <DayV3Goals {...goalsProps} exit={resolved} />,
+);
+assert.match(goalsMarkup, /Senior protection/);
+assert.match(
+  goalsMarkup,
+  /Choose whether Senior needs protection and the loss it should survive/,
+);
+assert.match(goalsMarkup, /Senior exit/);
+assert.match(
+  goalsMarkup,
+  /Choose whether Senior needs an immediate exit and how it should perform/,
+);
+assert.match(goalsMarkup, /aria-expanded="false"/);
+assert.equal(
+  (goalsMarkup.match(/data-collapsible="true"/g) ?? []).length,
+  2,
+  "the unified goal editor exposes only the protection and exit groups",
+);
+assert.doesNotMatch(goalsMarkup, /Deployment mapping/);
+assert.match(
+  goalsMarkup,
+  /15\.0% drop → 13\.5% minimum coverage · \$17\.0 Junior · 7-day observation period/,
+);
+assert.match(
+  goalsMarkup,
+  /\$10\.0 immediate exit → \$12\.4 SLP · \$9\.6 proceeds · \$95\.0 floor/,
+);
+assert.equal(
+  (goalsMarkup.match(/Section status: Confirmed/g) ?? []).length,
+  2,
+  "both goal groups are complete when every modeled input is present",
+);
+assert.match(goalsMarkup, /aria-label="Required"/);
+assert.match(goalsMarkup, /Should Senior have first-loss protection/);
+assert.match(goalsMarkup, /How should temporary losses be observed/);
+assert.match(goalsMarkup, /aria-label="Observation mode"/);
+assert.match(goalsMarkup, /Allow recovery/);
+assert.match(goalsMarkup, /How long should a temporary loss have to recover/);
+assert.match(goalsMarkup, /Observation Period Duration/);
+assert.match(goalsMarkup, /Should Senior have an immediate pool exit/);
+assert.match(goalsMarkup, /What would it take to refill the pool/);
+assert.match(goalsMarkup, /Days until Senior redeems for the underlying asset/);
+assert.match(goalsMarkup, /Additional days to convert the underlying asset/);
+assert.match(goalsMarkup, /Stressed conversion cost per \$100/);
+assert.match(goalsMarkup, /Model assumption/);
+assert.doesNotMatch(goalsMarkup, /solver/i);
+assert.doesNotMatch(goalsMarkup, /Recovery timing/);
+assert.doesNotMatch(goalsMarkup, /Protected Exit/);
+assert.doesNotMatch(goalsMarkup, /Restock hurdle/);
+assert.doesNotMatch(goalsMarkup, /day-v3-deployment-setup-inputs/);
+assert.doesNotMatch(goalsMarkup, /day-v3-premium-inputs/);
+assert.doesNotMatch(goalsMarkup, /day-v3-protected-exit-inputs/);
+assert.match(goalsMarkup, /Out of every \$100 Senior, how much should be sellable/);
+assert.match(goalsMarkup, /least a seller should receive for \$100 Senior/);
+assert.match(goalsMarkup, /SLP required/);
+assert.match(goalsMarkup, /Minimum Liquidity/);
+assert.match(goalsMarkup, /Lowest payout/);
+assert.match(goalsMarkup, /Expected proceeds/);
+assert.match(goalsMarkup, />\$12\.4</);
+assert.match(goalsMarkup, />10\.90%</);
+assert.match(goalsMarkup, />\$96\.2</);
+assert.match(goalsMarkup, />\$9\.6</);
+assert.doesNotMatch(goalsMarkup, /Maximum discount/);
+
+const protectionStart = goalsMarkup.indexOf('id="day-v3-protection-inputs"');
+const observationMode = goalsMarkup.indexOf('aria-label="Observation mode"');
+const exitStart = goalsMarkup.indexOf('id="day-v3-exit-inputs"');
+assert.ok(
+  protectionStart >= 0 &&
+    observationMode > protectionStart &&
+    exitStart > observationMode,
+  "observation-mode configuration remains inside Senior protection",
+);
+
+const missingObservationMarkup = renderToStaticMarkup(
+  <DayV3Goals {...goalsProps} exit={resolved} recoveryDays={null} />,
+);
+assert.match(missingObservationMarkup, /Section status: Missing/);
+assert.match(
+  missingObservationMarkup,
+  /data-section-status="incomplete">Missing/,
+);
+
+for (const missingRefillAssumption of [
+  { conversionCostBps: null },
+  { conversionDays: null },
+  { entryPointSettlementDays: null },
+] as const) {
+  const missingMarkup = renderToStaticMarkup(
+    <DayV3Goals
+      {...goalsProps}
+      {...missingRefillAssumption}
+      exit={resolved}
+    />,
+  );
+  assert.match(missingMarkup, /Section status: Missing/);
+  assert.match(missingMarkup, /data-section-status="incomplete">Missing/);
+}
 
 const checkingMarkup = renderToStaticMarkup(
   <DayV3Goals
-    {...exitStatusProps}
+    {...goalsProps}
     exit={{
       ...resolved,
       status: "resolving",
@@ -333,7 +329,7 @@ assert.match(checkingMarkup, /data-section-status="checking">Checking/);
 
 const infeasibleMarkup = renderToStaticMarkup(
   <DayV3Goals
-    {...exitStatusProps}
+    {...goalsProps}
     exit={{
       ...resolved,
       status: "infeasible",
@@ -350,12 +346,12 @@ const infeasibleMarkup = renderToStaticMarkup(
 assert.match(infeasibleMarkup, /Section status: Needs changes/);
 assert.match(infeasibleMarkup, /data-section-status="blocked">Needs changes/);
 assert.match(infeasibleMarkup, /no feasible pool/);
-assert.match(infeasibleMarkup, /completed solver result/);
+assert.match(infeasibleMarkup, /do not produce a viable immediate exit/);
 assert.doesNotMatch(infeasibleMarkup, /Try \$/);
 
 const unavailableMarkup = renderToStaticMarkup(
   <DayV3Goals
-    {...exitStatusProps}
+    {...goalsProps}
     exit={{
       ...resolved,
       status: "unresolved",
@@ -363,9 +359,9 @@ const unavailableMarkup = renderToStaticMarkup(
     }}
   />,
 );
-assert.match(unavailableMarkup, /Section status: Answered/);
-assert.match(unavailableMarkup, /data-section-status="review">Answered/);
-assert.match(unavailableMarkup, /live validation unavailable/);
-assert.match(unavailableMarkup, /Retry live validation/);
+assert.match(unavailableMarkup, /Section status: Review/);
+assert.match(unavailableMarkup, /data-section-status="review">Review/);
+assert.match(unavailableMarkup, /validation unavailable/);
+assert.match(unavailableMarkup, /Retry validation/);
 
 console.log("Day V3 exit-model presentation: PASS");
