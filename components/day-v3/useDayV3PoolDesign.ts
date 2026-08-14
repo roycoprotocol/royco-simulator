@@ -162,7 +162,7 @@ export function useDayV3PoolDesign(
             message: dayV3PoolDesignIssueMessage(
               body.issues,
               response.ok
-                ? "The exit promise could not be resolved."
+                ? "The exit terms could not be resolved."
                 : "The live template policy could not be refreshed.",
             ),
           },
@@ -191,7 +191,7 @@ export function useDayV3PoolDesign(
           status: "missing-goal",
           result: null,
           message:
-            "Complete the source yield, operating facts, exit promise, and deployment target.",
+            "Complete the source yield, operating facts, exit terms, and deployment target.",
         }
       : resolvedDesign?.key === goalsKey
         ? resolvedDesign.state

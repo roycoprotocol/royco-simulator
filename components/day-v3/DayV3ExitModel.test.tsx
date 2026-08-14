@@ -129,11 +129,17 @@ assert.match(
   disabledMarkup,
   /data-model-source="issuer-goal-no-immediate-exit"/,
 );
-assert.match(disabledMarkup, /no SLP or pool execution promise/);
-assert.match(disabledMarkup, /Sell-now promise/);
+assert.match(disabledMarkup, /no SLP or pool execution/);
+assert.match(disabledMarkup, /Immediate exit/);
 assert.match(disabledMarkup, />\$0\.00</);
 assert.match(disabledMarkup, />0\.00%?</);
 assert.doesNotMatch(disabledMarkup, /Swap fee:/);
+assert.doesNotMatch(
+  [resolvedMarkup, illustrativeMarkup, unresolvedMarkup, disabledMarkup].join(
+    "\n",
+  ),
+  /\bpromis(?:e|ed|es|ing)\b/i,
+);
 
 const emptyQuote = {
   requestedNAV: 0,
@@ -181,6 +187,54 @@ assert.match(exitCostMarkup, /no secondary pool route/);
 assert.match(exitCostMarkup, /primary in-kind redemption queue/);
 assert.doesNotMatch(exitCostMarkup, /early exit is unavailable/);
 
+const fundedQuote = {
+  requestedNAV: 10,
+  filledNAV: 10,
+  effectiveInputNAV: 9.99,
+  swapFeeNAV: 0.01,
+  stableOutNAV: 9.94,
+  unfilledNAV: 0,
+  executionPrice: 0.994,
+  slippage: 0.006,
+  poolPctSTAfter: 1,
+};
+const fundedExitCostMarkup = renderToStaticMarkup(
+  <DayV3ExitCost
+    assumptions={{
+      bandPct: 1,
+      concentration: 100,
+      stableYield: 0,
+      swapFeeBps: 10,
+      turnoverPerYear: 0,
+    }}
+    metrics={{
+      arbitrageReference: 0.01,
+      referenceSellNAV: 10,
+      referenceSellShareOfSenior: 0.1,
+      referenceQuote: fundedQuote,
+      boundarySellNAV: 10,
+      boundarySellShareOfSenior: 0.1,
+      boundaryQuote: fundedQuote,
+      curve: [
+        {
+          sellNAV: 10,
+          effectiveInputNAV: 9.99,
+          swapFeeNAV: 0.01,
+          executionPrice: 0.994,
+          slippage: 0.006,
+        },
+      ],
+    }}
+    unit="USD"
+  />,
+);
+assert.match(fundedExitCostMarkup, />\$0\.06</);
+assert.match(
+  fundedExitCostMarkup,
+  /\$0\.01 fee \+ \$0\.05 price impact/,
+  "small swap costs stay visible instead of rounding to $0",
+);
+
 const noop = () => undefined;
 const goalsProps = {
   drawdownPct: 15,
@@ -199,8 +253,8 @@ const goalsProps = {
   onResetExit: noop,
   onResetProtection: noop,
   protection: {
-    coveragePct: 13.5,
-    juniorPer100: 17,
+    coveragePct: 15,
+    juniorPer100: 20,
     juniorApy: 9,
     status: "recommended",
     message: "Senior remains whole.",
@@ -214,9 +268,9 @@ const goalsProps = {
     basis: "illustrative",
     check: {
       status: "profitable",
-      promisedDiscountBps: 49.8,
+      selectedDiscountBps: 49.8,
       worstCaseDiscountBps: 60.1,
-      promisedMarginBps: 28.3,
+      selectedMarginBps: 28.3,
       worstCaseMarginBps: 38.6,
       breakEvenSalePer100: 4.3,
       capacityPer100: 10.06,
@@ -228,7 +282,7 @@ const goalsProps = {
       swapFeeBps: 10,
       hurdleBps: 21.51,
     },
-    promisedSalePer100: 10,
+    selectedSalePer100: 10,
     seniorApyPct: 6,
   },
 } satisfies Omit<ComponentProps<typeof DayV3Goals>, "exit">;
@@ -255,8 +309,9 @@ assert.equal(
 assert.doesNotMatch(goalsMarkup, /Deployment mapping/);
 assert.match(
   goalsMarkup,
-  /15\.0% drop → 13\.5% minimum coverage · \$17\.0 Junior · 7-day observation period/,
+  /Goal: 15\.0% source drawdown · Contract: 15\.0% Minimum Coverage · \$20\.0 Junior at 90% target · 7-day observation period/,
 );
+assert.doesNotMatch(goalsMarkup, /drop → .*coverage/i);
 assert.match(
   goalsMarkup,
   /\$10\.0 immediate exit → \$12\.4 SLP · \$9\.6 proceeds · \$95\.0 floor/,
@@ -299,6 +354,7 @@ assert.match(goalsMarkup, />10\.90%</);
 assert.match(goalsMarkup, />\$96\.2</);
 assert.match(goalsMarkup, />\$9\.6</);
 assert.doesNotMatch(goalsMarkup, /Maximum discount/);
+assert.doesNotMatch(goalsMarkup, /See .*impact/i);
 
 const protectionStart = goalsMarkup.indexOf('id="day-v3-protection-inputs"');
 const observationMode = goalsMarkup.indexOf('aria-label="Observation mode"');
@@ -341,7 +397,7 @@ const infeasibleMarkup = renderToStaticMarkup(
       ...resolved,
       status: "infeasible",
       message:
-        "No deployable pool can meet this exit promise. Reduce the immediate exit amount, accept a lower payout, or shorten settlement and conversion time.",
+        "No deployable pool can meet these exit terms. Reduce the immediate exit amount, accept a lower payout, or shorten settlement and conversion time.",
       sellablePer100: null,
       proceeds: null,
       lowestPayoutPer100: null,
@@ -352,6 +408,7 @@ const infeasibleMarkup = renderToStaticMarkup(
 );
 assert.match(infeasibleMarkup, /Section status: Needs changes/);
 assert.match(infeasibleMarkup, /data-section-status="blocked">Needs changes/);
+assert.doesNotMatch(infeasibleMarkup, /\bpromis(?:e|ed|es|ing)\b/i);
 assert.match(infeasibleMarkup, /no feasible pool/);
 assert.match(infeasibleMarkup, /do not produce a viable immediate exit/);
 assert.doesNotMatch(infeasibleMarkup, /Try \$/);
@@ -368,9 +425,9 @@ const unavailableMarkup = renderToStaticMarkup(
 );
 assert.match(unavailableMarkup, /Section status: Set/);
 assert.match(unavailableMarkup, /data-section-status="complete">Set/);
-assert.match(unavailableMarkup, /exact sizing unavailable/);
-assert.match(unavailableMarkup, /Scenario APYs continue/);
-assert.match(unavailableMarkup, /Finalize in Royco Deploy/);
+assert.doesNotMatch(unavailableMarkup, /Exact E-CLP sizing/);
+assert.doesNotMatch(unavailableMarkup, /Scenario APYs continue/);
+assert.doesNotMatch(unavailableMarkup, /Finalize in Royco Deploy/);
 assert.doesNotMatch(unavailableMarkup, /Retry validation/);
 
 console.log("Day V3 exit-model presentation: PASS");

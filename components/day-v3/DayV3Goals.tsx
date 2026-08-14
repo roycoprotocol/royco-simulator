@@ -1,8 +1,6 @@
 "use client";
 
-import DayV3Button, {
-  dayV3ButtonVariants,
-} from "@/components/day-v3/DayV3Button";
+import DayV3Button from "@/components/day-v3/DayV3Button";
 import DayV3Group from "@/components/day-v3/DayV3Group";
 import DayV3NumberField from "@/components/day-v3/DayV3NumberField";
 import DayV3Origin, {
@@ -52,7 +50,7 @@ export type DayV3ExitView = {
   restockOperationalHurdleBps: MaybeNumber;
   /** All-in hurdle used by the canonical pool-design calculation. */
   restockHurdleBps: MaybeNumber;
-  /** Net refill margin at the state reached by the promised sale. */
+  /** Net refill margin at the state reached by the selected sale. */
   restockMarginBps: MaybeNumber;
   minimumLiquidityPct: MaybeNumber;
   maximumDiscountPct: MaybeNumber;
@@ -261,14 +259,14 @@ export default function DayV3Goals({
             ? "Protection off · no Junior"
             : drawdownPct === null
               ? "Choose a protected drawdown"
-              : `${fixed(drawdownPct)}% drop → ${
+              : `Goal: ${fixed(drawdownPct)}% source drawdown · Contract: ${
                   protection.coveragePct === null
                     ? "coverage pending"
-                    : `${fixed(protection.coveragePct)}% minimum coverage`
+                    : `${fixed(protection.coveragePct)}% Minimum Coverage`
                 }${
                   protection.juniorPer100 === null
                     ? ""
-                    : ` · ${dollars(protection.juniorPer100)} Junior`
+                    : ` · ${dollars(protection.juniorPer100)} Junior at 90% target`
                 } · ${
                   recoveryMode === "none"
                     ? "losses realize immediately"
@@ -314,10 +312,10 @@ export default function DayV3Goals({
         {!protectionDisabled ? (
           <div className="grid grid-cols-1 items-start gap-3 lg:grid-cols-2">
             <DayV3NumberField
-              label="What one-time drop should Senior survive without losing principal?"
+              label="What source drawdown should Senior survive without losing principal?"
               max={95}
               min={0.01}
-              note="This sets the Minimum Coverage and Junior capital required to keep Senior whole through the selected drop."
+              note="This is the protection goal. We test it at the 100%-utilized boundary, then size opening Junior capital at the 90% target."
               onChange={onDrawdownPct}
               origin={inputOrigin(inputOrigins.drawdown)}
               placeholder="Choose a drawdown"
@@ -395,14 +393,14 @@ export default function DayV3Goals({
             </div>
             <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
               <ResultTile
-                label="Minimum Coverage"
-                note="deployment requirement"
+                label="On-chain Minimum Coverage"
+                note="contract ratio · tested at 100% utilization"
                 origin="recommended"
                 value={`${fixed(protection.coveragePct ?? 0)}%`}
               />
               <ResultTile
-                label="Junior required"
-                note="per $100 Senior"
+                label="Junior to open"
+                note="per $100 Senior at the 90% operating target"
                 value={dollars(protection.juniorPer100 ?? 0)}
               />
             </div>
@@ -465,9 +463,7 @@ export default function DayV3Goals({
                   ? ` · missing ${dayV3MissingPreview(exitInputReadiness.missing)}`
                   : exit.status === "infeasible"
                     ? " · no feasible pool"
-                    : exit.status === "unresolved"
-                      ? " · exact sizing unavailable"
-                      : ""
+                    : ""
               }`
         }
         title="Senior exit"
@@ -479,8 +475,8 @@ export default function DayV3Goals({
                 Should Senior have an immediate pool exit?
               </h4>
               <p className="mt-1 text-[10.5px] leading-relaxed text-[var(--tertiary)]">
-                Turning this off removes the SLP and its one-trade exit
-                promise, and greys out every SLP model below.
+                Turning this off removes the SLP and immediate pool exit,
+                and greys out every SLP model below.
               </p>
             </div>
             <DayV3Origin origin={inputOrigin(inputOrigins.exitAmount)} />
@@ -631,27 +627,6 @@ export default function DayV3Goals({
             These inputs do not produce a viable immediate exit. Reduce the
             exit size, lower the payout floor, or turn off the immediate exit.
           </p>
-        ) : exit.status === "unresolved" ? (
-          <div
-            aria-live="polite"
-            className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-dashed border-[var(--border-subtle)] px-3 py-2.5"
-          >
-            <span className="text-[10.5px] leading-relaxed text-[var(--secondary)]">
-              Exact E-CLP sizing is unavailable here. Scenario APYs continue
-              using the disclosed illustrative SLP basis.
-            </span>
-            <a
-              className={dayV3ButtonVariants({
-                size: "sm",
-                variant: "secondary",
-              })}
-              href="https://www.royco.org/deploy-market"
-              rel="noreferrer"
-              target="_blank"
-            >
-              Finalize in Royco Deploy
-            </a>
-          </div>
         ) : null}
       </DayV3Group>
     </>

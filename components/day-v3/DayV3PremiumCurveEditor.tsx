@@ -282,10 +282,11 @@ function DayV3PremiumCurveEditor({
           <strong className="font-mono font-semibold tabular-nums">
             ${slpCapitalPer100.toFixed(1)}
           </strong>{" "}
-          of SLP for every $100 of Senior, which is a{" "}
+          of SLP for every $100 of Senior at the {pct(targetUtilization)}{" "}
+          operating target, which is a{" "}
           {slpMinimumLiquidityPct.toFixed(1)}% minimum liquidity requirement. A
           larger pool spreads the same premium across more capital, so the SLP
-          rate falls. Royco Deploy sets the real size.
+          rate falls.
         </p>
       ) : null}
 

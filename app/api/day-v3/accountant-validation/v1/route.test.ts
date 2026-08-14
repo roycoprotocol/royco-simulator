@@ -27,13 +27,13 @@ const valid = {
   },
   canonicalPool: { poolFundingPer100Senior: 11.12 },
   handoffTerms: {
-    minimumCoveragePct: 4.5,
+    minimumCoveragePct: 5,
     minimumLiquidityPct: 10.01,
     protectedExitThresholdPct: 1,
     protectedExitBonusPct: 0,
   },
   proposedTerms: {
-    minimumCoveragePct: 4.5,
+    minimumCoveragePct: 5,
     minimumLiquidityPct: 10.01,
     protectedExitThresholdPct: 1,
     protectedExitBonusPct: 0,

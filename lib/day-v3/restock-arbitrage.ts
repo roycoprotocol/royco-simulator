@@ -103,28 +103,28 @@ export interface DayV3RestockCheckInputs {
   openingSeniorNAV: number;
   /** The largest Senior NAV the pool can absorb in one trade. */
   capacityNAV: number;
-  /** The issuer's promised immediate exit, per $100 Senior. */
-  promisedSalePer100: number | null;
+  /** The issuer's selected immediate exit, per $100 Senior. */
+  selectedSalePer100: number | null;
   hurdle: DayV3RestockHurdle;
 }
 
 export interface DayV3RestockCheck {
   /**
-   * `no-promised-sale` is distinct from `unprofitable`: with no exit amount
+   * `no-selected-sale` is distinct from `unprofitable`: with no exit amount
    * chosen there is no trade to price yet, and reporting that as a failed
    * refill would be an answer to a question nobody asked.
    */
   status:
     | "unavailable"
-    | "no-promised-sale"
+    | "no-selected-sale"
     | "profitable"
     | "unprofitable";
-  /** Discount reached by the promised sale. */
-  promisedDiscountBps: number | null;
+  /** Discount reached by the selected sale. */
+  selectedDiscountBps: number | null;
   /** Discount at the point the pool can absorb no more — the deepest it goes. */
   worstCaseDiscountBps: number | null;
-  /** Promised discount less the hurdle. Positive means the refill trade pays. */
-  promisedMarginBps: number | null;
+  /** Selected-sale discount less the hurdle. Positive means the refill pays. */
+  selectedMarginBps: number | null;
   /** Worst-case discount less the hurdle. */
   worstCaseMarginBps: number | null;
   /**
@@ -140,7 +140,7 @@ const per100 = (nav: number, openingSeniorNAV: number) =>
   openingSeniorNAV > 0 ? (nav / openingSeniorNAV) * 100 : null;
 
 /**
- * Answer the two questions an issuer actually has: does the exit they promised
+ * Answer the two questions an issuer actually has: does the exit they selected
  * leave enough discount to attract a refill, and if not, how deep does the pool
  * have to be drawn before one arrives.
  *
@@ -151,13 +151,13 @@ const per100 = (nav: number, openingSeniorNAV: number) =>
 export function dayV3RestockCheck(
   inputs: DayV3RestockCheckInputs,
 ): DayV3RestockCheck {
-  const { capacityNAV, hurdle, openingSeniorNAV, promisedSalePer100, quoteSell } =
+  const { capacityNAV, hurdle, openingSeniorNAV, selectedSalePer100, quoteSell } =
     inputs;
   const unavailable: DayV3RestockCheck = {
     status: "unavailable",
-    promisedDiscountBps: null,
+    selectedDiscountBps: null,
     worstCaseDiscountBps: null,
-    promisedMarginBps: null,
+    selectedMarginBps: null,
     worstCaseMarginBps: null,
     breakEvenSalePer100: null,
     capacityPer100: null,
@@ -174,12 +174,12 @@ export function dayV3RestockCheck(
   const worstCaseDiscountBps = discountAt(capacityNAV);
   if (worstCaseDiscountBps === null) return unavailable;
 
-  const promisedNAV =
-    promisedSalePer100 === null
+  const selectedNAV =
+    selectedSalePer100 === null
       ? null
-      : Math.min((promisedSalePer100 / 100) * openingSeniorNAV, capacityNAV);
-  const promisedDiscountBps =
-    promisedNAV === null || promisedNAV <= 0 ? null : discountAt(promisedNAV);
+      : Math.min((selectedSalePer100 / 100) * openingSeniorNAV, capacityNAV);
+  const selectedDiscountBps =
+    selectedNAV === null || selectedNAV <= 0 ? null : discountAt(selectedNAV);
 
   let breakEvenNAV: number | null = null;
   if (worstCaseDiscountBps >= hurdle.hurdleBps) {
@@ -196,17 +196,17 @@ export function dayV3RestockCheck(
 
   return {
     status:
-      promisedDiscountBps === null
-        ? "no-promised-sale"
-        : promisedDiscountBps >= hurdle.hurdleBps
+      selectedDiscountBps === null
+        ? "no-selected-sale"
+        : selectedDiscountBps >= hurdle.hurdleBps
           ? "profitable"
           : "unprofitable",
-    promisedDiscountBps,
+    selectedDiscountBps,
     worstCaseDiscountBps,
-    promisedMarginBps:
-      promisedDiscountBps === null
+    selectedMarginBps:
+      selectedDiscountBps === null
         ? null
-        : promisedDiscountBps - hurdle.hurdleBps,
+        : selectedDiscountBps - hurdle.hurdleBps,
     worstCaseMarginBps: worstCaseDiscountBps - hurdle.hurdleBps,
     breakEvenSalePer100:
       breakEvenNAV === null ? null : per100(breakEvenNAV, openingSeniorNAV),

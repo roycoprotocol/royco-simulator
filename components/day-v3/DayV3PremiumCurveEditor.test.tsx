@@ -30,7 +30,7 @@ assert.match(markup, /Yield split/);
 assert.match(markup, /aria-expanded="false"/);
 assert.match(markup, /Jr 13\.0% · SLP 5\.0% at 90\.0% utilization/);
 assert.match(markup, /Section status: Set/);
-assert.doesNotMatch(markup, /See return impact/);
+assert.doesNotMatch(markup, /See .*impact/i);
 assert.match(markup, /Junior yield share/);
 assert.match(markup, /SLP yield share/);
 assert.match(markup, /Jr share at 90% utilization/);
@@ -39,6 +39,7 @@ assert.match(markup, /Projected Jr APY/);
 assert.match(markup, /Projected SLP APY/);
 assert.match(markup, /Why the SLP rate is what it is:/);
 assert.match(markup, /10\.0% minimum liquidity requirement/);
+assert.doesNotMatch(markup, /Exact E-CLP sizing/);
 assert.match(markup, /\$11\.1/);
 assert.match(markup, /for every \$100 of Senior/);
 assert.match(

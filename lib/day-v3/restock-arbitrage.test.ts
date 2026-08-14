@@ -113,7 +113,7 @@ const short = dayV3RestockCheck({
   quoteSell,
   openingSeniorNAV,
   capacityNAV,
-  promisedSalePer100: 10,
+  selectedSalePer100: 10,
   hurdle: dayV3RestockHurdle({
     costOfCapitalPct: 12,
     redemptionDays: 7,
@@ -123,13 +123,13 @@ const short = dayV3RestockCheck({
 });
 assert.equal(short.status, "profitable");
 assert.ok(
-  (short.promisedDiscountBps ?? 0) > 40,
+  (short.selectedDiscountBps ?? 0) > 40,
   "a $10 sale into the illustrative pool moves the curve tens of bps",
 );
-assert.ok((short.promisedMarginBps ?? 0) > 0);
+assert.ok((short.selectedMarginBps ?? 0) > 0);
 assert.ok(
   (short.breakEvenSalePer100 ?? Infinity) < 10,
-  "a one-week wait is covered before the promised sale is complete",
+  "a one-week wait is covered before the selected sale is complete",
 );
 
 // A long redemption queue is what actually breaks the refill loop: the same
@@ -138,7 +138,7 @@ const slow = dayV3RestockCheck({
   quoteSell,
   openingSeniorNAV,
   capacityNAV,
-  promisedSalePer100: 10,
+  selectedSalePer100: 10,
   hurdle: dayV3RestockHurdle({
     costOfCapitalPct: 12,
     redemptionDays: 90,
@@ -165,7 +165,7 @@ const crossing = dayV3RestockCheck({
   quoteSell,
   openingSeniorNAV,
   capacityNAV,
-  promisedSalePer100: 10,
+  selectedSalePer100: 10,
   hurdle: dayV3RestockHurdle({
     costOfCapitalPct: 12,
     redemptionDays: 4,
@@ -193,7 +193,7 @@ assert.equal(
     quoteSell,
     openingSeniorNAV,
     capacityNAV: 0,
-    promisedSalePer100: 10,
+    selectedSalePer100: 10,
     hurdle: dayV3RestockHurdle({
       costOfCapitalPct: 12,
       redemptionDays: 7,
@@ -210,7 +210,7 @@ const unpriced = dayV3RestockCheck({
   quoteSell,
   openingSeniorNAV,
   capacityNAV,
-  promisedSalePer100: null,
+  selectedSalePer100: null,
   hurdle: dayV3RestockHurdle({
     costOfCapitalPct: 12,
     redemptionDays: 7,
@@ -218,9 +218,9 @@ const unpriced = dayV3RestockCheck({
     swapFeeBps: 10,
   }),
 });
-assert.equal(unpriced.status, "no-promised-sale");
-assert.equal(unpriced.promisedDiscountBps, null);
-assert.equal(unpriced.promisedMarginBps, null);
+assert.equal(unpriced.status, "no-selected-sale");
+assert.equal(unpriced.selectedDiscountBps, null);
+assert.equal(unpriced.selectedMarginBps, null);
 assert.ok(
   (unpriced.breakEvenSalePer100 ?? 0) > 0,
   "the depth a refill needs is still answerable without a chosen exit",

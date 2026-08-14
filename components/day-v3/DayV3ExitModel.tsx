@@ -119,12 +119,12 @@ export default function DayV3ExitModel({
     >
       <CardHeader>
         <div className="flex items-baseline justify-between gap-2">
-          <CardTitle className="text-[17px]">Exit promise model</CardTitle>
+          <CardTitle className="text-[17px]">Exit model</CardTitle>
           <DayV3DocsLink label="SLP mechanics" topic="slpTranche" />
         </div>
         <CardDescription>
           {disabled
-            ? "Immediate Senior exit is off, so this design has no SLP or pool execution promise."
+            ? "Immediate Senior exit is off, so this design has no SLP or pool execution."
             : illustrative
               ? "Shows how the selected exit size and payout affect one trade, per $100 Senior."
               : "Shows the fee-inclusive result for one Senior sale using the selected market terms, per $100 Senior. Larger sales move farther through the pool and receive a larger discount. Arbitrageurs can later buy discounted Senior, redeem it for the underlying asset, and refill the SLP when that trade covers their time, costs, and fees."}
@@ -152,7 +152,7 @@ export default function DayV3ExitModel({
         {disabled ? (
           <div className="grid grid-cols-1 gap-x-5 gap-y-4 sm:grid-cols-3">
             <Outcome
-              label="Sell-now promise"
+              label="Immediate exit"
               note="no immediate pool exit"
               value="$0.00"
             />
@@ -170,7 +170,7 @@ export default function DayV3ExitModel({
         ) : modeled ? (
           <div className="grid grid-cols-2 gap-x-5 gap-y-4 sm:grid-cols-4">
             <Outcome
-              label={illustrative ? "Modeled capacity" : "Promised sale"}
+              label={illustrative ? "Modeled capacity" : "Selected sale"}
               note={
                 illustrative ? "one-trade pool limit" : "Senior sold at once"
               }
@@ -203,7 +203,7 @@ export default function DayV3ExitModel({
         ) : needsInputs ? (
           <div className="rounded-xl border border-dashed border-[var(--border-subtle)] bg-[var(--foundation)] px-4 py-5 text-center">
             <strong className="text-[13px] font-semibold">
-              Complete the exit promise above
+              Complete the exit terms above
             </strong>
             <p className="mx-auto mt-1 max-w-[58ch] text-[11.5px] leading-relaxed text-[var(--secondary)]">
               Choose the amount Senior can sell and the minimum payout. This
@@ -211,13 +211,13 @@ export default function DayV3ExitModel({
               curve without a row of empty values.
             </p>
           </div>
-        ) : (
+        ) : exit.status === "resolving" || exit.message ? (
           <p className="rounded-lg border border-dashed border-[var(--border-subtle)] px-3.5 py-3 text-[11.5px] leading-relaxed text-[var(--secondary)]">
             {exit.status === "resolving"
               ? "Refreshing the live template and recalculating this model…"
               : exit.message}
           </p>
-        )}
+        ) : null}
 
         {!disabled ? (
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-[var(--border-subtle)] pt-3 text-[10px] text-[var(--tertiary)]">

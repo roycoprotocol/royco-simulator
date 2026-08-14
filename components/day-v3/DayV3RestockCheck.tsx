@@ -11,7 +11,7 @@ export type DayV3RestockView = {
   basis: "live" | "illustrative";
   check: DayV3RestockResult | null;
   hurdle: DayV3RestockHurdle | null;
-  promisedSalePer100: number | null;
+  selectedSalePer100: number | null;
   seniorApyPct: number | null;
 };
 
@@ -76,7 +76,7 @@ export default function DayV3RestockCheck({
   redemptionDays: number | null;
   view: DayV3RestockView;
 }) {
-  const { basis, check, hurdle, promisedSalePer100 } = view;
+  const { basis, check, hurdle, selectedSalePer100 } = view;
   const missingInputs = costOfCapitalPct === null || redemptionDays === null;
   const resolved =
     !missingInputs &&
@@ -85,7 +85,7 @@ export default function DayV3RestockCheck({
     check.status !== "unavailable";
   const pays = resolved && check.status === "profitable";
   const everPays = resolved && check.breakEvenSalePer100 !== null;
-  const unpriced = resolved && check.status === "no-promised-sale";
+  const unpriced = resolved && check.status === "no-selected-sale";
 
   return (
     <section
@@ -184,7 +184,7 @@ export default function DayV3RestockCheck({
               }}
             >
               {pays
-                ? `Refill pays by ${bps(check.promisedMarginBps)} after the promised sale`
+                ? `Refill pays by ${bps(check.selectedMarginBps)} after the selected sale`
                 : !everPays
                   ? "No sale this pool can absorb pays for a refill"
                   : unpriced
@@ -193,12 +193,12 @@ export default function DayV3RestockCheck({
             </strong>
             <p className="mt-1 text-[10.5px] leading-relaxed text-[var(--secondary)]">
               {pays
-                ? `Selling ${dollars(promisedSalePer100)} of every $100 Senior leaves the pool ${bps(check.promisedDiscountBps)} below NAV, against a ${bps(hurdle.hurdleBps)} hurdle. A desk on these terms is paid to buy that Senior and redeem it, which is what puts the pool back and restores capacity for the next seller.`
+                ? `Selling ${dollars(selectedSalePer100)} of every $100 Senior leaves the pool ${bps(check.selectedDiscountBps)} below NAV, against a ${bps(hurdle.hurdleBps)} hurdle. A desk on these terms is paid to buy that Senior and redeem it, which is what puts the pool back and restores capacity for the next seller.`
                 : !everPays
                   ? `Even fully drained the pool is only ${bps(check.worstCaseDiscountBps)} below NAV, against a ${bps(hurdle.hurdleBps)} hurdle. Nothing brings this desk in. Shorten the redemption wait, allow a deeper payout floor, or expect the SLP to carry the position rather than see it arbitraged back.`
                   : unpriced
-                    ? `Choose an exit amount above to see whether the sale you promise reaches that depth on its own.`
-                    : `The promised ${dollars(promisedSalePer100)} sale only moves the pool ${bps(check.promisedDiscountBps)} below NAV, short of the ${bps(hurdle.hurdleBps)} hurdle. The pool has to be drawn deeper before a refill is worth doing, so capacity does not come back on its own after a sale of the size you promised.`}
+                    ? `Choose an exit amount above to see whether the sale you choose reaches that depth on its own.`
+                    : `The selected ${dollars(selectedSalePer100)} sale only moves the pool ${bps(check.selectedDiscountBps)} below NAV, short of the ${bps(hurdle.hurdleBps)} hurdle. The pool has to be drawn deeper before a refill is worth doing, so capacity does not come back on its own after a sale of the size you selected.`}
             </p>
           </div>
 
@@ -208,13 +208,13 @@ export default function DayV3RestockCheck({
                 What the desk is paid
               </h5>
               <Line
-                label="Discount after the promised sale"
+                label="Discount after the selected sale"
                 note={
                   unpriced
                     ? "choose an exit amount above"
-                    : `the pool's own move on ${dollars(promisedSalePer100)} of every $100 Senior`
+                    : `the pool's own move on ${dollars(selectedSalePer100)} of every $100 Senior`
                 }
-                value={bps(check.promisedDiscountBps)}
+                value={bps(check.selectedDiscountBps)}
               />
               <Line
                 label="Discount when fully drained"

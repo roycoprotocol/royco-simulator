@@ -8,8 +8,8 @@ const markup = renderToStaticMarkup(
     current={{
       sourceApyPct: 5.8,
       protectedDrawdownPct: 10,
-      coveragePct: 9,
-      juniorPer100: 11.1,
+      coveragePct: 10,
+      juniorPer100: 12.5,
       immediateExitSharePct: 5,
       minimumProceedsPer100: 99,
       slpPer100: null,
@@ -18,14 +18,14 @@ const markup = renderToStaticMarkup(
       juniorApyPct: null,
       slpApyPct: null,
       basis: "blocked",
-      message: "No feasible pool satisfies this promise.",
+      message: "No feasible pool satisfies these exit terms.",
     }}
   />,
 );
 
 assert.match(markup, /Protection/);
 assert.match(markup, /10\.0% drawdown/);
-assert.match(markup, /9\.0% minimum coverage · \$11\.1 Junior/);
+assert.match(markup, /10\.0% minimum coverage · \$12\.5 Junior/);
 assert.match(markup, /Immediate exit/);
 assert.match(markup, /\$5\.0 at once/);
 assert.match(markup, /Payout floor/);

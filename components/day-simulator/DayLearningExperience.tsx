@@ -318,7 +318,7 @@ export default function DayLearningExperience(props: DayLearningExperienceProps)
                   <div><p style={{ color: "#B8B2A9", fontSize: 10 }}>Annualized result</p><p className="mt-1" style={{ color: C.card, fontFamily: MONO, fontSize: 17, fontWeight: 750 }}>{slp ? formatReturn(slp.apy) : "—"}</p></div>
                   <div><p style={{ color: "#B8B2A9", fontSize: 10 }}>Peak-to-trough</p><p className="mt-1" style={{ color: (slp?.maxDrawdown ?? 0) > 0.0005 ? "#E8A89B" : C.card, fontFamily: MONO, fontSize: 17, fontWeight: 750 }}>{slp ? drawdownLabel(slp.maxDrawdown) : "—"}</p></div>
                 </div>
-                <div className="mt-3 flex flex-wrap items-center justify-between gap-2"><p style={{ color: "#B8B2A9", fontSize: 11.5 }}>Modeled outcome—not a promised or fixed return.</p><p style={{ color: "#D6D2CA", fontSize: 10 }}>{changed ? `${deltaLabel(((slp?.apy ?? 0) * 100) - baseline.slpApyPct)} annualized from start` : "Starting setup"}</p></div>
+                <div className="mt-3 flex flex-wrap items-center justify-between gap-2"><p style={{ color: "#B8B2A9", fontSize: 11.5 }}>Modeled outcome—not a guaranteed or fixed return.</p><p style={{ color: "#D6D2CA", fontSize: 10 }}>{changed ? `${deltaLabel(((slp?.apy ?? 0) * 100) - baseline.slpApyPct)} annualized from start` : "Starting setup"}</p></div>
               </div>
 
               <div className="mt-5">
