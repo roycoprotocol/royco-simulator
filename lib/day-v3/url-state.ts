@@ -16,6 +16,8 @@ export interface DayV3UrlState extends DayV3GoalDraft {
   quoteAssetLabel: string | null;
   /** The issuer's answer for what that asset earns while the SLP holds it. */
   quoteAssetYieldPct: number | null;
+  /** Annual swap volume as a multiple of pool value. Zero means no forecast. */
+  poolTurnoverPerYear: number | null;
   /** An outside desk's annual cost of capital, for the pool-refill check. */
   marketMakerCostOfCapitalPct: number | null;
   /** Days from buying discounted Senior to receiving the underlying at NAV. */
@@ -377,6 +379,7 @@ export function readDayV3UrlState(search: string): DayV3UrlState {
     sourceApyPct: finite(params.get("apy"), 0, 30),
     quoteAssetLabel: label(params.get("quote")),
     quoteAssetYieldPct: finite(params.get("quoteApy"), 0, 30),
+    poolTurnoverPerYear: finite(params.get("turnover"), 0, 100),
     marketMakerCostOfCapitalPct: finite(params.get("mmCost"), 0, 100),
     redemptionDays: integer(params.get("mmDays"), 0, 365),
     protectedDrawdownPct,
@@ -461,6 +464,7 @@ export function buildDayV3Query(state: DayV3UrlWriteState): string {
   if (state.immediateExitSharePct !== 0) {
     if (state.quoteAssetLabel) params.set("quote", state.quoteAssetLabel);
     setNumber("quoteApy", state.quoteAssetYieldPct);
+    setNumber("turnover", state.poolTurnoverPerYear);
     setNumber("mmCost", state.marketMakerCostOfCapitalPct);
     setWholeDays("mmDays", state.redemptionDays);
   }

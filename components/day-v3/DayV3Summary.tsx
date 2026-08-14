@@ -98,6 +98,9 @@ const CUSTOM_SOURCE_ID = "custom";
 /** Royco's own Senior-tranche USDC vault, the quote asset a Day pool opens on. */
 const DAY_V3_DEFAULT_QUOTE_ASSET = "sr-srRoyUSDC";
 const DAY_V3_DEFAULT_QUOTE_ASSET_YIELD_PCT = 4;
+/** No volume forecast until an issuer makes one, which is where V3 has always
+ *  started. The backtest used to disagree and assume the template's own 8x. */
+const DAY_V3_DEFAULT_POOL_TURNOVER = 0;
 const CUSTOM_SOURCE_MARKET = buildDayYieldDraftMarket({
   label: "Custom yield source",
   sourceApy: 0.12,
@@ -189,6 +192,12 @@ export default function DayV3Summary({
   const [quoteAssetYieldPct, setQuoteAssetYieldPct] = useState<number | null>(
     linked?.quoteAssetYieldPct ?? DAY_V3_DEFAULT_QUOTE_ASSET_YIELD_PCT,
   );
+  // Annual swap volume as a multiple of pool value. The forward model pinned
+  // this at zero while the backtest quietly ran the market template's 8x, so
+  // the projection and the history priced the same pool differently.
+  const [poolTurnoverPerYear, setPoolTurnoverPerYear] = useState<number | null>(
+    linked?.poolTurnoverPerYear ?? DAY_V3_DEFAULT_POOL_TURNOVER,
+  );
   // An outside desk's terms. These describe who might arbitrage the pool back
   // to NAV; they price nothing in the market itself and never gate a result.
   const [marketMakerCostOfCapitalPct, setMarketMakerCostOfCapitalPct] =
@@ -214,6 +223,7 @@ export default function DayV3Summary({
   const liqY100Override = activeManualOverrides.slpYieldShareAtFullPct;
   const modeledSourceApyPct = sourceApyPct ?? 0;
   const modeledQuoteAssetYieldPct = quoteAssetYieldPct ?? 0;
+  const modeledPoolTurnover = poolTurnoverPerYear ?? 0;
   const simulationDefaults = useMemo(
     () => ({
       ...defaults,
@@ -223,15 +233,20 @@ export default function DayV3Summary({
       // at zero here, which is right for a plain stablecoin and silently wrong
       // for anything that accrues.
       stableYield: modeledQuoteAssetYieldPct / 100,
-      // V3 still does not ask an issuer to forecast annual pool turnover. The
-      // live template fee prices canonical execution quotes; with no volume
-      // forecast it contributes no speculative fee income to SLP APY.
-      poolTurnoverPerYear: 0,
+      // Annual swap volume is the issuer's forecast too. At zero the live
+      // template fee still prices canonical execution quotes but contributes
+      // no speculative fee income to SLP APY.
+      poolTurnoverPerYear: modeledPoolTurnover,
       // This is the shared template's disclosed simulation assumption. A live
       // RWA response replaces it atomically when the exit design resolves.
       swapFeeBps: defaults.swapFeeBps,
     }),
-    [defaults, modeledQuoteAssetYieldPct, modeledSourceApyPct],
+    [
+      defaults,
+      modeledPoolTurnover,
+      modeledQuoteAssetYieldPct,
+      modeledSourceApyPct,
+    ],
   );
 
   // Switching market adopts that market's own terms, so the sliders describe the
@@ -247,6 +262,7 @@ export default function DayV3Summary({
     // cleared with the rest of the exit rather than carried across markets.
     setQuoteAssetLabel(DAY_V3_DEFAULT_QUOTE_ASSET);
     setQuoteAssetYieldPct(DAY_V3_DEFAULT_QUOTE_ASSET_YIELD_PCT);
+    setPoolTurnoverPerYear(DAY_V3_DEFAULT_POOL_TURNOVER);
     setImportedMarket(null);
     setManualOverrides(EMPTY_DAY_V3_OVERRIDES);
   };
@@ -436,6 +452,7 @@ export default function DayV3Summary({
           liquidityPct,
           sourceApyPct: modeledSourceApyPct,
           quoteAssetYieldPct: modeledQuoteAssetYieldPct,
+          poolTurnoverPerYear: modeledPoolTurnover,
           observationDays,
           bandPct: effectiveBandPct,
           maintainCoverage,
@@ -463,6 +480,7 @@ export default function DayV3Summary({
       liquidityPct,
       modeledImmediateExitSharePct,
       maintainCoverage,
+      modeledPoolTurnover,
       modeledQuoteAssetYieldPct,
       modeledSourceApyPct,
       observationDays,
@@ -578,6 +596,7 @@ export default function DayV3Summary({
       minLiquidity,
       sourceApy: inputs.sourceApyPct / 100,
       stableYield: inputs.quoteAssetYieldPct / 100,
+      poolTurnoverPerYear: inputs.poolTurnoverPerYear,
       observationDays: inputs.observationDays,
       eclpBandWidth: inputs.bandPct / 100,
       maintainCoverage: inputs.maintainCoverage,
@@ -626,6 +645,7 @@ export default function DayV3Summary({
     inputs.liquidityPct,
     inputs.maintainCoverage,
     inputs.observationDays,
+    inputs.poolTurnoverPerYear,
     inputs.quoteAssetYieldPct,
     inputs.sourceApyPct,
     simulationDefaults,
@@ -638,6 +658,7 @@ export default function DayV3Summary({
       minLiquidity: inputs.liquidityPct / 100,
       sourceApy: inputs.sourceApyPct / 100,
       stableYield: inputs.quoteAssetYieldPct / 100,
+      poolTurnoverPerYear: inputs.poolTurnoverPerYear,
       observationDays: inputs.observationDays,
       eclpBandWidth: inputs.bandPct / 100,
       maintainCoverage: inputs.maintainCoverage,
@@ -648,6 +669,7 @@ export default function DayV3Summary({
       inputs.liquidityPct,
       inputs.maintainCoverage,
       inputs.observationDays,
+      inputs.poolTurnoverPerYear,
       inputs.quoteAssetYieldPct,
       inputs.sourceApyPct,
       simulationDefaults,
@@ -830,6 +852,7 @@ export default function DayV3Summary({
     minimumProceedsPer100,
     quoteAssetLabel,
     quoteAssetYieldPct,
+    poolTurnoverPerYear,
     marketMakerCostOfCapitalPct,
     redemptionDays,
     // Legacy links still parse these fields, but the simulator no longer asks
@@ -1438,6 +1461,7 @@ export default function DayV3Summary({
               setMinimumProceedsPer100(value);
             }}
             onQuoteAssetLabel={setQuoteAssetLabel}
+            onPoolTurnoverPerYear={setPoolTurnoverPerYear}
             onQuoteAssetYieldPct={setQuoteAssetYieldPct}
             onRecoveryDays={(value) => {
               markStarterFieldEdited("recovery");
@@ -1462,6 +1486,7 @@ export default function DayV3Summary({
               setRecoveryMode(null);
             }}
             protection={protectionView}
+            poolTurnoverPerYear={poolTurnoverPerYear}
             quoteAssetLabel={quoteAssetLabel}
             quoteAssetYieldPct={quoteAssetYieldPct}
             recoveryDays={recoveryDaysInput}
@@ -1705,17 +1730,6 @@ export default function DayV3Summary({
                       promisedExitSharePct={immediateExitSharePct}
                     />
 
-                    {/* Whether anyone is paid to undo a sale is a result of the
-                        exit design, not another thing to design, so it reads
-                        here beside the pool it is judging. */}
-                    <DayV3RestockCheck
-                      costOfCapitalPct={marketMakerCostOfCapitalPct}
-                      onCostOfCapitalPct={setMarketMakerCostOfCapitalPct}
-                      onRedemptionDays={setRedemptionDays}
-                      redemptionDays={redemptionDays}
-                      view={restockView}
-                    />
-
                     {exitDisabled ? null : model.pool.swapFeeBps !== null ? (
                       <DayV3ExitCost
                         assumptions={{
@@ -1748,9 +1762,38 @@ export default function DayV3Summary({
                   </div>
                 </DayV3ModelGroup>
 
+                {/* Its own section, not a third card inside the exit group.
+                    "What one exit costs" and "does the pool come back" are two
+                    questions, and stacked they ran to 1,639px of scroll before
+                    a reader could reach the returns. */}
+                <DayV3ModelGroup
+                  disabledReason={
+                    exitDisabled
+                      ? "Immediate exit is off. With no pool there is no discount for anyone to arbitrage."
+                      : null
+                  }
+                  id="day-v3-restock-models"
+                  index={4}
+                  preview={
+                    restockView.check === null ||
+                    restockView.check.status === "unavailable"
+                      ? "Describe an arbitrageur's cost of capital and redemption wait to test whether a refill pays."
+                      : `${(restockView.check.worstCaseMarginBps ?? 0) >= 0 ? "Refill pays" : "No refill pays"} at the worst case · ${(restockView.check.worstCaseDiscountBps ?? 0).toFixed(0)} bps discount against a ${(restockView.hurdle?.hurdleBps ?? 0).toFixed(0)} bps hurdle`
+                  }
+                  title="Will arbitrage refill the pool?"
+                >
+                  <DayV3RestockCheck
+                    costOfCapitalPct={marketMakerCostOfCapitalPct}
+                    onCostOfCapitalPct={setMarketMakerCostOfCapitalPct}
+                    onRedemptionDays={setRedemptionDays}
+                    redemptionDays={redemptionDays}
+                    view={restockView}
+                  />
+                </DayV3ModelGroup>
+
             <DayV3ModelGroup
               id="day-v3-return-models"
-              index={4}
+              index={5}
               preview={
                 sourceApyPct === null
                   ? "Enter the source yield above to calculate Senior, Junior, and SLP APYs."
@@ -1859,7 +1902,7 @@ export default function DayV3Summary({
 
             <DayV3ModelGroup
               id="day-v3-history-models"
-              index={5}
+              index={6}
               preview={
                 market.series.length >= 3
                   ? `${market.series.length.toLocaleString()} dated observations · ${market.series[0]?.date} to ${market.series[market.series.length - 1]?.date}`
@@ -1880,6 +1923,7 @@ export default function DayV3Summary({
                 observationDays={inputs.observationDays}
                 onMaintainCoverage={setMaintainCoverage}
                 poolConfigOverrides={backtestConfigOverrides}
+                poolTurnoverPerYear={inputs.poolTurnoverPerYear}
                 quoteAssetYieldPct={inputs.quoteAssetYieldPct}
                 riskSharePct={resolved.riskYieldShare * 100}
                 riskY0Pct={resolved.y0 * 100}

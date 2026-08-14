@@ -67,6 +67,7 @@ function DayV3Backtest({
   onMaintainCoverage,
   poolConfigOverrides,
   observationDays: observationInput,
+  poolTurnoverPerYear: poolTurnoverInput,
   quoteAssetYieldPct: quoteAssetYieldInput,
   riskY0Pct: riskY0Input,
   riskY100Pct: riskY100Input,
@@ -85,19 +86,25 @@ function DayV3Backtest({
   onMaintainCoverage: (value: boolean) => void;
   poolConfigOverrides: Partial<Pick<MarketConfig, "swapFeeBps" | "eclpParams">>;
   observationDays: number;
+  poolTurnoverPerYear: number;
   quoteAssetYieldPct: number;
   riskY0Pct: number;
   riskY100Pct: number;
   riskSharePct: number;
   sourceApyPct: number;
 }) {
-  // The history has to run on the same quote asset as the projection above
-  // it. Reading `market.defaults` straight through left the backtest paying
-  // the market template's own exit-asset yield while the forward model was
-  // using the issuer's answer, so the two disagreed about the same pool.
+  // The history has to run on the same pool as the projection above it.
+  // Reading `market.defaults` straight through left the backtest paying the
+  // market template's own exit-asset yield and its own 8x annual turnover
+  // while the forward model used the issuer's answers, so the two disagreed
+  // about the same pool.
   const defaults = useMemo(
-    () => ({ ...market.defaults, stableYield: quoteAssetYieldInput / 100 }),
-    [market.defaults, quoteAssetYieldInput],
+    () => ({
+      ...market.defaults,
+      poolTurnoverPerYear: poolTurnoverInput,
+      stableYield: quoteAssetYieldInput / 100,
+    }),
+    [market.defaults, poolTurnoverInput, quoteAssetYieldInput],
   );
   const [windowId, setWindowId] = useState("full");
   // Declared on the market, the same two fields the root route reads.

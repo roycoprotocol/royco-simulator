@@ -140,12 +140,14 @@ export default function DayV3Goals({
   onDrawdownPct,
   onExitSharePct,
   onMinimumProceedsPer100,
+  onPoolTurnoverPerYear,
   onQuoteAssetLabel,
   onQuoteAssetYieldPct,
   onRecoveryDays,
   onRecoveryMode,
   onResetExit,
   onResetProtection,
+  poolTurnoverPerYear,
   protection,
   quoteAssetLabel,
   quoteAssetYieldPct,
@@ -166,12 +168,14 @@ export default function DayV3Goals({
   onDrawdownPct: (value: MaybeNumber) => void;
   onExitSharePct: (value: MaybeNumber) => void;
   onMinimumProceedsPer100: (value: MaybeNumber) => void;
+  onPoolTurnoverPerYear: (value: MaybeNumber) => void;
   onQuoteAssetLabel: (value: string) => void;
   onQuoteAssetYieldPct: (value: MaybeNumber) => void;
   onRecoveryDays: (value: MaybeNumber) => void;
   onRecoveryMode: (value: "none" | "window") => void;
   onResetExit: () => void;
   onResetProtection: () => void;
+  poolTurnoverPerYear: MaybeNumber;
   protection: DayV3ProtectionView;
   quoteAssetLabel: string;
   quoteAssetYieldPct: MaybeNumber;
@@ -489,7 +493,7 @@ export default function DayV3Goals({
                 label="Out of every $100 Senior, how much should be sellable right away?"
                 max={100}
                 min={0.01}
-                note="One sale, not a lifetime cap: what the pool absorbs in a single trade from rest, which sets the SLP capital. Arbitrage pushes it back to rest afterwards — model 3 tests whether that pays."
+                note="One sale, not a lifetime cap: what the pool absorbs in a single trade from rest, which sets the SLP capital. Arbitrage pushes it back to rest afterwards — model 4 tests whether that pays."
                 onChange={onExitSharePct}
                 origin={inputOrigin(inputOrigins.exitAmount)}
                 placeholder="Choose an amount"
@@ -526,7 +530,9 @@ export default function DayV3Goals({
             <DayV3QuoteAsset
               label={quoteAssetLabel}
               onLabel={onQuoteAssetLabel}
+              onTurnoverPerYear={onPoolTurnoverPerYear}
               onYieldPct={onQuoteAssetYieldPct}
+              turnoverPerYear={poolTurnoverPerYear}
               yieldOrigin={inputOrigin(inputOrigins.quoteAsset)}
               yieldPct={quoteAssetYieldPct}
             />

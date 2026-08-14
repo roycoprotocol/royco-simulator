@@ -39,13 +39,17 @@ const QUOTE_ASSET_SUGGESTIONS = [
 export default function DayV3QuoteAsset({
   label,
   onLabel,
+  onTurnoverPerYear,
   onYieldPct,
+  turnoverPerYear,
   yieldOrigin = "your-answer",
   yieldPct,
 }: {
   label: string;
   onLabel: (value: string) => void;
+  onTurnoverPerYear: (value: number | null) => void;
   onYieldPct: (value: number | null) => void;
+  turnoverPerYear: number | null;
   yieldOrigin?: DayV3VisibleOrigin;
   yieldPct: number | null;
 }) {
@@ -131,6 +135,24 @@ export default function DayV3QuoteAsset({
         step={0.1}
         suffix="% a year"
         value={yieldPct}
+      />
+
+      <DayV3NumberField
+        label="How much does the pool trade in a year?"
+        max={100}
+        min={0}
+        note="Annual swap volume as a multiple of pool value. 0 makes no volume forecast, which is the honest default; anything above it pays the SLP fee income the pool has not been shown to earn."
+        onChange={onTurnoverPerYear}
+        origin={yieldOrigin}
+        placeholder="Enter a multiple"
+        presets={[
+          { label: "0x", value: 0 },
+          { label: "2x", value: 2 },
+          { label: "8x", value: 8 },
+        ]}
+        step={0.5}
+        suffix="x pool value"
+        value={turnoverPerYear}
       />
     </>
   );

@@ -28,6 +28,7 @@ const legacyState: DayV3UrlState = {
   sourceApyPct: 6,
   quoteAssetLabel: "USDC",
   quoteAssetYieldPct: 0,
+  poolTurnoverPerYear: 8,
   marketMakerCostOfCapitalPct: 12,
   redemptionDays: 7,
   protectedDrawdownPct: 15,
@@ -126,6 +127,7 @@ const expectedCanonicalKeys = [
   "recover",
   "settle",
   "slp90",
+  "turnover",
 ];
 const canonicalQuery = buildDayV3Query(legacyState);
 const canonicalParams = new URLSearchParams(canonicalQuery);

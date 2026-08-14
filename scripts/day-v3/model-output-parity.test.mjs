@@ -171,8 +171,13 @@ assert.match(
 // local scenario check. Assert that boundary, not the absence of the words.
 assert.match(
   summary,
-  /data-model-column="exit"[\s\S]*<DayV3ExitModel[\s\S]*<DayV3RestockCheck[\s\S]*view=\{restockView\}/,
-  "The refill verdict is a result of the exit design and reads beside it",
+  /id="day-v3-restock-models"[\s\S]*<DayV3RestockCheck[\s\S]*view=\{restockView\}/,
+  "The refill verdict is its own result section, after the exit it judges",
+);
+assert.ok(
+  summary.indexOf('id="day-v3-restock-models"') >
+    summary.indexOf('id="day-v3-exit-models"'),
+  "The refill question follows the exit design it is asked about",
 );
 assert.doesNotMatch(
   goals,
@@ -252,6 +257,7 @@ for (const id of [
   "day-v3-capital-models",
   "day-v3-risk-models",
   "day-v3-exit-models",
+  "day-v3-restock-models",
   "day-v3-return-models",
   "day-v3-history-models",
 ]) {
@@ -356,8 +362,18 @@ assert.match(
 );
 assert.match(
   backtest,
-  /\.\.\.market\.defaults, stableYield: quoteAssetYieldInput \/ 100/,
-  "The backtest must not fall back to the market template's own exit-asset yield",
+  /\.\.\.market\.defaults,\s*poolTurnoverPerYear: poolTurnoverInput,\s*stableYield: quoteAssetYieldInput \/ 100,/,
+  "The backtest must not fall back to the template's own quote asset or volume",
+);
+assert.match(
+  summary,
+  /poolTurnoverPerYear=\{inputs\.poolTurnoverPerYear\}/,
+  "The history must run the same annual volume forecast as the projection",
+);
+assert.match(
+  summary,
+  /poolTurnoverPerYear: modeledPoolTurnover/,
+  "Annual volume is the issuer's forecast, not a pinned zero",
 );
 
 // A tranche the issuer switched off has no model to show, so its result

@@ -82,6 +82,7 @@ const urlState: DayV3UrlState = {
   sourceApyPct: 8.25,
   quoteAssetLabel: "sUSDS",
   quoteAssetYieldPct: 4.5,
+  poolTurnoverPerYear: 8,
   marketMakerCostOfCapitalPct: 12,
   redemptionDays: 7,
   protectedDrawdownPct: 12.5,
