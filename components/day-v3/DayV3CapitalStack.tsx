@@ -60,6 +60,16 @@ function DayV3CapitalStack({
   const total = st + jt + lt;
   const share = (value: number) => (total > 0 ? (value / total) * 100 : 0);
 
+  // The same stack at the floor. The requirement is only literally met at 100%
+  // utilization, and the 0.90 target sits above it with headroom. The pending
+  // state still needs this value to draw the resolved Senior and Junior legs;
+  // SLP remains zero until the canonical exit-pool validation completes.
+  const floor = dayCapitalAtUtilization(
+    defaults,
+    { coverage, minLiquidity },
+    1,
+  );
+
   if (liquidityPending) {
     return (
       <Card weight="primary">
@@ -69,49 +79,73 @@ function DayV3CapitalStack({
             <DayV3DocsLink label="How tranching works" topic="tranching" />
           </div>
         </CardHeader>
-        <CardContent className="flex flex-col gap-4">
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--foundation)] px-4 py-3">
-              <span className="text-[9px] font-semibold uppercase tracking-[0.1em] text-[var(--tertiary)]">
-                Senior
-              </span>
-              <strong className="mt-2 block font-mono text-[22px] tabular-nums">
-                {unitRatio(100, unit)}
-              </strong>
-              <span className="text-[10.5px] text-[var(--tertiary)]">
-                reference amount
-              </span>
-            </div>
-            <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--foundation)] px-4 py-3">
-              <span className="text-[9px] font-semibold uppercase tracking-[0.1em] text-[var(--tertiary)]">
-                Junior
-              </span>
-              <strong className="mt-2 block font-mono text-[22px] tabular-nums">
-                {coverage > 0
-                  ? unitRatio(per100(jt), unit)
-                  : unitRatio(0, unit)}
-              </strong>
-              <span className="text-[10.5px] text-[var(--tertiary)]">
-                first-loss capital
-              </span>
-            </div>
-            <div className="rounded-xl border border-dashed border-[var(--border-subtle)] px-4 py-3">
-              <span className="text-[9px] font-semibold uppercase tracking-[0.1em] text-[var(--tertiary)]">
-                SLP
-              </span>
-              <strong className="mt-2 block font-mono text-[22px] tabular-nums">
-                —
-              </strong>
-              <span className="text-[10.5px] text-[var(--red-emphasis)]">
-                validating exit pool
-              </span>
+        <CardContent className="grid grid-cols-1 gap-4 md:grid-cols-2 md:items-stretch">
+          <div className="flex min-w-0 flex-col justify-center rounded-xl border border-[var(--border-subtle)] bg-[var(--foundation)] px-5 py-4">
+            <div className="mx-auto w-full max-w-[360px]">
+              <DayV3StackDiagram
+                jt={per100(jt)}
+                jtFloor={per100(floor.jt)}
+                lt={0}
+                ltFloor={0}
+                st={100}
+                unit={unit}
+              />
+              <p className="mt-2 text-[10.5px] leading-snug text-[var(--tertiary)]">
+                Senior and Junior are shown now. The SLP leg appears after the
+                exit pool is validated.
+              </p>
             </div>
           </div>
-          <p className="rounded-lg border border-dashed border-[var(--border-subtle)] px-3.5 py-3 text-[11px] leading-relaxed text-[var(--secondary)]">
-            Senior and Junior sizing is available now. SLP capital and total
-            market capital appear after the Senior exit is validated; no zero
-            or fallback pool size is assumed.
-          </p>
+
+          <div className="flex min-w-0 flex-col gap-4">
+            <div className="flex min-w-0 flex-1 flex-col gap-3">
+              <div className="flex min-w-0 flex-1 items-center justify-between gap-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--foundation)] px-4 py-3">
+                <span className="flex min-w-0 flex-col gap-1">
+                  <span className="text-[9px] font-semibold uppercase tracking-[0.1em] text-[var(--tertiary)]">
+                    Senior
+                  </span>
+                  <span className="text-[10.5px] text-[var(--tertiary)]">
+                    reference amount
+                  </span>
+                </span>
+                <strong className="shrink-0 font-mono text-[22px] tabular-nums">
+                  {unitRatio(100, unit)}
+                </strong>
+              </div>
+              <div className="flex min-w-0 flex-1 items-center justify-between gap-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--foundation)] px-4 py-3">
+                <span className="flex min-w-0 flex-col gap-1">
+                  <span className="text-[9px] font-semibold uppercase tracking-[0.1em] text-[var(--tertiary)]">
+                    Junior
+                  </span>
+                  <span className="text-[10.5px] text-[var(--tertiary)]">
+                    first-loss capital
+                  </span>
+                </span>
+                <strong className="shrink-0 font-mono text-[22px] tabular-nums">
+                  {coverage > 0
+                    ? unitRatio(per100(jt), unit)
+                    : unitRatio(0, unit)}
+                </strong>
+              </div>
+              <div className="flex min-w-0 flex-1 items-center justify-between gap-4 rounded-xl border border-dashed border-[var(--border-subtle)] px-4 py-3">
+                <span className="flex min-w-0 flex-col gap-1">
+                  <span className="text-[9px] font-semibold uppercase tracking-[0.1em] text-[var(--tertiary)]">
+                    SLP
+                  </span>
+                  <span className="text-[10.5px] text-[var(--red-emphasis)]">
+                    validating exit pool
+                  </span>
+                </span>
+                <strong className="shrink-0 font-mono text-[22px] tabular-nums">
+                  —
+                </strong>
+              </div>
+            </div>
+            <p className="rounded-lg border border-dashed border-[var(--border-subtle)] px-3.5 py-3 text-[11px] leading-relaxed text-[var(--secondary)]">
+              SLP capital and total market capital appear after the Senior exit
+              is validated; no zero or fallback pool size is assumed.
+            </p>
+          </div>
         </CardContent>
       </Card>
     );
@@ -137,15 +171,6 @@ function DayV3CapitalStack({
    * rather than a layer that absorbs anything.
    */
 
-  // The same stack at the floor. The requirement is only literally met at 100%
-  // utilization, and the 0.90 target sits above it with headroom. Showing the
-  // target alone makes it look like the minimum, which it is not.
-  const floor = dayCapitalAtUtilization(
-    defaults,
-    { coverage, minLiquidity },
-    1,
-  );
-
   const legs = [
     {
       name: "Sr",
@@ -167,7 +192,7 @@ function DayV3CapitalStack({
       floorRatio: per100(floor.jt),
       description:
         coverage > 0
-          ? `First loss; meets ${pct(coverage)} minimum coverage at the ${pct(targetUtilization)} target`
+          ? `First-loss capital; ${pct(targetUtilization)} opening target includes headroom above the 100%-utilized requirement`
           : "No first-loss protection",
       funded: coverage > 0,
       fill: "var(--theme-brown)",
@@ -211,7 +236,8 @@ function DayV3CapitalStack({
             unit={unit}
           />
           <p className="mt-2 max-w-[46ch] text-[10.5px] leading-snug text-[var(--tertiary)]">
-            Dashed markers show minimums; lighter caps show target headroom.
+            Dashed markers show the 100%-utilized minimum; lighter caps show
+            opening headroom.
           </p>
         </div>
 
@@ -221,8 +247,8 @@ function DayV3CapitalStack({
             without any row restating a width. */}
           <div className="hidden items-baseline gap-3 pl-3.5 pr-3.5 text-[9px] font-semibold uppercase tracking-[0.08em] text-[var(--tertiary)] sm:flex">
             <span className="min-w-0 flex-1">Leg</span>
-            <span className="w-[86px] shrink-0 text-right">Target</span>
-            <span className="w-[86px] shrink-0 text-right">Minimum</span>
+            <span className="w-[86px] shrink-0 text-right">Opening target</span>
+            <span className="w-[86px] shrink-0 text-right">100% floor</span>
             <span className="w-[54px] shrink-0 text-right">Share</span>
           </div>
 
@@ -255,7 +281,7 @@ function DayV3CapitalStack({
                   </span>
                   <span className="flex min-w-0 flex-col gap-1 sm:w-[86px] sm:shrink-0 sm:text-right">
                     <span className="text-[8px] font-semibold uppercase tracking-[0.08em] text-[var(--tertiary)] sm:hidden">
-                      Target
+                      Opening target
                     </span>
                     <span
                       className="font-mono text-[14px] font-semibold leading-none tabular-nums"
@@ -268,7 +294,7 @@ function DayV3CapitalStack({
                   </span>
                   <span className="flex min-w-0 flex-col gap-1 sm:w-[86px] sm:shrink-0 sm:text-right">
                     <span className="text-[8px] font-semibold uppercase tracking-[0.08em] text-[var(--tertiary)] sm:hidden">
-                      Minimum
+                      100% floor
                     </span>
                     <span
                       className="font-mono text-[14px] font-semibold leading-none tabular-nums text-[var(--tertiary)]"

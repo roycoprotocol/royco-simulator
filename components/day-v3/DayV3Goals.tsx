@@ -240,14 +240,14 @@ export default function DayV3Goals({
             ? "Protection off · no Junior"
             : drawdownPct === null
               ? "Choose a protected drawdown"
-              : `${fixed(drawdownPct)}% drop → ${
+              : `Goal: ${fixed(drawdownPct)}% source drawdown · Contract: ${
                   protection.coveragePct === null
                     ? "coverage pending"
-                    : `${fixed(protection.coveragePct)}% minimum coverage`
+                    : `${fixed(protection.coveragePct)}% Minimum Coverage`
                 }${
                   protection.juniorPer100 === null
                     ? ""
-                    : ` · ${dollars(protection.juniorPer100)} Junior`
+                    : ` · ${dollars(protection.juniorPer100)} Junior at 90% target`
                 } · ${
                   recoveryMode === "none"
                     ? "losses realize immediately"
@@ -293,10 +293,10 @@ export default function DayV3Goals({
         {!protectionDisabled ? (
           <div className="grid grid-cols-1 items-start gap-3 lg:grid-cols-2">
             <DayV3NumberField
-              label="What one-time drop should Senior survive without losing principal?"
+              label="What source drawdown should Senior survive without losing principal?"
               max={95}
               min={0.01}
-              note="This sets the Minimum Coverage and Junior capital required to keep Senior whole through the selected drop."
+              note="This is the protection goal. We test it at the 100%-utilized boundary, then size opening Junior capital at the 90% target."
               onChange={onDrawdownPct}
               origin={inputOrigin(inputOrigins.drawdown)}
               placeholder="Choose a drawdown"
@@ -374,14 +374,14 @@ export default function DayV3Goals({
             </div>
             <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
               <ResultTile
-                label="Minimum Coverage"
-                note="deployment requirement"
+                label="On-chain Minimum Coverage"
+                note="contract ratio · tested at 100% utilization"
                 origin="recommended"
                 value={`${fixed(protection.coveragePct ?? 0)}%`}
               />
               <ResultTile
-                label="Junior required"
-                note="per $100 Senior"
+                label="Junior to open"
+                note="per $100 Senior at the 90% operating target"
                 value={dollars(protection.juniorPer100 ?? 0)}
               />
             </div>

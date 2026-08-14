@@ -603,7 +603,7 @@ check("V3 handoff round-trips without imported price history", () => {
       },
       maxReinvestmentSlippageBps: 50,
     },
-    minimumCoveragePct: 9,
+    minimumCoveragePct: 10,
     minimumLiquidityPct: 10,
     protectedExitThresholdPct: 5,
     protectedExitBonusPct: 0,
@@ -697,7 +697,7 @@ check(
         minimumProceedsPer100: 0,
       },
       deploymentPolicy,
-      minimumCoveragePct: 9,
+      minimumCoveragePct: 10,
       minimumLiquidityPct: 0,
       protectedExitThresholdPct: 5,
       protectedExitBonusPct: 0,
@@ -761,7 +761,7 @@ check("V3 handoff rejects invalid contract deployment policy", () => {
           },
           maxReinvestmentSlippageBps: 50,
         },
-        minimumCoveragePct: 9,
+        minimumCoveragePct: 10,
         minimumLiquidityPct: 10,
         protectedExitThresholdPct: 5,
         protectedExitBonusPct: 0,
@@ -826,11 +826,14 @@ check(
       minimumLiquidityPct: 10,
     });
     assert.equal(result.status, "recommended");
-    assert.equal(result.coverage.value, 9);
+    assert.equal(result.coverage.value, 10);
     assert.equal(result.seniorBasis, 100);
     assert.equal(result.stress.keepsSeniorWhole, true);
     assert.ok((result.stress.seniorLossPer100 ?? 1) < 1e-8);
-    assert.ok((result.capital?.juniorPer100 ?? 0) > 0);
+    assert.ok(
+      Math.abs((result.capital?.juniorPer100 ?? 0) - 12.5) < 1e-8,
+      "the displayed opening stack is sized at the 90% operating target",
+    );
     assert.ok((result.projectedApy.junior ?? 0) > 0);
     assert.equal(
       dayV3CoverageKeepsSeniorWhole(defaults, {
@@ -839,6 +842,15 @@ check(
         minimumLiquidityPct: 10,
       }),
       false,
+    );
+    assert.equal(
+      dayV3CoverageKeepsSeniorWhole(defaults, {
+        protectedDrawdownPct: 10,
+        coveragePct: 9,
+        minimumLiquidityPct: 10,
+      }),
+      false,
+      "the former 90%-target recommendation must fail at the 100% utilization boundary",
     );
   },
 );

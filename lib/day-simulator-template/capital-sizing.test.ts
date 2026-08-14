@@ -99,6 +99,41 @@ for (const coverage of [0.05, 0.1, 0.2, 0.25]) {
   );
 }
 
+// Full utilization is a contract boundary, so the inversion must remain on
+// the valid side after decimal inputs are converted to exact WAD values. A
+// Number comparison used to return balances a few wei short for these values.
+for (const coverage of [0.09, 0.0999, 0.1, 0.3, 0.8999]) {
+  const terms = {
+    coverage,
+    minLiquidity: 0.1,
+    eclpBandWidth: jbbb.eclpBandWidth,
+    observationDays: jbbb.observationDays,
+    riskYieldShare: jbbb.riskYDM.yTarget,
+    liquidityYieldShare: jbbb.liqYDM.yTarget,
+  };
+  const floor = dayCapitalAtUtilization(jbbb, terms, 1);
+  const cfg = buildDayMarketConfig(jbbb, terms);
+  assert.doesNotThrow(() => new Sim(cfg, floor));
+  check(
+    `cov=${coverage}: the exact 100% floor initializes a valid market`,
+    floor.jt > 0,
+  );
+}
+
+{
+  const terms = { coverage: 0.1, minLiquidity: 0.1 };
+  const floor = dayCapitalAtUtilization(jbbb, terms, 1);
+  const target = dayCapitalAtUtilization(jbbb, terms, TARGET);
+  check(
+    '10% coverage: the 100% floor is $11.111111 Junior per $100 Senior',
+    Math.abs((floor.jt / floor.st) * 100 - 11.11111111111111) < 1e-9,
+  );
+  check(
+    '10% coverage: the 90% opening target is $12.50 Junior per $100 Senior',
+    Math.abs((target.jt / target.st) * 100 - 12.5) < 1e-9,
+  );
+}
+
 for (const minLiquidity of [0.05, 0.1, 0.25]) {
   const terms = { coverage: 0.2, minLiquidity };
   const target = dayCapitalAtUtilization(jbbb, terms, TARGET);

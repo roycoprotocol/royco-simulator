@@ -194,8 +194,8 @@ const goalsProps = {
   onResetExit: noop,
   onResetProtection: noop,
   protection: {
-    coveragePct: 13.5,
-    juniorPer100: 17,
+    coveragePct: 15,
+    juniorPer100: 20,
     juniorApy: 9,
     status: "recommended",
     message: "Senior remains whole.",
@@ -226,8 +226,9 @@ assert.equal(
 assert.doesNotMatch(goalsMarkup, /Deployment mapping/);
 assert.match(
   goalsMarkup,
-  /15\.0% drop → 13\.5% minimum coverage · \$17\.0 Junior · 7-day observation period/,
+  /Goal: 15\.0% source drawdown · Contract: 15\.0% Minimum Coverage · \$20\.0 Junior at 90% target · 7-day observation period/,
 );
+assert.doesNotMatch(goalsMarkup, /drop → .*coverage/i);
 assert.match(
   goalsMarkup,
   /\$10\.0 immediate exit → \$12\.4 SLP · \$9\.6 proceeds · \$95\.0 floor/,

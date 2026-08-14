@@ -1,5 +1,6 @@
 import { Sim, steadyYear } from "@/lib/day/engine/runner";
 import type { DaySimulatorDefaults } from "@/lib/day-simulator-template/market";
+import { dayCapitalAtUtilization } from "@/lib/day-simulator-template/capital-sizing";
 import {
   buildDayMarketConfig,
   DAY_TARGET_UTILIZATION,
@@ -129,13 +130,23 @@ function evaluateCoverage(
   const coveragePct = coverageBps / 100;
   const modeledLiquidityPct = minimumLiquidityPct ?? 0;
   const normalized = normalizeDayV3Defaults(defaults);
+  const terms = {
+    coverage: coveragePct / 100,
+    minLiquidity: modeledLiquidityPct / 100,
+  };
   const capital = dayV3CapitalAtTarget(normalized, {
     coveragePct,
     minimumLiquidityPct: modeledLiquidityPct,
   });
+  // The issuer's protection promise must survive the contract boundary, not
+  // only the preferred 90% opening target. Seed the loss test at 100%
+  // coverage utilization, where Junior has no operating headroom left. The
+  // capital returned to the UI remains the recommended 90%-target opening
+  // stack used by the forward return model below.
+  const stressBalances = dayCapitalAtUtilization(normalized, terms, 1);
   const cfg = buildDayMarketConfig(normalized, {
-    coverage: coveragePct / 100,
-    minLiquidity: modeledLiquidityPct / 100,
+    coverage: terms.coverage,
+    minLiquidity: terms.minLiquidity,
     eclpBandWidth: normalized.eclpBandWidth,
     // Recovery time is deliberately not part of this solve. The zero-time
     // shock asks only whether Junior absorbs the selected depth immediately.
@@ -145,9 +156,9 @@ function evaluateCoverage(
       modeledLiquidityPct > 0 ? normalized.liqYDM.yTarget : 0,
   });
   const sim = new Sim(cfg, {
-    st: capital.seniorPer100,
-    jt: capital.juniorPer100,
-    lt: capital.slpPer100,
+    st: stressBalances.st,
+    jt: stressBalances.jt,
+    lt: stressBalances.lt,
   });
   const before = sim.last().stEffectiveNAV;
   sim.step({
@@ -249,7 +260,7 @@ export function recommendDayV3Coverage(
     return unresolvedCoverage(
       input.protectedDrawdownPct,
       "infeasible",
-      "The requested drawdown cannot be fully protected at the 90% operating target.",
+      "The requested drawdown cannot be fully protected from the 100% coverage-utilization boundary while opening at the 90% operating target.",
     );
   }
 
@@ -297,7 +308,8 @@ export function recommendDayV3Coverage(
       modelUsage: "fully-modeled",
       evidence: [
         `Smallest ${resolution} bp setting that kept Senior whole in the shared accountant stress run.`,
-        `Tested an instantaneous ${input.protectedDrawdownPct}% source drawdown at the 90% operating target.`,
+        `Tested an instantaneous ${input.protectedDrawdownPct}% source drawdown at the 100% coverage-utilization boundary.`,
+        "Opening Junior capital is shown at the 90% operating target, with headroom before that boundary.",
       ],
     },
     capital,
@@ -310,6 +322,6 @@ export function recommendDayV3Coverage(
     },
     projectedApy: evaluation.projectedApy,
     reason:
-      "The exact shared accountant kept Senior whole at this setting and not at the preceding deployable step.",
+      "Senior stayed whole through the selected source drawdown at the 100%-utilized boundary. Opening Junior capital is sized at the 90% target.",
   };
 }
