@@ -1,5 +1,5 @@
 {
-  "app/globals.css": "ab76f74ca7b8b596f7b03fe25dd272f84a6a1fb7a7a4730bf324fc57bf4e6253",
+  "app/globals.css": "967dd341d50bac49e8d8c4481569a93cf5e515b82e1f002699b2ae78dad1c63a",
   "app/day-sim/page.tsx": "93005c0daf4ca5d7a58ab9d2b6d66d62f72b0e3f1f8ff59eed1f3844f6ba383c",
   "app/internal/day-lab/page.tsx": "cc24297496366142511b0d660d8bac73f24530bff3375e431e0ba8e931d13cab",
   "app/api/day-explorer/import/route.ts": "569fd3bf24d5f1ab633af6096a2228d6215e3f87da5ce178138666397db6892a",

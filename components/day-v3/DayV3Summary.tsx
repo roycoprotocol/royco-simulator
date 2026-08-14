@@ -2046,7 +2046,7 @@ export default function DayV3Summary({
                 summary={
                   draftMarket
                     ? `Historical data · ${draftMarket.series.length.toLocaleString("en-US")} observations`
-                    : "Historical data · optional"
+                    : "Historical data"
                 }
                 variant="inline"
               >

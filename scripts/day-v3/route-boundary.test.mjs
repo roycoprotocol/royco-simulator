@@ -58,6 +58,7 @@ for (const file of v3Files) {
 const v2Route = readFileSync(join(root, "app/v2/page.tsx"), "utf8");
 const v3Route = readFileSync(join(root, "app/v3/page.tsx"), "utf8");
 const rootRoute = readFileSync(join(root, "app/page.tsx"), "utf8");
+const globalStyles = readFileSync(join(root, "app/globals.css"), "utf8");
 assert.match(v2Route, /components\/day-v2\/DayV2Summary/);
 assert.doesNotMatch(v2Route, /day-v3|\/v3/);
 assert.match(v3Route, /components\/day-v3\/DayV3Summary/);
@@ -65,6 +66,16 @@ assert.match(v3Route, /index:\s*false/);
 assert.match(v3Route, /follow:\s*false/);
 assert.match(rootRoute, /export \{ default, metadata \} from "\.\/v3\/page"/);
 assert.doesNotMatch(rootRoute, /\.\/v2\/page/);
+assert.match(
+  globalStyles,
+  /\.royco-v3\s*\{[\s\S]*?--foundation:\s*#f3f1eb;[\s\S]*?--foreground:\s*#17191f;[\s\S]*?--border-subtle:\s*#e4e0d6;[\s\S]*?\}/,
+  "V3 must retain its scoped light-theme tokens when promoted or merged",
+);
+assert.match(
+  globalStyles,
+  /\.royco-v3 \.day-v3-range\s*\{/,
+  "V3 must retain its scoped range-control styling",
+);
 
 console.log(
   `Day V3 route boundary: PASS (${v2Files.length} V2 files isolated; ${v3Files.length} V3 files isolated)`,
