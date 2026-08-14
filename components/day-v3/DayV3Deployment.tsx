@@ -242,9 +242,10 @@ function DayV3Deployment({
     },
     {
       label: "Reinvestment slippage",
-      ready: deploymentPolicy.maxReinvestmentSlippageBps !== null,
+      ready:
+        exitDisabled || deploymentPolicy.maxReinvestmentSlippageBps !== null,
       scope: "v3-handoff" as const,
-      missing: "Enter the maximum reinvestment slippage ceiling.",
+      missing: "Enter the maximum SLP reinvestment slippage ceiling.",
     },
     {
       label: "Registered yield-share models",
@@ -460,7 +461,8 @@ function DayV3Deployment({
       deploymentPolicy.depositExpirySeconds === null ||
       deploymentPolicy.withdrawalExpirySeconds === null ||
       deploymentPolicy.gateByOracleUpdate === null ||
-      deploymentPolicy.maxReinvestmentSlippageBps === null ||
+      (!exitDisabled &&
+        deploymentPolicy.maxReinvestmentSlippageBps === null) ||
       sourceApyPct === null
     ) {
       return;
@@ -504,7 +506,9 @@ function DayV3Deployment({
           withdrawalExpirySeconds: deploymentPolicy.withdrawalExpirySeconds,
           gateByOracleUpdate: deploymentPolicy.gateByOracleUpdate,
         },
-        maxReinvestmentSlippageBps: deploymentPolicy.maxReinvestmentSlippageBps,
+        maxReinvestmentSlippageBps: exitDisabled
+          ? 0
+          : (deploymentPolicy.maxReinvestmentSlippageBps as number),
       },
       minimumCoveragePct: protectionDisabled ? 0 : protection.coveragePct,
       minimumLiquidityPct: exitDisabled ? 0 : exit.minimumLiquidityPct,

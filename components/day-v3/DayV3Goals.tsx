@@ -173,6 +173,8 @@ export function DayV3OperationalFacts({
   onFixedTermGraceDays,
   onNavUpdateDays,
   origins = {},
+  seniorProtectionEnabled = true,
+  slpEnabled = true,
 }: {
   collateralToExitCostBps: MaybeNumber;
   collateralToExitDays: MaybeNumber;
@@ -184,6 +186,8 @@ export function DayV3OperationalFacts({
   onEntryPointSettlementDays: (value: MaybeNumber) => void;
   onFixedTermGraceDays: (value: MaybeNumber) => void;
   onNavUpdateDays: (value: MaybeNumber) => void;
+  seniorProtectionEnabled?: boolean;
+  slpEnabled?: boolean;
   origins?: Partial<{
     collateralToExitCost: DayV3VisibleOrigin;
     collateralToExitDays: DayV3VisibleOrigin;
@@ -208,13 +212,17 @@ export function DayV3OperationalFacts({
     >
       <div className="flex flex-wrap items-baseline justify-between gap-2">
         <strong className="text-[12px] font-semibold">
-          Redemption route
+          {slpEnabled ? "Redemption and refill route" : "Senior redemption"}
         </strong>
         <span className="text-[10.5px] text-[var(--tertiary)]">
-          Two clocks: receive collateral, then convert it for the SLP
+          {slpEnabled
+            ? "Two clocks: receive collateral, then convert it for the SLP"
+            : "The in-kind withdrawal clock"}
         </span>
       </div>
-      <div className="grid grid-cols-1 gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--card)] px-4 py-3 sm:grid-cols-2">
+      <div
+        className={`grid grid-cols-1 gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--card)] px-4 py-3 ${slpEnabled ? "sm:grid-cols-2" : ""}`}
+      >
         <p className="text-[10.5px] leading-relaxed text-[var(--secondary)]">
           <strong className="block text-[11px] text-[var(--foreground)]">
             1 · Redeem Senior for collateral
@@ -222,14 +230,16 @@ export function DayV3OperationalFacts({
           The market enforces a minimum queue before the in-kind redemption may
           execute.
         </p>
-        <p className="text-[10.5px] leading-relaxed text-[var(--secondary)]">
-          <strong className="block text-[11px] text-[var(--foreground)]">
-            2 · Convert collateral to the exit asset
-          </strong>
-          Once the queued redemption executes and collateral is received, this
-          separate clock covers conversion into the asset used to refill the
-          SLP.
-        </p>
+        {slpEnabled ? (
+          <p className="text-[10.5px] leading-relaxed text-[var(--secondary)]">
+            <strong className="block text-[11px] text-[var(--foreground)]">
+              2 · Convert collateral to the exit asset
+            </strong>
+            Once the queued redemption executes and collateral is received,
+            this separate clock covers conversion into the asset used to refill
+            the SLP.
+          </p>
+        ) : null}
       </div>
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
         <DayV3NumberField
@@ -251,50 +261,54 @@ export function DayV3OperationalFacts({
           wholeNumber
           required
         />
-        <DayV3NumberField
-          label="Once the redemption executes and collateral is received, how long should conversion into the exit asset take?"
-          max={365}
-          min={0}
-          note="This clock starts only after the in-kind redemption above finishes. Use the source’s actual conversion process; enter 0 only for same-day conversion."
-          onChange={onCollateralToExitDays}
-          origin={factOrigin(origins.collateralToExitDays)}
-          placeholder="Enter days"
-          presets={[
-            { label: "Same day", value: 0 },
-            { label: "1 day", value: 1 },
-            { label: "7 days", value: 7 },
-          ]}
-          suffix="days"
-          value={collateralToExitDays}
-          wholeNumber
-          required
-        />
-        <DayV3NumberField
-          label="What does it cost to convert $100 of collateral into the exit asset?"
-          max={99.99}
-          min={0}
-          note={`Include spread, execution, and operational costs. ${collateralToExitCostBps === null ? "This cost is still missing." : `$${(collateralToExitCostBps / 100).toFixed(2)} per $100 equals ${collateralToExitCostBps.toFixed(0)} bps.`}`}
-          onChange={(value) =>
-            onCollateralToExitCostBps(value === null ? null : value * 100)
-          }
-          origin={factOrigin(origins.collateralToExitCost)}
-          placeholder="Enter cost"
-          prefix="$"
-          presets={[
-            { label: "No cost", value: 0 },
-            { label: "0.25", value: 0.25 },
-            { label: "0.50", value: 0.5 },
-            { label: "1.00", value: 1 },
-          ]}
-          step={0.01}
-          suffix="per $100"
-          value={
-            collateralToExitCostBps === null
-              ? null
-              : collateralToExitCostBps / 100
-          }
-          required
-        />
+        {slpEnabled ? (
+          <>
+            <DayV3NumberField
+              label="Once the redemption executes and collateral is received, how long should conversion into the exit asset take?"
+              max={365}
+              min={0}
+              note="This clock starts only after the in-kind redemption above finishes. Use the source’s actual conversion process; enter 0 only for same-day conversion."
+              onChange={onCollateralToExitDays}
+              origin={factOrigin(origins.collateralToExitDays)}
+              placeholder="Enter days"
+              presets={[
+                { label: "Same day", value: 0 },
+                { label: "1 day", value: 1 },
+                { label: "7 days", value: 7 },
+              ]}
+              suffix="days"
+              value={collateralToExitDays}
+              wholeNumber
+              required
+            />
+            <DayV3NumberField
+              label="What does it cost to convert $100 of collateral into the exit asset?"
+              max={99.99}
+              min={0}
+              note={`Include spread, execution, and operational costs. ${collateralToExitCostBps === null ? "This cost is still missing." : `$${(collateralToExitCostBps / 100).toFixed(2)} per $100 equals ${collateralToExitCostBps.toFixed(0)} bps.`}`}
+              onChange={(value) =>
+                onCollateralToExitCostBps(value === null ? null : value * 100)
+              }
+              origin={factOrigin(origins.collateralToExitCost)}
+              placeholder="Enter cost"
+              prefix="$"
+              presets={[
+                { label: "No cost", value: 0 },
+                { label: "0.25", value: 0.25 },
+                { label: "0.50", value: 0.5 },
+                { label: "1.00", value: 1 },
+              ]}
+              step={0.01}
+              suffix="per $100"
+              value={
+                collateralToExitCostBps === null
+                  ? null
+                  : collateralToExitCostBps / 100
+              }
+              required
+            />
+          </>
+        ) : null}
       </div>
 
       <div className="flex flex-wrap items-baseline justify-between gap-2 border-t border-[var(--border-subtle)] pt-3">
@@ -302,7 +316,9 @@ export function DayV3OperationalFacts({
           Valuation and protection timing
         </strong>
         <span className="text-[10.5px] text-[var(--tertiary)]">
-          How quickly the market sees a new value and begins protection
+          {seniorProtectionEnabled
+            ? "How quickly the market sees a new value and begins protection"
+            : "How quickly the market sees a new value"}
         </span>
       </div>
       <DayV3NumberField
@@ -324,6 +340,7 @@ export function DayV3OperationalFacts({
         required
       />
 
+      {seniorProtectionEnabled ? (
       <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--card)] px-4 py-3">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <span className="text-[12.5px] font-semibold leading-snug">
@@ -383,13 +400,15 @@ export function DayV3OperationalFacts({
           />
         ) : null}
       </div>
+      ) : null}
       {entryPointSettlementDays === null || navUpdateDays === null ? (
         <p className="text-[10.5px] leading-relaxed text-[var(--tertiary)]">
           No settlement or NAV timing is assumed. Add both facts before the pool
           design can be resolved.
         </p>
       ) : null}
-      {collateralToExitDays === null || collateralToExitCostBps === null ? (
+      {slpEnabled &&
+      (collateralToExitDays === null || collateralToExitCostBps === null) ? (
         <p className="rounded-lg border border-dashed border-[var(--border-subtle)] px-3 py-2 text-[10.5px] leading-relaxed text-[var(--secondary)]">
           The immediate pool quote can still be priced, but the restock point
           remains unresolved until both collateral-conversion facts are added.
@@ -425,6 +444,9 @@ export default function DayV3Goals({
   recovery,
   recoveryDays,
   recoveryMode,
+  showExitSection = true,
+  showInlineFeatureControls = true,
+  showProtectionSection = true,
 }: {
   deploying?: boolean;
   drawdownPct: MaybeNumber;
@@ -459,6 +481,9 @@ export default function DayV3Goals({
   recovery: DayV3RecoveryView;
   recoveryDays: MaybeNumber;
   recoveryMode: "none" | "window" | null;
+  showExitSection?: boolean;
+  showInlineFeatureControls?: boolean;
+  showProtectionSection?: boolean;
 }) {
   const inputOrigin = (origin: DayV3VisibleOrigin | undefined) =>
     origin ?? "your-answer";
@@ -537,6 +562,7 @@ export default function DayV3Goals({
 
   return (
     <>
+      {showProtectionSection ? (
       <DayV3Group
         action={
           <DayV3Button
@@ -573,6 +599,7 @@ export default function DayV3Goals({
         }
         title="Senior protection"
       >
+        {showInlineFeatureControls ? (
         <div className="flex flex-col gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--foundation)] p-3.5">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
@@ -606,6 +633,7 @@ export default function DayV3Goals({
             value={protectionDisabled ? "off" : "on"}
           />
         </div>
+        ) : null}
 
         {!protectionDisabled ? (
           <div className="grid grid-cols-1 items-start gap-3 lg:grid-cols-2">
@@ -787,7 +815,9 @@ export default function DayV3Goals({
           </p>
         </div>
       </DayV3Group>
+      ) : null}
 
+      {showExitSection ? (
       <DayV3Group
         action={
           <DayV3Button
@@ -818,6 +848,7 @@ export default function DayV3Goals({
         }
         title="Senior exit"
       >
+        {showInlineFeatureControls ? (
         <div className="flex flex-col gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--foundation)] p-3.5">
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
@@ -852,6 +883,7 @@ export default function DayV3Goals({
             value={exitDisabled ? "off" : "on"}
           />
         </div>
+        ) : null}
 
         {!exitDisabled ? (
           <div className="grid grid-cols-1 items-start gap-3 lg:grid-cols-2">
@@ -1163,6 +1195,7 @@ export default function DayV3Goals({
         </div>
 
       </DayV3Group>
+      ) : null}
 
       {deploying ? premiumCurveEditor : null}
 

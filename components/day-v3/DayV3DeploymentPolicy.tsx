@@ -101,6 +101,7 @@ export default function DayV3DeploymentPolicy({
   onMaxReinvestmentSlippageBps,
   onWithdrawalExpirySeconds,
   recoveryDays,
+  slpEnabled = true,
   withdrawalDelayDays,
   withdrawalExpirySeconds,
 }: {
@@ -114,6 +115,7 @@ export default function DayV3DeploymentPolicy({
   onMaxReinvestmentSlippageBps: (value: number | null) => void;
   onWithdrawalExpirySeconds: (value: DayV3ExpiryPolicy | null) => void;
   recoveryDays: number | null;
+  slpEnabled?: boolean;
   withdrawalDelayDays: number | null;
   withdrawalExpirySeconds: DayV3ExpiryPolicy | null;
 }) {
@@ -121,8 +123,8 @@ export default function DayV3DeploymentPolicy({
     depositDelaySeconds,
     depositExpirySeconds,
     gateByOracleUpdate,
-    maxReinvestmentSlippageBps,
     withdrawalExpirySeconds,
+    ...(slpEnabled ? [maxReinvestmentSlippageBps] : []),
   ];
   const missing = values.filter((value) => value === null).length;
 
@@ -253,6 +255,7 @@ export default function DayV3DeploymentPolicy({
             </p>
           </div>
 
+          {slpEnabled ? (
           <DayV3NumberField
             label="How much value may SLP reinvestment give up?"
             max={99.99}
@@ -279,6 +282,7 @@ export default function DayV3DeploymentPolicy({
             }
             required
           />
+          ) : null}
         </div>
 
         <DayV3Disclosure
@@ -296,6 +300,7 @@ export default function DayV3DeploymentPolicy({
               window, and revalidates each finite expiry. NAV cadence above
               remains a modeling fact, not an EntryPoint contract field.
             </p>
+            {slpEnabled ? (
             <p className="rounded-xl border border-dashed border-[var(--border-subtle)] px-4 py-3 text-[10.5px] leading-relaxed text-[var(--secondary)]">
               <strong className="block text-[11px] text-[var(--foreground)]">
                 Exit-asset dependency
@@ -305,6 +310,7 @@ export default function DayV3DeploymentPolicy({
               final venue. Addresses, seed amounts, blacklist administration,
               and the deployer remain downstream-only.
             </p>
+            ) : null}
           </div>
         </DayV3Disclosure>
 

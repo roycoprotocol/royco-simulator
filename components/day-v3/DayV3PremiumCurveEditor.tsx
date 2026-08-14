@@ -12,6 +12,7 @@ import { pct } from "@/components/day-v3/format";
 
 export type DayV3PremiumCurveEditorProps = {
   curveOverridden: boolean;
+  juniorEnabled?: boolean;
   ready: boolean;
   startingCurveBasis?: string;
   validationIssues?: string[];
@@ -33,6 +34,7 @@ export type DayV3PremiumCurveEditorProps = {
   riskY100Pct: number;
   riskYtPct: number;
   slpModeledApy: number;
+  slpEnabled?: boolean;
   starterDefaultsLoaded?: boolean;
   seniorShareOfCapital: number;
   sourceApy: number;
@@ -207,6 +209,7 @@ function CurveCard({
  */
 function DayV3PremiumCurveEditor({
   curveOverridden,
+  juniorEnabled = true,
   ready,
   startingCurveBasis,
   validationIssues = [],
@@ -228,11 +231,20 @@ function DayV3PremiumCurveEditor({
   riskY100Pct,
   riskYtPct,
   slpModeledApy,
+  slpEnabled = true,
   starterDefaultsLoaded = false,
   seniorShareOfCapital,
   sourceApy,
   targetUtilization,
 }: DayV3PremiumCurveEditorProps) {
+  const activeCurveLabels = [
+    ...(juniorEnabled ? ["Junior"] : []),
+    ...(slpEnabled ? ["SLP"] : []),
+  ];
+  const activeCurveSummary = [
+    ...(juniorEnabled ? [`Jr ${pct(riskYtPct / 100)}`] : []),
+    ...(slpEnabled ? [`SLP ${pct(liqYtPct / 100)}`] : []),
+  ].join(" · ");
   return (
     <DayV3Group
       collapsible
@@ -248,16 +260,18 @@ function DayV3PremiumCurveEditor({
           : {
               label: "Incomplete",
               tone: "incomplete",
-              missing: ["Valid Junior and SLP curve anchors"],
+              missing: [`Valid ${activeCurveLabels.join(" and ")} curve anchors`],
             }
       }
-      subtitle="Set how Senior yield is shared with Junior and SLP"
+      subtitle={`Set how Senior yield is shared with ${activeCurveLabels.join(" and ")}`}
       summary={
         validationIssues.length === 0
-          ? `${curveOverridden ? "Custom" : "Suggested"} curves · Jr ${pct(riskYtPct / 100)} · SLP ${pct(liqYtPct / 100)} at ${pct(targetUtilization)}`
+          ? `${curveOverridden ? "Custom" : "Suggested"} ${activeCurveLabels.length === 1 ? "curve" : "curves"} · ${activeCurveSummary} at ${pct(targetUtilization)}`
           : starterDefaultsLoaded
-            ? `Illustrative defaults loaded · Jr ${pct(riskYtPct / 100)} · SLP ${pct(liqYtPct / 100)} at ${pct(targetUtilization)}`
-            : `Waiting for the exit-pool result · Jr ${pct(riskYtPct / 100)} · SLP pending`
+            ? `Illustrative defaults loaded · ${activeCurveSummary} at ${pct(targetUtilization)}`
+            : juniorEnabled && slpEnabled
+              ? `Waiting for the exit-pool result · Jr ${pct(riskYtPct / 100)} · SLP pending`
+              : `Waiting for the required capital result · ${activeCurveSummary}`
       }
       title="Yield split"
     >
@@ -304,7 +318,10 @@ function DayV3PremiumCurveEditor({
         </div>
       ) : null}
 
-      <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-2">
+      <div
+        className={`grid grid-cols-1 items-start gap-4 ${juniorEnabled && slpEnabled ? "xl:grid-cols-2" : ""}`}
+      >
+        {juniorEnabled ? (
         <CurveCard
           capPct={riskCapPct}
           description="Sets the share of Senior yield paid to Junior as first-loss coverage is used."
@@ -324,6 +341,8 @@ function DayV3PremiumCurveEditor({
           y100Pct={riskY100Pct}
           ytPct={riskYtPct}
         />
+        ) : null}
+        {slpEnabled ? (
         <CurveCard
           capPct={liqCapPct}
           description="Sets the share of Senior yield paid to SLP as exit liquidity is used."
@@ -343,6 +362,7 @@ function DayV3PremiumCurveEditor({
           y100Pct={liqY100Pct}
           ytPct={liqYtPct}
         />
+        ) : null}
       </div>
     </DayV3Group>
   );
