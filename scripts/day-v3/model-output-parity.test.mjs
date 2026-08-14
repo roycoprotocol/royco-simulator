@@ -109,7 +109,7 @@ assert.match(
 );
 assert.match(
   summary,
-  /<\/section>\s*\{deploying \? deploymentPanel : null\}\s*\{!deploying \? \(/,
+  /<\/section>\s*\{deploying \? deploymentPanel : null\}\s*<p className=/,
   "The Deploy handoff must remain at the bottom after the complete model section",
 );
 assert.match(

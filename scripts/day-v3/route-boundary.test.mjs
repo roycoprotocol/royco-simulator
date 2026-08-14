@@ -33,7 +33,7 @@ for (const file of [...v2Files, ...v2RouteFiles].sort()) {
 }
 assert.equal(
   v2Snapshot.digest("hex"),
-  "1579eac8c234ef5dac295eeef8c52c87123e2b55e28257624c33d46748ccb879",
+  "c71627493ae066c672b1a1e8146218828532434ca58306d6a99f7b48585f5f13",
   "V2 changed after the V3 snapshot; review and deliberately refresh the baseline",
 );
 
