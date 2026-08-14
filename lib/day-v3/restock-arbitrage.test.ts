@@ -6,6 +6,8 @@ import {
   dayV3RestockCheck,
   dayV3RestockHurdle,
 } from "@/lib/day-v3/restock-arbitrage";
+import { DAY_MARKETS } from "@/lib/day-markets/registry";
+import { buildDayExplainerMetrics } from "@/lib/day-simulator-template/explainer";
 import { dayCapitalAtUtilization } from "@/lib/day-simulator-template/capital-sizing";
 import { normalizeDayV3Defaults } from "@/lib/day-v3/normalization";
 import { buildDayYieldDraftMarket } from "@/lib/day-simulator-template/explorer-market";
@@ -248,5 +250,70 @@ assert.deepEqual(
   { boundaryOk: false, openingOk: true },
   "a $100 floor is legal at the opening target and unbuildable at the boundary, which the page must report rather than crash on",
 );
+
+// Against the real registry, not the custom draft. The draft declares no
+// E-CLP curve, which is the one market shape where both of these behave — so a
+// test written only against it pins the happy path and misses every listed
+// market. Both regressions below shipped and were caught by review, not here.
+const asSummaryBuilds = (market: (typeof DAY_MARKETS)[number], floorPer100: number) => {
+  const d = normalizeDayV3Defaults(market.defaults);
+  const bandPct = Math.min(99, Math.max(0.01, 100 - floorPer100));
+  const terms = {
+    coverage: 0.2,
+    minLiquidity: d.minLiquidity,
+    eclpBandWidth: bandPct / 100,
+    observationDays: 0,
+    riskYieldShare: d.riskYDM.yTarget,
+    liquidityYieldShare: d.liqYDM.yTarget,
+  };
+  // The band lives only in `terms`, never on the object passed as `defaults`,
+  // or `buildDayMarketConfig` compares the request against a copy of itself.
+  const effective = {
+    ...d,
+    ...terms,
+    eclpBandWidth: d.eclpBandWidth,
+    sourceApy: 0.08,
+    stableYield: 0,
+    poolTurnoverPerYear: 0,
+  };
+  const sized = { ...effective, eclpBandWidth: terms.eclpBandWidth };
+  return {
+    cfg: buildDayMarketConfig(effective, terms),
+    opening: buildDayInitialBalances(sized, terms),
+    sized,
+    terms,
+  };
+};
+
+for (const market of DAY_MARKETS) {
+  const { cfg, opening, sized, terms } = asSummaryBuilds(market, 95);
+  // Junior at the boundary, the pool on its admissible opening size. Solving
+  // both legs at 100% produces a stack the engine rejects by ~14ppm on every
+  // market that declares a curve, which cost 12 of 13 their loss waterfall.
+  const boundary = dayCapitalAtUtilization(sized, terms, 1);
+  buildDayExplainerMetrics(cfg, {
+    st: boundary.st,
+    jt: boundary.jt,
+    lt: opening.lt,
+  });
+}
+
+// And the payout floor has to reach the curve on a market that ships one.
+const discountAtFloor = (marketId: string, floorPer100: number) => {
+  const market = DAY_MARKETS.find((candidate) => candidate.id === marketId);
+  if (!market) throw new Error(`${marketId} is not in the registry`);
+  const { cfg, opening } = asSummaryBuilds(market, floorPer100);
+  const sim = new Sim(cfg, opening);
+  const quote = sim.previewSecondarySell(sim.last().stEffectiveNAV * 0.1);
+  return dayV3QuoteDiscountBps(quote) as number;
+};
+for (const marketId of ["susdai", "muga", "acred"]) {
+  const tightFloor = discountAtFloor(marketId, 99);
+  const wideFloor = discountAtFloor(marketId, 50);
+  assert.ok(
+    wideFloor > tightFloor * 10,
+    `${marketId}: the payout floor must reach the curve on a market that declares one (${tightFloor} vs ${wideFloor})`,
+  );
+}
 
 console.log("Day V3 restock arbitrage check: PASS");

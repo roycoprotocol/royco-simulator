@@ -495,6 +495,39 @@ assert.match(
   "A disabled model section must not open",
 );
 
+// Two regressions that shipped, both invisible on the custom draft and broken
+// on all 12 registry markets that declare an E-CLP curve. They live in how this
+// file calls the shared builders, so they are pinned here rather than in a unit
+// test that can reproduce the correct construction inline and pass either way.
+
+// `buildDayMarketConfig` keeps a declared `eclpParams` only while the requested
+// band still equals the declared one, and reads both off its `defaults`
+// argument. Setting the band on that object made it compare the request against
+// itself, so the guard never fired and the payout floor never reached the curve.
+const structuralStart = summary.indexOf("const structuralModel = useMemo(");
+const structuralEnd = summary.indexOf("const baseReturnTerms", structuralStart);
+const structural = summary.slice(structuralStart, structuralEnd);
+assert.ok(structuralStart >= 0 && structuralEnd > structuralStart);
+assert.doesNotMatch(
+  structural.slice(0, structural.indexOf("const terms:")),
+  /eclpBandWidth:/,
+  "The requested band must not sit on the object passed to buildDayMarketConfig as defaults, or its curve guard compares the band against a copy of itself",
+);
+assert.match(
+  structural,
+  /const terms: DayEditableTerms = \{[\s\S]*eclpBandWidth: inputs\.bandPct \/ 100/,
+  "The requested band belongs in terms, which is the side the guard compares",
+);
+
+// `dayCapitalAtUtilization` inverts liquidity against the raw deposit while
+// `newMarket` re-values it through the E-CLP; solving both legs at 100% gives a
+// stack the engine rejects by ~14ppm on every market that declares a curve.
+assert.match(
+  summary,
+  /dayCapitalAtUtilization\(sized, terms, 1\)[\s\S]{0,220}lt: balances\.lt/,
+  "The loss waterfall takes Junior to the boundary and leaves the pool on its admissible opening size",
+);
+
 console.log(
   `Day V3 unified model architecture: PASS (${modelFamilies.length}/${modelFamilies.length} shared model families)`,
 );

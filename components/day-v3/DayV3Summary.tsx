@@ -666,6 +666,14 @@ export default function DayV3Summary({
   const structuralModel = useMemo(() => {
     const coverage = inputs.coveragePct / 100;
     const minLiquidity = inputs.liquidityPct / 100;
+    // `eclpBandWidth` is deliberately NOT overwritten here. `buildDayMarketConfig`
+    // keeps a market's declared `eclpParams` only while the requested band still
+    // equals the declared one, and it reads both sides off the object passed as
+    // `defaults`. Overwriting the band here made it compare the request against
+    // a copy of itself, so the guard never fired and the declared curve was
+    // always retained: on the 12 registry markets that ship one, a $10 sale
+    // priced at 56.8 bps whether the payout floor was $99 or $50. Only the
+    // custom draft, which declares no curve, ever responded.
     const effective = {
       ...simulationDefaults,
       coverage,
@@ -674,13 +682,12 @@ export default function DayV3Summary({
       stableYield: inputs.quoteAssetYieldPct / 100,
       poolTurnoverPerYear: inputs.poolTurnoverPerYear,
       observationDays: inputs.observationDays,
-      eclpBandWidth: inputs.bandPct / 100,
       maintainCoverage: inputs.maintainCoverage,
     };
     const terms: DayEditableTerms = {
       coverage,
       minLiquidity,
-      eclpBandWidth: effective.eclpBandWidth,
+      eclpBandWidth: inputs.bandPct / 100,
       observationDays: effective.observationDays,
       riskYieldShare: effective.riskYDM.yTarget,
       liquidityYieldShare: effective.liqYDM.yTarget,
@@ -689,7 +696,8 @@ export default function DayV3Summary({
       ...buildDayMarketConfig(effective, terms),
       ...(inputs.engineOverrides ?? {}),
     };
-    const balances = buildDayInitialBalances(effective, terms);
+    const sized = { ...effective, eclpBandWidth: terms.eclpBandWidth };
+    const balances = buildDayInitialBalances(sized, terms);
     const opening = new Sim(cfg, balances);
     const openingSeniorNAV = opening.last().stEffectiveNAV;
     const requestedExitNAV =
@@ -724,12 +732,25 @@ export default function DayV3Summary({
       // meet its own liquidity requirement — measured: fine at a 0.1% band,
       // throws at 0.01%. That is a real answer about the design, so it is
       // caught and reported rather than taking the page down.
+      // Junior at the boundary, the pool left on its opening stack.
+      //
+      // `dayCapitalAtUtilization` inverts `liquidityUtilizationWad` against the
+      // raw deposit, but `newMarket` re-values that deposit through the E-CLP.
+      // For every market that declares a curve the two disagree by about 14
+      // parts per million, so a stack solved at exactly 100% liquidity
+      // utilization computes to 1.0000144 and is rejected — which silently cost
+      // 12 of the 13 markets their entire loss waterfall. Coverage utilization
+      // is what this model reads and the pool leg does not enter it, so the
+      // pool keeps the admissible opening size and Junior alone is taken to the
+      // boundary. Measured: 13 of 13 markets build.
       coverageExplainer: ((): DayExplainerMetrics["coverage"] | null => {
         try {
-          return buildDayExplainerMetrics(
-            cfg,
-            dayCapitalAtUtilization(effective, terms, 1),
-          ).coverage;
+          const boundary = dayCapitalAtUtilization(sized, terms, 1);
+          return buildDayExplainerMetrics(cfg, {
+            st: boundary.st,
+            jt: boundary.jt,
+            lt: balances.lt,
+          }).coverage;
         } catch {
           return null;
         }
@@ -759,6 +780,15 @@ export default function DayV3Summary({
       poolTurnoverPerYear: inputs.poolTurnoverPerYear,
       observationDays: inputs.observationDays,
       eclpBandWidth: inputs.bandPct / 100,
+      // `runDayTargetScenario` derives its own terms from this object, so the
+      // band can never differ from itself there and the curve guard can never
+      // fire. Dropping the declared curve is the only way to make the return
+      // model price the same pool the exit model does; the engine then derives
+      // one from the band, exactly as it does for a market that declares none.
+      eclpParams:
+        Math.abs(inputs.bandPct / 100 - simulationDefaults.eclpBandWidth) < 1e-12
+          ? simulationDefaults.eclpParams
+          : undefined,
       maintainCoverage: inputs.maintainCoverage,
     }),
     [

@@ -466,6 +466,8 @@ const restockView = {
   hurdle: restockHurdle,
   maximumDiscountPct: 5,
   policyBasis: "unresolved" as const,
+  selectedCurveInputPer100: 9.995,
+  selectedProceedsPer100: 9.735,
   selectedSalePer100: 10,
 };
 
