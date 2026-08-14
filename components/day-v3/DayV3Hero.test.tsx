@@ -15,7 +15,9 @@ assert.match(
   /Set how Senior yield is shared with Junior and SLP, choose the loss Senior should survive, and define the immediate exit/,
 );
 assert.match(hero, /inspect returns, capital requirements, and exit outcomes/);
-assert.match(hero, /text-\[clamp\(25px,2\.5vw,35px\)\]/);
+// The headline is fluid but capped well below a display size: this sits above
+// a dense input panel on a laptop, not on its own landing page.
+assert.match(hero, /text-\[clamp\(20px,1\.9vw,26px\)\]/);
 assert.match(hero, /lg:grid-cols-\[minmax\(0,1\.35fr\)_minmax\(390px,0\.65fr\)\]/);
 assert.match(hero, /Underlying yield/);
 assert.match(hero, /First-loss buffer/);

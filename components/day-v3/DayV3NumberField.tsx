@@ -138,17 +138,17 @@ function StableDayV3NumberField({
   return (
     <div
       className={cn(
-        "flex min-w-0 flex-col gap-2 rounded-xl border bg-[var(--card)] px-4 py-3 transition-[border-color,box-shadow]",
+        "flex min-w-0 flex-col gap-1.5 rounded-xl border bg-[var(--card)] px-3.5 py-2.5 transition-[border-color,box-shadow]",
         parsed.status === "invalid" || missing
           ? "border-[color-mix(in_srgb,var(--theme-brown)_60%,var(--border-subtle))]"
           : "border-[var(--border-subtle)] hover:border-[var(--secondary)] focus-within:border-[var(--foreground)] focus-within:shadow-[0_2px_10px_-4px_rgba(23,25,31,0.24)]",
         className,
       )}
     >
-      <div className="flex min-w-0 flex-col gap-2">
+      <div className="flex min-w-0 flex-col gap-1.5">
         <span className="flex items-start justify-between gap-3">
           <label
-            className="cursor-pointer text-[12.5px] font-semibold leading-snug"
+            className="cursor-pointer text-[12px] font-semibold leading-snug"
             htmlFor={id}
             id={labelId}
           >
@@ -174,11 +174,11 @@ function StableDayV3NumberField({
             <DayV3Origin origin={origin} />
           </span>
         </span>
-        <span className="flex items-center gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--foundation)] px-3 py-2 focus-within:border-[var(--foreground)]">
+        <span className="flex items-center gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--foundation)] px-2.5 py-1.5 focus-within:border-[var(--foreground)]">
           {prefix ? (
             <span
               aria-hidden="true"
-              className="shrink-0 font-mono text-[20px] font-bold leading-none text-[var(--secondary)]"
+              className="shrink-0 font-mono text-[17px] font-bold leading-none text-[var(--secondary)]"
             >
               {prefix}
             </span>
@@ -188,7 +188,7 @@ function StableDayV3NumberField({
             aria-invalid={parsed.status === "invalid"}
             aria-labelledby={labelId}
             aria-required={required}
-            className="min-w-0 flex-1 bg-transparent font-mono text-[20px] font-bold leading-none tabular-nums outline-none placeholder:font-sans placeholder:text-[13px] placeholder:font-normal placeholder:text-[var(--tertiary)]"
+            className="min-w-0 flex-1 bg-transparent font-mono text-[17px] font-bold leading-none tabular-nums outline-none placeholder:font-sans placeholder:text-[12px] placeholder:font-normal placeholder:text-[var(--tertiary)]"
             id={id}
             inputMode={wholeNumber ? "numeric" : "decimal"}
             max={max}
@@ -240,7 +240,7 @@ function StableDayV3NumberField({
           />
           <span
             aria-hidden="true"
-            className="shrink-0 text-[11px] font-semibold text-[var(--tertiary)]"
+            className="shrink-0 text-[10.5px] font-semibold text-[var(--tertiary)]"
           >
             {suffix}
           </span>
@@ -251,7 +251,7 @@ function StableDayV3NumberField({
       </div>
 
       {presets.length > 0 ? (
-        <div aria-label={`${label} common choices`} className="flex flex-wrap gap-1.5">
+        <div aria-label={`${label} common choices`} className="flex flex-wrap gap-1">
           {presets.map((preset) => (
             <DayV3Button
               aria-pressed={parsed.status === "valid" && parsed.value === preset.value}
@@ -280,7 +280,7 @@ function StableDayV3NumberField({
         </span>
       ) : null}
       <span
-        className="text-[10.5px] leading-relaxed text-[var(--tertiary)]"
+        className="text-[10px] leading-snug text-[var(--tertiary)]"
         id={noteId}
       >
         {note}

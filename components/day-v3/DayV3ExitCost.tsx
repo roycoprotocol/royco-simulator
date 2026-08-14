@@ -212,7 +212,7 @@ export default function DayV3ExitCost({
                 <span className="text-[9.5px] font-semibold uppercase tracking-[0.1em] text-[var(--tertiary)]">
                   Exit discount
                 </span>
-                <span className="font-mono text-[24px] font-bold leading-none tracking-[-0.02em] tabular-nums">
+                <span className="font-mono text-[19px] font-bold leading-none tracking-[-0.02em] tabular-nums">
                   {bps(selected.slippage)}
                 </span>
                 <span className="text-[10.5px] text-[var(--tertiary)]">
@@ -224,7 +224,7 @@ export default function DayV3ExitCost({
                   Given up
                 </span>
                 <span
-                  className="font-mono text-[24px] font-bold leading-none tracking-[-0.02em] tabular-nums"
+                  className="font-mono text-[19px] font-bold leading-none tracking-[-0.02em] tabular-nums"
                   style={{
                     color: costUSD > 0 ? "var(--red-emphasis)" : undefined,
                   }}
@@ -239,7 +239,7 @@ export default function DayV3ExitCost({
                 <span className="text-[9.5px] font-semibold uppercase tracking-[0.1em] text-[var(--tertiary)]">
                   Received
                 </span>
-                <span className="font-mono text-[24px] font-bold leading-none tracking-[-0.02em] tabular-nums">
+                <span className="font-mono text-[19px] font-bold leading-none tracking-[-0.02em] tabular-nums">
                   {amount(proceeds)}
                 </span>
                 <span className="text-[10.5px] text-[var(--tertiary)]">
@@ -251,6 +251,10 @@ export default function DayV3ExitCost({
               </div>
             </div>
 
+            {/* Chart and table read side by side at this width, the same
+                pairing the backtest uses: stacked they added about 300px of
+                scroll for two views of one curve. */}
+            <div className="grid min-w-0 grid-cols-1 items-start gap-4 xl:grid-cols-2">
             <DayV3ExitChart
               compactUsd={amount}
               marker={points[index]}
@@ -289,6 +293,7 @@ export default function DayV3ExitCost({
                 ))}
               </TableBody>
             </Table>
+            </div>
 
             <div
               className="flex flex-col gap-1.5 rounded-lg border px-3.5 py-3"

@@ -112,14 +112,14 @@ function ResultTile({
   value: string;
 }) {
   return (
-    <div className="flex min-w-0 flex-col gap-1 border-t border-[var(--border-subtle)] pt-3">
+    <div className="flex min-w-0 flex-col gap-0.5 border-t border-[var(--border-subtle)] pt-2.5">
       <span className="flex items-center justify-between gap-2">
         <span className="text-[9.5px] font-semibold uppercase tracking-[0.1em] text-[var(--tertiary)]">
           {label}
         </span>
         <DayV3Origin origin={origin} />
       </span>
-      <span className="font-mono text-[22px] font-bold leading-none tracking-[-0.02em] tabular-nums">
+      <span className="font-mono text-[18px] font-bold leading-none tracking-[-0.02em] tabular-nums">
         {value}
       </span>
       <span className="text-[10px] leading-snug text-[var(--tertiary)]">
@@ -264,21 +264,19 @@ export default function DayV3Goals({
         }
         title="Senior protection"
       >
-        <div className="flex flex-col gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--foundation)] p-3.5">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h4 className="text-[12.5px] font-semibold leading-tight">
-                Should Senior have first-loss protection?
-              </h4>
-              <p className="mt-1 text-[10.5px] leading-relaxed text-[var(--tertiary)]">
-                Turning this off removes Junior capital, lets Senior absorb
-                source losses directly, and greys out every Junior model below.
-              </p>
-            </div>
-            <DayV3Origin origin={inputOrigin(inputOrigins.drawdown)} />
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--foundation)] px-3.5 py-2.5">
+          <div className="min-w-0 flex-1">
+            <h4 className="text-[12px] font-semibold leading-tight">
+              Should Senior have first-loss protection?
+            </h4>
+            <p className="mt-0.5 text-[10px] leading-snug text-[var(--tertiary)]">
+              Off removes Junior capital, lets Senior absorb source losses
+              directly, and greys out every Junior model below.
+            </p>
           </div>
           <DayV3SegmentedControl
             ariaLabel="Senior first-loss protection"
+            className="shrink-0"
             onValueChange={(value) => {
               if (value === "off") {
                 onDrawdownPct(0);
@@ -292,6 +290,7 @@ export default function DayV3Goals({
               { label: "Add protection", value: "on" },
               { label: "No protection", value: "off" },
             ]}
+            size="sm"
             value={protectionDisabled ? "off" : "on"}
           />
         </div>
@@ -302,7 +301,7 @@ export default function DayV3Goals({
               label="What source drawdown should Senior survive without losing principal?"
               max={95}
               min={0.01}
-              note="This is the protection goal. We test it at the 100%-utilized boundary, then size opening Junior capital at the 90% target."
+              note="The protection goal, tested at the 100%-utilized boundary, then sized at the 90% target."
               onChange={onDrawdownPct}
               origin={inputOrigin(inputOrigins.drawdown)}
               placeholder="Choose a drawdown"
@@ -318,18 +317,19 @@ export default function DayV3Goals({
               required
             />
 
-            <div className="flex min-w-0 flex-col gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--foundation)] p-3.5">
+            <div className="flex min-w-0 flex-col gap-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--foundation)] px-3.5 py-2.5">
               <div>
-                <h4 className="text-[12.5px] font-semibold leading-tight">
+                <h4 className="text-[12px] font-semibold leading-tight">
                   How should temporary losses be observed?
                 </h4>
-                <p className="mt-1 text-[10.5px] leading-relaxed text-[var(--tertiary)]">
-                  This controls when a covered loss becomes permanent. It does
-                  not change the amount of Junior required.
+                <p className="mt-0.5 text-[10px] leading-snug text-[var(--tertiary)]">
+                  Controls when a covered loss becomes permanent. It does not
+                  change the amount of Junior required.
                 </p>
               </div>
               <DayV3SegmentedControl
                 ariaLabel="Observation mode"
+                size="sm"
                 onValueChange={(value) =>
                   onRecoveryMode(value as "none" | "window")
                 }
@@ -344,7 +344,7 @@ export default function DayV3Goals({
                   label="How long should a temporary loss have to recover?"
                   max={194}
                   min={1}
-                  note="This becomes Observation Period Duration. While it runs, withdrawals pause; a recovery restores Junior before the loss becomes permanent."
+                  note="Becomes Observation Period Duration. Withdrawals pause while it runs; a recovery restores Junior first."
                   onChange={onRecoveryDays}
                   placeholder="Enter days"
                   presets={[
@@ -455,21 +455,19 @@ export default function DayV3Goals({
         }
         title="Senior exit"
       >
-        <div className="flex flex-col gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--foundation)] p-3.5">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h4 className="text-[12.5px] font-semibold leading-tight">
-                Should Senior have an immediate pool exit?
-              </h4>
-              <p className="mt-1 text-[10.5px] leading-relaxed text-[var(--tertiary)]">
-                Turning this off removes the SLP and immediate pool exit,
-                and greys out every SLP model below.
-              </p>
-            </div>
-            <DayV3Origin origin={inputOrigin(inputOrigins.exitAmount)} />
+        <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-2 rounded-xl border border-[var(--border-subtle)] bg-[var(--foundation)] px-3.5 py-2.5">
+          <div className="min-w-0 flex-1">
+            <h4 className="text-[12px] font-semibold leading-tight">
+              Should Senior have an immediate pool exit?
+            </h4>
+            <p className="mt-0.5 text-[10px] leading-snug text-[var(--tertiary)]">
+              Off removes the SLP and immediate pool exit, and greys out every
+              SLP model below.
+            </p>
           </div>
           <DayV3SegmentedControl
             ariaLabel="Senior immediate pool exit"
+            className="shrink-0"
             onValueChange={(value) => {
               if (value === "off") {
                 onExitSharePct(0);
@@ -485,6 +483,7 @@ export default function DayV3Goals({
               { label: "Add immediate exit", value: "on" },
               { label: "No immediate exit", value: "off" },
             ]}
+            size="sm"
             value={exitDisabled ? "off" : "on"}
           />
         </div>
@@ -496,7 +495,7 @@ export default function DayV3Goals({
                 label="Out of every $100 Senior, how much should be sellable right away?"
                 max={100}
                 min={0.01}
-                note="Size for one sale, not for the lifetime of the market. This is what the pool must absorb in a single trade starting from rest, and it is what sets the SLP capital required. The pool does not stay drained: a sale leaves it below NAV, and outside desks that buy the discounted Senior and redeem it at NAV push it back to rest, which is what restores capacity for the next seller. Check below whether that trade actually pays."
+                note="One sale, not a lifetime cap: what the pool absorbs in a single trade from rest, which sets the SLP capital. Arbitrage pushes it back to rest afterwards — model 3 tests whether that pays."
                 onChange={onExitSharePct}
                 origin={inputOrigin(inputOrigins.exitAmount)}
                 placeholder="Choose an amount"
@@ -515,7 +514,7 @@ export default function DayV3Goals({
                 label="What is the least a seller should receive for $100 Senior?"
                 max={100}
                 min={0}
-                note="Worst case, not the expected case. This is the floor the design has to honour for a seller who takes the whole amount above in one trade, after fees. Smaller sales price nearer to NAV, so most sellers do better than this. Raising the floor buys a tighter worst case and costs more SLP capital to hold it; lowering it does the reverse."
+                note="Worst case, not expected: the fee-inclusive floor for a seller taking the whole amount above in one trade. Smaller sales price nearer NAV. A tighter floor costs more SLP capital."
                 onChange={onMinimumProceedsPer100}
                 origin={inputOrigin(inputOrigins.payout)}
                 placeholder="Choose a payout floor"

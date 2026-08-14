@@ -115,10 +115,9 @@ export default function DayV3RestockCheck({
           Test whether this works for arbitrageurs
         </CardTitle>
         <CardDescription>
-          A sale leaves the pool below NAV and it stays there until an outside
-          desk buys the discounted Senior and redeems it at NAV. Describe that
-          desk and this checks whether the trade pays. It changes nothing about
-          the market above.
+          A sale leaves the pool below NAV until an outside desk buys the
+          discounted Senior and redeems it at NAV. Describe that desk; this
+          checks whether the trade pays and changes nothing above.
         </CardDescription>
       </CardHeader>
 
@@ -274,15 +273,14 @@ export default function DayV3RestockCheck({
               </section>
             </div>
 
-            <p className="text-[9.5px] leading-relaxed text-[var(--tertiary)]">
+            <p className="text-[9.5px] leading-snug text-[var(--tertiary)]">
               Both discounts are fee-inclusive payouts from the exit design
-              above, not a reading off the illustrative pool.{" "}
+              above.{" "}
               {worstCaseBasis === "modeled"
                 ? "The worst case is the live template's lowest modeled payout."
-                : "Until the live template sizes the pool, the worst case is the payout floor you set, which the deployed pool must still honour."}{" "}
-              The Senior yield offset assumes the source performs at its modeled
-              rate over the wait. Royco Deploy revalidates this against the real
-              settlement and conversion schedule.
+                : "Until the template sizes the pool, it is the floor you set."}{" "}
+              The Senior offset assumes the source performs at its modeled rate.
+              Royco Deploy revalidates against the real settlement schedule.
             </p>
           </>
         )}

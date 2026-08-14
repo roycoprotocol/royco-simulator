@@ -1268,9 +1268,11 @@ export default function DayV3Summary({
   const defaultOpenInputId = nextInputStep?.id ?? null;
 
   return (
-    // Capped rather than full-bleed. Past about 1400px the cards stop gaining
-    // anything and the prose lines just get harder to track back to.
-    <main className="royco-v3 mx-auto flex w-full max-w-[1440px] flex-col gap-6 px-5 py-6 sm:px-8 sm:py-8">
+    // Capped well inside a laptop viewport. At 1440px a two-column input row
+    // gave each control a 644px cell to hold three characters, so every field
+    // read as a banner. At 1180px a cell is about 545px, which is a control
+    // with its label and its note on one comfortable measure.
+    <main className="royco-v3 mx-auto flex w-full max-w-[1180px] flex-col gap-5 px-5 py-6 sm:px-6 sm:py-7">
       <DayV3Hero />
 
       {/* One short questionnaire owns every visible model input. */}
@@ -1689,6 +1691,10 @@ export default function DayV3Summary({
                   }
                   title="Senior exit and pool depth"
                 >
+                  {/* Full width, not paired. Halving these cards to 541px
+                      pushes their own two-column interiors below the width
+                      their content needs, and the refill check grew from 700px
+                      to 889px for the privilege. */}
                   <div
                     className="flex min-w-0 flex-col gap-4"
                     data-model-column="exit"
