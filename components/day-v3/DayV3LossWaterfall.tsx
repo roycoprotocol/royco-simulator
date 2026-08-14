@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import DayV3DocsLink from "@/components/day-v3/DayV3DocsLink";
@@ -81,6 +81,13 @@ export default function DayV3LossWaterfall({
   // terms decide where the cover runs out, this decides how hard the source is
   // hit. Held as a grid index so the readout is always an engine point.
   const [rawIndex, setRawIndex] = useState(limitIndex);
+  // A protection-goal change replaces the entire accountant curve. Follow its
+  // new Senior-loss breakpoint unless the reader subsequently moves this
+  // scenario control; otherwise the marker appears stuck on a stress chosen
+  // for the previous market and makes the new coverage result look inert.
+  useEffect(() => {
+    setRawIndex(limitIndex);
+  }, [limitIndex]);
   const index = Math.min(rawIndex, points.length - 1);
   const selected = points[index];
   const seniorLoss = 100 - selected.senior;

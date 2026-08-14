@@ -1,6 +1,7 @@
 import { Sim, defaultConfig, steadyYear } from "@/lib/day/engine/runner";
 import type { MarketConfig } from "@/lib/day/engine/types";
 import { dayCapitalAtUtilization } from "@/lib/day-simulator-template/capital-sizing";
+import { dayLiquidationUtilizationFromExitBuffer } from "@/lib/day-simulator-template/deploy-fields";
 import type {
   DayForwardScenarioId,
   DayForwardTestCustomization,
@@ -129,6 +130,8 @@ export function buildDayMarketConfig(
 ): MarketConfig {
   return defaultConfig({
     coverage: terms.coverage,
+    // Royco Day v1.1.0 has one coinvested collateral ledger. The deprecated
+    // beta field remains in the engine adapter but no longer changes results.
     beta: 1,
     targetUtilization: DAY_TARGET_UTILIZATION,
     minLiquidity: terms.minLiquidity,
@@ -146,7 +149,13 @@ export function buildDayMarketConfig(
       y100: Math.max(defaults.liqYDM.y100, terms.liquidityYieldShare),
     },
     fixedTermDurationSec: terms.observationDays * 86_400,
-    liquidationUtilization: 100 / Math.max(defaults.exitBufferPct, 0.01),
+    // Deployment grace is target policy, not an issuer simulation default.
+    // V3 readiness must leave it unresolved until the selected template
+    // supplies it; ordinary simulator runs start after that launch-only window.
+    fixedTermGracePeriodSec: 0,
+    liquidationUtilization: dayLiquidationUtilizationFromExitBuffer(
+      defaults.exitBufferPct,
+    ),
     stSelfLiquidationBonus: defaults.selfLiquidationBonus,
     stProtocolFee: defaults.stProtocolFee,
     jtProtocolFee: defaults.jtProtocolFee,

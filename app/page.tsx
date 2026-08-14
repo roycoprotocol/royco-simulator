@@ -1,3 +1,3 @@
-// The current Day simulator lives at the root. `/v2` remains available as the
-// versioned address and renders the identical page.
-export { default, metadata } from "./v2/page";
+// V3 is the current Day simulator at the root. Both versioned routes remain
+// available for regression review and direct links.
+export { default, metadata } from "./v3/page";

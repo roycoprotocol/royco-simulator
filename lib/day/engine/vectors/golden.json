@@ -1,66 +1,332 @@
 {
-  "schemaVersion": 1,
+  "schemaVersion": 3,
+  "expectedVectorCount": 78,
+  "expectedVectorIds": [
+    "coverage-util-exact",
+    "coverage-util-one-wei-short",
+    "coverage-util-zero-buffer",
+    "liquidity-util-exact",
+    "liquidity-util-one-wei-short",
+    "coverage-util-zero-minimum",
+    "coverage-util-zero-collateral",
+    "coverage-util-half",
+    "coverage-util-over",
+    "coverage-util-one-wei",
+    "liquidity-util-zero-minimum",
+    "liquidity-util-zero-senior",
+    "liquidity-util-zero-pool",
+    "liquidity-util-half",
+    "liquidity-util-over",
+    "virtual-shares-healthy",
+    "virtual-shares-bootstrap",
+    "mint-dilution-clamp",
+    "virtual-value-redemption",
+    "premium-lpt-fe-carveout",
+    "virtual-shares-one-wei",
+    "virtual-shares-zero-supply",
+    "virtual-shares-wiped-large",
+    "virtual-value-zero-shares",
+    "virtual-value-zero-supply",
+    "virtual-value-full-supply",
+    "virtual-value-one-wei-share",
+    "covered-loss",
+    "partial-recovery",
+    "full-recovery",
+    "junior-wipe-and-senior-loss",
+    "loss-one-unit",
+    "loss-exactly-junior",
+    "loss-through-junior",
+    "gain-one-wei",
+    "gain-ten-units",
+    "loss-below-liquidation",
+    "loss-at-liquidation",
+    "flat-accounting-sync",
+    "loss-zero-duration",
+    "loss-maximum-v3-duration",
+    "loss-inside-deployment-grace",
+    "loss-at-deployment-grace-boundary",
+    "premium-same-block-instantaneous",
+    "premium-elapsed-zero-accumulators",
+    "premium-time-weighted-nondivisible",
+    "post-st-deposit",
+    "post-jt-deposit",
+    "post-lpt-deposit",
+    "post-st-redemption",
+    "post-jt-redemption",
+    "post-lpt-redemption",
+    "post-st-redemption-bonus",
+    "post-st-deposit-one",
+    "post-jt-deposit-one",
+    "post-lpt-deposit-one",
+    "post-st-redemption-one",
+    "post-jt-redemption-one",
+    "post-lpt-redemption-one",
+    "post-jt-redemption-preserves-il",
+    "fee-and-premium-mints",
+    "fee-mints-zero",
+    "fee-mints-st-only",
+    "fee-mints-jt-only",
+    "fee-mints-premium-fully-carved",
+    "self-liquidation-healthy",
+    "self-liquidation-breached",
+    "self-liquidation-at-threshold",
+    "self-liquidation-one-wei-below",
+    "self-liquidation-one-wei-above",
+    "adaptive-initial-zero-util",
+    "adaptive-initial-half-target-util",
+    "adaptive-initial-target-util",
+    "adaptive-initial-mid-upper-util",
+    "adaptive-initial-full-util",
+    "adaptive-high-util-30d",
+    "adaptive-frozen-fixed-term",
+    "adaptive-unsaturated-one-day"
+  ],
   "provenance": {
     "repository": "https://github.com/roycoprotocol/royco-day",
-    "commit": "952d22968968a43bbb80e4b892bc1aa3ba20c12d",
+    "commit": "9764c9e20c8e8af7df1358f228c4be83b78be97f",
     "solc": "0.8.35",
+    "foundry": "1.7.1",
     "harness": "lib/day/engine/harness/DayVectorGen.t.sol",
-    "harnessSha256": "43b4be678bce8c4c7a10c7d4a662ea451b202b780825852581acbf176d231af3",
+    "harnessSha256": "89934cfbb6d9b162636127c261cd507509b0f7b046e1a7d429cab14d9975f6e7",
     "generator": "scripts/day-simulator/generate-day-vectors.mjs"
   },
   "requiredGroups": [
+    "coverage-utilization",
     "liquidity-utilization",
     "rounding-boundaries",
+    "virtual-share-valuation",
     "premium-share-mint",
     "mint-dilution-clamp",
-    "nonzero-fees",
-    "lt-raw-commit",
+    "waterfall",
+    "recovery",
+    "fixed-term-grace",
+    "premium-accounting",
     "post-operations",
-    "operation-gates",
-    "premium-reinvestment",
-    "self-liquidation"
+    "jt-il-post-operation",
+    "fee-processing",
+    "self-liquidation",
+    "adaptive-ydm-v2"
   ],
   "vectors": [
     {
-      "id": "liq-util-exact",
+      "id": "coverage-util-exact",
+      "group": "coverage-utilization",
+      "kind": "coverageUtilization",
+      "inputs": {
+        "collateralNAV": "1200000000000000000000",
+        "minCoverageWAD": "100000000000000000",
+        "jtEffectiveNAV": "200000000000000000000"
+      },
+      "outputs": {
+        "value": "600000000000000000"
+      }
+    },
+    {
+      "id": "coverage-util-one-wei-short",
+      "group": "rounding-boundaries",
+      "kind": "coverageUtilization",
+      "inputs": {
+        "collateralNAV": "1200000000000000000000",
+        "minCoverageWAD": "100000000000000000",
+        "jtEffectiveNAV": "199999999999999999999"
+      },
+      "outputs": {
+        "value": "600000000000000001"
+      }
+    },
+    {
+      "id": "coverage-util-zero-buffer",
+      "group": "rounding-boundaries",
+      "kind": "coverageUtilization",
+      "inputs": {
+        "collateralNAV": "1200000000000000000000",
+        "minCoverageWAD": "100000000000000000",
+        "jtEffectiveNAV": "0"
+      },
+      "outputs": {
+        "value": "115792089237316195423570985008687907853269984665640564039457584007913129639935"
+      }
+    },
+    {
+      "id": "liquidity-util-exact",
       "group": "liquidity-utilization",
       "kind": "liquidityUtilization",
       "inputs": {
-        "stEffective": "1000000000000000000000",
+        "stEffectiveNAV": "1000000000000000000000",
         "minLiquidityWAD": "50000000000000000",
-        "ltRaw": "50000000000000000000"
+        "lptRawNAV": "50000000000000000000"
       },
       "outputs": {
         "value": "1000000000000000000"
       }
     },
     {
-      "id": "liq-util-one-wei-short",
+      "id": "liquidity-util-one-wei-short",
       "group": "rounding-boundaries",
       "kind": "liquidityUtilization",
       "inputs": {
-        "stEffective": "1000000000000000000000",
+        "stEffectiveNAV": "1000000000000000000000",
         "minLiquidityWAD": "50000000000000000",
-        "ltRaw": "49999999999999999999"
+        "lptRawNAV": "49999999999999999999"
       },
       "outputs": {
         "value": "1000000000000000001"
       }
     },
     {
-      "id": "premium-and-fee-share-mint",
-      "group": "premium-share-mint",
-      "kind": "feePremiumShares",
+      "id": "coverage-util-zero-minimum",
+      "group": "coverage-utilization",
+      "kind": "coverageUtilization",
       "inputs": {
-        "stEffective": "1120000000000000000000",
-        "premium": "10000000000000000000",
-        "fee": "5000000000000000000",
+        "collateralNAV": "1200000000000000000000",
+        "minCoverageWAD": "0",
+        "jtEffectiveNAV": "0"
+      },
+      "outputs": {
+        "value": "0"
+      }
+    },
+    {
+      "id": "coverage-util-zero-collateral",
+      "group": "coverage-utilization",
+      "kind": "coverageUtilization",
+      "inputs": {
+        "collateralNAV": "0",
+        "minCoverageWAD": "100000000000000000",
+        "jtEffectiveNAV": "0"
+      },
+      "outputs": {
+        "value": "0"
+      }
+    },
+    {
+      "id": "coverage-util-half",
+      "group": "coverage-utilization",
+      "kind": "coverageUtilization",
+      "inputs": {
+        "collateralNAV": "1200000000000000000000",
+        "minCoverageWAD": "100000000000000000",
+        "jtEffectiveNAV": "240000000000000000000"
+      },
+      "outputs": {
+        "value": "500000000000000000"
+      }
+    },
+    {
+      "id": "coverage-util-over",
+      "group": "coverage-utilization",
+      "kind": "coverageUtilization",
+      "inputs": {
+        "collateralNAV": "1200000000000000000000",
+        "minCoverageWAD": "300000000000000000",
+        "jtEffectiveNAV": "100000000000000000000"
+      },
+      "outputs": {
+        "value": "3600000000000000000"
+      }
+    },
+    {
+      "id": "coverage-util-one-wei",
+      "group": "rounding-boundaries",
+      "kind": "coverageUtilization",
+      "inputs": {
+        "collateralNAV": "1",
+        "minCoverageWAD": "1000000000000000000",
+        "jtEffectiveNAV": "1"
+      },
+      "outputs": {
+        "value": "1000000000000000000"
+      }
+    },
+    {
+      "id": "liquidity-util-zero-minimum",
+      "group": "liquidity-utilization",
+      "kind": "liquidityUtilization",
+      "inputs": {
+        "stEffectiveNAV": "1000000000000000000000",
+        "minLiquidityWAD": "0",
+        "lptRawNAV": "0"
+      },
+      "outputs": {
+        "value": "0"
+      }
+    },
+    {
+      "id": "liquidity-util-zero-senior",
+      "group": "liquidity-utilization",
+      "kind": "liquidityUtilization",
+      "inputs": {
+        "stEffectiveNAV": "0",
+        "minLiquidityWAD": "50000000000000000",
+        "lptRawNAV": "0"
+      },
+      "outputs": {
+        "value": "0"
+      }
+    },
+    {
+      "id": "liquidity-util-zero-pool",
+      "group": "liquidity-utilization",
+      "kind": "liquidityUtilization",
+      "inputs": {
+        "stEffectiveNAV": "1000000000000000000000",
+        "minLiquidityWAD": "50000000000000000",
+        "lptRawNAV": "0"
+      },
+      "outputs": {
+        "value": "115792089237316195423570985008687907853269984665640564039457584007913129639935"
+      }
+    },
+    {
+      "id": "liquidity-util-half",
+      "group": "liquidity-utilization",
+      "kind": "liquidityUtilization",
+      "inputs": {
+        "stEffectiveNAV": "1000000000000000000000",
+        "minLiquidityWAD": "50000000000000000",
+        "lptRawNAV": "100000000000000000000"
+      },
+      "outputs": {
+        "value": "500000000000000000"
+      }
+    },
+    {
+      "id": "liquidity-util-over",
+      "group": "liquidity-utilization",
+      "kind": "liquidityUtilization",
+      "inputs": {
+        "stEffectiveNAV": "1000000000000000000000",
+        "minLiquidityWAD": "200000000000000000",
+        "lptRawNAV": "50000000000000000000"
+      },
+      "outputs": {
+        "value": "4000000000000000000"
+      }
+    },
+    {
+      "id": "virtual-shares-healthy",
+      "group": "virtual-share-valuation",
+      "kind": "sharesForValue",
+      "inputs": {
+        "value": "10000000000000000000",
+        "totalValue": "1000000000000000000000",
         "supply": "1000000000000000000000"
       },
       "outputs": {
-        "premiumShares": "9049773755656108597",
-        "feeShares": "4524886877828054298",
-        "supplyAfter": "1013574660633484162895"
+        "shares": "10000000000000000000"
+      }
+    },
+    {
+      "id": "virtual-shares-bootstrap",
+      "group": "virtual-share-valuation",
+      "kind": "sharesForValue",
+      "inputs": {
+        "value": "10000000000000000000",
+        "totalValue": "0",
+        "supply": "0"
+      },
+      "outputs": {
+        "shares": "10000000000000000000"
       }
     },
     {
@@ -73,184 +339,700 @@
         "supply": "1000000000000000000"
       },
       "outputs": {
-        "shares": "999999999999000000000000000000"
+        "shares": "999999999999000000999999999999"
       }
     },
     {
-      "id": "nonzero-four-fees-sync",
-      "group": "nonzero-fees",
-      "kind": "accountantSync",
+      "id": "virtual-value-redemption",
+      "group": "virtual-share-valuation",
+      "kind": "valueForShares",
       "inputs": {
-        "seedST": "1000000000000000000000",
-        "seedJT": "200000000000000000000",
-        "seedLT": "100000000000000000000",
-        "newST": "1100000000000000000000",
-        "newJT": "220000000000000000000",
-        "jtShareWAD": "200000000000000000",
-        "ltShareWAD": "100000000000000000",
-        "elapsed": "86400"
+        "shares": "10000000000000000000",
+        "supply": "1000000000000000000000",
+        "totalValue": "1200000000000000000000"
       },
       "outputs": {
-        "marketState": "PERPETUAL",
-        "stRaw": "1100000000000000000000",
-        "jtRaw": "220000000000000000000",
-        "ltRaw": "0",
-        "stEffective": "1080000000000000000000",
-        "jtEffective": "240000000000000000000",
-        "jtIL": "0",
-        "liquidityPremium": "10000000000000000000",
-        "stFee": "7000000000000000000",
-        "jtFee": "4000000000000000000",
-        "ltFee": "1000000000000000000",
-        "coverageUtilWAD": "550000000000000000",
-        "liquidityUtilWAD": "0"
+        "value": "11999999999999999999"
       }
     },
     {
-      "id": "fee-st-only",
-      "group": "nonzero-fees",
-      "kind": "accountantSync",
+      "id": "premium-lpt-fe-carveout",
+      "group": "premium-share-mint",
+      "kind": "feePremiumShares",
       "inputs": {
-        "seedST": "1000000000000000000000",
-        "seedJT": "200000000000000000000",
-        "seedLT": "100000000000000000000",
-        "newST": "1100000000000000000000",
-        "newJT": "220000000000000000000",
-        "jtShareWAD": "200000000000000000",
-        "ltShareWAD": "100000000000000000",
-        "elapsed": "86400",
-        "stFeeRate": "100000000000000000",
-        "jtFeeRate": "0",
-        "jtShareFeeRate": "0",
-        "ltShareFeeRate": "0"
+        "stEffective": "1120000000000000000000",
+        "grossPremium": "10000000000000000000",
+        "stFee": "5000000000000000000",
+        "lptFee": "1000000000000000000",
+        "supply": "1000000000000000000000"
       },
       "outputs": {
-        "marketState": "PERPETUAL",
-        "stRaw": "1100000000000000000000",
-        "jtRaw": "220000000000000000000",
-        "ltRaw": "0",
-        "stEffective": "1080000000000000000000",
-        "jtEffective": "240000000000000000000",
-        "jtIL": "0",
-        "liquidityPremium": "10000000000000000000",
-        "stFee": "7000000000000000000",
-        "jtFee": "0",
-        "ltFee": "0",
-        "coverageUtilWAD": "550000000000000000",
-        "liquidityUtilWAD": "0"
+        "premiumShares": "8144796380090497737",
+        "feeShares": "5429864253393665158",
+        "supplyAfter": "1013574660633484162895"
       }
     },
     {
-      "id": "fee-jt-only",
-      "group": "nonzero-fees",
-      "kind": "accountantSync",
+      "id": "virtual-shares-one-wei",
+      "group": "rounding-boundaries",
+      "kind": "sharesForValue",
       "inputs": {
-        "seedST": "1000000000000000000000",
-        "seedJT": "200000000000000000000",
-        "seedLT": "100000000000000000000",
-        "newST": "1100000000000000000000",
-        "newJT": "220000000000000000000",
-        "jtShareWAD": "200000000000000000",
-        "ltShareWAD": "100000000000000000",
-        "elapsed": "86400",
-        "stFeeRate": "0",
-        "jtFeeRate": "100000000000000000",
-        "jtShareFeeRate": "0",
-        "ltShareFeeRate": "0"
+        "value": "1",
+        "totalValue": "1000000000000000000000",
+        "supply": "1000000000000000000000"
       },
       "outputs": {
-        "marketState": "PERPETUAL",
-        "stRaw": "1100000000000000000000",
-        "jtRaw": "220000000000000000000",
-        "ltRaw": "0",
-        "stEffective": "1080000000000000000000",
-        "jtEffective": "240000000000000000000",
-        "jtIL": "0",
-        "liquidityPremium": "10000000000000000000",
-        "stFee": "0",
-        "jtFee": "2000000000000000000",
-        "ltFee": "0",
-        "coverageUtilWAD": "550000000000000000",
-        "liquidityUtilWAD": "0"
+        "shares": "1"
       }
     },
     {
-      "id": "fee-jt-yield-share-only",
-      "group": "nonzero-fees",
-      "kind": "accountantSync",
+      "id": "virtual-shares-zero-supply",
+      "group": "virtual-share-valuation",
+      "kind": "sharesForValue",
       "inputs": {
-        "seedST": "1000000000000000000000",
-        "seedJT": "200000000000000000000",
-        "seedLT": "100000000000000000000",
-        "newST": "1100000000000000000000",
-        "newJT": "220000000000000000000",
-        "jtShareWAD": "200000000000000000",
-        "ltShareWAD": "100000000000000000",
-        "elapsed": "86400",
-        "stFeeRate": "0",
-        "jtFeeRate": "0",
-        "jtShareFeeRate": "100000000000000000",
-        "ltShareFeeRate": "0"
+        "value": "10000000000000000000",
+        "totalValue": "1000000000000000000000",
+        "supply": "0"
       },
       "outputs": {
-        "marketState": "PERPETUAL",
-        "stRaw": "1100000000000000000000",
-        "jtRaw": "220000000000000000000",
-        "ltRaw": "0",
-        "stEffective": "1080000000000000000000",
-        "jtEffective": "240000000000000000000",
-        "jtIL": "0",
-        "liquidityPremium": "10000000000000000000",
-        "stFee": "0",
-        "jtFee": "2000000000000000000",
-        "ltFee": "0",
-        "coverageUtilWAD": "550000000000000000",
-        "liquidityUtilWAD": "0"
+        "shares": "0"
       }
     },
     {
-      "id": "fee-lt-yield-share-only",
-      "group": "nonzero-fees",
-      "kind": "accountantSync",
+      "id": "virtual-shares-wiped-large",
+      "group": "mint-dilution-clamp",
+      "kind": "sharesForValue",
       "inputs": {
-        "seedST": "1000000000000000000000",
-        "seedJT": "200000000000000000000",
-        "seedLT": "100000000000000000000",
-        "newST": "1100000000000000000000",
-        "newJT": "220000000000000000000",
-        "jtShareWAD": "200000000000000000",
-        "ltShareWAD": "100000000000000000",
-        "elapsed": "86400",
-        "stFeeRate": "0",
-        "jtFeeRate": "0",
-        "jtShareFeeRate": "0",
-        "ltShareFeeRate": "100000000000000000"
+        "value": "10000000000000000000",
+        "totalValue": "0",
+        "supply": "1000000000000000000000"
       },
       "outputs": {
-        "marketState": "PERPETUAL",
-        "stRaw": "1100000000000000000000",
-        "jtRaw": "220000000000000000000",
-        "ltRaw": "0",
-        "stEffective": "1080000000000000000000",
-        "jtEffective": "240000000000000000000",
-        "jtIL": "0",
-        "liquidityPremium": "10000000000000000000",
+        "shares": "999999999999000000000999999999999"
+      }
+    },
+    {
+      "id": "virtual-value-zero-shares",
+      "group": "virtual-share-valuation",
+      "kind": "valueForShares",
+      "inputs": {
+        "shares": "0",
+        "supply": "1000000000000000000000",
+        "totalValue": "1200000000000000000000"
+      },
+      "outputs": {
+        "value": "0"
+      }
+    },
+    {
+      "id": "virtual-value-zero-supply",
+      "group": "virtual-share-valuation",
+      "kind": "valueForShares",
+      "inputs": {
+        "shares": "10000000000000000000",
+        "supply": "0",
+        "totalValue": "0"
+      },
+      "outputs": {
+        "value": "10000000000000000000"
+      }
+    },
+    {
+      "id": "virtual-value-full-supply",
+      "group": "virtual-share-valuation",
+      "kind": "valueForShares",
+      "inputs": {
+        "shares": "1000000000000000000000",
+        "supply": "1000000000000000000000",
+        "totalValue": "1200000000000000000000"
+      },
+      "outputs": {
+        "value": "1199999999999999999999"
+      }
+    },
+    {
+      "id": "virtual-value-one-wei-share",
+      "group": "rounding-boundaries",
+      "kind": "valueForShares",
+      "inputs": {
+        "shares": "1",
+        "supply": "1000000000000000000000",
+        "totalValue": "1200000000000000000000"
+      },
+      "outputs": {
+        "value": "1"
+      }
+    },
+    {
+      "id": "covered-loss",
+      "group": "waterfall",
+      "kind": "accountantSync",
+      "inputs": {
+        "seedCollateral": "1300000000000000000000",
+        "seedST": "1000000000000000000000",
+        "seedJT": "300000000000000000000",
+        "newCollateral": "1170000000000000000000",
+        "fixedTermDurationSec": "604800",
+        "graceSec": "0"
+      },
+      "outputs": {
+        "marketState": "FIXED_TERM",
+        "collateralNAV": "1170000000000000000000",
+        "lptRawNAV": "0",
+        "stEffective": "1000000000000000000000",
+        "jtEffective": "170000000000000000000",
+        "jtIL": "130000000000000000000",
+        "liquidityPremium": "0",
         "stFee": "0",
         "jtFee": "0",
-        "ltFee": "1000000000000000000",
-        "coverageUtilWAD": "550000000000000000",
-        "liquidityUtilWAD": "0"
+        "lptFee": "0",
+        "coverageUtilWAD": "688235294117647059",
+        "liquidityUtilWAD": "0",
+        "fixedTermEndTimestamp": "604801"
       }
     },
     {
-      "id": "post-mint-lt-raw-commit",
-      "group": "lt-raw-commit",
-      "kind": "ltCommit",
+      "id": "partial-recovery",
+      "group": "recovery",
+      "kind": "accountantSync",
       "inputs": {
-        "ltRaw": "123000000000000000000"
+        "seedCollateral": "1170000000000000000000",
+        "seedST": "1000000000000000000000",
+        "seedJT": "170000000000000000000",
+        "seedJTIL": "130000000000000000000",
+        "newCollateral": "1230000000000000000000",
+        "fixedTermDurationSec": "604800",
+        "graceSec": "0"
       },
       "outputs": {
-        "lastLTRawNAV": "123000000000000000000"
+        "marketState": "FIXED_TERM",
+        "collateralNAV": "1230000000000000000000",
+        "lptRawNAV": "0",
+        "stEffective": "1000000000000000000000",
+        "jtEffective": "230000000000000000000",
+        "jtIL": "70000000000000000000",
+        "liquidityPremium": "0",
+        "stFee": "0",
+        "jtFee": "0",
+        "lptFee": "0",
+        "coverageUtilWAD": "534782608695652174",
+        "liquidityUtilWAD": "0",
+        "fixedTermEndTimestamp": "604801"
+      }
+    },
+    {
+      "id": "full-recovery",
+      "group": "recovery",
+      "kind": "accountantSync",
+      "inputs": {
+        "seedCollateral": "1230000000000000000000",
+        "seedST": "1000000000000000000000",
+        "seedJT": "230000000000000000000",
+        "seedJTIL": "70000000000000000000",
+        "newCollateral": "1300000000000000000000",
+        "fixedTermDurationSec": "604800",
+        "graceSec": "0"
+      },
+      "outputs": {
+        "marketState": "PERPETUAL",
+        "collateralNAV": "1300000000000000000000",
+        "lptRawNAV": "0",
+        "stEffective": "1000000000000000000000",
+        "jtEffective": "300000000000000000000",
+        "jtIL": "0",
+        "liquidityPremium": "0",
+        "stFee": "0",
+        "jtFee": "0",
+        "lptFee": "0",
+        "coverageUtilWAD": "433333333333333334",
+        "liquidityUtilWAD": "0",
+        "fixedTermEndTimestamp": "0"
+      }
+    },
+    {
+      "id": "junior-wipe-and-senior-loss",
+      "group": "waterfall",
+      "kind": "accountantSync",
+      "inputs": {
+        "seedCollateral": "1200000000000000000000",
+        "seedST": "1000000000000000000000",
+        "seedJT": "200000000000000000000",
+        "newCollateral": "600000000000000000000",
+        "fixedTermDurationSec": "604800",
+        "graceSec": "0"
+      },
+      "outputs": {
+        "marketState": "PERPETUAL",
+        "collateralNAV": "600000000000000000000",
+        "lptRawNAV": "0",
+        "stEffective": "600000000000000000000",
+        "jtEffective": "0",
+        "jtIL": "0",
+        "liquidityPremium": "0",
+        "stFee": "0",
+        "jtFee": "0",
+        "lptFee": "0",
+        "coverageUtilWAD": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+        "liquidityUtilWAD": "0",
+        "fixedTermEndTimestamp": "0"
+      }
+    },
+    {
+      "id": "loss-one-unit",
+      "group": "waterfall",
+      "kind": "accountantSync",
+      "inputs": {
+        "seedCollateral": "1300000000000000000000",
+        "seedST": "1000000000000000000000",
+        "seedJT": "300000000000000000000",
+        "newCollateral": "1299000000000000000000",
+        "fixedTermDurationSec": "604800",
+        "graceSec": "0"
+      },
+      "outputs": {
+        "marketState": "FIXED_TERM",
+        "collateralNAV": "1299000000000000000000",
+        "lptRawNAV": "0",
+        "stEffective": "1000000000000000000000",
+        "jtEffective": "299000000000000000000",
+        "jtIL": "1000000000000000000",
+        "liquidityPremium": "0",
+        "stFee": "0",
+        "jtFee": "0",
+        "lptFee": "0",
+        "coverageUtilWAD": "434448160535117057",
+        "liquidityUtilWAD": "0",
+        "fixedTermEndTimestamp": "604801"
+      }
+    },
+    {
+      "id": "loss-exactly-junior",
+      "group": "waterfall",
+      "kind": "accountantSync",
+      "inputs": {
+        "seedCollateral": "1200000000000000000000",
+        "seedST": "1000000000000000000000",
+        "seedJT": "200000000000000000000",
+        "newCollateral": "1000000000000000000000",
+        "fixedTermDurationSec": "604800",
+        "graceSec": "0"
+      },
+      "outputs": {
+        "marketState": "PERPETUAL",
+        "collateralNAV": "1000000000000000000000",
+        "lptRawNAV": "0",
+        "stEffective": "1000000000000000000000",
+        "jtEffective": "0",
+        "jtIL": "0",
+        "liquidityPremium": "0",
+        "stFee": "0",
+        "jtFee": "0",
+        "lptFee": "0",
+        "coverageUtilWAD": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+        "liquidityUtilWAD": "0",
+        "fixedTermEndTimestamp": "0"
+      }
+    },
+    {
+      "id": "loss-through-junior",
+      "group": "waterfall",
+      "kind": "accountantSync",
+      "inputs": {
+        "seedCollateral": "1200000000000000000000",
+        "seedST": "1000000000000000000000",
+        "seedJT": "200000000000000000000",
+        "newCollateral": "999000000000000000000",
+        "fixedTermDurationSec": "604800",
+        "graceSec": "0"
+      },
+      "outputs": {
+        "marketState": "PERPETUAL",
+        "collateralNAV": "999000000000000000000",
+        "lptRawNAV": "0",
+        "stEffective": "999000000000000000000",
+        "jtEffective": "0",
+        "jtIL": "0",
+        "liquidityPremium": "0",
+        "stFee": "0",
+        "jtFee": "0",
+        "lptFee": "0",
+        "coverageUtilWAD": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+        "liquidityUtilWAD": "0",
+        "fixedTermEndTimestamp": "0"
+      }
+    },
+    {
+      "id": "gain-one-wei",
+      "group": "waterfall",
+      "kind": "accountantSync",
+      "inputs": {
+        "seedCollateral": "1200000000000000000000",
+        "seedST": "1000000000000000000000",
+        "seedJT": "200000000000000000000",
+        "newCollateral": "1200000000000000000001",
+        "fixedTermDurationSec": "604800",
+        "graceSec": "0"
+      },
+      "outputs": {
+        "marketState": "PERPETUAL",
+        "collateralNAV": "1200000000000000000001",
+        "lptRawNAV": "0",
+        "stEffective": "1000000000000000000000",
+        "jtEffective": "200000000000000000001",
+        "jtIL": "0",
+        "liquidityPremium": "0",
+        "stFee": "0",
+        "jtFee": "0",
+        "lptFee": "0",
+        "coverageUtilWAD": "600000000000000000",
+        "liquidityUtilWAD": "0",
+        "fixedTermEndTimestamp": "0"
+      }
+    },
+    {
+      "id": "gain-ten-units",
+      "group": "waterfall",
+      "kind": "accountantSync",
+      "inputs": {
+        "seedCollateral": "1200000000000000000000",
+        "seedST": "1000000000000000000000",
+        "seedJT": "200000000000000000000",
+        "newCollateral": "1210000000000000000000",
+        "fixedTermDurationSec": "604800",
+        "graceSec": "0"
+      },
+      "outputs": {
+        "marketState": "PERPETUAL",
+        "collateralNAV": "1210000000000000000000",
+        "lptRawNAV": "0",
+        "stEffective": "1008333333333333333333",
+        "jtEffective": "201666666666666666667",
+        "jtIL": "0",
+        "liquidityPremium": "0",
+        "stFee": "0",
+        "jtFee": "0",
+        "lptFee": "0",
+        "coverageUtilWAD": "600000000000000000",
+        "liquidityUtilWAD": "0",
+        "fixedTermEndTimestamp": "0"
+      }
+    },
+    {
+      "id": "loss-below-liquidation",
+      "group": "waterfall",
+      "kind": "accountantSync",
+      "inputs": {
+        "seedCollateral": "1200000000000000000000",
+        "seedST": "1000000000000000000000",
+        "seedJT": "200000000000000000000",
+        "newCollateral": "1110000000000000000000",
+        "fixedTermDurationSec": "604800",
+        "graceSec": "0"
+      },
+      "outputs": {
+        "marketState": "FIXED_TERM",
+        "collateralNAV": "1110000000000000000000",
+        "lptRawNAV": "0",
+        "stEffective": "1000000000000000000000",
+        "jtEffective": "110000000000000000000",
+        "jtIL": "90000000000000000000",
+        "liquidityPremium": "0",
+        "stFee": "0",
+        "jtFee": "0",
+        "lptFee": "0",
+        "coverageUtilWAD": "1009090909090909091",
+        "liquidityUtilWAD": "0",
+        "fixedTermEndTimestamp": "604801"
+      }
+    },
+    {
+      "id": "loss-at-liquidation",
+      "group": "waterfall",
+      "kind": "accountantSync",
+      "inputs": {
+        "seedCollateral": "1200000000000000000000",
+        "seedST": "1000000000000000000000",
+        "seedJT": "200000000000000000000",
+        "newCollateral": "1100000000000000000000",
+        "fixedTermDurationSec": "604800",
+        "graceSec": "0"
+      },
+      "outputs": {
+        "marketState": "PERPETUAL",
+        "collateralNAV": "1100000000000000000000",
+        "lptRawNAV": "0",
+        "stEffective": "1000000000000000000000",
+        "jtEffective": "100000000000000000000",
+        "jtIL": "0",
+        "liquidityPremium": "0",
+        "stFee": "0",
+        "jtFee": "0",
+        "lptFee": "0",
+        "coverageUtilWAD": "1100000000000000000",
+        "liquidityUtilWAD": "0",
+        "fixedTermEndTimestamp": "0"
+      }
+    },
+    {
+      "id": "flat-accounting-sync",
+      "group": "waterfall",
+      "kind": "accountantSync",
+      "inputs": {
+        "seedCollateral": "1200000000000000000000",
+        "seedST": "1000000000000000000000",
+        "seedJT": "200000000000000000000",
+        "newCollateral": "1200000000000000000000",
+        "fixedTermDurationSec": "604800",
+        "graceSec": "0"
+      },
+      "outputs": {
+        "marketState": "PERPETUAL",
+        "collateralNAV": "1200000000000000000000",
+        "lptRawNAV": "0",
+        "stEffective": "1000000000000000000000",
+        "jtEffective": "200000000000000000000",
+        "jtIL": "0",
+        "liquidityPremium": "0",
+        "stFee": "0",
+        "jtFee": "0",
+        "lptFee": "0",
+        "coverageUtilWAD": "600000000000000000",
+        "liquidityUtilWAD": "0",
+        "fixedTermEndTimestamp": "0"
+      }
+    },
+    {
+      "id": "loss-zero-duration",
+      "group": "waterfall",
+      "kind": "accountantSync",
+      "inputs": {
+        "seedCollateral": "1200000000000000000000",
+        "seedST": "1000000000000000000000",
+        "seedJT": "200000000000000000000",
+        "newCollateral": "1150000000000000000000",
+        "fixedTermDurationSec": "0",
+        "graceSec": "0"
+      },
+      "outputs": {
+        "marketState": "PERPETUAL",
+        "collateralNAV": "1150000000000000000000",
+        "lptRawNAV": "0",
+        "stEffective": "1000000000000000000000",
+        "jtEffective": "150000000000000000000",
+        "jtIL": "0",
+        "liquidityPremium": "0",
+        "stFee": "0",
+        "jtFee": "0",
+        "lptFee": "0",
+        "coverageUtilWAD": "766666666666666667",
+        "liquidityUtilWAD": "0",
+        "fixedTermEndTimestamp": "0"
+      }
+    },
+    {
+      "id": "loss-maximum-v3-duration",
+      "group": "waterfall",
+      "kind": "accountantSync",
+      "inputs": {
+        "seedCollateral": "1200000000000000000000",
+        "seedST": "1000000000000000000000",
+        "seedJT": "200000000000000000000",
+        "newCollateral": "1150000000000000000000",
+        "fixedTermDurationSec": "16761600",
+        "graceSec": "0"
+      },
+      "outputs": {
+        "marketState": "FIXED_TERM",
+        "collateralNAV": "1150000000000000000000",
+        "lptRawNAV": "0",
+        "stEffective": "1000000000000000000000",
+        "jtEffective": "150000000000000000000",
+        "jtIL": "50000000000000000000",
+        "liquidityPremium": "0",
+        "stFee": "0",
+        "jtFee": "0",
+        "lptFee": "0",
+        "coverageUtilWAD": "766666666666666667",
+        "liquidityUtilWAD": "0",
+        "fixedTermEndTimestamp": "16761601"
+      }
+    },
+    {
+      "id": "loss-inside-deployment-grace",
+      "group": "fixed-term-grace",
+      "kind": "accountantSync",
+      "inputs": {
+        "seedCollateral": "1300000000000000000000",
+        "seedST": "1000000000000000000000",
+        "seedJT": "300000000000000000000",
+        "newCollateral": "1200000000000000000000",
+        "fixedTermDurationSec": "604800",
+        "graceSec": "2592000",
+        "elapsed": "0"
+      },
+      "outputs": {
+        "marketState": "PERPETUAL",
+        "collateralNAV": "1200000000000000000000",
+        "lptRawNAV": "0",
+        "stEffective": "1000000000000000000000",
+        "jtEffective": "200000000000000000000",
+        "jtIL": "0",
+        "liquidityPremium": "0",
+        "stFee": "0",
+        "jtFee": "0",
+        "lptFee": "0",
+        "coverageUtilWAD": "600000000000000000",
+        "liquidityUtilWAD": "0",
+        "fixedTermEndTimestamp": "0"
+      }
+    },
+    {
+      "id": "loss-at-deployment-grace-boundary",
+      "group": "fixed-term-grace",
+      "kind": "accountantSync",
+      "inputs": {
+        "seedCollateral": "1300000000000000000000",
+        "seedST": "1000000000000000000000",
+        "seedJT": "300000000000000000000",
+        "newCollateral": "1200000000000000000000",
+        "fixedTermDurationSec": "604800",
+        "graceSec": "2592000",
+        "elapsed": "2592000"
+      },
+      "outputs": {
+        "marketState": "FIXED_TERM",
+        "collateralNAV": "1200000000000000000000",
+        "lptRawNAV": "0",
+        "stEffective": "1000000000000000000000",
+        "jtEffective": "200000000000000000000",
+        "jtIL": "100000000000000000000",
+        "liquidityPremium": "0",
+        "stFee": "0",
+        "jtFee": "0",
+        "lptFee": "0",
+        "coverageUtilWAD": "600000000000000000",
+        "liquidityUtilWAD": "0",
+        "fixedTermEndTimestamp": "3196801"
+      }
+    },
+    {
+      "id": "premium-same-block-instantaneous",
+      "group": "premium-accounting",
+      "kind": "premiumAccounting",
+      "inputs": {
+        "seedCollateral": "1200000000000000000000",
+        "seedST": "1000000000000000000000",
+        "seedJT": "200000000000000000000",
+        "seedLPT": "100000000000000000000",
+        "newCollateral": "1300000000000000000000",
+        "elapsedSincePremium": "0",
+        "twJT": "0",
+        "twLPT": "0",
+        "spotJT": "70000000000000000",
+        "spotLPT": "30000000000000000",
+        "stProtocolFeeWAD": "100000000000000000",
+        "jtProtocolFeeWAD": "100000000000000000",
+        "jtYieldShareProtocolFeeWAD": "100000000000000000",
+        "lptYieldShareProtocolFeeWAD": "100000000000000000",
+        "maxJTYieldShareWAD": "200000000000000000",
+        "maxLPTYieldShareWAD": "100000000000000000",
+        "fixedTermDurationSec": "604800",
+        "graceSec": "0"
+      },
+      "outputs": {
+        "marketState": "PERPETUAL",
+        "collateralNAV": "1300000000000000000000",
+        "lptRawNAV": "0",
+        "stEffective": "1077500000000000000000",
+        "jtEffective": "222500000000000000000",
+        "jtIL": "0",
+        "liquidityPremium": "2499999999999999999",
+        "stFee": "7500000000000000000",
+        "jtFee": "2249999999999999999",
+        "lptFee": "249999999999999999",
+        "coverageUtilWAD": "584269662921348315",
+        "liquidityUtilWAD": "0",
+        "fixedTermEndTimestamp": "0"
+      }
+    },
+    {
+      "id": "premium-elapsed-zero-accumulators",
+      "group": "premium-accounting",
+      "kind": "premiumAccounting",
+      "inputs": {
+        "seedCollateral": "1200000000000000000000",
+        "seedST": "1000000000000000000000",
+        "seedJT": "200000000000000000000",
+        "seedLPT": "100000000000000000000",
+        "newCollateral": "1300000000000000000000",
+        "elapsedSincePremium": "100",
+        "twJT": "0",
+        "twLPT": "0",
+        "spotJT": "70000000000000000",
+        "spotLPT": "30000000000000000",
+        "stProtocolFeeWAD": "100000000000000000",
+        "jtProtocolFeeWAD": "100000000000000000",
+        "jtYieldShareProtocolFeeWAD": "100000000000000000",
+        "lptYieldShareProtocolFeeWAD": "100000000000000000",
+        "maxJTYieldShareWAD": "200000000000000000",
+        "maxLPTYieldShareWAD": "100000000000000000",
+        "fixedTermDurationSec": "604800",
+        "graceSec": "0"
+      },
+      "outputs": {
+        "marketState": "PERPETUAL",
+        "collateralNAV": "1300000000000000000000",
+        "lptRawNAV": "0",
+        "stEffective": "1083333333333333333333",
+        "jtEffective": "216666666666666666667",
+        "jtIL": "0",
+        "liquidityPremium": "0",
+        "stFee": "8333333333333333333",
+        "jtFee": "1666666666666666666",
+        "lptFee": "0",
+        "coverageUtilWAD": "600000000000000000",
+        "liquidityUtilWAD": "0",
+        "fixedTermEndTimestamp": "0"
+      }
+    },
+    {
+      "id": "premium-time-weighted-nondivisible",
+      "group": "premium-accounting",
+      "kind": "premiumAccounting",
+      "inputs": {
+        "seedCollateral": "1200000000000000000000",
+        "seedST": "1000000000000000000000",
+        "seedJT": "200000000000000000000",
+        "seedLPT": "100000000000000000000",
+        "newCollateral": "1300000000000000000000",
+        "elapsedSincePremium": "3",
+        "twJT": "500000000000000000",
+        "twLPT": "0",
+        "spotJT": "200000000000000000",
+        "spotLPT": "80000000000000000",
+        "stProtocolFeeWAD": "100000000000000000",
+        "jtProtocolFeeWAD": "100000000000000000",
+        "jtYieldShareProtocolFeeWAD": "100000000000000000",
+        "lptYieldShareProtocolFeeWAD": "100000000000000000",
+        "maxJTYieldShareWAD": "200000000000000000",
+        "maxLPTYieldShareWAD": "100000000000000000",
+        "fixedTermDurationSec": "604800",
+        "graceSec": "0"
+      },
+      "outputs": {
+        "marketState": "PERPETUAL",
+        "collateralNAV": "1300000000000000000000",
+        "lptRawNAV": "0",
+        "stEffective": "1069444444444444444445",
+        "jtEffective": "230555555555555555555",
+        "jtIL": "0",
+        "liquidityPremium": "0",
+        "stFee": "6944444444444444444",
+        "jtFee": "3055555555555555554",
+        "lptFee": "0",
+        "coverageUtilWAD": "563855421686746988",
+        "liquidityUtilWAD": "0",
+        "fixedTermEndTimestamp": "0"
       }
     },
     {
@@ -259,28 +1041,28 @@
       "kind": "postOp",
       "inputs": {
         "operation": "ST_DEPOSIT",
+        "seedCollateral": "1200000000000000000000",
         "seedST": "1000000000000000000000",
         "seedJT": "200000000000000000000",
-        "seedLT": "100000000000000000000",
-        "stRaw": "1100000000000000000000",
-        "jtRaw": "200000000000000000000",
-        "ltRaw": "100000000000000000000",
-        "bonus": "0"
+        "seedLPTRaw": "100000000000000000000",
+        "collateralNAV": "1300000000000000000000",
+        "lptRawNAV": "100000000000000000000",
+        "bonusNAV": "0"
       },
       "outputs": {
         "marketState": "PERPETUAL",
-        "stRaw": "1100000000000000000000",
-        "jtRaw": "200000000000000000000",
-        "ltRaw": "100000000000000000000",
+        "collateralNAV": "1300000000000000000000",
+        "lptRawNAV": "100000000000000000000",
         "stEffective": "1100000000000000000000",
         "jtEffective": "200000000000000000000",
         "jtIL": "0",
         "liquidityPremium": "0",
         "stFee": "0",
         "jtFee": "0",
-        "ltFee": "0",
+        "lptFee": "0",
         "coverageUtilWAD": "650000000000000000",
-        "liquidityUtilWAD": "550000000000000000"
+        "liquidityUtilWAD": "550000000000000000",
+        "fixedTermEndTimestamp": "0"
       }
     },
     {
@@ -289,296 +1071,741 @@
       "kind": "postOp",
       "inputs": {
         "operation": "JT_DEPOSIT",
+        "seedCollateral": "1200000000000000000000",
         "seedST": "1000000000000000000000",
         "seedJT": "200000000000000000000",
-        "seedLT": "100000000000000000000",
-        "stRaw": "1000000000000000000000",
-        "jtRaw": "250000000000000000000",
-        "ltRaw": "100000000000000000000",
-        "bonus": "0"
+        "seedLPTRaw": "100000000000000000000",
+        "collateralNAV": "1250000000000000000000",
+        "lptRawNAV": "100000000000000000000",
+        "bonusNAV": "0"
       },
       "outputs": {
         "marketState": "PERPETUAL",
-        "stRaw": "1000000000000000000000",
-        "jtRaw": "250000000000000000000",
-        "ltRaw": "100000000000000000000",
+        "collateralNAV": "1250000000000000000000",
+        "lptRawNAV": "100000000000000000000",
         "stEffective": "1000000000000000000000",
         "jtEffective": "250000000000000000000",
         "jtIL": "0",
         "liquidityPremium": "0",
         "stFee": "0",
         "jtFee": "0",
-        "ltFee": "0",
+        "lptFee": "0",
         "coverageUtilWAD": "500000000000000000",
-        "liquidityUtilWAD": "500000000000000000"
+        "liquidityUtilWAD": "500000000000000000",
+        "fixedTermEndTimestamp": "0"
       }
     },
     {
-      "id": "post-lt-deposit",
+      "id": "post-lpt-deposit",
       "group": "post-operations",
       "kind": "postOp",
       "inputs": {
-        "operation": "LT_DEPOSIT",
+        "operation": "LPT_DEPOSIT",
+        "seedCollateral": "1200000000000000000000",
         "seedST": "1000000000000000000000",
         "seedJT": "200000000000000000000",
-        "seedLT": "100000000000000000000",
-        "stRaw": "1000000000000000000000",
-        "jtRaw": "200000000000000000000",
-        "ltRaw": "150000000000000000000",
-        "bonus": "0"
+        "seedLPTRaw": "100000000000000000000",
+        "collateralNAV": "1200000000000000000000",
+        "lptRawNAV": "150000000000000000000",
+        "bonusNAV": "0"
       },
       "outputs": {
         "marketState": "PERPETUAL",
-        "stRaw": "1000000000000000000000",
-        "jtRaw": "200000000000000000000",
-        "ltRaw": "150000000000000000000",
+        "collateralNAV": "1200000000000000000000",
+        "lptRawNAV": "150000000000000000000",
         "stEffective": "1000000000000000000000",
         "jtEffective": "200000000000000000000",
         "jtIL": "0",
         "liquidityPremium": "0",
         "stFee": "0",
         "jtFee": "0",
-        "ltFee": "0",
+        "lptFee": "0",
         "coverageUtilWAD": "600000000000000000",
-        "liquidityUtilWAD": "333333333333333334"
+        "liquidityUtilWAD": "333333333333333334",
+        "fixedTermEndTimestamp": "0"
       }
     },
     {
-      "id": "post-st-redeem",
+      "id": "post-st-redemption",
       "group": "post-operations",
       "kind": "postOp",
       "inputs": {
-        "operation": "ST_REDEEM",
+        "operation": "ST_REDEMPTION",
+        "seedCollateral": "1200000000000000000000",
         "seedST": "1000000000000000000000",
         "seedJT": "200000000000000000000",
-        "seedLT": "100000000000000000000",
-        "stRaw": "900000000000000000000",
-        "jtRaw": "200000000000000000000",
-        "ltRaw": "100000000000000000000",
-        "bonus": "0"
+        "seedLPTRaw": "100000000000000000000",
+        "collateralNAV": "1100000000000000000000",
+        "lptRawNAV": "100000000000000000000",
+        "bonusNAV": "0"
       },
       "outputs": {
         "marketState": "PERPETUAL",
-        "stRaw": "900000000000000000000",
-        "jtRaw": "200000000000000000000",
-        "ltRaw": "100000000000000000000",
+        "collateralNAV": "1100000000000000000000",
+        "lptRawNAV": "100000000000000000000",
         "stEffective": "900000000000000000000",
         "jtEffective": "200000000000000000000",
         "jtIL": "0",
         "liquidityPremium": "0",
         "stFee": "0",
         "jtFee": "0",
-        "ltFee": "0",
+        "lptFee": "0",
         "coverageUtilWAD": "550000000000000000",
-        "liquidityUtilWAD": "450000000000000000"
+        "liquidityUtilWAD": "450000000000000000",
+        "fixedTermEndTimestamp": "0"
       }
     },
     {
-      "id": "post-jt-redeem",
+      "id": "post-jt-redemption",
       "group": "post-operations",
       "kind": "postOp",
       "inputs": {
-        "operation": "JT_REDEEM",
+        "operation": "JT_REDEMPTION",
+        "seedCollateral": "1200000000000000000000",
         "seedST": "1000000000000000000000",
         "seedJT": "200000000000000000000",
-        "seedLT": "100000000000000000000",
-        "stRaw": "1000000000000000000000",
-        "jtRaw": "150000000000000000000",
-        "ltRaw": "100000000000000000000",
-        "bonus": "0"
+        "seedLPTRaw": "100000000000000000000",
+        "collateralNAV": "1150000000000000000000",
+        "lptRawNAV": "100000000000000000000",
+        "bonusNAV": "0"
       },
       "outputs": {
         "marketState": "PERPETUAL",
-        "stRaw": "1000000000000000000000",
-        "jtRaw": "150000000000000000000",
-        "ltRaw": "100000000000000000000",
+        "collateralNAV": "1150000000000000000000",
+        "lptRawNAV": "100000000000000000000",
         "stEffective": "1000000000000000000000",
         "jtEffective": "150000000000000000000",
         "jtIL": "0",
         "liquidityPremium": "0",
         "stFee": "0",
         "jtFee": "0",
-        "ltFee": "0",
+        "lptFee": "0",
         "coverageUtilWAD": "766666666666666667",
-        "liquidityUtilWAD": "500000000000000000"
+        "liquidityUtilWAD": "500000000000000000",
+        "fixedTermEndTimestamp": "0"
       }
     },
     {
-      "id": "post-lt-redeem",
+      "id": "post-lpt-redemption",
       "group": "post-operations",
       "kind": "postOp",
       "inputs": {
-        "operation": "LT_REDEEM",
+        "operation": "LPT_REDEMPTION",
+        "seedCollateral": "1200000000000000000000",
         "seedST": "1000000000000000000000",
         "seedJT": "200000000000000000000",
-        "seedLT": "100000000000000000000",
-        "stRaw": "1000000000000000000000",
-        "jtRaw": "200000000000000000000",
-        "ltRaw": "50000000000000000000",
-        "bonus": "0"
+        "seedLPTRaw": "100000000000000000000",
+        "collateralNAV": "1200000000000000000000",
+        "lptRawNAV": "50000000000000000000",
+        "bonusNAV": "0"
       },
       "outputs": {
         "marketState": "PERPETUAL",
-        "stRaw": "1000000000000000000000",
-        "jtRaw": "200000000000000000000",
-        "ltRaw": "50000000000000000000",
+        "collateralNAV": "1200000000000000000000",
+        "lptRawNAV": "50000000000000000000",
         "stEffective": "1000000000000000000000",
         "jtEffective": "200000000000000000000",
         "jtIL": "0",
         "liquidityPremium": "0",
         "stFee": "0",
         "jtFee": "0",
-        "ltFee": "0",
+        "lptFee": "0",
         "coverageUtilWAD": "600000000000000000",
-        "liquidityUtilWAD": "1000000000000000000"
+        "liquidityUtilWAD": "1000000000000000000",
+        "fixedTermEndTimestamp": "0"
       }
     },
     {
-      "id": "post-st-redeem-bonus",
+      "id": "post-st-redemption-bonus",
       "group": "post-operations",
       "kind": "postOp",
       "inputs": {
-        "operation": "ST_REDEEM",
+        "operation": "ST_REDEMPTION",
+        "seedCollateral": "1200000000000000000000",
         "seedST": "1000000000000000000000",
         "seedJT": "200000000000000000000",
-        "seedLT": "100000000000000000000",
-        "stRaw": "900000000000000000000",
-        "jtRaw": "199000000000000000000",
-        "ltRaw": "100000000000000000000",
-        "bonus": "1000000000000000000"
+        "seedLPTRaw": "100000000000000000000",
+        "collateralNAV": "1090000000000000000000",
+        "lptRawNAV": "100000000000000000000",
+        "bonusNAV": "10000000000000000000"
       },
       "outputs": {
         "marketState": "PERPETUAL",
-        "stRaw": "900000000000000000000",
-        "jtRaw": "199000000000000000000",
-        "ltRaw": "100000000000000000000",
+        "collateralNAV": "1090000000000000000000",
+        "lptRawNAV": "100000000000000000000",
         "stEffective": "900000000000000000000",
-        "jtEffective": "199000000000000000000",
+        "jtEffective": "190000000000000000000",
         "jtIL": "0",
         "liquidityPremium": "0",
         "stFee": "0",
         "jtFee": "0",
-        "ltFee": "0",
-        "coverageUtilWAD": "552261306532663317",
-        "liquidityUtilWAD": "450000000000000000"
+        "lptFee": "0",
+        "coverageUtilWAD": "573684210526315790",
+        "liquidityUtilWAD": "450000000000000000",
+        "fixedTermEndTimestamp": "0"
       }
     },
     {
-      "id": "gate-st-deposit-coverage-liquidity",
-      "group": "operation-gates",
-      "kind": "postOpRevert",
+      "id": "post-st-deposit-one",
+      "group": "post-operations",
+      "kind": "postOp",
       "inputs": {
         "operation": "ST_DEPOSIT",
+        "seedCollateral": "1200000000000000000000",
         "seedST": "1000000000000000000000",
         "seedJT": "200000000000000000000",
-        "seedLT": "100000000000000000000",
-        "stRaw": "2001000000000000000000",
-        "jtRaw": "200000000000000000000",
-        "ltRaw": "100000000000000000000",
-        "bonus": "0"
+        "seedLPTRaw": "100000000000000000000",
+        "collateralNAV": "1200000000000000000001",
+        "lptRawNAV": "100000000000000000000",
+        "bonusNAV": "0"
       },
       "outputs": {
-        "reverted": true,
-        "selector": "1887653499"
+        "marketState": "PERPETUAL",
+        "collateralNAV": "1200000000000000000001",
+        "lptRawNAV": "100000000000000000000",
+        "stEffective": "1000000000000000000001",
+        "jtEffective": "200000000000000000000",
+        "jtIL": "0",
+        "liquidityPremium": "0",
+        "stFee": "0",
+        "jtFee": "0",
+        "lptFee": "0",
+        "coverageUtilWAD": "600000000000000001",
+        "liquidityUtilWAD": "500000000000000001",
+        "fixedTermEndTimestamp": "0"
       }
     },
     {
-      "id": "gate-lt-redeem-liquidity",
-      "group": "operation-gates",
-      "kind": "postOpRevert",
+      "id": "post-jt-deposit-one",
+      "group": "post-operations",
+      "kind": "postOp",
       "inputs": {
-        "operation": "LT_REDEEM",
+        "operation": "JT_DEPOSIT",
+        "seedCollateral": "1200000000000000000000",
         "seedST": "1000000000000000000000",
         "seedJT": "200000000000000000000",
-        "seedLT": "100000000000000000000",
-        "stRaw": "1000000000000000000000",
-        "jtRaw": "200000000000000000000",
-        "ltRaw": "49000000000000000000",
-        "bonus": "0"
+        "seedLPTRaw": "100000000000000000000",
+        "collateralNAV": "1200000000000000000001",
+        "lptRawNAV": "100000000000000000000",
+        "bonusNAV": "0"
       },
       "outputs": {
-        "reverted": true,
-        "selector": "422986096"
+        "marketState": "PERPETUAL",
+        "collateralNAV": "1200000000000000000001",
+        "lptRawNAV": "100000000000000000000",
+        "stEffective": "1000000000000000000000",
+        "jtEffective": "200000000000000000001",
+        "jtIL": "0",
+        "liquidityPremium": "0",
+        "stFee": "0",
+        "jtFee": "0",
+        "lptFee": "0",
+        "coverageUtilWAD": "600000000000000000",
+        "liquidityUtilWAD": "500000000000000000",
+        "fixedTermEndTimestamp": "0"
       }
     },
     {
-      "id": "premium-reinvestment-success",
-      "group": "premium-reinvestment",
-      "kind": "reinvestment",
+      "id": "post-lpt-deposit-one",
+      "group": "post-operations",
+      "kind": "postOp",
       "inputs": {
-        "success": true,
+        "operation": "LPT_DEPOSIT",
+        "seedCollateral": "1200000000000000000000",
+        "seedST": "1000000000000000000000",
+        "seedJT": "200000000000000000000",
+        "seedLPTRaw": "100000000000000000000",
+        "collateralNAV": "1200000000000000000000",
+        "lptRawNAV": "100000000000000000001",
+        "bonusNAV": "0"
+      },
+      "outputs": {
+        "marketState": "PERPETUAL",
+        "collateralNAV": "1200000000000000000000",
+        "lptRawNAV": "100000000000000000001",
+        "stEffective": "1000000000000000000000",
+        "jtEffective": "200000000000000000000",
+        "jtIL": "0",
+        "liquidityPremium": "0",
+        "stFee": "0",
+        "jtFee": "0",
+        "lptFee": "0",
+        "coverageUtilWAD": "600000000000000000",
+        "liquidityUtilWAD": "500000000000000000",
+        "fixedTermEndTimestamp": "0"
+      }
+    },
+    {
+      "id": "post-st-redemption-one",
+      "group": "post-operations",
+      "kind": "postOp",
+      "inputs": {
+        "operation": "ST_REDEMPTION",
+        "seedCollateral": "1200000000000000000000",
+        "seedST": "1000000000000000000000",
+        "seedJT": "200000000000000000000",
+        "seedLPTRaw": "100000000000000000000",
+        "collateralNAV": "1199999999999999999999",
+        "lptRawNAV": "100000000000000000000",
+        "bonusNAV": "0"
+      },
+      "outputs": {
+        "marketState": "PERPETUAL",
+        "collateralNAV": "1199999999999999999999",
+        "lptRawNAV": "100000000000000000000",
+        "stEffective": "999999999999999999999",
+        "jtEffective": "200000000000000000000",
+        "jtIL": "0",
+        "liquidityPremium": "0",
+        "stFee": "0",
+        "jtFee": "0",
+        "lptFee": "0",
+        "coverageUtilWAD": "600000000000000000",
+        "liquidityUtilWAD": "500000000000000000",
+        "fixedTermEndTimestamp": "0"
+      }
+    },
+    {
+      "id": "post-jt-redemption-one",
+      "group": "post-operations",
+      "kind": "postOp",
+      "inputs": {
+        "operation": "JT_REDEMPTION",
+        "seedCollateral": "1200000000000000000000",
+        "seedST": "1000000000000000000000",
+        "seedJT": "200000000000000000000",
+        "seedLPTRaw": "100000000000000000000",
+        "collateralNAV": "1199999999999999999999",
+        "lptRawNAV": "100000000000000000000",
+        "bonusNAV": "0"
+      },
+      "outputs": {
+        "marketState": "PERPETUAL",
+        "collateralNAV": "1199999999999999999999",
+        "lptRawNAV": "100000000000000000000",
+        "stEffective": "1000000000000000000000",
+        "jtEffective": "199999999999999999999",
+        "jtIL": "0",
+        "liquidityPremium": "0",
+        "stFee": "0",
+        "jtFee": "0",
+        "lptFee": "0",
+        "coverageUtilWAD": "600000000000000001",
+        "liquidityUtilWAD": "500000000000000000",
+        "fixedTermEndTimestamp": "0"
+      }
+    },
+    {
+      "id": "post-lpt-redemption-one",
+      "group": "post-operations",
+      "kind": "postOp",
+      "inputs": {
+        "operation": "LPT_REDEMPTION",
+        "seedCollateral": "1200000000000000000000",
+        "seedST": "1000000000000000000000",
+        "seedJT": "200000000000000000000",
+        "seedLPTRaw": "100000000000000000000",
+        "collateralNAV": "1200000000000000000000",
+        "lptRawNAV": "99999999999999999999",
+        "bonusNAV": "0"
+      },
+      "outputs": {
+        "marketState": "PERPETUAL",
+        "collateralNAV": "1200000000000000000000",
+        "lptRawNAV": "99999999999999999999",
+        "stEffective": "1000000000000000000000",
+        "jtEffective": "200000000000000000000",
+        "jtIL": "0",
+        "liquidityPremium": "0",
+        "stFee": "0",
+        "jtFee": "0",
+        "lptFee": "0",
+        "coverageUtilWAD": "600000000000000000",
+        "liquidityUtilWAD": "500000000000000001",
+        "fixedTermEndTimestamp": "0"
+      }
+    },
+    {
+      "id": "post-jt-redemption-preserves-il",
+      "group": "jt-il-post-operation",
+      "kind": "postOp",
+      "inputs": {
+        "operation": "JT_REDEMPTION",
+        "seedCollateral": "1200000000000000000000",
+        "seedST": "1000000000000000000000",
+        "seedJT": "200000000000000000000",
+        "seedJTIL": "100000000000000000000",
+        "seedLPTRaw": "100000000000000000000",
+        "seedMarketState": "FIXED_TERM",
+        "seedFixedTermEndTimestamp": "3196904",
+        "collateralNAV": "1140000000000000000000",
+        "lptRawNAV": "100000000000000000000",
+        "bonusNAV": "0"
+      },
+      "outputs": {
+        "marketState": "FIXED_TERM",
+        "collateralNAV": "1140000000000000000000",
+        "lptRawNAV": "100000000000000000000",
+        "stEffective": "1000000000000000000000",
+        "jtEffective": "140000000000000000000",
+        "jtIL": "100000000000000000000",
+        "liquidityPremium": "0",
+        "stFee": "0",
+        "jtFee": "0",
+        "lptFee": "0",
+        "coverageUtilWAD": "814285714285714286",
+        "liquidityUtilWAD": "500000000000000000",
+        "fixedTermEndTimestamp": "3196904"
+      }
+    },
+    {
+      "id": "fee-and-premium-mints",
+      "group": "fee-processing",
+      "kind": "feeProcessing",
+      "inputs": {
         "stEffective": "1120000000000000000000",
         "jtEffective": "220000000000000000000",
-        "ltRaw": "100000000000000000000",
-        "premium": "10000000000000000000",
+        "grossPremium": "10000000000000000000",
         "stFee": "5000000000000000000",
         "jtFee": "2000000000000000000",
-        "ltFee": "1000000000000000000",
+        "lptFee": "1000000000000000000",
         "stSupply": "1000000000000000000000",
         "jtSupply": "200000000000000000000",
-        "ltSupply": "100000000000000000000"
+        "lptSupply": "100000000000000000000"
       },
       "outputs": {
         "stSupplyAfter": "1013574660633484162895",
         "jtSupplyAfter": "201834862385321100917",
-        "ltSupplyAfter": "101010101010101010101",
-        "premiumShares": "9049773755656108597",
-        "stFeeShares": "4524886877828054298",
+        "lptSupplyAfter": "100000000000000000000",
+        "premiumShares": "8144796380090497737",
+        "stFeeShares": "5429864253393665158",
         "jtFeeShares": "1834862385321100917",
-        "ltFeeShares": "1010101010101010101",
+        "lptFeeShares": "0",
+        "idlePremiumShares": "8144796380090497737"
+      }
+    },
+    {
+      "id": "fee-mints-zero",
+      "group": "fee-processing",
+      "kind": "feeProcessing",
+      "inputs": {
+        "stEffective": "1120000000000000000000",
+        "jtEffective": "220000000000000000000",
+        "grossPremium": "0",
+        "stFee": "0",
+        "jtFee": "0",
+        "lptFee": "0",
+        "stSupply": "1000000000000000000000",
+        "jtSupply": "200000000000000000000",
+        "lptSupply": "100000000000000000000"
+      },
+      "outputs": {
+        "stSupplyAfter": "1000000000000000000000",
+        "jtSupplyAfter": "200000000000000000000",
+        "lptSupplyAfter": "100000000000000000000",
+        "premiumShares": "0",
+        "stFeeShares": "0",
+        "jtFeeShares": "0",
+        "lptFeeShares": "0",
         "idlePremiumShares": "0"
       }
     },
     {
-      "id": "premium-reinvestment-deferred",
-      "group": "premium-reinvestment",
-      "kind": "reinvestment",
+      "id": "fee-mints-st-only",
+      "group": "fee-processing",
+      "kind": "feeProcessing",
       "inputs": {
-        "success": false,
         "stEffective": "1120000000000000000000",
         "jtEffective": "220000000000000000000",
-        "ltRaw": "100000000000000000000",
-        "premium": "10000000000000000000",
+        "grossPremium": "0",
         "stFee": "5000000000000000000",
-        "jtFee": "2000000000000000000",
-        "ltFee": "1000000000000000000",
+        "jtFee": "0",
+        "lptFee": "0",
         "stSupply": "1000000000000000000000",
         "jtSupply": "200000000000000000000",
-        "ltSupply": "100000000000000000000"
+        "lptSupply": "100000000000000000000"
       },
       "outputs": {
-        "stSupplyAfter": "1013574660633484162895",
-        "jtSupplyAfter": "201834862385321100917",
-        "ltSupplyAfter": "100917431192660550458",
-        "premiumShares": "9049773755656108597",
-        "stFeeShares": "4524886877828054298",
-        "jtFeeShares": "1834862385321100917",
-        "ltFeeShares": "917431192660550458",
-        "idlePremiumShares": "9049773755656108597"
+        "stSupplyAfter": "1004484304932735426008",
+        "jtSupplyAfter": "200000000000000000000",
+        "lptSupplyAfter": "100000000000000000000",
+        "premiumShares": "0",
+        "stFeeShares": "4484304932735426008",
+        "jtFeeShares": "0",
+        "lptFeeShares": "0",
+        "idlePremiumShares": "0"
       }
     },
     {
-      "id": "self-liquidation-bonus",
+      "id": "fee-mints-jt-only",
+      "group": "fee-processing",
+      "kind": "feeProcessing",
+      "inputs": {
+        "stEffective": "1120000000000000000000",
+        "jtEffective": "220000000000000000000",
+        "grossPremium": "0",
+        "stFee": "0",
+        "jtFee": "2000000000000000000",
+        "lptFee": "0",
+        "stSupply": "1000000000000000000000",
+        "jtSupply": "200000000000000000000",
+        "lptSupply": "100000000000000000000"
+      },
+      "outputs": {
+        "stSupplyAfter": "1000000000000000000000",
+        "jtSupplyAfter": "201834862385321100917",
+        "lptSupplyAfter": "100000000000000000000",
+        "premiumShares": "0",
+        "stFeeShares": "0",
+        "jtFeeShares": "1834862385321100917",
+        "lptFeeShares": "0",
+        "idlePremiumShares": "0"
+      }
+    },
+    {
+      "id": "fee-mints-premium-fully-carved",
+      "group": "fee-processing",
+      "kind": "feeProcessing",
+      "inputs": {
+        "stEffective": "1120000000000000000000",
+        "jtEffective": "220000000000000000000",
+        "grossPremium": "10000000000000000000",
+        "stFee": "0",
+        "jtFee": "0",
+        "lptFee": "10000000000000000000",
+        "stSupply": "1000000000000000000000",
+        "jtSupply": "200000000000000000000",
+        "lptSupply": "100000000000000000000"
+      },
+      "outputs": {
+        "stSupplyAfter": "1009009009009009009009",
+        "jtSupplyAfter": "200000000000000000000",
+        "lptSupplyAfter": "100000000000000000000",
+        "premiumShares": "0",
+        "stFeeShares": "9009009009009009009",
+        "jtFeeShares": "0",
+        "lptFeeShares": "0",
+        "idlePremiumShares": "0"
+      }
+    },
+    {
+      "id": "self-liquidation-healthy",
       "group": "self-liquidation",
       "kind": "selfLiquidation",
       "inputs": {
-        "bonusWAD": "10000000000000000",
-        "stRaw": "800000000000000000000",
-        "jtRaw": "240000000000000000000",
+        "bonusWAD": "100000000000000000",
+        "collateralNAV": "1040000000000000000000",
         "stEffective": "1000000000000000000000",
         "jtEffective": "40000000000000000000",
-        "coverageUtilWAD": "5200000000000000000",
-        "liquidationUtilWAD": "4000000000000000000",
-        "jtCoinvested": true,
-        "claimST": "80000000000000000000",
-        "claimJT": "20000000000000000000",
+        "coverageUtilWAD": "1000000000000000000",
+        "liquidationUtilWAD": "2000000000000000000",
+        "claimCollateral": "100000000000000000000",
         "claimNAV": "100000000000000000000"
       },
       "outputs": {
-        "bonus": "1000000000000000000",
-        "claimST": "80000000000000000000",
-        "claimJT": "21000000000000000000",
-        "claimNAV": "101000000000000000000"
+        "bonus": "0",
+        "claimCollateral": "100000000000000000000",
+        "claimNAV": "100000000000000000000"
+      }
+    },
+    {
+      "id": "self-liquidation-breached",
+      "group": "self-liquidation",
+      "kind": "selfLiquidation",
+      "inputs": {
+        "bonusWAD": "100000000000000000",
+        "collateralNAV": "1040000000000000000000",
+        "stEffective": "1000000000000000000000",
+        "jtEffective": "40000000000000000000",
+        "coverageUtilWAD": "3000000000000000000",
+        "liquidationUtilWAD": "2000000000000000000",
+        "claimCollateral": "100000000000000000000",
+        "claimNAV": "100000000000000000000"
+      },
+      "outputs": {
+        "bonus": "4000000000000000000",
+        "claimCollateral": "104000000000000000000",
+        "claimNAV": "104000000000000000000"
+      }
+    },
+    {
+      "id": "self-liquidation-at-threshold",
+      "group": "self-liquidation",
+      "kind": "selfLiquidation",
+      "inputs": {
+        "bonusWAD": "100000000000000000",
+        "collateralNAV": "1040000000000000000000",
+        "stEffective": "1000000000000000000000",
+        "jtEffective": "40000000000000000000",
+        "coverageUtilWAD": "2000000000000000000",
+        "liquidationUtilWAD": "2000000000000000000",
+        "claimCollateral": "100000000000000000000",
+        "claimNAV": "100000000000000000000"
+      },
+      "outputs": {
+        "bonus": "4000000000000000000",
+        "claimCollateral": "104000000000000000000",
+        "claimNAV": "104000000000000000000"
+      }
+    },
+    {
+      "id": "self-liquidation-one-wei-below",
+      "group": "self-liquidation",
+      "kind": "selfLiquidation",
+      "inputs": {
+        "bonusWAD": "100000000000000000",
+        "collateralNAV": "1040000000000000000000",
+        "stEffective": "1000000000000000000000",
+        "jtEffective": "40000000000000000000",
+        "coverageUtilWAD": "1999999999999999999",
+        "liquidationUtilWAD": "2000000000000000000",
+        "claimCollateral": "100000000000000000000",
+        "claimNAV": "100000000000000000000"
+      },
+      "outputs": {
+        "bonus": "0",
+        "claimCollateral": "100000000000000000000",
+        "claimNAV": "100000000000000000000"
+      }
+    },
+    {
+      "id": "self-liquidation-one-wei-above",
+      "group": "self-liquidation",
+      "kind": "selfLiquidation",
+      "inputs": {
+        "bonusWAD": "100000000000000000",
+        "collateralNAV": "1040000000000000000000",
+        "stEffective": "1000000000000000000000",
+        "jtEffective": "40000000000000000000",
+        "coverageUtilWAD": "2000000000000000001",
+        "liquidationUtilWAD": "2000000000000000000",
+        "claimCollateral": "100000000000000000000",
+        "claimNAV": "100000000000000000000"
+      },
+      "outputs": {
+        "bonus": "4000000000000000000",
+        "claimCollateral": "104000000000000000000",
+        "claimNAV": "104000000000000000000"
+      }
+    },
+    {
+      "id": "adaptive-initial-zero-util",
+      "group": "adaptive-ydm-v2",
+      "kind": "adaptiveYDM",
+      "inputs": {
+        "initialTarget": "300000000000000000",
+        "utilizationWAD": "0",
+        "elapsed": "0",
+        "marketState": "PERPETUAL"
+      },
+      "outputs": {
+        "yieldShareWAD": "100000000000000000",
+        "targetWAD": "300000000000000000"
+      }
+    },
+    {
+      "id": "adaptive-initial-half-target-util",
+      "group": "adaptive-ydm-v2",
+      "kind": "adaptiveYDM",
+      "inputs": {
+        "initialTarget": "300000000000000000",
+        "utilizationWAD": "450000000000000000",
+        "elapsed": "0",
+        "marketState": "PERPETUAL"
+      },
+      "outputs": {
+        "yieldShareWAD": "200000000000000000",
+        "targetWAD": "300000000000000000"
+      }
+    },
+    {
+      "id": "adaptive-initial-target-util",
+      "group": "adaptive-ydm-v2",
+      "kind": "adaptiveYDM",
+      "inputs": {
+        "initialTarget": "300000000000000000",
+        "utilizationWAD": "900000000000000000",
+        "elapsed": "0",
+        "marketState": "PERPETUAL"
+      },
+      "outputs": {
+        "yieldShareWAD": "300000000000000000",
+        "targetWAD": "300000000000000000"
+      }
+    },
+    {
+      "id": "adaptive-initial-mid-upper-util",
+      "group": "adaptive-ydm-v2",
+      "kind": "adaptiveYDM",
+      "inputs": {
+        "initialTarget": "300000000000000000",
+        "utilizationWAD": "950000000000000000",
+        "elapsed": "0",
+        "marketState": "PERPETUAL"
+      },
+      "outputs": {
+        "yieldShareWAD": "400000000000000000",
+        "targetWAD": "300000000000000000"
+      }
+    },
+    {
+      "id": "adaptive-initial-full-util",
+      "group": "adaptive-ydm-v2",
+      "kind": "adaptiveYDM",
+      "inputs": {
+        "initialTarget": "300000000000000000",
+        "utilizationWAD": "1000000000000000000",
+        "elapsed": "0",
+        "marketState": "PERPETUAL"
+      },
+      "outputs": {
+        "yieldShareWAD": "500000000000000000",
+        "targetWAD": "300000000000000000"
+      }
+    },
+    {
+      "id": "adaptive-high-util-30d",
+      "group": "adaptive-ydm-v2",
+      "kind": "adaptiveYDM",
+      "inputs": {
+        "initialTarget": "300000000000000000",
+        "utilizationWAD": "1000000000000000000",
+        "elapsed": "2592000",
+        "marketState": "PERPETUAL"
+      },
+      "outputs": {
+        "yieldShareWAD": "1000000000000000000",
+        "targetWAD": "1000000000000000000"
+      }
+    },
+    {
+      "id": "adaptive-frozen-fixed-term",
+      "group": "adaptive-ydm-v2",
+      "kind": "adaptiveYDM",
+      "inputs": {
+        "initialTarget": "1000000000000000000",
+        "utilizationWAD": "0",
+        "elapsed": "2592000",
+        "marketState": "FIXED_TERM"
+      },
+      "outputs": {
+        "yieldShareWAD": "800000000000000000",
+        "targetWAD": "1000000000000000000"
+      }
+    },
+    {
+      "id": "adaptive-unsaturated-one-day",
+      "group": "adaptive-ydm-v2",
+      "kind": "adaptiveYDM",
+      "inputs": {
+        "initialTarget": "300000000000000000",
+        "utilizationWAD": "910000000000000000",
+        "elapsed": "86400",
+        "marketState": "PERPETUAL"
+      },
+      "outputs": {
+        "yieldShareWAD": "324152134160075207",
+        "targetWAD": "308332804876908591"
       }
     }
   ]

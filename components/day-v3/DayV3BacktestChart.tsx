@@ -28,7 +28,7 @@ const SERIES = [
   ["strategy", "Source", "#596270"],
   ["senior", "Sr", "#1d4987"],
   ["junior", "Jr", "#8c5f3d"],
-  ["liquidity", "SLP", "#01c555"],
+  ["liquidity", "SLP", "#087a45"],
 ] as const;
 
 function DayV3BacktestChart({

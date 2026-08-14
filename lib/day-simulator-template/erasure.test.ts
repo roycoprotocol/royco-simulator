@@ -62,7 +62,11 @@ const observationExit = stepEvents.find((event) => event.kind === 'exit-fixed-te
 const erasedAmount = erasure?.amountNAV ?? 0;
 const navPerIndexPoint = (sim.state.jtShares * first.jtPrice) / 100;
 
-check('engine emits an exact structured erased amount', approx(erasedAmount, 10), `amount=${erasedAmount}`);
+check(
+  'engine emits an exact structured erased amount',
+  approx(erasedAmount, (senior + junior) * 0.01),
+  `amount=${erasedAmount}`,
+);
 check('engine emits a structured Observation Period exit reason', observationExit?.observationExitReason === 'period-ended');
 check('display text formatting is not used as accounting data', erasure?.msg.includes('$10') === true);
 

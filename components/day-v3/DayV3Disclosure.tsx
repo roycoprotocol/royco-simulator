@@ -1,4 +1,6 @@
-import type { ReactNode } from "react";
+"use client";
+
+import { useState, type ReactNode } from "react";
 
 import { DAY_V3_CONTROL_FOCUS } from "@/components/day-v3/DayV3Button";
 import { cn } from "@/lib/utils";
@@ -8,6 +10,7 @@ export default function DayV3Disclosure({
   children,
   className,
   contentClassName,
+  defaultOpen = false,
   description,
   summary,
   variant = "card",
@@ -15,11 +18,13 @@ export default function DayV3Disclosure({
   children: ReactNode;
   className?: string;
   contentClassName?: string;
+  defaultOpen?: boolean;
   description?: ReactNode;
   summary: ReactNode;
   variant?: "card" | "inline";
 }) {
   const card = variant === "card";
+  const [open, setOpen] = useState(defaultOpen);
   return (
     <details
       className={cn(
@@ -29,6 +34,8 @@ export default function DayV3Disclosure({
           : "w-fit",
         className,
       )}
+      onToggle={(event) => setOpen(event.currentTarget.open)}
+      open={open}
     >
       <summary
         className={cn(
@@ -36,7 +43,7 @@ export default function DayV3Disclosure({
           DAY_V3_CONTROL_FOCUS,
           card
             ? "-mx-1 flex min-h-11 items-center justify-between gap-4 rounded-lg px-1 text-[12px] font-semibold"
-            : "inline-flex min-h-9 items-center gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--card)] px-3 text-[10.5px] font-semibold text-[var(--secondary)] transition-colors hover:border-[var(--secondary)] hover:text-[var(--foreground)]",
+            : "inline-flex min-h-11 items-center gap-2 rounded-lg border border-[var(--border-subtle)] bg-[var(--card)] px-3 text-[10.5px] font-semibold text-[var(--secondary)] transition-colors hover:border-[var(--secondary)] hover:text-[var(--foreground)]",
         )}
       >
         <span className={cn(card && "flex min-w-0 flex-col gap-0.5")}>
@@ -67,9 +74,7 @@ export default function DayV3Disclosure({
       </summary>
       <div
         className={cn(
-          card
-            ? "mt-3 border-t border-[var(--border-subtle)] pt-3"
-            : "mt-1.5",
+          card ? "mt-3 border-t border-[var(--border-subtle)] pt-3" : "mt-1.5",
           contentClassName,
         )}
       >

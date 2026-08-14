@@ -1,15 +1,17 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 
 import {
   DAY_V3_POOL_DESIGN_SCHEMA,
+  dayV3PoolDesignRequestKey,
   dayV3PoolDesignMatchesGoals,
   dayV3PoolDesignIssueMessage,
   isDayV3PoolDesignInventory,
   isDayV3PoolDesignResult,
   type DayV3PoolDesignResult,
   type DayV3PoolDesignTarget,
+  type DayV3PoolDesignContext,
 } from "@/lib/day-v3/pool-design";
 import type { DayV3Goals } from "@/lib/day-v3/types";
 
@@ -21,8 +23,16 @@ type InventoryState =
 type DesignState =
   | { status: "missing-goal"; result: null; message: string }
   | { status: "resolving"; result: null; message: string }
-  | { status: "resolved"; result: Extract<DayV3PoolDesignResult, { status: "resolved" }>; message: string }
-  | { status: "infeasible" | "unresolved"; result: DayV3PoolDesignResult | null; message: string };
+  | {
+      status: "resolved";
+      result: Extract<DayV3PoolDesignResult, { status: "resolved" }>;
+      message: string;
+    }
+  | {
+      status: "infeasible" | "unresolved";
+      result: DayV3PoolDesignResult | null;
+      message: string;
+    };
 
 async function readJson(response: Response): Promise<unknown> {
   try {
@@ -32,19 +42,34 @@ async function readJson(response: Response): Promise<unknown> {
   }
 }
 
-export function useDayV3PoolDesign(goals: DayV3Goals | null) {
+export function useDayV3PoolDesign(
+  goals: DayV3Goals | null,
+  context: DayV3PoolDesignContext | null,
+  enabled = true,
+) {
   const [inventory, setInventory] = useState<InventoryState>({
     status: "loading",
     targets: [],
     message: "Loading live deployment targets…",
   });
-  const goalsKey = goals === null ? null : JSON.stringify(goals);
+  const goalsKey = dayV3PoolDesignRequestKey(goals, context);
   const [resolvedDesign, setResolvedDesign] = useState<{
     key: string;
     state: DesignState;
   } | null>(null);
+  const [refreshNonce, setRefreshNonce] = useState(0);
+  const retry = useCallback(() => {
+    setResolvedDesign(null);
+    setInventory({
+      status: "loading",
+      targets: [],
+      message: "Refreshing live deployment targets…",
+    });
+    setRefreshNonce((current) => current + 1);
+  }, []);
 
   useEffect(() => {
+    if (!enabled) return;
     const controller = new AbortController();
     void fetch("/api/day-v3/pool-design", {
       cache: "no-store",
@@ -88,16 +113,20 @@ export function useDayV3PoolDesign(goals: DayV3Goals | null) {
         });
       });
     return () => controller.abort();
-  }, []);
+  }, [enabled, refreshNonce]);
 
   useEffect(() => {
-    if (!goals || goalsKey === null) return;
+    if (!enabled || !goals || !context || goalsKey === null) return;
 
     const controller = new AbortController();
     const requestKey = goalsKey;
     void fetch("/api/day-v3/pool-design", {
       method: "POST",
-      body: JSON.stringify({ schemaVersion: DAY_V3_POOL_DESIGN_SCHEMA, goals }),
+      body: JSON.stringify({
+        schemaVersion: DAY_V3_POOL_DESIGN_SCHEMA,
+        goals,
+        context,
+      }),
       headers: { "Content-Type": "application/json" },
       cache: "no-store",
       signal: controller.signal,
@@ -105,10 +134,12 @@ export function useDayV3PoolDesign(goals: DayV3Goals | null) {
       .then(async (response) => {
         const body = await readJson(response);
         if (!isDayV3PoolDesignResult(body)) {
-          throw new Error("The canonical pool-design service returned an invalid response.");
+          throw new Error(
+            "The canonical pool-design service returned an invalid response.",
+          );
         }
         if (body.status === "resolved") {
-          if (!dayV3PoolDesignMatchesGoals(body, goals)) {
+          if (!dayV3PoolDesignMatchesGoals(body, goals, context)) {
             throw new Error(
               "The canonical pool-design response does not match the current goals.",
             );
@@ -152,22 +183,24 @@ export function useDayV3PoolDesign(goals: DayV3Goals | null) {
         });
       });
     return () => controller.abort();
-  }, [goals, goalsKey]);
+  }, [context, enabled, goals, goalsKey, refreshNonce]);
 
   const design: DesignState =
-    goalsKey === null
+    !enabled || goalsKey === null
       ? {
           status: "missing-goal",
           result: null,
-          message: "Complete the operating facts, exit promise, and deployment target.",
+          message:
+            "Complete the source yield, operating facts, exit promise, and deployment target.",
         }
       : resolvedDesign?.key === goalsKey
         ? resolvedDesign.state
         : {
             status: "resolving",
             result: null,
-            message: "Refreshing the template fee and solving the exact E-CLP design…",
+            message:
+              "Refreshing the template fee and solving the exact E-CLP design…",
           };
 
-  return { design, inventory };
+  return { design, inventory, retry };
 }

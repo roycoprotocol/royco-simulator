@@ -154,9 +154,8 @@ function DayV3StackDiagram({
       className="w-full"
       role="img"
       aria-label={
-        `Capital stack. Senior ${money(st, unit)} rests on Junior ${money(jt, unit)}, ` +
-        `which absorbs the first loss. SLP capital of ${money(lt, unit)} stands beside ` +
-        `the stack rather than under it, because it is venue capital and not a loss layer.`
+        `Capital stack. Senior ${money(st, unit)}${jt > 0 ? ` rests on Junior ${money(jt, unit)}, which absorbs the first loss` : " has no Junior first-loss layer"}. ` +
+        `${lt > 0 ? `SLP capital of ${money(lt, unit)} stands beside the stack rather than under it, because it is venue capital and not a loss layer.` : "No SLP exit venue is funded."}`
       }
       viewBox={`0 0 ${W} ${H}`}
     >
@@ -297,7 +296,9 @@ function DayV3StackDiagram({
         x={STACK_X}
         y={BOTTOM + 14}
       >
-        {`${money(st + jt, unit)} protected`}
+        {jt > 0
+          ? `${money(st + jt, unit)} protected`
+          : `${money(st, unit)} unprotected`}
       </text>
       <text
         className="fill-[var(--tertiary)] text-[9px]"

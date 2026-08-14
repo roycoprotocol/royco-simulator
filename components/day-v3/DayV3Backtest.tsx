@@ -49,8 +49,10 @@ const monthLabel = (key: string) => {
   const [year, month] = key.split("-");
   return `${MONTH[Number(month) - 1]} ${year}`;
 };
-const signed = (value: number) =>
-  `${value < 0 ? "-" : "+"}${Math.abs(value * 100).toFixed(2)}%`;
+export const formatDayV3MonthlyReturn = (value: number) =>
+  Number.isFinite(value)
+    ? `${value < 0 ? "-" : "+"}${Math.abs(value * 100).toFixed(2)}%`
+    : "N/A";
 
 function DayV3Backtest({
   bandPct: bandInput,
@@ -248,7 +250,7 @@ function DayV3Backtest({
           </div>
           <CardDescription>
             {customSource
-              ? "Add dated NAV or price history in the source step to run this test."
+              ? "Add dated NAV or price history in Section 1. That is the only missing input for this backtest; the current market terms will be applied automatically."
               : "No dated history is available; results above are forward projections at the selected source yield."}
           </CardDescription>
         </CardHeader>
@@ -288,6 +290,18 @@ function DayV3Backtest({
   // true sentence. On the default market this is 99% of Jr's starting capital.
   const toppedUp = result.juniorCapitalInjectedShareOfStart ?? 0;
   const outsideCapitalMatters = toppedUp >= 0.005;
+  const closedRecoveryPeriods = result.observationPeriods.filter(
+    (period) => !period.expired && period.bIndex < result.chart.length - 1,
+  ).length;
+  const expiredRecoveryPeriods = result.observationPeriods.filter(
+    (period) => period.expired,
+  ).length;
+  const openRecoveryPeriods = Math.max(
+    0,
+    result.observationPeriods.length -
+      closedRecoveryPeriods -
+      expiredRecoveryPeriods,
+  );
 
   return (
     <Card data-accountant-source="runDayHistoricalBacktest">
@@ -329,30 +343,50 @@ function DayV3Backtest({
           )}
         </p>
 
-        {/* The window chooses which part of the supplied history to run. Coverage
-            restoration is intentionally kept below the chart it changes, so it
-            cannot be mistaken for a market term. */}
-        <div>
-          <label className="flex flex-1 max-w-[420px] flex-col gap-1.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--foundation)] px-4 py-3">
-            <span className="text-[9.5px] font-semibold uppercase tracking-[0.1em] text-[var(--tertiary)]">
-              Backtest window
-            </span>
-            <select
-              className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--card)] px-3 py-2 text-[13px] font-medium"
-              onChange={(event) => setWindowId(event.target.value)}
-              value={active.id}
-            >
-              {windows.map((span) => (
-                <option key={span.id} value={span.id}>
-                  {span.label} ({series[span.from].date} to{" "}
-                  {series[series.length - 1].date})
-                </option>
-              ))}
-            </select>
-            <span className="text-[10px] leading-snug text-[var(--tertiary)]">
-              Each window starts a new run from its first date.
-            </span>
-          </label>
+        <div
+          aria-label="Historical mechanism evidence"
+          className="grid grid-cols-2 gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--foundation)] p-3 sm:grid-cols-4"
+          role="group"
+        >
+          {[
+            {
+              label: "Recovery windows",
+              value: result.observationEvents.toString(),
+              note: `${closedRecoveryPeriods} closed before expiry · ${expiredRecoveryPeriods} expired${openRecoveryPeriods > 0 ? ` · ${openRecoveryPeriods} open` : ""}`,
+            },
+            {
+              label: "Junior claim resets",
+              value: result.erasedRecoveryClaims.toString(),
+              note: "Junior recovery claims erased by the accountant",
+            },
+            {
+              label: "Senior loss events",
+              value: result.seniorLossEvents.toString(),
+              note:
+                result.seniorLossEvents === 0
+                  ? "No dated step impaired Senior"
+                  : "Dated steps where Senior lost value",
+            },
+            {
+              label: "Outside Junior capital",
+              value: pct(toppedUp),
+              note: maintainCoverage
+                ? "Added after finalized Junior losses"
+                : "Coverage restoration is off",
+            },
+          ].map((item) => (
+            <div className="min-w-0" key={item.label}>
+              <span className="text-[9px] font-semibold uppercase tracking-[0.1em] text-[var(--tertiary)]">
+                {item.label}
+              </span>
+              <strong className="mt-1 block font-mono text-[20px] leading-none tabular-nums">
+                {item.value}
+              </strong>
+              <span className="mt-1 block text-[9.5px] leading-snug text-[var(--tertiary)]">
+                {item.note}
+              </span>
+            </div>
+          ))}
         </div>
 
         {/* Outputs. Labelled as a group: four figures that only mean anything
@@ -392,7 +426,32 @@ function DayV3Backtest({
             a stack of differently sized slabs, and a 1.3fr/1fr here was the
             only place breaking it. */}
         <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-          <DayV3BacktestChart data={chartData} unit={returnUnit} />
+          <div className="flex min-w-0 flex-col gap-3">
+            <DayV3BacktestChart data={chartData} unit={returnUnit} />
+
+            {/* The window controls the chart immediately above it, so it lives
+                with that chart rather than interrupting the result summary. */}
+            <label className="flex flex-col gap-1.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--foundation)] px-4 py-3">
+              <span className="text-[9.5px] font-semibold uppercase tracking-[0.1em] text-[var(--tertiary)]">
+                Backtest window
+              </span>
+              <select
+                className="w-full rounded-lg border border-[var(--border-subtle)] bg-[var(--card)] px-3 py-2 text-[13px] font-medium"
+                onChange={(event) => setWindowId(event.target.value)}
+                value={active.id}
+              >
+                {windows.map((span) => (
+                  <option key={span.id} value={span.id}>
+                    {span.label} ({series[span.from].date} to{" "}
+                    {series[series.length - 1].date})
+                  </option>
+                ))}
+              </select>
+              <span className="text-[10px] leading-snug text-[var(--tertiary)]">
+                Each window starts a new run from its first date.
+              </span>
+            </label>
+          </div>
 
           {/* Detail, visible by default rather than behind a toggle. */}
           <div className="max-h-[360px] overflow-y-auto rounded-lg border border-[var(--border-subtle)]">
@@ -427,7 +486,13 @@ function DayV3Backtest({
                             : undefined
                         }
                       >
-                        {signed(value)}
+                        {formatDayV3MonthlyReturn(value)}
+                        {!Number.isFinite(value) ? (
+                          <span className="sr-only">
+                            Not applicable because this position began the
+                            month with no remaining capital.
+                          </span>
+                        ) : null}
                       </TableCell>
                     ))}
                   </TableRow>

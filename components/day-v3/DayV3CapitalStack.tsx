@@ -106,7 +106,10 @@ function DayV3CapitalStack({
       amount: jt,
       ratio: per100(jt),
       floorRatio: per100(floor.jt),
-      description: `First loss; meets ${pct(coverage)} minimum coverage at the ${pct(targetUtilization)} target`,
+      description:
+        coverage > 0
+          ? `First loss; meets ${pct(coverage)} minimum coverage at the ${pct(targetUtilization)} target`
+          : "No first-loss protection",
       funded: coverage > 0,
       fill: "var(--theme-brown)",
       lossLayer: true,
@@ -116,7 +119,10 @@ function DayV3CapitalStack({
       amount: lt,
       ratio: per100(lt),
       floorRatio: per100(floor.lt),
-      description: `Exit liquidity; meets ${pct(minLiquidity)} minimum liquidity at the ${pct(targetUtilization)} target`,
+      description:
+        minLiquidity > 0
+          ? `Exit liquidity; meets ${pct(minLiquidity)} minimum liquidity at the ${pct(targetUtilization)} target`
+          : "No immediate pool exit",
       funded: minLiquidity > 0,
       fill: "var(--theme-green)",
       lossLayer: false,
@@ -242,7 +248,13 @@ function DayV3CapitalStack({
                   In the yield source
                 </span>
                 <span className="text-[11px] leading-snug text-[var(--tertiary)]">
-                  Sr, Jr, and SLP&apos;s {pct(poolSeniorWeight)} Sr allocation
+                  {coverage > 0 && minLiquidity > 0
+                    ? `Sr, Jr, and SLP's ${pct(poolSeniorWeight)} Sr allocation`
+                    : coverage > 0
+                      ? "Sr and Jr; no SLP pool is funded"
+                      : minLiquidity > 0
+                        ? `Sr and SLP's ${pct(poolSeniorWeight)} Sr allocation; no Jr is funded`
+                        : "Only Sr; no Jr or SLP capital is funded"}
                 </span>
               </span>
               <span className="flex min-w-0 flex-col gap-1 sm:w-[86px] sm:shrink-0 sm:text-right">

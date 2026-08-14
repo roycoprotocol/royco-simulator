@@ -37,10 +37,10 @@ export const dayV3ButtonVariants = cva(
           "border-transparent bg-transparent text-[var(--foreground)] underline decoration-dotted underline-offset-2 hover:translate-y-0 hover:text-[var(--secondary)]",
       },
       size: {
-        sm: "min-h-9 px-3 py-2",
+        sm: "min-h-11 px-3 py-2",
         md: "min-h-11 px-4 py-2.5",
         lg: "min-h-12 px-5 py-3 text-[13px]",
-        icon: "size-10 p-0",
+        icon: "size-11 p-0",
         inline: "min-h-0 p-0 text-[length:inherit] leading-[inherit]",
       },
     },

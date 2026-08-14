@@ -28,7 +28,7 @@ export type DayV3Point = {
 const TONES = {
   senior: "#1d4987",
   junior: "#8c5f3d",
-  liquidity: "#01c555",
+  liquidity: "#087a45",
 } as const;
 
 function DayV3Chart({ data, unit }: { data: DayV3Point[]; unit: DayV3Unit }) {

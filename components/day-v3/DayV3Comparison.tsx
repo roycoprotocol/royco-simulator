@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import {
@@ -45,6 +45,15 @@ export type DayV3PositionBreakdown = {
   liqDelta: number;
   /** True when this position holds the source asset itself. */
   holdsSource: boolean;
+};
+
+export type DayV3PoolCarryBreakdown = {
+  /** Carry earned by the Senior-share side of the resting pool. */
+  seniorShareCarry: number;
+  /** Carry earned by the exit-asset side of the resting pool. */
+  exitAssetCarry: number;
+  /** Fee income produced by the modeled annual swap volume. */
+  swapFeeIncome: number;
 };
 
 /**
@@ -93,43 +102,126 @@ function Line({
   value: string;
 }) {
   return (
-    <div className="flex items-baseline justify-between gap-3 border-b border-dashed border-[var(--border-subtle)] py-1 last:border-b-0">
-      <span className="text-[11.5px] text-[var(--secondary)]">
+    <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 border-b border-[var(--border-subtle)] py-2 last:border-b-0">
+      <span className="text-[11.5px] font-medium text-[var(--secondary)]">
         {label}
-        {/* Parenthesised so the label and its gloss do not read as one run-on
-            sentence: "Pool base the stable side plus trading fees on the pool". */}
-        {note ? (
-          <span className="text-[var(--tertiary)]"> ({note})</span>
-        ) : null}
       </span>
-      <span className="font-mono text-[11.5px] tabular-nums whitespace-nowrap">
+      <span className="row-span-2 font-mono text-[11.5px] font-semibold tabular-nums whitespace-nowrap">
+        {value}
+      </span>
+      {note ? (
+        <span className="mt-0.5 text-[10px] leading-snug text-[var(--tertiary)]">
+          {note}
+        </span>
+      ) : null}
+    </div>
+  );
+}
+
+function BreakdownGroup({
+  children,
+  label,
+}: {
+  children: ReactNode;
+  label: string;
+}) {
+  return (
+    <section className="rounded-lg border border-[var(--border-subtle)] bg-[var(--background)] px-3 py-2">
+      <h4 className="border-b border-[var(--border-subtle)] pb-2 text-[9.5px] font-semibold uppercase tracking-[0.11em] text-[var(--tertiary)]">
+        {label}
+      </h4>
+      {children}
+    </section>
+  );
+}
+
+function ResultLine({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="flex items-center justify-between gap-4 rounded-lg border border-[var(--border-subtle)] bg-[var(--foundation)] px-3 py-2.5">
+      <span className="text-[12px] font-semibold">{label}</span>
+      <span className="font-mono text-[13px] font-bold tabular-nums">
         {value}
       </span>
     </div>
   );
 }
 
+export function DayV3PoolCarryLines({
+  breakdown,
+  poolEconomics,
+  source,
+  total,
+}: {
+  breakdown: DayV3PoolCarryBreakdown;
+  poolEconomics: {
+    seniorWeight: number;
+    stableYield: number | null;
+    swapFeeBps: number | null;
+    turnoverPerYear: number | null;
+  };
+  source: number;
+  total: number;
+}) {
+  const exitAssetWeight = Math.max(0, 1 - poolEconomics.seniorWeight);
+  const swapFeeNote =
+    poolEconomics.swapFeeBps === null
+      ? "Live execution fee unresolved"
+      : poolEconomics.turnoverPerYear === null
+        ? `${poolEconomics.swapFeeBps} bps execution · annual volume unresolved`
+        : poolEconomics.turnoverPerYear === 0
+          ? `${poolEconomics.swapFeeBps} bps execution · no annual volume forecast`
+          : `${poolEconomics.swapFeeBps} bps execution · ${poolEconomics.turnoverPerYear}x annual turnover`;
+
+  return (
+    <BreakdownGroup label="Pool carry">
+      <Line
+        label="Senior shares"
+        note={`${pct(poolEconomics.seniorWeight)} of pool · ${pct(source)} source APY`}
+        value={signed(breakdown.seniorShareCarry)}
+      />
+      <Line
+        label="Exit asset"
+        note={`${pct(exitAssetWeight)} of pool · ${poolEconomics.stableYield === null ? "yield unresolved" : `${pct(poolEconomics.stableYield)} modeled yield`}`}
+        value={signed(breakdown.exitAssetCarry)}
+      />
+      <Line
+        label="Swap fees"
+        note={swapFeeNote}
+        value={signed(breakdown.swapFeeIncome)}
+      />
+      <div className="flex items-center justify-between gap-3 pt-2">
+        <span className="text-[11.5px] font-semibold">Pool carry subtotal</span>
+        <span className="font-mono text-[12.5px] font-bold tabular-nums">
+          {exact(total)}
+        </span>
+      </div>
+    </BreakdownGroup>
+  );
+}
+
 export default function DayV3Comparison({
+  poolCarry,
   poolEconomics,
   positions,
   shares,
   source,
   unit,
 }: {
+  /** Engine-differential decomposition of the SLP's return before premiums. */
+  poolCarry: DayV3PoolCarryBreakdown;
   /** How the two premiums were priced, so Simulate can show the derivation it
    *  has no controls for. */
   shares: {
     coveragePct: number;
     curveOverridden: boolean;
-    deploying: boolean;
     liquidityPct: number;
     riskSharePct: number;
     liqSharePct: number;
     targetUtilization: number;
-    onOpenDeploy: () => void;
   };
   /** The venue assumptions the pool base rests on, read off the run's config. */
   poolEconomics: {
+    seniorWeight: number;
     stableYield: number | null;
     swapFeeBps: number | null;
     turnoverPerYear: number | null;
@@ -159,8 +251,8 @@ export default function DayV3Comparison({
             nowhere and the reader cannot tell whether they were chosen. */}
         <p className="max-w-[76ch] rounded-lg border border-dashed border-[var(--border-subtle)] px-3.5 py-2.5 text-[11px] leading-relaxed text-[var(--secondary)]">
           {shares.curveOverridden
-            ? "Manual yield-share curves. "
-            : "Source-model yield-share curves. "}
+            ? "Issuer-edited static yield-share curves. "
+            : "Illustrative V3 yield-share curves. "}
           At the {pct(shares.targetUtilization)} target, Jr receives{" "}
           <strong className="font-mono font-semibold tabular-nums">
             {pct(shares.riskSharePct / 100)}
@@ -170,9 +262,10 @@ export default function DayV3Comparison({
           <strong className="font-mono font-semibold tabular-nums">
             {pct(shares.liqSharePct / 100)}
           </strong>{" "}
-          at {pct(shares.liquidityPct / 100)} minimum liquidity. These curves
-          are visible simulation assumptions; V3 does not export them as
-          issuer-approved deployment terms.
+          at {pct(shares.liquidityPct / 100)} minimum liquidity.{" "}
+          {shares.curveOverridden
+            ? "These anchors drive every model here. RWA deployment must still validate the final registered YDM policy."
+            : "These are visible assumptions inherited from the V3 modeling basis—not facts supplied by the custom source. Customize them in Deploy."}
         </p>
         <Table>
           <TableHeader>
@@ -281,62 +374,38 @@ export default function DayV3Comparison({
                 expanded ? (
                   <TableRow id={detailsId} key={`${position.short}-detail`}>
                     <TableCell className="bg-[var(--foundation)]" colSpan={5}>
-                      <div className="flex flex-col gap-0.5 py-1">
+                      <div className="flex flex-col gap-3 py-1">
                         {position.holdsSource ? (
-                          <Line
-                            label="Return before the displayed premiums"
-                            value={exact(position.base)}
-                          />
+                          <BreakdownGroup label="Starting return">
+                            <Line
+                              label="Return before premiums"
+                              value={exact(position.base)}
+                            />
+                          </BreakdownGroup>
                         ) : (
-                          <Line
-                            label="SLP pool carry"
-                            note={
-                              poolEconomics.stableYield === null ||
-                              poolEconomics.swapFeeBps === null ||
-                              poolEconomics.turnoverPerYear === null
-                                ? "Live template fee unresolved; no exit-asset yield or swap-volume income is forecast"
-                                : poolEconomics.stableYield === 0 &&
-                                    poolEconomics.turnoverPerYear === 0
-                                  ? `${poolEconomics.swapFeeBps} bps live fee prices execution; V3 forecasts no exit-asset yield or swap-volume income`
-                                  : `Sr/exit-asset mix; ${pct(poolEconomics.stableYield)} exit yield; ${poolEconomics.swapFeeBps} bps × ${poolEconomics.turnoverPerYear}x modeled swaps`
-                            }
-                            value={exact(position.base)}
+                          <DayV3PoolCarryLines
+                            breakdown={poolCarry}
+                            poolEconomics={poolEconomics}
+                            source={source}
+                            total={position.base}
                           />
                         )}
-                        <Line
-                          label={
-                            position.riskDelta >= 0
-                              ? "Risk premium received"
-                              : "Risk premium paid to Jr"
-                          }
-                          note={
-                            position.riskDelta >= 0
-                              ? "for standing in first loss"
-                              : undefined
-                          }
-                          value={signed(position.riskDelta)}
+                        <BreakdownGroup label="Premium flows">
+                          <Line
+                            label="Junior risk premium"
+                            note="Senior pays Junior for first-loss protection"
+                            value={signed(position.riskDelta)}
+                          />
+                          <Line
+                            label="SLP liquidity premium"
+                            note="Senior pays SLP for holding the exit pool"
+                            value={signed(position.liqDelta)}
+                          />
+                        </BreakdownGroup>
+                        <ResultLine
+                          label={`${position.name} keeps`}
+                          value={exact(position.apy)}
                         />
-                        <Line
-                          label={
-                            position.liqDelta >= 0
-                              ? "Liquidity premium received"
-                              : "Liquidity premium paid to SLP"
-                          }
-                          note={
-                            position.liqDelta >= 0
-                              ? "for holding the exit pool"
-                              : undefined
-                          }
-                          value={signed(position.liqDelta)}
-                        />
-                        <div className="mt-1 flex items-baseline justify-between gap-3 border-t border-[var(--border-subtle)] pt-1.5">
-                          <span className="text-[11.5px] font-semibold">
-                            {position.name} keeps
-                          </span>
-                          <span className="font-mono text-[12.5px] font-bold tabular-nums">
-                            {exact(position.apy)}
-                          </span>
-                        </div>
                       </div>
                     </TableCell>
                   </TableRow>

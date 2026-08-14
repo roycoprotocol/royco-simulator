@@ -237,7 +237,7 @@ function DayV3Parameters({
           <DayV3Slider
             display={pct(bandPct / 100)}
             docs="slpTranche"
-            hint="The only E-CLP input modeled here. Deployment also sets premium, depth, reinvestment slippage, and seed liquidity."
+            hint="A simulation control only. Deployment derives premium and depth, then separately resolves reinvestment slippage and genesis liquidity."
             label="Maximum discount"
             max={5}
             maxLabel="5%"

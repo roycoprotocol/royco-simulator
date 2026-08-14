@@ -48,6 +48,21 @@ assert.notEqual(reshaped.seniorApy, implicit.seniorApy);
 assert.notEqual(reshaped.juniorApy, implicit.juniorApy);
 assert.notEqual(reshaped.liquidityApy, implicit.liquidityApy);
 
+const canonicalEclp = {
+  alpha: 0.99,
+  beta: 1.02,
+  c: 1,
+  s: 0,
+  lambda: 100,
+};
+const canonicalPoolBacktest = runDayHistoricalBacktest({
+  ...base,
+  configOverrides: { swapFeeBps: 37, eclpParams: canonicalEclp },
+});
+assert.equal(canonicalPoolBacktest.cfg.swapFeeBps, 37);
+assert.deepEqual(canonicalPoolBacktest.cfg.eclpParams, canonicalEclp);
+assert.notEqual(canonicalPoolBacktest.liquidityApy, implicit.liquidityApy);
+
 // A covered drawdown expires under the short Observation Period, while the
 // same path recovers before a longer period ends. `maintainCoverage` is off so
 // the test observes that lifecycle directly rather than masking it with a Jr

@@ -13,9 +13,7 @@ import type { DayV3DesignField } from "@/lib/day-v3/types";
 import { DAY_V3_SENIOR_BASIS } from "@/lib/day-v3/types";
 
 export type DayV3CoverageRecommendationStatus =
-  | "recommended"
-  | "infeasible"
-  | "invalid-input";
+  "recommended" | "infeasible" | "invalid-input";
 
 export interface DayV3CoverageRecommendationInput {
   protectedDrawdownPct: number;
@@ -23,6 +21,40 @@ export interface DayV3CoverageRecommendationInput {
   minimumLiquidityPct?: number;
   /** Deployment precision for the recommendation. Defaults to one basis point. */
   coverageResolutionBps?: number;
+}
+
+/**
+ * Accountant-backed single-point evaluation used by the recommendation search
+ * and its minimality regression. It exposes no duplicated coverage formula.
+ */
+export function dayV3CoverageKeepsSeniorWhole(
+  defaults: DaySimulatorDefaults,
+  input: {
+    protectedDrawdownPct: number;
+    coveragePct: number;
+    minimumLiquidityPct?: number;
+  },
+): boolean {
+  if (
+    !Number.isFinite(input.protectedDrawdownPct) ||
+    input.protectedDrawdownPct < 0 ||
+    input.protectedDrawdownPct > 95 ||
+    !Number.isFinite(input.coveragePct) ||
+    input.coveragePct < 0 ||
+    input.coveragePct >= DAY_TARGET_UTILIZATION * 100
+  ) {
+    return false;
+  }
+  try {
+    return evaluateCoverage(
+      defaults,
+      Math.round(input.coveragePct * 100),
+      input.protectedDrawdownPct,
+      input.minimumLiquidityPct,
+    ).passes;
+  } catch {
+    return false;
+  }
 }
 
 export interface DayV3CoverageRecommendation {
@@ -208,7 +240,9 @@ export function recommendDayV3Coverage(
     return unresolvedCoverage(
       input.protectedDrawdownPct,
       "infeasible",
-      error instanceof Error ? error.message : "The accountant could not size this stress.",
+      error instanceof Error
+        ? error.message
+        : "The accountant could not size this stress.",
     );
   }
   if (!highEvaluation.passes) {
@@ -233,14 +267,15 @@ export function recommendDayV3Coverage(
     else lowStep = midStep + 1;
   }
   const coverageBps = highStep * resolution;
-  const evaluation = coverageBps === maxStep * resolution
-    ? highEvaluation
-    : evaluateCoverage(
-        defaults,
-        coverageBps,
-        input.protectedDrawdownPct,
-        input.minimumLiquidityPct,
-      );
+  const evaluation =
+    coverageBps === maxStep * resolution
+      ? highEvaluation
+      : evaluateCoverage(
+          defaults,
+          coverageBps,
+          input.protectedDrawdownPct,
+          input.minimumLiquidityPct,
+        );
   const coveragePct = coverageBps / 100;
   const capital = {
     ...evaluation.capital,
@@ -274,6 +309,7 @@ export function recommendDayV3Coverage(
       keepsSeniorWhole: evaluation.passes,
     },
     projectedApy: evaluation.projectedApy,
-    reason: "The exact shared accountant kept Senior whole at this setting and not at the preceding deployable step.",
+    reason:
+      "The exact shared accountant kept Senior whole at this setting and not at the preceding deployable step.",
   };
 }

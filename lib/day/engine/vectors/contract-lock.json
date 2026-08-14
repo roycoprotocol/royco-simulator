@@ -1,6 +1,7 @@
 {
   "repository": "https://github.com/roycoprotocol/royco-day",
-  "commit": "952d22968968a43bbb80e4b892bc1aa3ba20c12d",
+  "commit": "9764c9e20c8e8af7df1358f228c4be83b78be97f",
   "solc": "0.8.35",
-  "schemaVersion": 1
+  "foundry": "1.7.1",
+  "schemaVersion": 3
 }

@@ -28,9 +28,9 @@ export default function DayV3DocsLink({
 }) {
   return (
     <a
-      aria-label={`Royco docs: ${label}`}
+      aria-label={`Royco docs: ${label} (opens in new tab)`}
       className={cn(
-        "inline-flex shrink-0 cursor-pointer items-center gap-0.5 whitespace-nowrap rounded-sm text-[10px] font-semibold text-[var(--tertiary)] underline decoration-dotted underline-offset-2 hover:text-[var(--foreground)]",
+        "inline-flex min-h-11 shrink-0 cursor-pointer items-center gap-0.5 whitespace-nowrap rounded-sm px-1 text-[10px] font-semibold text-[var(--tertiary)] underline decoration-dotted underline-offset-2 hover:text-[var(--foreground)]",
         DAY_V3_CONTROL_FOCUS,
       )}
       href={DAY_DOCS[topic]}

@@ -35,7 +35,9 @@ export const DAY_UINT24_DAYS = 16_777_215 / 86_400;
  *  Source: constants.ts UINT32_MAX = 4_294_967_295. */
 export const DAY_UINT32_DAYS = 4_294_967_295 / 86_400;
 
-/** The T+1 withdrawal floor. Royco mandates it, the chain does not.
+/** The T+1 withdrawal floor, enforced in both places. The deploy flow mandates
+ *  it, and the Day deployment template rejects a tranche configured below it
+ *  with REDEMPTION_DELAY_BELOW_MIN.
  *  Source: constants.ts MIN_REDEMPTION_DELAY_SECONDS = 86_400. */
 export const DAY_MIN_WITHDRAWAL_DELAY_DAYS = 1;
 
@@ -155,6 +157,34 @@ export function dayAbsoluteFromExitBufferPct(
   coveragePct: number,
 ): number {
   return (exitBufferPct / 100) * coveragePct;
+}
+
+/** Floor applied before inversion so an unresolved zero cannot produce
+ *  Infinity. This preserves the guard used by the shared runtime. */
+export const DAY_EXIT_BUFFER_MIN_PCT = 0.01;
+
+/**
+ * `exitBufferPct` and `liquidationUtilization` are one Protected Exit setting
+ * expressed on two scales:
+ *
+ *   liquidationUtilization = 100 / exitBufferPct
+ *   exitBufferPct          = 100 / liquidationUtilization
+ *
+ * The first value is a percentage of the Minimum Coverage requirement still
+ * standing. The second is the dimensionless utilization ratio consumed by the
+ * accountant. Keeping both directions here prevents callers from open-coding
+ * the inversion or accidentally treating the percentage as a ratio.
+ */
+export function dayLiquidationUtilizationFromExitBuffer(
+  exitBufferPct: number,
+): number {
+  return 100 / Math.max(exitBufferPct, DAY_EXIT_BUFFER_MIN_PCT);
+}
+
+export function dayExitBufferFromLiquidationUtilization(
+  liquidationUtilization: number,
+): number {
+  return 100 / Math.max(liquidationUtilization, DAY_EXIT_BUFFER_MIN_PCT);
 }
 
 // ---------------------------------------------------------------------------

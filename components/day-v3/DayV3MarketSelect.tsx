@@ -2,7 +2,6 @@
 
 import {
   useEffect,
-  useId,
   useRef,
   useState,
   type KeyboardEvent,
@@ -66,7 +65,7 @@ export default function DayV3MarketSelect({
   const optionRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const typeaheadRef = useRef("");
   const typeaheadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const listboxId = useId();
+  const listboxId = "day-v3-listed-source-options";
 
   useEffect(() => {
     if (!open) return;

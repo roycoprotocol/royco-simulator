@@ -5,7 +5,7 @@ import {
   DAY_MARKETS,
   DEFAULT_DAY_EXPLORER_MARKET,
 } from "@/lib/day-markets/registry";
-import { readDayV3UrlState } from "@/lib/day-v3";
+import { applyDayV3StarterDefaults, readDayV3UrlState } from "@/lib/day-v3";
 
 export const metadata: Metadata = {
   title: "Royco Day · v3",
@@ -31,14 +31,21 @@ export default async function DayV3Page({
     if (typeof value === "string") params.set(key, value);
   }
 
-  const linked = readDayV3UrlState(params.toString());
-  const market = DAY_MARKETS.find((candidate) => candidate.id === linked.market);
+  const starter = applyDayV3StarterDefaults(
+    readDayV3UrlState(params.toString()),
+    params.toString(),
+  );
+  const linked = starter.state;
+  const market = DAY_MARKETS.find(
+    (candidate) => candidate.id === linked.market,
+  );
 
   return (
     <DayV3Summary
       initialMarket={market ?? DEFAULT_DAY_EXPLORER_MARKET}
       initialState={linked}
       markets={DAY_MARKETS}
+      starterDefaultFields={starter.appliedFields}
     />
   );
 }

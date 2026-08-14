@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useRef, useState } from "react";
+import { useRef, useState } from "react";
 
 import DayV3Button, {
   dayV3ButtonVariants,
@@ -44,8 +44,8 @@ export default function DayV3Source({
   const [error, setError] = useState("");
   const [fileName, setFileName] = useState("No file chosen");
   const fileRef = useRef<HTMLInputElement>(null);
-  const fileInputId = useId();
-  const urlInputId = useId();
+  const fileInputId = "day-v3-history-file";
+  const urlInputId = "day-v3-history-url";
 
   const activate = (source: Parameters<typeof buildDayDraftMarket>[0]) => {
     // Build eagerly so the draft builder's own validation lands in the alert
@@ -134,10 +134,15 @@ export default function DayV3Source({
 
   return (
     <div className="flex flex-col gap-3" data-day-v3-section="source">
+      <p className="text-[10.5px] leading-relaxed text-[var(--tertiary)]">
+        Optional: use either method to add dated NAV or price history. You can
+        continue without it.
+      </p>
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
         <div className="flex flex-col gap-1.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--card)] px-4 py-3.5">
-          <span className="text-[9.5px] font-semibold uppercase tracking-[0.1em] text-[var(--tertiary)]">
-            Upload history
+          <span className="flex items-center justify-between gap-2 text-[9.5px] font-semibold uppercase tracking-[0.1em] text-[var(--tertiary)]">
+            Upload a file
+            <span className="rounded-full border border-[var(--border-subtle)] px-2 py-0.5 text-[8.5px]">Optional</span>
           </span>
           <span className="flex min-w-0 flex-wrap items-center gap-2">
             <input
@@ -178,14 +183,15 @@ export default function DayV3Source({
 
         <div className="flex flex-col gap-1.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--card)] px-4 py-3.5">
           <label
-            className="text-[9.5px] font-semibold uppercase tracking-[0.1em] text-[var(--tertiary)]"
+            className="flex items-center justify-between gap-2 text-[9.5px] font-semibold uppercase tracking-[0.1em] text-[var(--tertiary)]"
             htmlFor={urlInputId}
           >
-            Import a public URL
+            Paste a public data link
+            <span className="rounded-full border border-[var(--border-subtle)] px-2 py-0.5 text-[8.5px]">Optional</span>
           </label>
           <span className="flex flex-wrap gap-2">
             <input
-              className="min-h-9 min-w-[240px] flex-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--card)] px-3 py-2 text-[12px] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--foreground)]"
+              className="min-h-11 w-full min-w-0 flex-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--card)] px-3 py-2 text-[12px] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--foreground)] sm:min-w-[240px]"
               disabled={busy !== null}
               id={urlInputId}
               onChange={(event) => setUrl(event.target.value)}
@@ -208,7 +214,8 @@ export default function DayV3Source({
             </DayV3Button>
           </span>
           <span className="text-[10px] leading-snug text-[var(--tertiary)]">
-            CSV, JSON, Google Sheets, or an HTML table.
+            Must be reachable without signing in. CSV, JSON, Google Sheet, or
+            HTML table.
           </span>
         </div>
       </div>

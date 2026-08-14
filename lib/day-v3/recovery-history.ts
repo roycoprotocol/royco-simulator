@@ -4,7 +4,10 @@ import {
   type DayBacktestResult,
   type DayBacktestTerms,
 } from "@/lib/day-simulator-template/backtest";
-import type { DaySeriesPoint, DaySimulatorDefaults } from "@/lib/day-simulator-template/market";
+import type {
+  DaySeriesPoint,
+  DaySimulatorDefaults,
+} from "@/lib/day-simulator-template/market";
 import { normalizeDayV3Defaults } from "@/lib/day-v3/normalization";
 import type { DayV3DesignField } from "@/lib/day-v3/types";
 
@@ -15,6 +18,7 @@ export type DayV3RecoveryAnalysisStatus =
   | "no-history"
   | "no-observation-periods"
   | "sparse-history"
+  | "outside-deployment-window"
   | "recommended";
 
 export interface DayV3RecoveryEpisode {
@@ -24,7 +28,8 @@ export interface DayV3RecoveryEpisode {
   endDate: string | null;
   days: number | null;
   recovered: boolean;
-  exitReason: "period-ended" | "protected-exit" | "st-impairment" | "recovered" | null;
+  exitReason:
+    "period-ended" | "protected-exit" | "st-impairment" | "recovered" | null;
 }
 
 /** Pair Observation Periods with exact lifecycle events without reading copy. */
@@ -37,9 +42,11 @@ export function dayV3RecoveryEpisodesFromBacktest(
   return backtest.observationPeriods.map((period) => {
     const closeTime = backtest.chart[period.bIndex]?.t;
     const eventIndex = unusedExitEvents.findIndex(
-      (event) => event.t === closeTime && event.observationExitReason !== undefined,
+      (event) =>
+        event.t === closeTime && event.observationExitReason !== undefined,
     );
-    const event = eventIndex >= 0 ? unusedExitEvents.splice(eventIndex, 1)[0] : undefined;
+    const event =
+      eventIndex >= 0 ? unusedExitEvents.splice(eventIndex, 1)[0] : undefined;
     const exitReason = event?.observationExitReason ?? null;
     return {
       aIndex: period.aIndex,
@@ -60,7 +67,9 @@ export interface DayV3RecoveryAnalysis {
   recoveredEpisodeCount: number;
   percentile90Days: number | null;
   cappedByDeploymentLimit: boolean;
-  referenceObservationDays: typeof DAY_V3_MAX_RECOVERY_DAYS;
+  /** Evidence-only accountant horizon. It may exceed the deployable uint24
+   * limit so historical recoveries are observed rather than censored. */
+  referenceObservationDays: number;
 }
 
 export type DayV3RecoveryAnalysisInput = {
@@ -88,16 +97,19 @@ const unresolvedField = (evidence: string[]): DayV3DesignField<number> => ({
  */
 export function analyzeDayV3RecoveryHistory(
   backtest: DayBacktestResult,
+  referenceObservationDays = DAY_V3_MAX_RECOVERY_DAYS,
 ): DayV3RecoveryAnalysis {
   if (backtest.chart.length < 2) {
     return {
       status: "no-history",
-      field: unresolvedField(["Dated history is required for a recovery-time recommendation."]),
+      field: unresolvedField([
+        "Dated history is required for a recovery-time recommendation.",
+      ]),
       episodes: [],
       recoveredEpisodeCount: 0,
       percentile90Days: null,
       cappedByDeploymentLimit: false,
-      referenceObservationDays: DAY_V3_MAX_RECOVERY_DAYS,
+      referenceObservationDays,
     };
   }
 
@@ -113,7 +125,7 @@ export function analyzeDayV3RecoveryHistory(
       recoveredEpisodeCount: 0,
       percentile90Days: null,
       cappedByDeploymentLimit: false,
-      referenceObservationDays: DAY_V3_MAX_RECOVERY_DAYS,
+      referenceObservationDays,
     };
   }
 
@@ -132,48 +144,82 @@ export function analyzeDayV3RecoveryHistory(
       recoveredEpisodeCount: recoveredDays.length,
       percentile90Days: null,
       cappedByDeploymentLimit: false,
-      referenceObservationDays: DAY_V3_MAX_RECOVERY_DAYS,
+      referenceObservationDays,
     };
   }
 
   // Nearest-rank p90 selects the first duration that covers at least 90% of
   // recovered episodes. Durations and the deploy field are whole days.
-  const percentileIndex = Math.max(0, Math.ceil(recoveredDays.length * 0.9) - 1);
+  const percentileIndex = Math.max(
+    0,
+    Math.ceil(recoveredDays.length * 0.9) - 1,
+  );
   const percentile90Days = Math.ceil(recoveredDays[percentileIndex]);
-  const recommendedDays = Math.min(DAY_V3_MAX_RECOVERY_DAYS, percentile90Days);
   const capped = percentile90Days > DAY_V3_MAX_RECOVERY_DAYS;
+  if (capped) {
+    const reason = `The 90th-percentile recovery took ${percentile90Days} days, longer than the 194-day deployment limit. V3 will not recommend a shorter timer than the evidence supports.`;
+    return {
+      status: "outside-deployment-window",
+      field: unresolvedField([reason]),
+      episodes,
+      recoveredEpisodeCount: recoveredDays.length,
+      percentile90Days,
+      cappedByDeploymentLimit: true,
+      referenceObservationDays,
+    };
+  }
   return {
     status: "recommended",
     field: {
       id: "observation-period-duration",
-      value: recommendedDays,
+      value: percentile90Days,
       unit: "days",
       origin: "recommended",
       deployPath: "accountantParams.fixedTermDurationSeconds",
       modelUsage: "fully-modeled",
       evidence: [
         `Nearest-rank 90th percentile across ${recoveredDays.length} accountant-confirmed recovered Observation Periods.`,
-        capped
-          ? `The ${percentile90Days}-day result is capped at the 194-day deployment limit.`
-          : "Rounded up to a whole day.",
+        "Rounded up to a whole day.",
       ],
     },
     episodes,
     recoveredEpisodeCount: recoveredDays.length,
     percentile90Days,
-    cappedByDeploymentLimit: capped,
-    referenceObservationDays: DAY_V3_MAX_RECOVERY_DAYS,
+    cappedByDeploymentLimit: false,
+    referenceObservationDays,
   };
 }
 
-/** Run the reference history with the longest deployable recovery window. */
+const DAY_MS = 86_400_000;
+
+/**
+ * Keep evidence collection separate from the deployable timer. A 194-day
+ * accountant run would classify a real day-195 recovery as `period-ended`,
+ * hiding the evidence needed to say that the deployable limit is too short.
+ * The evidence run therefore stays open beyond the full supplied history;
+ * recommendations are still rejected above the 194-day deployment limit.
+ */
+function recoveryEvidenceHorizonDays(series: DaySeriesPoint[]): number {
+  const timestamps = series
+    .map((point) => Date.parse(point.date))
+    .filter(Number.isFinite);
+  if (timestamps.length < 2) return DAY_V3_MAX_RECOVERY_DAYS;
+  const spanDays = Math.ceil(
+    (Math.max(...timestamps) - Math.min(...timestamps)) / DAY_MS,
+  );
+  return Math.max(DAY_V3_MAX_RECOVERY_DAYS + 1, spanDays + 1);
+}
+
+/** Run history through the shared accountant with an uncensored evidence horizon. */
 export function runDayV3RecoveryAnalysis(
   input: DayV3RecoveryAnalysisInput,
 ): DayV3RecoveryAnalysis {
   if (input.series.length < 2) {
     return {
       status: "no-history",
-      field: unresolvedField(["Dated history is required for a recovery-time recommendation."]),
+      field: unresolvedField([
+        "Dated history is required for a recovery-time recommendation.",
+      ]),
       episodes: [],
       recoveredEpisodeCount: 0,
       percentile90Days: null,
@@ -181,6 +227,7 @@ export function runDayV3RecoveryAnalysis(
       referenceObservationDays: DAY_V3_MAX_RECOVERY_DAYS,
     };
   }
+  const evidenceObservationDays = recoveryEvidenceHorizonDays(input.series);
   const backtestInput: DayBacktestInput = {
     // Recovery evidence must not be censored by a market's existing Protected
     // Exit trigger. A near-zero buffer maps to a practically unreachable
@@ -192,11 +239,14 @@ export function runDayV3RecoveryAnalysis(
     series: input.series,
     terms: {
       ...input.terms,
-      observationDays: DAY_V3_MAX_RECOVERY_DAYS,
+      observationDays: evidenceObservationDays,
     },
     maintainCoverage: false,
     omitInitialZeroReturnPeriod: input.omitInitialZeroReturnPeriod ?? false,
     monthlyBaselineDate: input.monthlyBaselineDate,
   };
-  return analyzeDayV3RecoveryHistory(runDayHistoricalBacktest(backtestInput));
+  return analyzeDayV3RecoveryHistory(
+    runDayHistoricalBacktest(backtestInput),
+    evidenceObservationDays,
+  );
 }

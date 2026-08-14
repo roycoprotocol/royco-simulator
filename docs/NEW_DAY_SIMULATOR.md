@@ -135,11 +135,11 @@ In the browser, compare the market with `/falconx-v3` at desktop, mobile, and hi
 npm run day-sim:certify -- <market-id>
 ```
 
-Certification runs data verification, accountant runtime checks, all 74 Solidity golden vectors, the Day invariant and regression suites, source-import tests, lint, and a production build. A successful report ends with:
+Certification runs data verification, accountant runtime checks, every checked-in Solidity golden vector generated from the pinned Royco Day commit, the Day invariant and regression suites, source-import tests, lint, and a production build. A successful report ends with:
 
 ```text
 Data integrity: PASS
-Accountant parity: PASS (74/74 Solidity vectors)
+Accountant parity: PASS (78/78 replayed vectors from royco-day @9764c9e20c)
 Calibration guardrails: PASS
 Locked copy: PASS
 Design contract: PASS
@@ -166,7 +166,9 @@ The SHA-256 lock file makes that boundary machine-verifiable. It prevents a mark
 
 All Day state transitions and outputs flow through `lib/day/engine`. Shared wiring in `lib/day-simulator-template/runtime.ts` is the only adapter allowed to build initial balances and accountant configuration. The UI, market files, calibration command, and verifier consume this shared adapter; none may duplicate its formulas.
 
-The Solidity suite contains 52 Foundry-generated core accountant vectors and 22 pinned current-contract vectors. It covers SLP commitment/reinvestment (contract symbol LT), all four fee rates, ST liquidity-premium share minting, all six post-operation paths, coverage/liquidity gates, Protected Exit, one-wei rounding, and the mint-dilution clamp. Regenerate vectors only from the locked compiled contracts using the documented generator—never from TypeScript.
+The Solidity differential suite is regenerated from the exact Royco Day commit, solc, Foundry version, and harness pinned in `lib/day/engine/vectors/contract-lock.json`. Its current inventory covers the single-collateral waterfall and recovery, fixed-term deployment grace, coverage and liquidity utilization, exact premium accounting, all six post-operation paths, nonzero Junior recovery-ledger behavior across redemption, LPT fee carve-outs into Senior shares, virtual-share valuation, Protected Exit, adaptive YDM V2, one-wei rounding, and the mint-dilution clamp. Regenerate vectors only from a clean checkout of those locked compiled contracts using the documented generator—never from TypeScript. Certification reads the checked-in vector count and exact pinned commit instead of publishing a hard-coded count.
+
+`day-sim:parity` replays those checked-in vectors; it does not compile Solidity or inspect a live deployment. A PASS means the TypeScript engine still reproduces the vectors generated from the pinned commit. Advancing the pin requires regenerating the vectors against that commit first.
 
 SLP stable-asset yield, trading-fee income, turnover, and execution-liquidity economics are variable off-chain model inputs. They are invariant-tested, but they are not fixed onchain economics.
 

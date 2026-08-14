@@ -10,7 +10,9 @@ import {
   dayAdaptationSpeedApplies,
   dayCurveModelIsAdaptive,
   dayDerivedExpiryDays,
+  dayExitBufferFromLiquidationUtilization,
   dayExitBufferPctFromAbsolute,
+  dayLiquidationUtilizationFromExitBuffer,
   dayRestockHurdleBps,
   dayValidateDeployFields,
 } from '@/lib/day-simulator-template/deploy-fields';
@@ -51,7 +53,7 @@ for (const coveragePct of [1, 5, 10, 20, 66.67]) {
       `got ${back}`,
     );
     // Both express the same on-chain multiple.
-    const engineMultiple = 100 / bufferPct;
+    const engineMultiple = dayLiquidationUtilizationFromExitBuffer(bufferPct);
     const flowMultiple = coveragePct / absolute;
     check(
       `both units give the same liquidation multiple (${coveragePct}, ${bufferPct})`,
@@ -300,5 +302,48 @@ for (const [id, rule] of Object.entries(DAY_DEPLOY_FIELD_RULES)) {
     check(`rule ${id} has a coherent range`, rule.min < rule.max, `${rule.min}..${rule.max}`);
   }
 }
+
+// ---------------------------------------------------------------------------
+// One Protected Exit setting, expressed as percent standing and utilization.
+// ---------------------------------------------------------------------------
+
+check(
+  '100% of the requirement standing is 1x utilization',
+  dayLiquidationUtilizationFromExitBuffer(100) === 1,
+  String(dayLiquidationUtilizationFromExitBuffer(100)),
+);
+check(
+  '50% standing is 2x utilization',
+  dayLiquidationUtilizationFromExitBuffer(50) === 2,
+  String(dayLiquidationUtilizationFromExitBuffer(50)),
+);
+check(
+  '10% standing is 10x utilization',
+  dayLiquidationUtilizationFromExitBuffer(10) === 10,
+  String(dayLiquidationUtilizationFromExitBuffer(10)),
+);
+
+for (const pct of [0.01, 1, 5, 12.5, 50, 71.43, 99.91, 100]) {
+  const back = dayExitBufferFromLiquidationUtilization(
+    dayLiquidationUtilizationFromExitBuffer(pct),
+  );
+  check(
+    `exit buffer ${pct}% round-trips through utilization`,
+    Math.abs(back - pct) < 1e-9,
+    `got ${back}`,
+  );
+}
+
+check(
+  'a zero threshold is floored rather than divided by zero',
+  Number.isFinite(dayLiquidationUtilizationFromExitBuffer(0)),
+  String(dayLiquidationUtilizationFromExitBuffer(0)),
+);
+
+check(
+  'absolute coverage and share-of-requirement units remain distinct',
+  dayAbsoluteFromExitBufferPct(50, 10) === 5 &&
+    dayExitBufferPctFromAbsolute(5, 10) === 50,
+);
 
 console.log(`deploy-fields: ${passed} checks passed`);

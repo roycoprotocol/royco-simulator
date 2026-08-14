@@ -34,13 +34,60 @@ export interface DayV3DeploymentTarget {
   templateId: string;
 }
 
-/** Fully resolved goals accepted by the canonical pool-design service. */
+/**
+ * Contract-level feature switches are explicit in exported designs. A zero
+ * goal by itself is not trusted as proof that the issuer intended to disable
+ * a mechanism.
+ */
+export interface DayV3Features {
+  seniorProtection: "enabled" | "disabled";
+  immediateExit: "enabled" | "disabled";
+}
+
+/**
+ * EntryPoint settlement is a single market-level product decision in the RWA
+ * deployment flow. The same schedule is intentionally written to Senior,
+ * Junior, and Senior LP. `"no-expiry"` is explicit and maps to uint32 max at
+ * deployment; it is never overloaded with an unresolved/null value.
+ */
+export type DayV3ExpiryPolicy = number | "no-expiry";
+
+export interface DayV3SettlementPolicy {
+  appliesTo: "all-tranches";
+  depositDelaySeconds: number;
+  depositExpirySeconds: DayV3ExpiryPolicy;
+  withdrawalDelaySeconds: number;
+  withdrawalExpirySeconds: DayV3ExpiryPolicy;
+  gateByOracleUpdate: boolean;
+}
+
+export interface DayV3DeploymentPolicy {
+  settlement: DayV3SettlementPolicy;
+  /** On-chain reinvestment value-loss ceiling. Must be strictly below 100%. */
+  maxReinvestmentSlippageBps: number;
+}
+
+/**
+ * Issuer goals accepted by the canonical pool-design service.
+ *
+ * The nullable deployment facts are deliberate. They are forwarded so a
+ * response can still resolve live template policy and price the immediate
+ * pool exit, but a deployment handoff may not be marked ready until the
+ * issuer has supplied them.
+ */
 export interface DayV3Goals {
   protectedDrawdownPct: number;
   recoveryDays: number;
   immediateExitSharePct: number;
   minimumProceedsPer100: number;
-  redemptionDays: number;
+  /** Minimum EntryPoint queue time before an in-kind Senior redemption may execute. */
+  entryPointSettlementDays: number;
+  /** Additional operational time to convert claimed collateral to the exit asset. */
+  collateralToExitDays: number | null;
+  /** Issuer-supplied all-in conversion cost; no fallback is allowed. */
+  collateralToExitCostBps: number | null;
+  /** Delay after deployment before a drawdown may start a fixed term. */
+  fixedTermGraceDays: number;
   navUpdateDays: number;
   target: DayV3DeploymentTarget;
 }
@@ -63,5 +110,12 @@ export interface DayV3Overrides {
   protectedExitThresholdPct: number | null;
   protectedExitBonusPct: number | null;
   poolCapitalPer100: number | null;
+  /** Issuer-edited static Junior premium curve anchors. */
+  jrYieldShareAtZeroPct: number | null;
+  jrYieldShareAtTargetPct: number | null;
+  jrYieldShareAtFullPct: number | null;
+  /** Issuer-edited static SLP premium curve anchors. */
+  slpYieldShareAtZeroPct: number | null;
+  slpYieldShareAtTargetPct: number | null;
+  slpYieldShareAtFullPct: number | null;
 }
-

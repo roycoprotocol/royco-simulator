@@ -19,9 +19,9 @@ import {
  *
  * Every registry market is a `static` YDM, which the engine defines as
  * piecewise-linear through three anchors: 0% utilization pays Y0, the 90%
- * target pays YT, and 100% pays Y100. YT is the only one this page sets from a
- * requirement, and the target is where the modeled scenario sits, so YT is the
- * number that binds and the other two describe what happens either side of it.
+ * target pays YT, and 100% pays Y100. V3 derives all three starting anchors
+ * from one source/template shape as the requirement changes. Issuer edits in
+ * Deploy replace that complete starting curve atomically.
  */
 /**
  * Three readings of one point on the curve, because the share alone is not
@@ -57,7 +57,10 @@ function CurveTooltip({
     // No currency symbol. This page runs markets quoted in ETH and BTC as well
     // as dollars, and the line this replaces said "per dollar of Sr" on all of
     // them.
-    ["Additional yield", `${((sharePct / 100) * sourceApy * 100).toFixed(2)}% a year on Sr`],
+    [
+      "Additional yield",
+      `${((sharePct / 100) * sourceApy * 100).toFixed(2)}% a year on Sr`,
+    ],
     [
       "Share of total yield",
       `${(sharePct * seniorShareOfCapital).toFixed(1)}%`,
@@ -116,8 +119,15 @@ function DayV3YieldCurve({
   return (
     <div style={{ width: "100%" }}>
       <ResponsiveContainer height={150} width="100%">
-        <LineChart data={data} margin={{ bottom: 4, left: 0, right: 8, top: 8 }}>
-          <CartesianGrid stroke="#e4e0d6" strokeDasharray="2 4" vertical={false} />
+        <LineChart
+          data={data}
+          margin={{ bottom: 4, left: 0, right: 8, top: 8 }}
+        >
+          <CartesianGrid
+            stroke="#e4e0d6"
+            strokeDasharray="2 4"
+            vertical={false}
+          />
           <XAxis
             axisLine={false}
             dataKey="utilization"

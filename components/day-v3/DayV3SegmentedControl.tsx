@@ -10,7 +10,7 @@ const CONTROL_SIZES = {
 } as const;
 
 const ITEM_SIZES = {
-  sm: "min-h-9 min-w-16 px-3 py-2 text-[12px]",
+  sm: "min-h-11 min-w-16 px-3 py-2 text-[12px]",
   md: "min-h-12 px-3 py-2 text-[12px]",
   lg: "min-h-12 px-4 py-2 text-[15px]",
 } as const;

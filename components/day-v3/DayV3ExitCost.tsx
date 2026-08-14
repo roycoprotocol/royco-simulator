@@ -80,6 +80,8 @@ export default function DayV3ExitCost({
   // reaches, so the claim has to name whichever limit actually binds.
   const depthBindsFirst =
     metrics.boundaryQuote.slippage <= metrics.arbitrageReference + 1e-12;
+  const referenceUnavailable =
+    metrics.referenceSellNAV <= 0 && metrics.boundarySellNAV > 0;
 
   // With no liquidity funded the pool has no depth, and the engine quotes the
   // degenerate case as a 100% cost on a zero-sized fill. That is arithmetically
@@ -92,6 +94,10 @@ export default function DayV3ExitCost({
   const selected = metrics.curve[index];
   const sellNAV = selected.sellNAV;
   const costUSD = sellNAV * selected.slippage;
+  const curveCost = Math.max(
+    0,
+    selected.effectiveInputNAV - sellNAV * selected.executionPrice,
+  );
   const proceeds = sellNAV * selected.executionPrice;
   const shareOfSr = seniorNAV > 0 ? sellNAV / seniorNAV : 0;
 
@@ -124,14 +130,28 @@ export default function DayV3ExitCost({
         <CardDescription>
           One-trade SLP capacity in a 90/10 Balancer E-CLP (λ
           {assumptions.concentration}) with a {pct(assumptions.bandPct / 100)}{" "}
-          maximum discount and a {assumptions.swapFeeBps} bps pool swap fee.
+          maximum discount. Every quote is all-in: the{" "}
+          {assumptions.swapFeeBps} bps exact-input swap fee is deducted before
+          E-CLP pricing and retained by SLP. The 1.0% level below is a near-NAV
+          reference, not the pool&apos;s full discount limit.
         </CardDescription>
       </CardHeader>
 
       <CardContent className="flex flex-col gap-4">
         <p className="max-w-[64ch] text-[14.5px] leading-relaxed text-[var(--foreground)]">
           {metrics.boundarySellNAV <= 0 ? (
-            <>No SLP is funded, so early exit is unavailable.</>
+            <>
+              No SLP is funded, so there is no secondary pool route. Senior
+              still uses the primary in-kind redemption queue at effective NAV,
+              subject to its settlement rules.
+            </>
+          ) : referenceUnavailable ? (
+            <>
+              The exact-input swap fee already reaches the{" "}
+              {pct(metrics.arbitrageReference)} near-NAV reference, so no
+              positive one-trade exit meets that threshold. Full SLP depth is{" "}
+              {amount(metrics.boundarySellNAV)}.
+            </>
           ) : depthBindsFirst ? (
             <>
               One trade can exit{" "}
@@ -140,7 +160,7 @@ export default function DayV3ExitCost({
               </strong>{" "}
               ({pct(metrics.boundarySellShareOfSenior)} of Sr). Draining the SLP
               costs {bps(metrics.boundaryQuote.slippage)}; depth runs out before
-              the {pct(metrics.arbitrageReference)} maximum discount.
+              the {pct(metrics.arbitrageReference)} near-NAV reference.
             </>
           ) : (
             <>
@@ -149,7 +169,7 @@ export default function DayV3ExitCost({
                 {amount(metrics.referenceSellNAV)}
               </strong>{" "}
               ({pct(metrics.referenceSellShareOfSenior)} of Sr) before the{" "}
-              {pct(metrics.arbitrageReference)} maximum discount. Full SLP depth
+              {pct(metrics.arbitrageReference)} near-NAV reference. Full SLP depth
               is {amount(metrics.boundarySellNAV)}.
             </>
           )}
@@ -210,7 +230,7 @@ export default function DayV3ExitCost({
                   {amount(costUSD)}
                 </span>
                 <span className="text-[10.5px] text-[var(--tertiary)]">
-                  the cost of leaving now
+                  {amount(selected.swapFeeNAV)} fee + {amount(curveCost)} price impact
                 </span>
               </div>
               <div className="flex flex-col gap-0.5">
@@ -282,7 +302,7 @@ export default function DayV3ExitCost({
               </span>
               <p className="text-[11.5px] leading-relaxed text-[var(--foreground)]">
                 Each quote is one sale into a pool at rest. At the{" "}
-                {pct(metrics.arbitrageReference)} maximum discount, arbitrage
+                {pct(metrics.arbitrageReference)} near-NAV reference, arbitrage
                 may replenish capacity before another sale; timing and price are
                 not guaranteed.
               </p>
