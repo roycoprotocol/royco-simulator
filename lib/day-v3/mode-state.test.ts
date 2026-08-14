@@ -29,6 +29,7 @@ const legacyState: DayV3UrlState = {
   quoteAssetLabel: "USDC",
   quoteAssetYieldPct: 0,
   poolTurnoverPerYear: 8,
+  swapFeeBps: 30,
   marketMakerCostOfCapitalPct: 12,
   redemptionDays: 7,
   protectedDrawdownPct: 15,
@@ -116,6 +117,7 @@ const expectedCanonicalKeys = [
   "convert",
   "convertCost",
   "exit",
+  "fee",
   "jr90",
   "m",
   "mmCost",
@@ -146,6 +148,7 @@ assert.equal(canonicalParams.get("receive"), "95");
 assert.equal(canonicalParams.get("settle"), "90");
 assert.equal(canonicalParams.get("convert"), "0");
 assert.equal(canonicalParams.get("convertCost"), "50");
+assert.equal(canonicalParams.get("fee"), "30");
 
 for (const removedKey of [
   "mode",
@@ -196,6 +199,9 @@ assert.equal(canonicalState.minimumProceedsPer100, 95);
 assert.equal(canonicalState.entryPointSettlementDays, 90);
 assert.equal(canonicalState.collateralToExitDays, 0);
 assert.equal(canonicalState.collateralToExitCostBps, 50);
+// A hand-set pool fee is a model input: it changes every quote the page draws,
+// so a shared link that dropped it would describe a different market.
+assert.equal(canonicalState.swapFeeBps, 30);
 assert.equal(canonicalState.overrides.jrYieldShareAtTargetPct, 12);
 assert.equal(canonicalState.overrides.slpYieldShareAtTargetPct, 5);
 for (const field of [

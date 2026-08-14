@@ -13,6 +13,8 @@ const modelState = read("lib/day-v3/model-state.ts");
 const yieldCurves = read("lib/day-v3/yield-curves.ts");
 const backtest = read("components/day-v3/DayV3Backtest.tsx");
 const modelGroup = read("components/day-v3/DayV3ModelGroup.tsx");
+const quoteAsset = read("components/day-v3/DayV3QuoteAsset.tsx");
+const simulationPoolDesign = read("lib/day-v3/simulation-pool-design.ts");
 
 // One workflow must retain every model that explains how an issuer's four
 // inputs change returns, capital, protection, immediate exits, and history.
@@ -383,6 +385,96 @@ assert.match(
   summary,
   /poolTurnoverPerYear: modeledPoolTurnover/,
   "Annual volume is the issuer's forecast, not a pinned zero",
+);
+
+// The pool's swap fee is settable per market. It is the one issuer answer the
+// canonical service cannot be asked to honour — its request body is
+// key-restricted and its parser asserts the returned fee equals the live
+// template policy — so the whole feature turns on the fee winning locally and
+// the canonical outcomes standing down when it does.
+assert.match(
+  summary,
+  /swapFeeBps: swapFeeBps \?\? defaults\.swapFeeBps/,
+  "A hand-set pool fee must reach the shared accountant, not just the display",
+);
+assert.match(
+  summary,
+  /\.\.\.\(canonicalEngineOverrides \?\? \{\}\),\s*\.\.\.\(feeOverridden \? \{ swapFeeBps: swapFeeBps as number \} : \{\}\),/,
+  "The engine override must keep the live E-CLP and protocol fees while replacing only the fee",
+);
+assert.match(
+  summary,
+  /\]\.some\(\(value\) => value !== null\) \|\| feeOverridden;/,
+  "A hand-set fee must suppress the canonical pool design like any other pool override",
+);
+assert.match(
+  summary,
+  /const canonicalPoolDesign =\s*rawCanonicalPoolDesign && !hasPoolOverride/,
+  "Canonical outcomes solved at another fee must not survive the override gate",
+);
+const poolDesignRequest = summary.slice(
+  summary.indexOf("const poolDesignGoals ="),
+  summary.indexOf("const activePoolDesign ="),
+);
+assert.doesNotMatch(
+  poolDesignRequest,
+  /swapFeeBps|feeOverridden/,
+  "A hand-set fee must never enter the canonical pool-design request",
+);
+assert.doesNotMatch(
+  simulationPoolDesign,
+  /swapFeeBps/,
+  "The simulation pool-design contract must stay the four goals and the source APY",
+);
+// The projection and the history have to run the same pool. Both merge these
+// overrides by spread, so a key present and `undefined` erases a real value.
+assert.match(
+  summary,
+  /const backtestConfigOverrides = useMemo\(\(\) => \{[\s\S]*inputs\.engineOverrides\?\.swapFeeBps !== undefined\) \{\s*overrides\.swapFeeBps = inputs\.engineOverrides\.swapFeeBps;/,
+  "The backtest must run the same swap fee the projection was priced at",
+);
+assert.doesNotMatch(
+  summary,
+  /eclpParams: inputs\.engineOverrides\.eclpParams,\s*swapFeeBps: inputs\.engineOverrides\.swapFeeBps,/,
+  "Engine overrides must be built by omitting keys, never by writing undefined ones",
+);
+assert.match(
+  summary,
+  /poolConfigOverrides=\{backtestConfigOverrides\}/,
+  "The historical backtest must receive the same override object",
+);
+// Honesty: a fee the issuer typed is never presented as the market's own, and
+// the swap-fee line in the position comparison stays a two-run engine
+// differential rather than fee x turnover arithmetic written into the UI.
+assert.match(
+  summary,
+  /policyBasis: feeOverridden\s*\?\s*\("issuer-fee" as const\)/,
+  "The live-models eyebrow must not claim to be live while a hand-set fee is in force",
+);
+assert.match(
+  summary,
+  /feeSource: feeOverridden\s*\?\s*`Issuer-set pool swap fee/,
+  "The fee's provenance must name the issuer, never a template or product policy",
+);
+assert.doesNotMatch(
+  quoteAsset,
+  /"live-template"|"product-policy"|"source-fact"/,
+  "The fee field must not label a hand-set fee as a template or policy fact",
+);
+assert.match(
+  quoteAsset,
+  /swapFeeBps === null \? "model-assumption" : "manual-override"/,
+  "A fee the reader typed reads as a manual override",
+);
+assert.match(
+  quoteAsset,
+  /max=\{10000\}\s*min=\{0\.01\}/,
+  "The fee field's bounds are what keep previewSecondarySell from throwing",
+);
+assert.doesNotMatch(
+  `${summary}\n${goals}\n${quoteAsset}`,
+  /swapFeeBps\s*[)\s]*\/\s*10_?000/,
+  "Fee economics stay in the shared engine; the UI must not compute fee income",
 );
 
 // A tranche the issuer switched off has no model to show, so its result

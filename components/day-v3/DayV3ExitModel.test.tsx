@@ -255,6 +255,7 @@ const goalsProps = {
   onRecoveryMode: noop,
   onResetExit: noop,
   onResetProtection: noop,
+  onSwapFeeBps: noop,
   protection: {
     coveragePct: 15,
     juniorPer100: 20,
@@ -267,6 +268,7 @@ const goalsProps = {
   quoteAssetYieldPct: 0,
   recoveryDays: 7,
   recoveryMode: "window",
+  swapFeeBps: null,
 } satisfies Omit<ComponentProps<typeof DayV3Goals>, "exit">;
 
 const goalsMarkup = renderToStaticMarkup(
@@ -350,6 +352,27 @@ assert.match(
 );
 assert.doesNotMatch(goalsMarkup, /Maximum discount/);
 assert.doesNotMatch(goalsMarkup, /See .*impact/i);
+
+// The pool's swap fee is the issuer's to set, with an inherited default. An
+// empty field is labelled for what it is — the fee the model is assuming — and
+// a typed one is never presented as the template's own policy.
+assert.match(
+  goalsMarkup,
+  /What swap fee should the pool charge on a sale\?/,
+);
+assert.match(goalsMarkup, /Use the live fee/);
+assert.match(goalsMarkup, /Model assumption/);
+assert.doesNotMatch(goalsMarkup, /Manual override/);
+
+const handSetFeeMarkup = renderToStaticMarkup(
+  <DayV3Goals {...goalsProps} exit={resolved} swapFeeBps={30} />,
+);
+assert.match(handSetFeeMarkup, /Manual override/);
+assert.doesNotMatch(handSetFeeMarkup, /Live template|Product policy/);
+// These two bounds are the only guard against `previewSecondarySell` throwing
+// INVALID_SWAP_FEE inside a render-time memo with no error boundary above it.
+assert.match(handSetFeeMarkup, /min="0\.01"/);
+assert.match(handSetFeeMarkup, /max="10000"/);
 
 const protectionStart = goalsMarkup.indexOf('id="day-v3-protection-inputs"');
 const observationMode = goalsMarkup.indexOf('aria-label="Observation mode"');

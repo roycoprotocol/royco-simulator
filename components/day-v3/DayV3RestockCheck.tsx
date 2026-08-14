@@ -19,9 +19,10 @@ export type DayV3RestockView = {
   hurdle: DayV3RestockHurdle | null;
   /** The pool's maximum discount, which the payout floor sets locally. */
   maximumDiscountPct: number;
-  /** Whether the pool priced here is the live template's or the disclosed
-   *  illustrative one. Both are real pools; only their provenance differs. */
-  policyBasis: "live" | "unresolved";
+  /** Which pool priced these quotes. `issuer-fee` is not a lesser answer than
+   *  `unresolved` — it is the reader's own fee, which is exactly what they
+   *  asked to model — but it is not the live template's pool either. */
+  policyBasis: "live" | "unresolved" | "issuer-fee";
   selectedSalePer100: number | null;
 };
 
@@ -247,7 +248,9 @@ export default function DayV3RestockCheck({
       data-model-source={
         policyBasis === "live"
           ? "canonical-rwa-eclp-service"
-          : "shared-day-engine-illustrative-default"
+          : policyBasis === "issuer-fee"
+            ? "issuer-swap-fee"
+            : "shared-day-engine-illustrative-default"
       }
       data-restock-status={
         missingInputs ? "missing-inputs" : (check?.status ?? "unavailable")
@@ -259,7 +262,9 @@ export default function DayV3RestockCheck({
             Test whether this works for arbitrageurs
           </CardTitle>
           {policyBasis === "live" ? null : (
-            <Badge tone="neutral">illustrative pool</Badge>
+            <Badge tone="neutral">
+              {policyBasis === "issuer-fee" ? "your fee" : "illustrative pool"}
+            </Badge>
           )}
         </span>
         <CardNote>
@@ -427,7 +432,9 @@ export default function DayV3RestockCheck({
 Both discounts are quotes from{" "}
                 {policyBasis === "live"
                   ? "the live template's pool"
-                  : "the disclosed illustrative pool"}
+                  : policyBasis === "issuer-fee"
+                    ? "a pool priced at the swap fee you set"
+                    : "the disclosed illustrative pool"}
                 , whose {maximumDiscountPct.toFixed(2)}% maximum discount is set
                 by your payout floor. The Senior offset assumes the source
                 performs at its modeled rate. Royco Deploy revalidates against
