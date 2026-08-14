@@ -51,6 +51,7 @@ export function DayV3ModelAccordion({
  */
 export default function DayV3ModelGroup({
   children,
+  disabledLabel = "off",
   disabledReason,
   id,
   index,
@@ -58,6 +59,9 @@ export default function DayV3ModelGroup({
   title,
 }: {
   children?: React.ReactNode;
+  /** What the chip says. "off" is an issuer choice; a design that cannot be
+   *  built is not switched off, it has no model. */
+  disabledLabel?: string;
   /**
    * Set when the tranche this section models is switched off. There is nothing
    * to draw, so the section is greyed, cannot be opened, and says why in place
@@ -124,7 +128,7 @@ export default function DayV3ModelGroup({
         <div className="flex min-h-11 w-full items-center gap-3">
           {heading}
           <span className="mr-1 shrink-0 rounded-full border border-[var(--border-subtle)] px-2 py-0.5 text-[9px] font-semibold uppercase tracking-[0.08em] text-[var(--tertiary)]">
-            off
+            {disabledLabel}
           </span>
         </div>
       ) : (

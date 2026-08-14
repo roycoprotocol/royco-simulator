@@ -6,6 +6,7 @@ import {
   dayV3RestockCheck,
   dayV3RestockHurdle,
 } from "@/lib/day-v3/restock-arbitrage";
+import { dayCapitalAtUtilization } from "@/lib/day-simulator-template/capital-sizing";
 import { normalizeDayV3Defaults } from "@/lib/day-v3/normalization";
 import { buildDayYieldDraftMarket } from "@/lib/day-simulator-template/explorer-market";
 import {
@@ -208,6 +209,44 @@ assert.ok(
       worstCaseDiscountBps: wide,
     }).status === "profitable",
   "and it must flip the verdict, which is the whole point of the control",
+);
+
+// A design can be legal at the 90% opening target and unbuildable at the 100%
+// contract boundary. The page must survive that rather than throw: a $100
+// payout floor asks the pool for zero price impact, and the boundary stack is
+// then rejected for failing its own liquidity requirement.
+const boundaryBuilds = (floorPer100: number) => {
+  const terms = {
+    coverage: 0.2,
+    minLiquidity: defaults.minLiquidity,
+    eclpBandWidth: Math.max(0.0001, (100 - floorPer100) / 100),
+    observationDays: 0,
+    riskYieldShare: defaults.riskYDM.yTarget,
+    liquidityYieldShare: defaults.liqYDM.yTarget,
+  };
+  const effective = {
+    ...defaults,
+    ...terms,
+    sourceApy: 0.08,
+    stableYield: 0,
+    poolTurnoverPerYear: 0,
+  };
+  const cfg = buildDayMarketConfig(effective, terms);
+  const opening = () => new Sim(cfg, buildDayInitialBalances(effective, terms));
+  const boundary = () =>
+    new Sim(cfg, dayCapitalAtUtilization(effective, terms, 1));
+  let openingOk = true;
+  let boundaryOk = true;
+  try { opening(); } catch { openingOk = false; }
+  try { boundary(); } catch { boundaryOk = false; }
+  return { boundaryOk, openingOk };
+};
+assert.deepEqual(boundaryBuilds(95), { boundaryOk: true, openingOk: true });
+assert.deepEqual(boundaryBuilds(99.9), { boundaryOk: true, openingOk: true });
+assert.deepEqual(
+  boundaryBuilds(100),
+  { boundaryOk: false, openingOk: true },
+  "a $100 floor is legal at the opening target and unbuildable at the boundary, which the page must report rather than crash on",
 );
 
 console.log("Day V3 restock arbitrage check: PASS");

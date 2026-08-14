@@ -84,7 +84,10 @@ import {
 import type { EclpParams } from "@/lib/day/engine/eclp";
 import { DAY_ECLP_SIMULATION_LAMBDA } from "@/lib/day/engine/engine";
 import { Sim } from "@/lib/day/engine/runner";
-import { buildDayExplainerMetrics } from "@/lib/day-simulator-template/explainer";
+import {
+  buildDayExplainerMetrics,
+  type DayExplainerMetrics,
+} from "@/lib/day-simulator-template/explainer";
 import type { DayMarket } from "@/lib/day-simulator-template/market";
 import {
   buildDayInitialBalances,
@@ -657,10 +660,23 @@ export default function DayV3Summary({
       // requirement, so drawing the loss path on it overstates protection by
       // the size of that headroom. Liquidity stays on the opening pool, which
       // is the pool a seller actually trades into.
-      coverageExplainer: buildDayExplainerMetrics(
-        cfg,
-        dayCapitalAtUtilization(effective, terms, 1),
-      ).coverage,
+      //
+      // A design can be legal at the 90% target and unbuildable at the
+      // boundary. A $100 payout floor asks the pool for zero price impact, the
+      // band collapses, and `newMarket` rejects the stack because it cannot
+      // meet its own liquidity requirement — measured: fine at a 0.1% band,
+      // throws at 0.01%. That is a real answer about the design, so it is
+      // caught and reported rather than taking the page down.
+      coverageExplainer: ((): DayExplainerMetrics["coverage"] | null => {
+        try {
+          return buildDayExplainerMetrics(
+            cfg,
+            dayCapitalAtUtilization(effective, terms, 1),
+          ).coverage;
+        } catch {
+          return null;
+        }
+      })(),
     };
   }, [
     inputs.bandPct,
@@ -1666,10 +1682,15 @@ export default function DayV3Summary({
                 </DayV3ModelGroup>
 
                 <DayV3ModelGroup
+                  disabledLabel={
+                    protectionDisabled ? "off" : "no model"
+                  }
                   disabledReason={
                     protectionDisabled
                       ? "Protection is off. No Junior is funded, so there is no loss waterfall to draw — Senior absorbs source losses from the first dollar."
-                      : null
+                      : model.coverageExplainer === null
+                        ? `No protection model exists at these terms. A ${minimumProceedsPer100 === null ? "" : `$${minimumProceedsPer100.toFixed(2)} `}payout floor asks the exit pool for almost no price impact, and at the 100%-utilized boundary no pool can hold that and still meet its own liquidity requirement. Lower the payout floor to model the loss path.`
+                        : null
                   }
                   id="day-v3-risk-models"
                   index={2}
@@ -1680,10 +1701,12 @@ export default function DayV3Summary({
                   }
                   title="Senior protection"
                 >
-                  <DayV3LossWaterfall
-                    metrics={model.coverageExplainer}
-                    unit={returnUnit}
-                  />
+                  {model.coverageExplainer === null ? null : (
+                    <DayV3LossWaterfall
+                      metrics={model.coverageExplainer}
+                      unit={returnUnit}
+                    />
+                  )}
                 </DayV3ModelGroup>
 
                 <DayV3ModelGroup
