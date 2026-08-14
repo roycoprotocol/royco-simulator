@@ -1,7 +1,3 @@
-"use client";
-
-import DayV3SegmentedControl from "@/components/day-v3/DayV3SegmentedControl";
-
 const ROYCO_DISPLAY_FONT =
   '"Shippori Mincho B1", "Iowan Old Style", Baskerville, "Times New Roman", serif';
 
@@ -23,22 +19,12 @@ const MARKET_ROLES = [
   },
 ] as const;
 
-export type DayV3HeroMode = "simulate" | "deploy";
-
 /**
  * V3 owns this copy of the main simulator hero so its experimental runtime
- * never crosses into components/day-v2. The geometry and type treatment match
- * origin/main; only the explanatory sentence reflects V3's goal-driven flow.
+ * never crosses into components/day-v2. Its single workflow introduces the
+ * three issuer decisions before the page reveals the resulting market models.
  */
-export default function DayV3Hero({
-  mode,
-  onModeChange,
-}: {
-  mode: DayV3HeroMode;
-  onModeChange: (mode: DayV3HeroMode) => void;
-}) {
-  const deploying = mode === "deploy";
-
+export default function DayV3Hero() {
   return (
     <header className="overflow-hidden rounded-2xl border border-[var(--foreground)] bg-[var(--foreground)] text-[var(--background)] shadow-[0_12px_36px_-28px_rgba(23,25,31,0.75)]">
       <div className="grid lg:grid-cols-[minmax(0,1.35fr)_minmax(390px,0.65fr)]">
@@ -50,12 +36,13 @@ export default function DayV3Hero({
             className="mt-2.5 max-w-[28ch] text-balance text-[clamp(25px,2.5vw,35px)] font-semibold leading-[1.06]"
             style={{ fontFamily: ROYCO_DISPLAY_FONT }}
           >
-            Design liquidity and drawdown protection around one yield source.
+            Design the yield split, protection, and immediate exit in one
+            workflow.
           </h1>
           <p className="mt-2.5 max-w-[68ch] text-[12px] leading-relaxed text-[#b7b7b0] sm:text-[12.5px]">
-            Choose the drawdown Senior should withstand and the exit it should
-            offer. V3 derives the Junior and SLP requirements per $100 Senior,
-            then lets you review them before deployment.
+            Set how Senior yield is shared with Junior and SLP, choose the loss
+            Senior should survive, and define the immediate exit. Then inspect
+            returns, capital requirements, and exit outcomes.
           </p>
         </div>
 
@@ -93,24 +80,22 @@ export default function DayV3Hero({
           </span>
         </div>
 
-        <div className="flex w-full shrink-0 flex-col gap-1 lg:w-[340px]">
+        <div className="flex w-full shrink-0 flex-col gap-1.5 lg:w-[460px]">
           <span className="text-[9px] font-medium uppercase tracking-[0.14em] text-[#8f8f87]">
-            {deploying
-              ? "Finalize a market design"
-              : "Explore how the protocol works"}
+            One workflow
           </span>
-          <DayV3SegmentedControl
-            ariaLabel="Simulation mode"
-            className="w-full"
-            onValueChange={onModeChange}
-            options={[
-              { label: "Simple", value: "simulate" },
-              { label: "Advanced", value: "deploy" },
-            ]}
-            size="lg"
-            toggleOnSelected
-            value={mode}
-          />
+          <ol className="grid grid-cols-2 gap-x-3 gap-y-1 text-[10.5px] font-medium text-[#d4d2ca] sm:grid-cols-4 lg:gap-x-4">
+            {["Yield split", "Protection", "Immediate exit", "Outcomes"].map(
+              (step, index) => (
+                <li className="flex min-w-0 items-center gap-1.5" key={step}>
+                  <span className="flex size-4 shrink-0 items-center justify-center rounded-full border border-white/20 font-mono text-[8px] text-[#999990]">
+                    {index + 1}
+                  </span>
+                  <span className="truncate">{step}</span>
+                </li>
+              ),
+            )}
+          </ol>
         </div>
       </div>
     </header>

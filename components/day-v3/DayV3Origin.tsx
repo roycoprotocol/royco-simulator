@@ -8,6 +8,7 @@ export type DayV3VisibleOrigin =
   | "product-policy"
   | "live-template"
   | "manual-override"
+  | "model-assumption"
   | "illustrative";
 
 const LABELS: Record<DayV3VisibleOrigin, string> = {
@@ -18,6 +19,7 @@ const LABELS: Record<DayV3VisibleOrigin, string> = {
   "product-policy": "Product policy",
   "live-template": "Live template",
   "manual-override": "Manual override",
+  "model-assumption": "Model assumption",
   illustrative: "Illustrative",
 };
 

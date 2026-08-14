@@ -38,7 +38,7 @@ export default function DayV3YieldModels({
         <CardDescription>
           {curveOverridden
             ? "These are the Junior and SLP curve anchors set above. They drive every return model on this page; deployment still validates the final registered YDM policy."
-            : "How the current scenario changes Junior and SLP's share of Senior yield as their capital is used. These starting curves drive the model and can be customized in Advanced."}
+            : "How the current scenario changes Junior and SLP's share of Senior yield as their capital is used. These starting curves drive the model and can be adjusted in the yield-split section."}
         </CardDescription>
       </CardHeader>
       <CardContent className="grid grid-cols-1 gap-4 xl:grid-cols-2">

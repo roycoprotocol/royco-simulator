@@ -5,11 +5,7 @@ import {
   buildDayV3Query,
   DAY_V3_STARTER_DEFAULTS,
   readDayV3UrlState,
-  toggleDayV3Mode,
 } from "./url-state";
-
-assert.equal(toggleDayV3Mode("simulate"), "deploy");
-assert.equal(toggleDayV3Mode("deploy"), "simulate");
 
 const emptyStarter = applyDayV3StarterDefaults(readDayV3UrlState(""), "");
 assert.equal(emptyStarter.applied, true);
@@ -38,24 +34,49 @@ const starterQuery = buildDayV3Query({
   ...emptyStarter.state,
   starterFields: emptyStarter.appliedFields,
 });
-assert.equal(starterQuery.includes("starter="), true);
+assert.equal(starterQuery.includes("starter="), false);
+assert.deepEqual(
+  [...new URLSearchParams(starterQuery).keys()].sort(),
+  [
+    "apy",
+    "convert",
+    "convertCost",
+    "exit",
+    "m",
+    "protect",
+    "receive",
+    "recover",
+    "settle",
+  ],
+  "canonical links contain visible model inputs, not starter provenance",
+);
 const reloadedStarter = applyDayV3StarterDefaults(
   readDayV3UrlState(starterQuery),
   starterQuery,
 );
-assert.deepEqual(reloadedStarter.appliedFields, emptyStarter.appliedFields);
+assert.equal(reloadedStarter.state.sourceApyPct, emptyStarter.state.sourceApyPct);
+assert.equal(
+  reloadedStarter.state.protectedDrawdownPct,
+  emptyStarter.state.protectedDrawdownPct,
+);
+assert.equal(
+  reloadedStarter.state.immediateExitSharePct,
+  emptyStarter.state.immediateExitSharePct,
+);
 assert.equal(reloadedStarter.applied, true);
 
 const confirmedQuery = buildDayV3Query({
   ...emptyStarter.state,
   starterFields: [],
 });
-const reloadedConfirmed = applyDayV3StarterDefaults(
-  readDayV3UrlState(confirmedQuery),
-  confirmedQuery,
+assert.equal(confirmedQuery, starterQuery);
+
+const legacyStarter = applyDayV3StarterDefaults(
+  readDayV3UrlState("m=custom&starter=source%2Cgrace"),
+  "m=custom&starter=source%2Cgrace",
 );
-assert.deepEqual(reloadedConfirmed.appliedFields, []);
-assert.equal(reloadedConfirmed.applied, false);
+assert.equal(legacyStarter.appliedFields.includes("source"), true);
+assert.equal(legacyStarter.appliedFields.includes("grace"), true);
 
 const partialStarter = applyDayV3StarterDefaults(
   readDayV3UrlState("m=custom&apy=12&recover=30"),
@@ -99,12 +120,13 @@ assert.equal(
   DAY_V3_STARTER_DEFAULTS.minimumProceedsPer100,
 );
 assert.equal(listedSource.state.entryPointSettlementDays, null);
-assert.equal(listedSource.state.target, null);
+assert.deepEqual(listedSource.state.target, DAY_V3_STARTER_DEFAULTS.target);
 assert.deepEqual(listedSource.appliedFields, [
   "drawdown",
   "recovery",
   "exit-amount",
   "payout",
+  "target",
 ]);
 
 const query = buildDayV3Query({
@@ -128,42 +150,79 @@ const query = buildDayV3Query({
   incentiveBudgetPer100: 2,
   target: { chainId: 1, templateId: "day-template" },
   overrides: {
-    coveragePct: null,
-    minimumLiquidityPct: null,
-    maximumDiscountPct: null,
-    depthAtNav: null,
-    maximumPremiumPct: null,
-    protectedExitThresholdPct: null,
-    protectedExitBonusPct: null,
-    poolCapitalPer100: null,
-    jrYieldShareAtZeroPct: null,
-    jrYieldShareAtTargetPct: null,
-    jrYieldShareAtFullPct: null,
-    slpYieldShareAtZeroPct: null,
-    slpYieldShareAtTargetPct: null,
-    slpYieldShareAtFullPct: null,
+    coveragePct: 16,
+    minimumLiquidityPct: 12,
+    maximumDiscountPct: 2.5,
+    depthAtNav: 300,
+    maximumPremiumPct: 0.08,
+    protectedExitThresholdPct: 10,
+    protectedExitBonusPct: 1,
+    poolCapitalPer100: 13,
+    jrYieldShareAtZeroPct: 2,
+    jrYieldShareAtTargetPct: 12,
+    jrYieldShareAtFullPct: 18,
+    slpYieldShareAtZeroPct: 1,
+    slpYieldShareAtTargetPct: 5,
+    slpYieldShareAtFullPct: 14,
   },
+  starterFields: ["source", "target"],
 });
 const parsed = readDayV3UrlState(query);
 assert.equal(parsed.market, "custom");
-assert.equal(parsed.mode, "deploy");
+assert.equal(parsed.mode, null);
 assert.equal(parsed.protectedDrawdownPct, 18);
 assert.equal(parsed.recoveryDays, 45);
 assert.equal(parsed.immediateExitSharePct, 10);
 assert.equal(parsed.minimumProceedsPer100, 98.5);
-assert.equal(parsed.incentiveBudgetPer100, 2);
 assert.equal(parsed.entryPointSettlementDays, 7);
 assert.equal(parsed.collateralToExitDays, 2);
 assert.equal(parsed.collateralToExitCostBps, 35);
-assert.equal(parsed.fixedTermGraceDays, 0);
-assert.equal(parsed.depositDelaySeconds, 300);
-assert.equal(parsed.depositExpirySeconds, 1_814_400);
-assert.equal(parsed.withdrawalExpirySeconds, "no-expiry");
-assert.equal(parsed.gateByOracleUpdate, true);
-assert.equal(parsed.maxReinvestmentSlippageBps, 50);
-assert.deepEqual(parsed.target, { chainId: 1, templateId: "day-template" });
-assert.equal(query.includes("cov="), false);
-assert.equal(query.includes("liq="), false);
+assert.equal(parsed.overrides.jrYieldShareAtTargetPct, 12);
+assert.equal(parsed.overrides.slpYieldShareAtTargetPct, 5);
+assert.deepEqual(
+  [...new URLSearchParams(query).keys()].sort(),
+  [
+    "apy",
+    "convert",
+    "convertCost",
+    "exit",
+    "jr90",
+    "m",
+    "protect",
+    "receive",
+    "recover",
+    "settle",
+    "slp90",
+  ],
+  "the canonical writer strips hidden state while retaining visible target shares",
+);
+for (const hidden of [
+  "mode",
+  "grace",
+  "nav",
+  "depDelay",
+  "depExpiry",
+  "wdExpiry",
+  "priceGate",
+  "reinvestSlip",
+  "incentive",
+  "target",
+  "cov",
+  "liq",
+  "discount",
+  "lambda",
+  "premium",
+  "pexit",
+  "bonus",
+  "pool",
+  "jr0",
+  "jr100",
+  "slp0",
+  "slp100",
+  "starter",
+]) {
+  assert.equal(new URLSearchParams(query).has(hidden), false, hidden);
+}
 
 // Reported live-state regression: zero is a deliberate value for same-day
 // conversion and no incentive, while every other operational fact round-trips
@@ -214,7 +273,10 @@ assert.deepEqual(
   },
 );
 assert.equal(buildDayV3Query(reported).includes("convert=0"), true);
-assert.equal(buildDayV3Query(reported).includes("incentive=0"), true);
+assert.equal(buildDayV3Query(reported).includes("settle=90"), true);
+assert.equal(buildDayV3Query(reported).includes("convertCost=50"), true);
+assert.equal(buildDayV3Query(reported).includes("recover=20"), true);
+assert.equal(buildDayV3Query(reported).includes("incentive=0"), false);
 
 const settlementPolicy = readDayV3UrlState(
   "depDelay=0&depExpiry=604800&wdExpiry=none&priceGate=0&reinvestSlip=25",
@@ -224,7 +286,7 @@ assert.equal(settlementPolicy.depositExpirySeconds, 604_800);
 assert.equal(settlementPolicy.withdrawalExpirySeconds, "no-expiry");
 assert.equal(settlementPolicy.gateByOracleUpdate, false);
 assert.equal(settlementPolicy.maxReinvestmentSlippageBps, 25);
-assert.equal(buildDayV3Query(settlementPolicy).includes("wdExpiry=none"), true);
+assert.equal(buildDayV3Query(settlementPolicy).includes("wdExpiry=none"), false);
 assert.equal(readDayV3UrlState("depExpiry=4294967295").depositExpirySeconds, null);
 assert.equal(readDayV3UrlState("reinvestSlip=10000").maxReinvestmentSlippageBps, null);
 
@@ -248,16 +310,99 @@ assert.deepEqual(overridden.overrides, {
   slpYieldShareAtFullPct: 14,
 });
 const curveRoundTrip = buildDayV3Query(overridden);
-for (const field of [
-  "jr0=2",
-  "jr90=12",
-  "jr100=18",
-  "slp0=1",
-  "slp90=5",
-  "slp100=14",
-]) {
+for (const field of ["jr90=12", "slp90=5"]) {
   assert.equal(curveRoundTrip.includes(field), true);
 }
+for (const field of ["jr0=", "jr100=", "slp0=", "slp100="]) {
+  assert.equal(curveRoundTrip.includes(field), false);
+}
+const simpleYieldSplit = readDayV3UrlState("m=custom&apy=8&jr90=20&slp90=10");
+assert.deepEqual(
+  {
+    jr0: simpleYieldSplit.overrides.jrYieldShareAtZeroPct,
+    jr90: simpleYieldSplit.overrides.jrYieldShareAtTargetPct,
+    jr100: simpleYieldSplit.overrides.jrYieldShareAtFullPct,
+    slp0: simpleYieldSplit.overrides.slpYieldShareAtZeroPct,
+    slp90: simpleYieldSplit.overrides.slpYieldShareAtTargetPct,
+    slp100: simpleYieldSplit.overrides.slpYieldShareAtFullPct,
+  },
+  {
+    jr0: null,
+    jr90: 20,
+    jr100: null,
+    slp0: null,
+    slp90: 10,
+    slp100: null,
+  },
+  "Simple target-share links preserve their two visible APY inputs",
+);
+assert.match(buildDayV3Query(simpleYieldSplit), /jr90=20/);
+assert.match(buildDayV3Query(simpleYieldSplit), /slp90=10/);
+
+const slpOnlyQuery = buildDayV3Query({
+  ...reported,
+  protectedDrawdownPct: 0,
+  recoveryDays: null,
+  fixedTermGraceDays: null,
+  overrides: {
+    ...reported.overrides,
+    jrYieldShareAtTargetPct: 12,
+    slpYieldShareAtTargetPct: 5,
+  },
+});
+const slpOnly = readDayV3UrlState(slpOnlyQuery);
+assert.equal(new URLSearchParams(slpOnlyQuery).get("recover"), "0");
+assert.equal(new URLSearchParams(slpOnlyQuery).has("grace"), false);
+assert.equal(new URLSearchParams(slpOnlyQuery).has("jr90"), false);
+assert.equal(slpOnly.overrides.jrYieldShareAtTargetPct, null);
+assert.equal(slpOnly.overrides.slpYieldShareAtTargetPct, 5);
+
+const juniorOnlyQuery = buildDayV3Query({
+  ...reported,
+  immediateExitSharePct: 0,
+  minimumProceedsPer100: null,
+  overrides: {
+    ...reported.overrides,
+    jrYieldShareAtTargetPct: 12,
+    slpYieldShareAtTargetPct: 5,
+  },
+});
+const juniorOnly = readDayV3UrlState(juniorOnlyQuery);
+assert.equal(new URLSearchParams(juniorOnlyQuery).get("receive"), "0");
+assert.equal(new URLSearchParams(juniorOnlyQuery).get("recover"), "20");
+assert.equal(new URLSearchParams(juniorOnlyQuery).has("slp90"), false);
+assert.equal(new URLSearchParams(juniorOnlyQuery).has("settle"), false);
+assert.equal(new URLSearchParams(juniorOnlyQuery).has("convert"), false);
+assert.equal(new URLSearchParams(juniorOnlyQuery).has("convertCost"), false);
+assert.equal(juniorOnly.overrides.jrYieldShareAtTargetPct, 12);
+assert.equal(juniorOnly.overrides.slpYieldShareAtTargetPct, null);
+
+const immediateObservationQuery = buildDayV3Query({
+  ...reported,
+  recoveryDays: 0,
+});
+assert.equal(
+  new URLSearchParams(immediateObservationQuery).get("recover"),
+  "0",
+  "the unified simulator preserves deliberate realize-immediately observation",
+);
+
+const unresolvedObservationQuery = buildDayV3Query({
+  ...reported,
+  recoveryDays: null,
+});
+assert.equal(
+  new URLSearchParams(unresolvedObservationQuery).has("recover"),
+  false,
+  "the unified simulator omits observation duration until one is chosen",
+);
+
+assert.equal(
+  readDayV3UrlState("jr90=70&slp90=40").overrides
+    .jrYieldShareAtTargetPct,
+  null,
+  "over-budget Simple target shares are rejected",
+);
 assert.equal(
   Object.values(
     readDayV3UrlState("jr0=-1&jr90=NaN&jr100=101&slp0=-1&slp90=x&slp100=101")
@@ -301,16 +446,22 @@ const disabledFeatures = readDayV3UrlState(
   }),
 );
 assert.equal(disabledFeatures.protectedDrawdownPct, 0);
+assert.equal(disabledFeatures.recoveryDays, 0);
+assert.equal(disabledFeatures.fixedTermGraceDays, null);
 assert.equal(disabledFeatures.immediateExitSharePct, 0);
 assert.equal(disabledFeatures.minimumProceedsPer100, 0);
+assert.equal(disabledFeatures.overrides.jrYieldShareAtTargetPct, null);
+assert.equal(disabledFeatures.overrides.slpYieldShareAtTargetPct, null);
 assert.equal(
   readDayV3UrlState("settle=0&convert=-1&convertCost=10000&grace=195")
     .entryPointSettlementDays,
   null,
 );
 
-// Existing V3 links migrate the old `redeem` key to in-kind settlement. New
-// links emit only the precise name.
+// Existing V3 mode and `redeem` links remain readable. Canonical links omit
+// mode and use only the precise, model-driving settlement name.
+assert.equal(readDayV3UrlState("mode=deploy").mode, "deploy");
+assert.equal(query.includes("mode="), false);
 assert.equal(readDayV3UrlState("redeem=7").entryPointSettlementDays, 7);
 assert.equal(query.includes("settle=7"), true);
 assert.equal(query.includes("redeem="), false);

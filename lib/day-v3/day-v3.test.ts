@@ -24,7 +24,6 @@ import {
   recommendDayV3ProtectedExitTrigger,
   runDayV3ProtectedExitScenarios,
   runDayV3RecoveryAnalysis,
-  toggleDayV3Mode,
   type DayV3UrlState,
   type DayV3PoolDesignResult,
 } from "@/lib/day-v3";
@@ -40,11 +39,6 @@ const defaults = DEFAULT_DAY_EXPLORER_MARKET.defaults;
 const DAY_MS = 86_400_000;
 
 console.log("Day V3 goal-state and recommendations");
-
-check("V3 mode toggles directly", () => {
-  assert.equal(toggleDayV3Mode("simulate"), "deploy");
-  assert.equal(toggleDayV3Mode("deploy"), "simulate");
-});
 
 check("custom source handoffs use the accountant's custom registry key", () => {
   assert.equal(
@@ -120,8 +114,26 @@ const urlState: DayV3UrlState = {
   },
 };
 
-check("V3 URL goals and explicit overrides round-trip", () => {
-  assert.deepEqual(readDayV3UrlState(buildDayV3Query(urlState)), urlState);
+check("V3 URL round-trips only unified model inputs", () => {
+  assert.deepEqual(readDayV3UrlState(buildDayV3Query(urlState)), {
+    ...urlState,
+    mode: null,
+    fixedTermGraceDays: null,
+    navUpdateDays: null,
+    depositDelaySeconds: null,
+    depositExpirySeconds: null,
+    withdrawalExpirySeconds: null,
+    gateByOracleUpdate: null,
+    maxReinvestmentSlippageBps: null,
+    incentiveBudgetPer100: null,
+    target: null,
+    overrides: {
+      ...urlState.overrides,
+      minimumLiquidityPct: null,
+      depthAtNav: null,
+      protectedExitBonusPct: null,
+    },
+  });
 });
 
 check(
@@ -140,8 +152,8 @@ check(
     assert.equal(parsed.recoveryDays, 7);
     assert.equal(parsed.entryPointSettlementDays, 8);
     assert.equal(parsed.collateralToExitDays, 2);
-    assert.equal(parsed.fixedTermGraceDays, 7);
-    assert.equal(parsed.navUpdateDays, 31);
+    assert.equal(parsed.fixedTermGraceDays, null);
+    assert.equal(parsed.navUpdateDays, null);
   },
 );
 
@@ -170,16 +182,13 @@ check("derived fields stay out of the URL until overridden", () => {
   assert.equal(new URLSearchParams(query).has("lambda"), false);
 });
 
-check(
-  "issuer incentive budget is URL state, not a manual pool override",
-  () => {
-    const query = buildDayV3Query(urlState);
-    const parsed = readDayV3UrlState(query);
-    assert.equal(parsed.incentiveBudgetPer100, 2);
-    assert.equal(new URLSearchParams(query).get("incentive"), "2");
-    assert.equal(parsed.overrides.protectedExitBonusPct, 0);
-  },
-);
+check("removed deployment-only fields stay out of unified links", () => {
+  const query = buildDayV3Query(urlState);
+  const parsed = readDayV3UrlState(query);
+  assert.equal(parsed.incentiveBudgetPer100, null);
+  assert.equal(new URLSearchParams(query).has("incentive"), false);
+  assert.equal(parsed.overrides.protectedExitBonusPct, null);
+});
 
 check("malformed or out-of-range URL input stays unresolved", () => {
   const parsed = readDayV3UrlState(

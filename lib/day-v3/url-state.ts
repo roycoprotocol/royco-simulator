@@ -101,10 +101,9 @@ export function applyDayV3StarterDefaults(
   const params = new URLSearchParams(search);
   const customSource = !params.has("m") || state.market === "custom";
 
-  // `replaceState` writes the visible starter numbers into the address bar.
-  // Persist their origin separately so a refresh cannot turn an illustrative
-  // value into an issuer-approved deployment input merely because its key is
-  // now present in the URL.
+  // Legacy links may carry a `starter` marker. Continue honoring it when links
+  // are read, even though the canonical writer no longer serializes UI-only
+  // provenance or hidden starter fields.
   const appliedFields = readStarterFields(params);
   const whenAbsent = <T>(
     field: DayV3StarterDefaultField,
@@ -219,14 +218,14 @@ export function applyDayV3StarterDefaults(
           DAY_V3_STARTER_DEFAULTS.incentiveBudgetPer100,
         )
       : state.incentiveBudgetPer100,
-    target: customSource
-      ? whenAbsent(
-          "target",
-          ["target"],
-          state.target,
-          DAY_V3_STARTER_DEFAULTS.target,
-        )
-      : state.target,
+    // V3 currently supports one certified deployment template, so retain it
+    // in the URL and handoff without showing a one-option issuer question.
+    target: whenAbsent(
+      "target",
+      ["target"],
+      state.target,
+      DAY_V3_STARTER_DEFAULTS.target,
+    ),
   };
   return {
     applied: appliedFields.length > 0,
@@ -280,10 +279,6 @@ function readTarget(raw: string | null): DayV3DeploymentTarget | null {
   return { chainId, templateId };
 }
 
-export function toggleDayV3Mode(mode: DayV3Mode): DayV3Mode {
-  return mode === "simulate" ? "deploy" : "simulate";
-}
-
 /** Parse the independent V3 address-bar contract. Invalid input stays unresolved. */
 export function readDayV3UrlState(search: string): DayV3UrlState {
   const params = new URLSearchParams(search);
@@ -299,6 +294,24 @@ export function readDayV3UrlState(search: string): DayV3UrlState {
   const curveValues = Object.values(curveOverrides);
   const hasAnyCurveOverride = curveValues.some((value) => value !== null);
   const hasCompleteCurveOverride = curveValues.every((value) => value !== null);
+  const protectedDrawdownPct = finite(params.get("protect"), 0, 95);
+  const immediateExitSharePct = finite(params.get("exit"), 0, 100);
+  const juniorTargetRequired = protectedDrawdownPct !== 0;
+  const slpTargetRequired = immediateExitSharePct !== 0;
+  const hasTargetOnlyCurveOverride =
+    (!juniorTargetRequired ||
+      curveOverrides.jrYieldShareAtTargetPct !== null) &&
+    (!slpTargetRequired ||
+      curveOverrides.slpYieldShareAtTargetPct !== null) &&
+    (curveOverrides.jrYieldShareAtTargetPct !== null ||
+      curveOverrides.slpYieldShareAtTargetPct !== null) &&
+    curveOverrides.jrYieldShareAtZeroPct === null &&
+    curveOverrides.jrYieldShareAtFullPct === null &&
+    curveOverrides.slpYieldShareAtZeroPct === null &&
+    curveOverrides.slpYieldShareAtFullPct === null &&
+    (curveOverrides.jrYieldShareAtTargetPct ?? 0) +
+      (curveOverrides.slpYieldShareAtTargetPct ?? 0) <=
+      100;
   const validCurveOverride =
     hasCompleteCurveOverride &&
     validateDayV3YieldCurveDesign({
@@ -313,12 +326,13 @@ export function readDayV3UrlState(search: string): DayV3UrlState {
         y100Pct: curveOverrides.slpYieldShareAtFullPct as number,
       },
     }).valid;
-  // The six anchors form one atomic model input. A partial, inverted, or
-  // over-budget hand-edited URL is rejected as a unit rather than normalized
-  // into a different curve while the address bar continues to claim the raw
-  // values.
+  // The unified editor may carry the two visible target shares alone; its
+  // hidden endpoints are re-derived from the disclosed fixed basis. A legacy
+  // six-anchor curve is accepted only when the full shape is valid. Every
+  // other partial, inverted, or over-budget curve is rejected as a unit.
   const acceptedCurveOverrides =
-    !hasAnyCurveOverride || !validCurveOverride
+    !hasAnyCurveOverride ||
+    (!validCurveOverride && !hasTargetOnlyCurveOverride)
       ? {
           jrYieldShareAtZeroPct: null,
           jrYieldShareAtTargetPct: null,
@@ -327,16 +341,27 @@ export function readDayV3UrlState(search: string): DayV3UrlState {
           slpYieldShareAtTargetPct: null,
           slpYieldShareAtFullPct: null,
         }
-      : curveOverrides;
+      : hasTargetOnlyCurveOverride
+        ? {
+            jrYieldShareAtZeroPct: null,
+            jrYieldShareAtTargetPct:
+              curveOverrides.jrYieldShareAtTargetPct,
+            jrYieldShareAtFullPct: null,
+            slpYieldShareAtZeroPct: null,
+            slpYieldShareAtTargetPct:
+              curveOverrides.slpYieldShareAtTargetPct,
+            slpYieldShareAtFullPct: null,
+          }
+        : curveOverrides;
   return {
     market: text(params.get("m")),
     mode: rawMode === "simulate" || rawMode === "deploy" ? rawMode : null,
     sourceApyPct: finite(params.get("apy"), 0, 30),
-    protectedDrawdownPct: finite(params.get("protect"), 0, 95),
+    protectedDrawdownPct,
     recoveryDays: integer(params.get("recover"), 0, 194),
     // `0` is an explicit product choice: no immediate pool exit and no SLP.
     // `null` remains the unresolved/malformed state.
-    immediateExitSharePct: finite(params.get("exit"), 0, 100),
+    immediateExitSharePct,
     minimumProceedsPer100: finite(params.get("receive"), 0, 100),
     entryPointSettlementDays: integer(
       params.get("settle") ?? params.get("redeem"),
@@ -379,17 +404,18 @@ export type DayV3UrlWriteState = DayV3UrlState & {
 const rounded = (value: number): string =>
   String(Math.round(value * 10_000) / 10_000);
 
-/** Operational durations are deployment whole-day fields. */
+/** Operational durations in legacy links are deployment whole-day fields. */
 export const roundDayV3WholeDays = (value: number): number => Math.round(value);
 
 /**
- * Derived values are absent by construction unless supplied in `overrides`,
- * which represents an explicit manual override in V3 state.
+ * Write the smallest shareable model contract. Hidden operational facts,
+ * deployment policy, historical state, Protected Exit settings, derived pool
+ * fields, full curve anchors, and starter provenance remain readable from old
+ * links but are never added to a new canonical URL.
  */
 export function buildDayV3Query(state: DayV3UrlWriteState): string {
   const params = new URLSearchParams();
   if (state.market) params.set("m", state.market);
-  if (state.mode === "deploy") params.set("mode", "deploy");
 
   const setNumber = (key: string, value: number | null) => {
     if (value !== null && Number.isFinite(value))
@@ -402,53 +428,35 @@ export function buildDayV3Query(state: DayV3UrlWriteState): string {
   };
   setNumber("apy", state.sourceApyPct);
   setNumber("protect", state.protectedDrawdownPct);
-  setWholeDays("recover", state.recoveryDays);
   setNumber("exit", state.immediateExitSharePct);
-  setNumber("receive", state.minimumProceedsPer100);
-  setWholeDays("settle", state.entryPointSettlementDays);
-  setWholeDays("convert", state.collateralToExitDays);
-  setNumber("convertCost", state.collateralToExitCostBps);
-  setWholeDays("grace", state.fixedTermGraceDays);
-  setWholeDays("nav", state.navUpdateDays);
-  setNumber("depDelay", state.depositDelaySeconds);
-  const setExpiry = (key: string, value: DayV3ExpiryPolicy | null) => {
-    if (value === "no-expiry") params.set(key, "none");
-    else setNumber(key, value);
-  };
-  setExpiry("depExpiry", state.depositExpirySeconds);
-  setExpiry("wdExpiry", state.withdrawalExpirySeconds);
-  if (state.gateByOracleUpdate !== null) {
-    params.set("priceGate", state.gateByOracleUpdate ? "1" : "0");
-  }
-  setNumber("reinvestSlip", state.maxReinvestmentSlippageBps);
-  setNumber("incentive", state.incentiveBudgetPer100);
-  if (state.target) {
-    params.set("target", `${state.target.chainId}:${state.target.templateId}`);
+  if (state.immediateExitSharePct === 0) params.set("receive", "0");
+  else setNumber("receive", state.minimumProceedsPer100);
+
+  // These visible exit inputs drive the canonical restock hurdle. They belong
+  // to the unified simulator and no longer depend on a legacy view mode.
+  if (state.immediateExitSharePct !== 0) {
+    setWholeDays("settle", state.entryPointSettlementDays);
+    setWholeDays("convert", state.collateralToExitDays);
+    setNumber("convertCost", state.collateralToExitCostBps);
   }
 
-  setNumber("cov", state.overrides.coveragePct);
-  setNumber("liq", state.overrides.minimumLiquidityPct);
-  setNumber("discount", state.overrides.maximumDiscountPct);
-  setNumber("lambda", state.overrides.depthAtNav);
-  setNumber("premium", state.overrides.maximumPremiumPct);
-  setNumber("pexit", state.overrides.protectedExitThresholdPct);
-  setNumber("bonus", state.overrides.protectedExitBonusPct);
-  setNumber("pool", state.overrides.poolCapitalPer100);
-  setNumber("jr0", state.overrides.jrYieldShareAtZeroPct);
-  setNumber("jr90", state.overrides.jrYieldShareAtTargetPct);
-  setNumber("jr100", state.overrides.jrYieldShareAtFullPct);
-  setNumber("slp0", state.overrides.slpYieldShareAtZeroPct);
-  setNumber("slp90", state.overrides.slpYieldShareAtTargetPct);
-  setNumber("slp100", state.overrides.slpYieldShareAtFullPct);
-  const starterFields = [
-    ...new Set(
-      (state.starterFields ?? []).filter((field) =>
-        DAY_V3_STARTER_DEFAULT_FIELDS.has(field),
-      ),
-    ),
-  ];
-  if (starterFields.length > 0) {
-    params.set("starter", starterFields.join(","));
+  // Zero is a deliberate "realize immediately" observation choice, not an
+  // unresolved value.
+  if (state.protectedDrawdownPct !== 0) {
+    setWholeDays("recover", state.recoveryDays);
+  }
+
+  // `protect=0` and `exit=0&receive=0` are the existing feature-off
+  // sentinels. Do not serialize any removed launch-policy fields.
+  if (state.protectedDrawdownPct === 0) {
+    params.set("recover", "0");
+  }
+
+  if (state.protectedDrawdownPct !== 0) {
+    setNumber("jr90", state.overrides.jrYieldShareAtTargetPct);
+  }
+  if (state.immediateExitSharePct !== 0) {
+    setNumber("slp90", state.overrides.slpYieldShareAtTargetPct);
   }
   return params.toString();
 }

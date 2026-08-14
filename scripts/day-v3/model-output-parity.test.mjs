@@ -5,36 +5,26 @@ import { join } from "node:path";
 const root = process.cwd();
 const read = (path) => readFileSync(join(root, path), "utf8");
 const summary = read("components/day-v3/DayV3Summary.tsx");
+const hero = read("components/day-v3/DayV3Hero.tsx");
 const goals = read("components/day-v3/DayV3Goals.tsx");
-const deployment = read("components/day-v3/DayV3Deployment.tsx");
-const deploymentPolicy = read(
-  "components/day-v3/DayV3DeploymentPolicy.tsx",
-);
 const editor = read("components/day-v3/DayV3PremiumCurveEditor.tsx");
+const modeModel = read("lib/day-v3/mode-model.ts");
 const yieldCurves = read("lib/day-v3/yield-curves.ts");
 
-// Every user-facing V2 model has a V3-native equivalent. The test deliberately
-// checks V3 integration points rather than importing V2 runtime components.
-const parity = [
+// One workflow must retain every forward model that explains how an issuer's
+// four inputs change returns, capital, protection, and immediate exits.
+const modelFamilies = [
   ["position return cards", "Scenario returns at these terms"],
   ["capital stack", "<DayV3CapitalStack"],
   ["loss waterfall and stress slider", "<DayV3LossWaterfall"],
+  ["issuer goal versus canonical exit", "<DayV3ExitModel"],
   ["atomic exit cost/depth curve and table", "<DayV3ExitCost"],
   ["one-year growth chart", "<DayV3Chart"],
   ["position/yield composition table", "<DayV3Comparison"],
-  ["historical chart, monthly table, and restoration", "<DayV3Backtest"],
-];
-
-for (const [name, marker] of parity) {
-  assert.ok(summary.includes(marker), `V3 is missing the V2 ${name} model`);
-}
-
-const v3Additions = [
-  ["issuer goal versus canonical exit", "<DayV3ExitModel"],
   ["visible premium curves", "<DayV3YieldModels"],
 ];
-for (const [name, marker] of v3Additions) {
-  assert.ok(summary.includes(marker), `V3 is missing ${name}`);
+for (const [name, marker] of modelFamilies) {
+  assert.ok(summary.includes(marker), `Unified V3 is missing ${name}`);
 }
 
 assert.doesNotMatch(
@@ -44,13 +34,8 @@ assert.doesNotMatch(
 );
 assert.doesNotMatch(
   summary,
-  /<DayV3ProtectionSensitivity/,
-  "V3 must not render the removed protection sensitivity section",
-);
-assert.doesNotMatch(
-  summary,
-  /<DayV3ProtectedExitModel/,
-  "V3 must not render the removed Protected Exit redemption model",
+  /<DayV3ProtectionSensitivity|<DayV3ProtectedExitModel/,
+  "Unified V3 must not restore either removed model",
 );
 assert.match(
   summary,
@@ -63,92 +48,170 @@ assert.match(
   "V3 must hide stale model evidence while its atomic snapshot updates",
 );
 
-// Simulate stays goal-first: operational facts and deployment configuration are
-// present only when Deploy is active, while all model families remain shared.
-assert.match(
-  summary,
-  /deploying \? \([\s\S]*<DayV3OperationalFacts/,
-  "Simulate must not render operational deployment facts",
-);
-assert.match(
-  summary,
-  /<DayV3Goals[\s\S]*deploying=\{deploying\}/,
-  "The goal surface must receive the active workflow",
+// The mode split is gone. Legacy URL parsing lives in url-state; no component
+// may render a toggle, badge, conditional input flow, or conditional model set.
+assert.match(summary, /<DayV3Hero\s*\/>/, "The hero must be mode-free");
+assert.match(hero, /export default function DayV3Hero\(\)/);
+assert.doesNotMatch(
+  `${summary}\n${hero}`,
+  /\bDayV3Mode\b|\bdeploying\b|\bsetMode\b|onModeChange|mode=\{mode\}/,
+  "The unified simulator must not retain runtime mode branching",
 );
 assert.doesNotMatch(
-  goals,
-  /summary="Deployment mapping"/,
-  "Derived deployment mapping must not be nested inside issuer goal inputs",
+  hero,
+  /Switch to|Simulate|Deploy|Simple|Advanced|DayV3SegmentedControl/,
+  "The hero must not expose a mode toggle",
 );
-for (const marker of [
-  'label="Minimum Liquidity"',
-  'label="Maximum Discount"',
-  'label="Depth at NAV"',
-  'label="Maximum Premium"',
-  '"Swap Fee"',
-]) {
-  assert.ok(
-    deployment.includes(marker),
-    `The bottom deployment handoff lost its ${marker} mapping`,
+assert.doesNotMatch(
+  summary,
+  /Advanced only|ADVANCED ONLY|deployOnly=|Edit APYs in Simple/,
+  "The unified flow must not show mode-specific badges or actions",
+);
+
+// The questionnaire has exactly four ordered input groups. Source and target
+// yield split live in Summary/editor; protection and exit live in DayV3Goals.
+const inputSurface = `${summary}\n${editor}\n${goals}`;
+const inputGroups = [
+  ["day-v3-source-inputs", "Yield source"],
+  ["day-v3-premium-inputs", "Yield split"],
+  ["day-v3-protection-inputs", "Senior protection"],
+  ["day-v3-exit-inputs", "Senior exit"],
+];
+for (const [id, label] of inputGroups) {
+  assert.equal(
+    inputSurface.match(new RegExp(`id="${id}"`, "g"))?.length,
+    1,
+    `Unified V3 must render exactly one ${label} input group`,
   );
 }
 assert.match(
-  goals,
-  /deploying \? \([\s\S]*title="Protected Exit"/,
-  "Protected Exit configuration must be Deploy-only",
-);
-assert.match(
-  goals,
-  /\{deploying \? premiumCurveEditor : null\}[\s\S]*title="Protected Exit"/,
-  "The Deploy-only premium editor must appear before Protected Exit",
-);
-assert.match(
   summary,
-  /premiumCurveEditor=\{premiumCurveEditor\}/,
-  "The premium editor must be mounted in the V3 goal flow",
+  /id="day-v3-source-inputs"[\s\S]*premiumCurveEditor[\s\S]*<DayV3Goals/,
+  "The visible input flow must be source, target yield split, protection, then exit",
+);
+assert.doesNotMatch(
+  `${summary}\n${editor}`,
+  /presentation=|showCurveShapeAnchors|deployOnly|\bsimple\b|\bAdvanced\b|six YDM anchors|deployment handoff|suggestedCurve/,
+  "The sole yield-split editor must not retain mode-specific or full-curve controls",
+);
+assert.doesNotMatch(
+  editor,
+  /onRiskY0Pct|onRiskY100Pct|onLiqY0Pct|onLiqY100Pct|No coverage used \(Y0\)|Full coverage used \(Y100\)/,
+  "The unified editor must expose only operating-target yield shares",
 );
 assert.match(
-  summary,
-  /<\/section>\s*\{deploying \? deploymentPanel : null\}\s*<p className=/,
-  "The Deploy handoff must remain at the bottom after the complete model section",
+  modeModel,
+  /jrYieldShareAtTargetPct:\s*overrides\.jrYieldShareAtTargetPct[\s\S]*slpYieldShareAtTargetPct:\s*overrides\.slpYieldShareAtTargetPct/,
+  "Only the two visible target yield shares may remain active",
+);
+
+const protectionGroupStart = goals.indexOf('id="day-v3-protection-inputs"');
+const exitGroupStart = goals.indexOf('id="day-v3-exit-inputs"');
+assert.ok(
+  protectionGroupStart >= 0 && exitGroupStart > protectionGroupStart,
+  "Senior protection must precede Senior exit",
+);
+const protectionGroup = goals.slice(protectionGroupStart, exitGroupStart);
+const exitGroup = goals.slice(exitGroupStart);
+assert.match(
+  protectionGroup,
+  /Should Senior have first-loss protection\?[\s\S]*ariaLabel="Observation mode"[\s\S]*Realize immediately[\s\S]*Allow recovery/,
+  "Protection and observation mode must stay in one input group",
 );
 assert.match(
-  goals,
-  /After this minimum delay, execution may proceed once any post-request oracle gate and market-state checks pass\. This is not the conversion time below\./,
-  "Withdrawal settlement must remain distinct from post-claim conversion timing",
+  protectionGroup,
+  /How long should a temporary loss have to recover\?[\s\S]*onChange=\{onRecoveryDays\}[\s\S]*value=\{recoveryDays\}/,
+  "Recovery duration must stay inside Senior protection",
 );
 assert.match(
-  deploymentPolicy,
-  /settlement[\s\S]*delay must pass,[\s\S]*oracle must publish a timestamp after the[\s\S]*request was queued\.[\s\S]*EntryPoint does not compare the old and new[\s\S]*price values/,
-  "The oracle gate must require a post-request timestamp in addition to the settlement delay",
+  exitGroup,
+  /Should Senior have an immediate pool exit\?/,
+  "The immediate-exit choice must stay inside Senior exit",
 );
-assert.match(
-  deploymentPolicy,
-  /Gate off uses the[\s\S]*settlement delay without that extra freshness check\./,
-  "Disabling the oracle gate must leave the settlement delay in force",
-);
-for (const marker of [
-  "jrYieldShareAtZeroPct",
-  "jrYieldShareAtTargetPct",
-  "jrYieldShareAtFullPct",
-  "slpYieldShareAtZeroPct",
-  "slpYieldShareAtTargetPct",
-  "slpYieldShareAtFullPct",
+for (const [name, marker] of [
+  [
+    "redemption settlement time",
+    /Days until Senior redeems for the underlying asset/,
+  ],
+  [
+    "underlying conversion time",
+    /Additional days to convert the underlying asset/,
+  ],
+  ["stressed conversion cost", /Stressed conversion cost per \$100/],
 ]) {
-  assert.ok(
-    summary.includes(marker),
-    `Premium editor lost state wiring: ${marker}`,
+  assert.match(
+    exitGroup,
+    marker,
+    `Senior exit must retain the ${name} refill assumption`,
   );
 }
+assert.match(
+  exitGroup,
+  /What would it take to refill the pool\?[\s\S]*entryPointSettlementDays[\s\S]*conversionDays[\s\S]*conversionCostBps/,
+  "All three refill assumptions must stay folded into Senior exit",
+);
+
+// There is one exact, unconditional pool-design request for the unified flow.
+assert.match(
+  summary,
+  /useDayV3PoolDesign\(\s*poolDesignGoals,\s*poolDesignContext,\s*true,?\s*\)/,
+  "The unified simulator must call the exact canonical pool-design service",
+);
+assert.doesNotMatch(
+  summary,
+  /useDayV3SimulationPoolDesign|deploying\s*\?\s*poolDesignGoals|deploying\s*\?\s*poolDesignContext/,
+  "The unified simulator must not use a reduced or mode-gated E-CLP request",
+);
+assert.match(
+  summary,
+  /recoveryDays:\s*recoveryDaysInput[\s\S]*entryPointSettlementDays[\s\S]*collateralToExitDays[\s\S]*collateralToExitCostBps[\s\S]*fixedTermGraceDays:\s*0[\s\S]*navUpdateDays:\s*1/,
+  "The exact request must contain observation time and the three visible refill assumptions",
+);
+
+// Every model family is shared because there is no mode branch around the
+// capital/protection, E-CLP, or APY explanation groups.
+for (const id of [
+  "day-v3-risk-models",
+  "day-v3-exit-models",
+  "day-v3-return-models",
+]) {
+  assert.equal(
+    summary.match(new RegExp(`id="${id}"`, "g"))?.length,
+    1,
+    `Unified V3 must render exactly one ${id} model group`,
+  );
+}
+
+// Removed deployment-form surfaces cannot return under a different name.
+for (const [name, marker] of [
+  ["market operations", /<DayV3OperationalFacts|day-v3-deployment-setup-inputs/],
+  ["request policy", /<DayV3DeploymentPolicy|day-v3-request-policy-inputs/],
+  ["historical evidence", /<DayV3Backtest|day-v3-history-models/],
+  ["Protected Exit", /day-v3-protected-exit-inputs|protectedExitView/],
+  ["deployment handoff", /<DayV3Deployment|deploymentPanel/],
+]) {
+  assert.doesNotMatch(
+    summary,
+    marker,
+    `Unified V3 must not render ${name}`,
+  );
+}
+assert.doesNotMatch(
+  goals,
+  /summary="Deployment mapping"|day-v3-deployment-setup-inputs|day-v3-protected-exit-inputs/,
+  "Removed deployment sections must not be nested inside issuer inputs",
+);
+
+// Hidden legacy curve anchors remain derived and cannot affect the unified UI.
 assert.equal(
   editor.match(/<DayV3Slider/g)?.length,
-  3,
-  "Each of the two curve cards must reuse the same three-anchor slider surface",
+  1,
+  "One target-share slider must be reused by the Junior and SLP cards",
 );
 assert.match(
   summary,
   /deriveDayV3StartingYieldCurvePolicy/,
-  "V3 must derive one complete starting policy for all six premium anchors",
+  "V3 must derive one complete starting policy behind the two visible shares",
 );
 assert.doesNotMatch(
   summary,
@@ -158,7 +221,7 @@ assert.doesNotMatch(
 assert.match(
   yieldCurves,
   /juniorTargetPct = coveragePct;[\s\S]*slpTargetPct = minimumLiquidityPct;/,
-  "The starting policy must use the explicit capital-parity floor rather than an unexplained premium uplift",
+  "The starting policy must retain the explicit capital-parity floor",
 );
 
 const exitCost = read("components/day-v3/DayV3ExitCost.tsx");
@@ -173,17 +236,6 @@ for (const marker of [
   assert.ok(exitCost.includes(marker), `Atomic exit model lost: ${marker}`);
 }
 
-const backtest = read("components/day-v3/DayV3Backtest.tsx");
-for (const marker of [
-  "Historical backtest",
-  "Backtest window",
-  "<DayV3BacktestChart",
-  "Coverage restoration",
-  "<TableHead>Month</TableHead>",
-]) {
-  assert.ok(backtest.includes(marker), `Historical model lost: ${marker}`);
-}
-
 console.log(
-  `Day V3 model-output parity: PASS (${parity.length}/${parity.length} V2 model families; ${v3Additions.length} V3 additions)`,
+  `Day V3 unified model architecture: PASS (${modelFamilies.length}/${modelFamilies.length} shared model families)`,
 );

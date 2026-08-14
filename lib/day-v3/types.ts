@@ -82,9 +82,9 @@ export interface DayV3Goals {
   minimumProceedsPer100: number;
   /** Minimum EntryPoint queue time before an in-kind Senior redemption may execute. */
   entryPointSettlementDays: number;
-  /** Additional operational time to convert claimed collateral to the exit asset. */
+  /** Additional operational time to convert the redeemed underlying asset to the exit asset. */
   collateralToExitDays: number | null;
-  /** Issuer-supplied all-in conversion cost; no fallback is allowed. */
+  /** Issuer-selected conservative external conversion-spread assumption; no fallback is allowed. */
   collateralToExitCostBps: number | null;
   /** Delay after deployment before a drawdown may start a fixed term. */
   fixedTermGraceDays: number;
