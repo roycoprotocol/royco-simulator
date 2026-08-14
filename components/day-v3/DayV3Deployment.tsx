@@ -14,7 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import {
   Card,
   CardContent,
-  CardDescription,
+  CardNote,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -606,23 +606,23 @@ function DayV3Deployment({
         hidden={!open}
         id={contentId}
       >
-        <CardHeader>
+        <CardHeader className="gap-0.5 px-4 pt-3.5">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <CardTitle>Deployment handoff details</CardTitle>
+            <CardTitle className="text-[13.5px]">Deployment handoff details</CardTitle>
             <Badge tone={handoffReady ? "liquidity" : "caution"}>
               {handoffReady
                 ? "ready for deployment setup"
                 : "draft · incomplete"}
             </Badge>
           </div>
-          <CardDescription>
+          <CardNote>
             One relative design, normalized to $100 Senior. Deployment must
             revalidate it against the live template; absolute funding stays open
             until deployment has a notional and initialization policy.
-          </CardDescription>
+          </CardNote>
         </CardHeader>
 
-        <CardContent className="flex flex-col gap-5">
+        <CardContent className="px-4 pb-4 flex flex-col gap-5">
           <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
             <section className="rounded-xl border border-[var(--border-subtle)] bg-[var(--foundation)] px-4 py-3">
               <h3 className="mb-1 text-[10px] font-semibold uppercase tracking-[0.1em]">

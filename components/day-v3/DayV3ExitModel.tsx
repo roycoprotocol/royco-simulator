@@ -3,7 +3,7 @@ import DayV3DocsLink from "@/components/day-v3/DayV3DocsLink";
 import {
   Card,
   CardContent,
-  CardDescription,
+  CardNote,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -117,21 +117,21 @@ export default function DayV3ExitModel({
             : "canonical-rwa-eclp-service"
       }
     >
-      <CardHeader>
+      <CardHeader className="gap-0.5 px-4 pt-3.5">
         <div className="flex items-baseline justify-between gap-2">
-          <CardTitle className="text-[17px]">Exit model</CardTitle>
+          <CardTitle className="text-[13.5px]">Exit model</CardTitle>
           <DayV3DocsLink label="SLP mechanics" topic="slpTranche" />
         </div>
-        <CardDescription>
+        <CardNote>
           {disabled
             ? "Immediate Senior exit is off, so this design has no SLP or pool execution."
             : illustrative
               ? "Shows how the selected exit size and payout affect one trade, per $100 Senior."
               : "Shows the fee-inclusive result for one Senior sale using the selected market terms, per $100 Senior. Larger sales move farther through the pool and receive a larger discount. Arbitrageurs can later buy discounted Senior, redeem it for the underlying asset, and refill the SLP when that trade covers their time, costs, and fees."}
-        </CardDescription>
+        </CardNote>
       </CardHeader>
 
-      <CardContent className="flex flex-col gap-5">
+      <CardContent className="px-4 pb-4 flex flex-col gap-5">
         {!disabled ? (
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
             <ComparisonBar

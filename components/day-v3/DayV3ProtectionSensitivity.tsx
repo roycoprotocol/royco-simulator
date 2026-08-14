@@ -4,7 +4,7 @@ import DayV3DocsLink from "@/components/day-v3/DayV3DocsLink";
 import {
   Card,
   CardContent,
-  CardDescription,
+  CardNote,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -41,12 +41,12 @@ export default function DayV3ProtectionSensitivity({
   if (selectedDrawdownPct === null) {
     return (
       <Card data-accountant-source="recommendDayV3Coverage">
-        <CardHeader>
-          <CardTitle className="text-[17px]">Protection sensitivity</CardTitle>
-          <CardDescription>
+        <CardHeader className="gap-0.5 px-4 pt-3.5">
+          <CardTitle className="text-[13.5px]">Protection sensitivity</CardTitle>
+          <CardNote>
             Choose a protected source drawdown to compare the Junior capital
             required at smaller and larger shocks.
-          </CardDescription>
+          </CardNote>
         </CardHeader>
       </Card>
     );
@@ -85,20 +85,20 @@ export default function DayV3ProtectionSensitivity({
       data-accountant-source="recommendDayV3Coverage"
       data-model-source="recommendDayV3Coverage"
     >
-      <CardHeader>
+      <CardHeader className="gap-0.5 px-4 pt-3.5">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <CardTitle className="text-[17px]">
+          <CardTitle className="text-[13.5px]">
             Protection sensitivity
           </CardTitle>
           <DayV3DocsLink label="Minimum coverage" topic="coverage" />
         </div>
-        <CardDescription>
+        <CardNote>
           How larger source shocks change the smallest Minimum Coverage and
           Junior capital required per $100 Senior.
-        </CardDescription>
+        </CardNote>
       </CardHeader>
 
-      <CardContent className="flex flex-col gap-4">
+      <CardContent className="px-4 pb-4 flex flex-col gap-4">
         <div className="flex flex-col gap-2" aria-label="Protection sensitivity bars">
           {points.map((point) => (
             <div

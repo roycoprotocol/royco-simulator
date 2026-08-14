@@ -44,7 +44,7 @@ assert.match(markup, /\$11\.1/);
 assert.match(markup, /for every \$100 of Senior/);
 assert.match(
   markup,
-  /larger pool spreads the same premium across more capital/,
+  /larger pool spreads the same premium thinner/,
   "the basis note has to say why the number moves, not just state it",
 );
 assert.match(markup, /8\.5%/);

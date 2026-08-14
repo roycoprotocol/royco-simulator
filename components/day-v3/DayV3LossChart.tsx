@@ -51,7 +51,7 @@ function DayV3LossChart({
     // ResponsiveContainer resolves a percentage height against a parent that
     // has not sized itself yet and collapses to a few pixels.
     <div style={{ width: "100%" }}>
-      <ResponsiveContainer height={240} width="100%">
+      <ResponsiveContainer height={200} width="100%">
         <AreaChart data={points} margin={{ bottom: 4, left: -14, right: 10, top: 14 }}>
           <CartesianGrid stroke="#e4e0d6" vertical={false} />
           <XAxis

@@ -73,13 +73,13 @@ function DayV3CapitalStack({
   if (liquidityPending) {
     return (
       <Card weight="primary">
-        <CardHeader>
+        <CardHeader className="gap-0.5 px-4 pt-3.5">
           <div className="flex items-baseline justify-between gap-2">
-            <CardTitle>Capital stack</CardTitle>
+            <CardTitle className="text-[13.5px]">Capital stack</CardTitle>
             <DayV3DocsLink label="How tranching works" topic="tranching" />
           </div>
         </CardHeader>
-        <CardContent className="grid grid-cols-1 gap-4 md:grid-cols-2 md:items-stretch">
+        <CardContent className="px-4 pb-4 grid grid-cols-1 gap-4 md:grid-cols-2 md:items-stretch">
           <div className="flex min-w-0 flex-col justify-center rounded-xl border border-[var(--border-subtle)] bg-[var(--foundation)] px-5 py-4">
             <div className="mx-auto w-full max-w-[360px]">
               <DayV3StackDiagram
@@ -215,14 +215,14 @@ function DayV3CapitalStack({
 
   return (
     <Card weight="primary">
-      <CardHeader>
+      <CardHeader className="gap-0.5 px-4 pt-3.5">
         <div className="flex items-baseline justify-between gap-2">
-          <CardTitle>Capital stack</CardTitle>
+          <CardTitle className="text-[13.5px]">Capital stack</CardTitle>
           <DayV3DocsLink label="How tranching works" topic="tranching" />
         </div>
       </CardHeader>
 
-      <CardContent className="grid grid-cols-1 gap-4 lg:grid-cols-2 lg:items-stretch">
+      <CardContent className="px-4 pb-4 grid grid-cols-1 gap-4 lg:grid-cols-2 lg:items-stretch">
         <div className="flex min-w-0 flex-col justify-center rounded-xl border border-[var(--border-subtle)] bg-[var(--foundation)] px-5 py-4">
           <div className="mx-auto w-full max-w-[420px]">
             {/* Per 100 of Senior, exactly like the table beside it. Passing the

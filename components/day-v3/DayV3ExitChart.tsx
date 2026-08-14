@@ -35,7 +35,7 @@ function DayV3ExitChart({
     // Height on the container, not a wrapper: ResponsiveContainer collapses
     // when it resolves a percentage against an unsized flex parent.
     <div style={{ width: "100%" }}>
-      <ResponsiveContainer height={220} width="100%">
+      <ResponsiveContainer height={190} width="100%">
         <AreaChart data={points} margin={{ bottom: 4, left: -8, right: 10, top: 14 }}>
           <CartesianGrid stroke="#e4e0d6" vertical={false} />
           <XAxis

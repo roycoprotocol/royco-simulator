@@ -4,7 +4,7 @@ import DayV3NumberField from "@/components/day-v3/DayV3NumberField";
 import {
   Card,
   CardContent,
-  CardDescription,
+  CardNote,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -110,25 +110,25 @@ export default function DayV3RestockCheck({
         missingInputs ? "missing-inputs" : (check?.status ?? "unavailable")
       }
     >
-      <CardHeader>
-        <CardTitle className="text-[17px]">
+      <CardHeader className="gap-0.5 px-4 pt-3.5">
+        <CardTitle className="text-[13.5px]">
           Test whether this works for arbitrageurs
         </CardTitle>
-        <CardDescription>
+        <CardNote>
           A sale leaves the pool below NAV until an outside desk buys the
           discounted Senior and redeems it at NAV. Describe that desk; this
           checks whether the trade pays and changes nothing above.
-        </CardDescription>
+        </CardNote>
       </CardHeader>
 
-      <CardContent className="flex flex-col gap-4">
+      <CardContent className="px-4 pb-4 flex flex-col gap-4">
         <div className="grid grid-cols-1 items-start gap-3 sm:grid-cols-2">
           <DayV3NumberField
             className="bg-[var(--foundation)]"
             label="What does that desk's capital cost, a year?"
             max={100}
             min={0}
-            note="The return it needs on money tied up in the trade. A higher cost means it needs a deeper discount before it bothers."
+            note="What it needs on money tied up in the trade. Higher cost, deeper discount before it bothers."
             onChange={onCostOfCapitalPct}
             placeholder="Enter a rate"
             presets={[
@@ -146,7 +146,7 @@ export default function DayV3RestockCheck({
             label="How long until it gets NAV back for that Senior?"
             max={365}
             min={0}
-            note="Queue plus settlement: from buying the Senior share to holding the underlying. This is the wait its capital has to be paid for."
+            note="Queue plus settlement, from buying the Senior share to holding the underlying."
             onChange={onRedemptionDays}
             placeholder="Enter days"
             presets={[

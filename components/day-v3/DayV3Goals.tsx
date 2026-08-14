@@ -103,21 +103,16 @@ export type DayV3RecoveryView = {
 function ResultTile({
   label,
   note,
-  origin = "derived",
   value,
 }: {
   label: string;
   note: string;
-  origin?: DayV3VisibleOrigin;
   value: string;
 }) {
   return (
     <div className="flex min-w-0 flex-col gap-0.5 border-t border-[var(--border-subtle)] pt-2.5">
-      <span className="flex items-center justify-between gap-2">
-        <span className="text-[9.5px] font-semibold uppercase tracking-[0.1em] text-[var(--tertiary)]">
-          {label}
-        </span>
-        <DayV3Origin origin={origin} />
+      <span className="text-[9.5px] font-semibold uppercase tracking-[0.1em] text-[var(--tertiary)]">
+        {label}
       </span>
       <span className="font-mono text-[18px] font-bold leading-none tracking-[-0.02em] tabular-nums">
         {value}
@@ -374,15 +369,15 @@ export default function DayV3Goals({
               <strong className="text-[12px] font-semibold">
                 Protection result
               </strong>
-              <span className="text-[10.5px] text-[var(--tertiary)]">
+              <span className="flex items-center gap-2 text-[10px] text-[var(--tertiary)]">
                 Per $100 Senior
+                <DayV3Origin origin="recommended" />
               </span>
             </div>
-            <div className="mt-3 grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div className="mt-2.5 grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2">
               <ResultTile
                 label="On-chain Minimum Coverage"
                 note="contract ratio · tested at 100% utilization"
-                origin="recommended"
                 value={`${fixed(protection.coveragePct ?? 0)}%`}
               />
               <ResultTile
@@ -391,7 +386,7 @@ export default function DayV3Goals({
                 value={dollars(protection.juniorPer100 ?? 0)}
               />
             </div>
-            <p className="mt-3 text-[10.5px] leading-relaxed text-[var(--tertiary)]">
+            <p className="mt-2.5 text-[10px] leading-snug text-[var(--tertiary)]">
               {protection.message}
             </p>
           </div>
@@ -489,8 +484,7 @@ export default function DayV3Goals({
         </div>
 
         {!exitDisabled ? (
-          <>
-            <div className="grid grid-cols-1 items-start gap-3 lg:grid-cols-2">
+          <div className="grid grid-cols-1 items-start gap-3 lg:grid-cols-2">
               <DayV3NumberField
                 label="Out of every $100 Senior, how much should be sellable right away?"
                 max={100}
@@ -529,7 +523,6 @@ export default function DayV3Goals({
                 value={minimumProceedsPer100}
                 required
               />
-            </div>
             <DayV3QuoteAsset
               label={quoteAssetLabel}
               onLabel={onQuoteAssetLabel}
@@ -537,7 +530,7 @@ export default function DayV3Goals({
               yieldOrigin={inputOrigin(inputOrigins.quoteAsset)}
               yieldPct={quoteAssetYieldPct}
             />
-          </>
+          </div>
         ) : null}
 
         {exitDisabled ? (
@@ -545,44 +538,47 @@ export default function DayV3Goals({
             Immediate exit is off, so this design requires no SLP funding.
           </p>
         ) : exit.status === "recommended" || exit.status === "illustrative" ? (
-          <div className="grid grid-cols-2 gap-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--card)] px-4 py-4 sm:grid-cols-4">
+          <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--card)] px-4 py-3">
+            <div className="flex flex-wrap items-baseline justify-between gap-2">
+              <strong className="text-[12px] font-semibold">Exit result</strong>
+              <span className="flex items-center gap-2 text-[10px] text-[var(--tertiary)]">
+                Per $100 Senior
+                <DayV3Origin origin={poolResultOrigin} />
+              </span>
+            </div>
+            <div className="mt-2.5 grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-4">
             <ResultTile
               label="SLP required"
               note="per $100 Senior"
-              origin={poolResultOrigin}
               value={dollars(exit.slpPer100)}
             />
             <ResultTile
               label="Minimum Liquidity"
               note="deployment requirement"
-              origin={poolResultOrigin}
               value={`${fixed(exit.minimumLiquidityPct, 2)}%`}
             />
             <ResultTile
               label="Lowest payout"
               note="fee-inclusive, per $100"
-              origin={poolResultOrigin}
               value={dollars(exit.lowestPayoutPer100)}
             />
             <ResultTile
               label="Expected proceeds"
               note="received for the selected sale"
-              origin={poolResultOrigin}
               value={dollars(exit.proceeds)}
             />
+            </div>
           </div>
         ) : exit.status === "resolving" ? (
-          <div className="grid grid-cols-2 gap-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--card)] px-4 py-4">
+          <div className="grid grid-cols-2 gap-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--card)] px-4 py-3">
             <ResultTile
               label="Illustrative SLP"
               note="per $100 Senior"
-              origin="illustrative"
               value={dollars(exit.slpPer100)}
             />
             <ResultTile
               label="Illustrative liquidity"
               note="used for scenario APY"
-              origin="illustrative"
               value={`${fixed(exit.minimumLiquidityPct, 2)}%`}
             />
           </div>

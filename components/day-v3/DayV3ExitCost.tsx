@@ -9,7 +9,7 @@ import DayV3ExitChart, {
 import {
   Card,
   CardContent,
-  CardDescription,
+  CardNote,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -126,20 +126,20 @@ export default function DayV3ExitCost({
 
   return (
     <Card data-accountant-source="buildDayExplainerMetrics.liquidity">
-      <CardHeader>
+      <CardHeader className="gap-0.5 px-4 pt-3.5">
         <div className="flex items-center justify-between gap-2">
-          <CardTitle className="text-[17px]">Exit cost and depth</CardTitle>
+          <CardTitle className="text-[13.5px]">Exit cost and depth</CardTitle>
           <DayV3DocsLink label="SLP mechanics" topic="slpTranche" />
         </div>
-        <CardDescription>
+        <CardNote>
           See how the seller&apos;s payout changes as one Senior sale uses more of
           the SLP. Small sales stay near the published value; larger sales
           receive a larger discount. The displayed payout includes the pool&apos;s
           {" "}{assumptions.swapFeeBps} bps swap fee.
-        </CardDescription>
+        </CardNote>
       </CardHeader>
 
-      <CardContent className="flex flex-col gap-4">
+      <CardContent className="px-4 pb-4 flex flex-col gap-4">
         <p className="max-w-[64ch] text-[14.5px] leading-relaxed text-[var(--foreground)]">
           {metrics.boundarySellNAV <= 0 ? (
             <>

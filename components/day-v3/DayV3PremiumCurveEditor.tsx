@@ -246,9 +246,9 @@ function DayV3PremiumCurveEditor({
       }
       title="Yield split"
     >
-      <p className="max-w-[78ch] text-[10.5px] leading-relaxed text-[var(--tertiary)]">
+      <p className="text-[10px] leading-snug text-[var(--tertiary)]">
         Adjust the share paid at the {pct(targetUtilization)} operating target.
-        Each position&apos;s modeled APY updates below.
+        Each position&apos;s modeled APY updates beside it.
       </p>
 
       {validationIssues.length > 0 ? (
@@ -277,16 +277,14 @@ function DayV3PremiumCurveEditor({
           <strong className="font-semibold text-[var(--foreground)]">
             Why the SLP rate is what it is:
           </strong>{" "}
-          the premium below is taken out of Senior&apos;s yield, then shared
-          across however much SLP capital the pool holds. This model assumes{" "}
+          the premium below comes out of Senior&apos;s yield, then spreads
+          across however much SLP capital the pool holds — here{" "}
           <strong className="font-mono font-semibold tabular-nums">
             ${slpCapitalPer100.toFixed(1)}
           </strong>{" "}
-          of SLP for every $100 of Senior at the {pct(targetUtilization)}{" "}
-          operating target, which is a{" "}
+          for every $100 of Senior, a{" "}
           {slpMinimumLiquidityPct.toFixed(1)}% minimum liquidity requirement. A
-          larger pool spreads the same premium across more capital, so the SLP
-          rate falls.
+          larger pool spreads the same premium thinner, so the SLP rate falls.
         </p>
       ) : null}
 

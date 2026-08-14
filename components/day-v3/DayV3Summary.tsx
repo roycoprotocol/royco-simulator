@@ -40,7 +40,7 @@ import { useDayV3SimulationPoolDesign } from "@/components/day-v3/useDayV3Simula
 import {
   Card,
   CardContent,
-  CardDescription,
+  CardNote,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -1566,9 +1566,9 @@ export default function DayV3Summary({
                     </Badge>
                   )}
                 </div>
-                <CardDescription>{position.holds}</CardDescription>
+                <CardNote>{position.holds}</CardNote>
               </CardHeader>
-              <CardContent className="flex flex-col gap-2 px-6">
+              <CardContent className="px-4 pb-4 flex flex-col gap-2 px-6">
                 <div className="flex items-baseline gap-1.5">
                   <span
                     className="font-mono text-[clamp(34px,3.2vw,44px)] font-bold leading-[0.92] tracking-[-0.03em] tabular-nums"
@@ -1733,15 +1733,15 @@ export default function DayV3Summary({
                         data-prerequisite-state="exit-inputs"
                         weight="quiet"
                       >
-                        <CardHeader>
-                          <CardTitle className="text-[17px]">
+                        <CardHeader className="gap-0.5 px-4 pt-3.5">
+                          <CardTitle className="text-[13.5px]">
                             Complete the exit setup above
                           </CardTitle>
-                          <CardDescription>
+                          <CardNote>
                             {exitView.status === "infeasible"
                               ? "These exit terms do not produce a deployable pool. Change the inputs identified in the Senior exit section to redraw the curve."
                               : "Finish the Senior exit section and resolve its live template. The one-trade curve will appear here; V3 does not fill this space with dashes or a fallback pool."}
-                          </CardDescription>
+                          </CardNote>
                         </CardHeader>
                       </Card>
                     )}
@@ -1768,34 +1768,34 @@ export default function DayV3Summary({
           stack of differently proportioned slabs. */}
               {sourceApyPct === null ? (
                 <Card weight="quiet">
-                  <CardHeader>
+                  <CardHeader className="gap-0.5 px-4 pt-3.5">
                     <CardTitle>Source yield required</CardTitle>
-                    <CardDescription>
+                    <CardNote>
                       Enter the custom source&apos;s net annual yield to
                       calculate return projections and their split across
                       Senior, Junior, and SLP.
-                    </CardDescription>
+                    </CardNote>
                   </CardHeader>
                 </Card>
               ) : displayedReturnState !== "ready" ? (
                 <Card data-model-state={displayedReturnState} weight="quiet">
-                  <CardHeader>
+                  <CardHeader className="gap-0.5 px-4 pt-3.5">
                     <CardTitle>Return models are waiting for market terms</CardTitle>
-                    <CardDescription>
+                    <CardNote>
                       Complete or revise the Senior exit above. Return charts do not use fallback fees or pool parameters.
-                    </CardDescription>
+                    </CardNote>
                   </CardHeader>
                 </Card>
               ) : (
                 <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-2">
                   <Card weight="quiet">
-                    <CardHeader>
+                    <CardHeader className="gap-0.5 px-4 pt-3.5">
                       <CardTitle>Growth over a year</CardTitle>
-                      <CardDescription>
+                      <CardNote>
                         Compounded from the scenario annual rates above.
-                      </CardDescription>
+                      </CardNote>
                     </CardHeader>
-                    <CardContent>
+                    <CardContent className="px-4 pb-4">
                       <DayV3Chart data={chartData} unit={returnUnit} />
                     </CardContent>
                   </Card>

@@ -66,6 +66,20 @@ export function CardDescription({ className, ...props }: HTMLAttributes<HTMLPara
   );
 }
 
+/**
+ * A description sized for a card sitting inside a numbered section, where the
+ * group already carries a subtitle and a second relaxed 12px paragraph reads as
+ * a competing one. Same element, one step down.
+ */
+export function CardNote({ className, ...props }: HTMLAttributes<HTMLParagraphElement>) {
+  return (
+    <p
+      className={cn("text-[10.5px] leading-snug text-[var(--tertiary)]", className)}
+      {...props}
+    />
+  );
+}
+
 export function CardContent({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
   return <div className={cn("px-5 pb-5", className)} {...props} />;
 }

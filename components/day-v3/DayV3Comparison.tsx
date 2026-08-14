@@ -6,7 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import {
   Card,
   CardContent,
-  CardDescription,
+  CardNote,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -253,18 +253,18 @@ export default function DayV3Comparison({
 
   return (
     <Card weight="quiet">
-      <CardHeader>
+      <CardHeader className="gap-0.5 px-4 pt-3.5">
         <div className="flex items-baseline justify-between gap-2">
-          <CardTitle>Position comparison</CardTitle>
+          <CardTitle className="text-[13.5px]">Position comparison</CardTitle>
           <DayV3DocsLink label="How yield is split" topic="yieldSplit" />
         </div>
         {/* A basis is prose, not status. Badges are for state. */}
-        <CardDescription>
+        <CardNote>
           Returns on {stake100(unit)} over one year. Select any position for its
           breakdown.
-        </CardDescription>
+        </CardNote>
       </CardHeader>
-      <CardContent className="flex flex-col gap-3">
+      <CardContent className="px-4 pb-4 flex flex-col gap-3">
         {/* Simulate has no control for either share, so it has to say where they
             came from. Otherwise the two premiums are numbers that appear from
             nowhere and the reader cannot tell whether they were chosen. */}

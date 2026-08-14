@@ -3,7 +3,7 @@ import DayV3YieldCurve from "@/components/day-v3/DayV3YieldCurve";
 import {
   Card,
   CardContent,
-  CardDescription,
+  CardNote,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -30,18 +30,18 @@ export default function DayV3YieldModels({
       data-model-source="runDayTargetScenario-yield-share-curves"
       weight="quiet"
     >
-      <CardHeader>
+      <CardHeader className="gap-0.5 px-4 pt-3.5">
         <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <CardTitle>Premium curves</CardTitle>
+          <CardTitle className="text-[13.5px]">Premium curves</CardTitle>
           <DayV3DocsLink label="Yield split" topic="yieldSplit" />
         </div>
-        <CardDescription>
+        <CardNote>
           {curveOverridden
             ? "These are the Junior and SLP curve anchors set above. They drive every return model on this page; deployment still validates the final registered YDM policy."
             : "How the current scenario changes Junior and SLP's share of Senior yield as their capital is used. These starting curves drive the model and can be adjusted in the yield-split section."}
-        </CardDescription>
+        </CardNote>
       </CardHeader>
-      <CardContent className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+      <CardContent className="px-4 pb-4 grid grid-cols-1 gap-4 xl:grid-cols-2">
         <section className="rounded-xl border border-[var(--border-subtle)] bg-[var(--card)] px-4 py-3">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
             <strong className="text-[12px] font-semibold">

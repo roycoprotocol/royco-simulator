@@ -40,7 +40,7 @@ function DayV3BacktestChart({
 }) {
   return (
     <div style={{ width: "100%" }}>
-      <ResponsiveContainer height={250} width="100%">
+      <ResponsiveContainer height={205} width="100%">
         <LineChart data={data} margin={{ bottom: 4, left: -18, right: 10, top: 8 }}>
           <CartesianGrid stroke="#e4e0d6" vertical={false} />
           <XAxis

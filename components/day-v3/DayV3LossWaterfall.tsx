@@ -10,7 +10,7 @@ import DayV3LossChart, {
 import {
   Card,
   CardContent,
-  CardDescription,
+  CardNote,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -119,9 +119,9 @@ export default function DayV3LossWaterfall({
 
   return (
     <Card data-accountant-source="buildDayExplainerMetrics.coverage">
-      <CardHeader>
+      <CardHeader className="gap-0.5 px-4 pt-3.5">
         <div className="flex items-center justify-between gap-2">
-          <CardTitle className="text-[17px]">Loss waterfall</CardTitle>
+          <CardTitle className="text-[13.5px]">Loss waterfall</CardTitle>
           <span className="flex items-baseline gap-2">
             <Badge tone={coverageFunded ? "junior" : "caution"}>
               {coverageFunded ? "Jr first" : "no cover"}
@@ -129,10 +129,10 @@ export default function DayV3LossWaterfall({
             <DayV3DocsLink label="Impermanent loss" topic="impermanentLoss" />
           </span>
         </div>
-        <CardDescription>How losses move from Jr to Sr.</CardDescription>
+        <CardNote>How losses move from Jr to Sr.</CardNote>
       </CardHeader>
 
-      <CardContent className="grid grid-cols-1 gap-5 md:grid-cols-2 md:items-start">
+      <CardContent className="px-4 pb-4 grid grid-cols-1 gap-5 md:grid-cols-2 md:items-start">
         <div className="flex min-w-0 flex-col gap-4">
           {/* The claim, stated once and large, so the section answers its own
               question before any detail is read. */}

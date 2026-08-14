@@ -10,7 +10,7 @@ import DayV3SegmentedControl from "@/components/day-v3/DayV3SegmentedControl";
 import {
   Card,
   CardContent,
-  CardDescription,
+  CardNote,
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
@@ -250,20 +250,20 @@ function DayV3Backtest({
   if (market.series.length < 3 || !result || !active) {
     return (
       <Card>
-        <CardHeader>
+        <CardHeader className="gap-0.5 px-4 pt-3.5">
           <div className="flex items-center justify-between gap-2">
-            <CardTitle className="text-[17px]" level={3}>
+            <CardTitle className="text-[13.5px]" level={3}>
               Historical backtest
             </CardTitle>
             <Badge tone="caution">no history</Badge>
           </div>
-          <CardDescription>
+          <CardNote>
             {customSource
               ? "Add dated NAV or price history in Section 1. That is the only missing input for this backtest; the current market terms will be applied automatically."
               : "No dated history is available; results above are forward projections at the selected source yield."}
-          </CardDescription>
+          </CardNote>
         </CardHeader>
-        <CardContent>
+        <CardContent className="px-4 pb-4">
           {/* The markets without history are the forward-modeled ones, which is
               exactly where this disclosure lives. Dropping it on this branch
               would hide it on every market that declares one. */}
@@ -314,9 +314,9 @@ function DayV3Backtest({
 
   return (
     <Card data-accountant-source="runDayHistoricalBacktest">
-      <CardHeader>
+      <CardHeader className="gap-0.5 px-4 pt-3.5">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <CardTitle className="text-[17px]" level={3}>
+          <CardTitle className="text-[13.5px]" level={3}>
             Historical backtest
           </CardTitle>
           <Badge className="max-w-full whitespace-normal text-right" tone="neutral">
@@ -324,13 +324,13 @@ function DayV3Backtest({
             {result.chart[result.chart.length - 1].date}
           </Badge>
         </div>
-        <CardDescription>
+        <CardNote>
           Runs these terms, including the {observationDays}-day Observation
           Period, against the source&apos;s dated price path.
-        </CardDescription>
+        </CardNote>
       </CardHeader>
 
-      <CardContent className="flex flex-col gap-4">
+      <CardContent className="px-4 pb-4 flex flex-col gap-4">
         <p className="max-w-[68ch] text-[14.5px] leading-relaxed text-[var(--foreground)]">
           Worst drawdown: source{" "}
           <strong className="font-mono text-[16px] font-bold tabular-nums">
