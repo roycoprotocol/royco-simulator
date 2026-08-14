@@ -1,5 +1,8 @@
 import assert from "node:assert/strict";
 
+import { DAY_MARKETS } from "@/lib/day-markets/registry";
+import { runDayHistoricalBacktest } from "@/lib/day-simulator-template/backtest";
+import { runDayTargetScenario } from "@/lib/day-simulator-template/runtime";
 import {
   createDayV3ModelSnapshot,
   dayV3ReturnDisplayState,
@@ -18,23 +21,20 @@ assert.deepEqual(snapshot, {
 });
 assert.equal(snapshot.engineOverrides, policy);
 
-// Pending wins even when the deferred snapshot still contains a complete old
-// policy. The caller also sets this while the asynchronous canonical solver is
-// resolving, so a selected template never flashes as "missing" between goals.
-// This is the regression that previously exposed old/new hybrid APYs.
+// A deferred snapshot remains a valid shared-accountant answer while the next
+// one is calculating. The UI labels it as updating rather than replacing a
+// numeric result with punctuation.
 assert.equal(
   dayV3ReturnDisplayState({
     modelUpdating: true,
     sourceApyResolved: true,
-    returnPolicyResolved: true,
   }),
-  "updating",
+  "ready",
 );
 assert.equal(
   dayV3ReturnDisplayState({
     modelUpdating: false,
     sourceApyResolved: false,
-    returnPolicyResolved: true,
   }),
   "missing-source",
 );
@@ -42,17 +42,66 @@ assert.equal(
   dayV3ReturnDisplayState({
     modelUpdating: false,
     sourceApyResolved: true,
-    returnPolicyResolved: false,
-  }),
-  "missing-policy",
-);
-assert.equal(
-  dayV3ReturnDisplayState({
-    modelUpdating: false,
-    sourceApyResolved: true,
-    returnPolicyResolved: true,
   }),
   "ready",
+);
+
+// Recovery timing may change historical results, but it must never suppress a
+// valid forward return. Both paths continue to use the shared Day runtime.
+const market = DAY_MARKETS.find((candidate) => candidate.id === "jbbb");
+assert.ok(market, "JBBB must remain available as a listed Day market");
+
+for (const observationDays of [0, 7]) {
+  const result = runDayTargetScenario({
+    ...market.defaults,
+    observationDays,
+  });
+
+  for (const [position, apy] of [
+    ["Senior", result.seniorApy],
+    ["Junior", result.juniorApy],
+    ["SLP", result.liquidityApy],
+  ] as const) {
+    assert.ok(
+      Number.isFinite(apy),
+      `${position} must remain finite with a ${observationDays}-day recovery window`,
+    );
+  }
+}
+
+const historicalTerms = {
+  coveragePct: market.defaults.coverage * 100,
+  minLiquidityPct: market.defaults.minLiquidity * 100,
+  eclpBandWidthPct: market.defaults.eclpBandWidth * 100,
+  riskSharePct: market.defaults.riskYDM.yTarget * 100,
+  riskY0Pct: market.defaults.riskYDM.y0 * 100,
+  riskY100Pct: market.defaults.riskYDM.y100 * 100,
+  liqSharePct: market.defaults.liqYDM.yTarget * 100,
+  liqY0Pct: market.defaults.liqYDM.y0 * 100,
+  liqY100Pct: market.defaults.liqYDM.y100 * 100,
+};
+
+const historicalAt = (observationDays: number) =>
+  runDayHistoricalBacktest({
+    defaults: market.defaults,
+    series: market.series,
+    maintainCoverage: false,
+    omitInitialZeroReturnPeriod: false,
+    terms: { ...historicalTerms, observationDays },
+  });
+
+const immediate = historicalAt(0);
+const recoverable = historicalAt(30);
+
+assert.equal(immediate.observationPeriods.length, 0);
+assert.ok(
+  recoverable.observationPeriods.length > 0,
+  "JBBB history must continue to exercise the Observation Period path",
+);
+assert.notEqual(
+  recoverable.juniorApy,
+  immediate.juniorApy,
+  "historical Junior returns must remain sensitive to the recovery window",
 );
 
 console.log("Day V3 atomic model snapshot state: PASS");

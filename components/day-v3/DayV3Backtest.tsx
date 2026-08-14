@@ -306,11 +306,11 @@ function DayV3Backtest({
   return (
     <Card data-accountant-source="runDayHistoricalBacktest">
       <CardHeader>
-        <div className="flex items-center justify-between gap-2">
+        <div className="flex flex-wrap items-center justify-between gap-2">
           <CardTitle className="text-[17px]" level={3}>
             Historical backtest
           </CardTitle>
-          <Badge tone="neutral">
+          <Badge className="max-w-full whitespace-normal text-right" tone="neutral">
             {result.chart[0].date} to{" "}
             {result.chart[result.chart.length - 1].date}
           </Badge>

@@ -13,17 +13,18 @@ export function createDayV3ModelSnapshot<
 export type DayV3ReturnDisplayState =
   | "updating"
   | "missing-source"
-  | "missing-policy"
   | "ready";
 
-/** Stale model values are never presented as answers to newly visible goals. */
+/**
+ * Forward returns need a source yield, not a resolved deployment pool. Exact
+ * E-CLP quotes keep their own stricter readiness gate; coupling that gate to
+ * APYs caused valid shared-accountant results to disappear while the pool
+ * service refreshed or while an observation period was being edited.
+ */
 export function dayV3ReturnDisplayState(input: {
   modelUpdating: boolean;
   sourceApyResolved: boolean;
-  returnPolicyResolved: boolean;
 }): DayV3ReturnDisplayState {
-  if (input.modelUpdating) return "updating";
   if (!input.sourceApyResolved) return "missing-source";
-  if (!input.returnPolicyResolved) return "missing-policy";
   return "ready";
 }

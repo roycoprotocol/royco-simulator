@@ -191,8 +191,8 @@ export default function DayV3ExitModel({
               value={dollars(exit.slpPer100, 2)}
             />
             <Outcome
-              label="Refill economic"
-              note="share of Senior sold"
+              label="Refill pays after"
+              note="% of Senior sold under the timing and conversion assumptions"
               value={
                 exit.restockPoint === null
                   ? illustrative

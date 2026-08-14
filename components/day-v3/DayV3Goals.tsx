@@ -205,20 +205,22 @@ export default function DayV3Goals({
     exitSharePct,
     minimumProceedsPer100,
   });
+  const missingExitEconomics = [
+    ...(entryPointSettlementDays === null ? ["redemption wait"] : []),
+    ...(conversionDays === null ? ["conversion time"] : []),
+    ...(conversionCostBps === null ? ["stressed conversion cost"] : []),
+  ];
   const exitEconomicsComplete =
-    exitDisabled ||
-    (entryPointSettlementDays !== null &&
-      conversionDays !== null &&
-      conversionCostBps !== null);
+    exitDisabled || missingExitEconomics.length === 0;
   const exitStatus = !exitInputReadiness.complete || !exitEconomicsComplete
     ? ({
         label: "Missing",
         tone: "incomplete",
         missing: [
           ...exitInputReadiness.missing,
-          ...(entryPointSettlementDays === null ? ["Redemption time"] : []),
-          ...(conversionDays === null ? ["Conversion time"] : []),
-          ...(conversionCostBps === null ? ["Stressed conversion cost"] : []),
+          ...missingExitEconomics.map((label) =>
+            label.replace(/^./, (character) => character.toUpperCase()),
+          ),
         ] as string[],
       } as const)
     : exit.status === "resolving"
@@ -227,7 +229,7 @@ export default function DayV3Goals({
         ? ({ label: "Needs changes", tone: "blocked" } as const)
         : exit.status === "unresolved"
           ? ({ label: "Review", tone: "review" } as const)
-          : ({ label: "Confirmed", tone: "complete" } as const);
+          : ({ label: "Set", tone: "complete" } as const);
 
   return (
     <>
@@ -251,7 +253,7 @@ export default function DayV3Goals({
         index={1 + indexOffset}
         status={
           protectionComplete
-            ? { label: "Confirmed", tone: "complete" }
+            ? { label: "Set", tone: "complete" }
             : {
                 label: "Missing",
                 tone: "incomplete",
@@ -559,82 +561,100 @@ export default function DayV3Goals({
         ) : null}
 
         {!exitDisabled ? (
-          <div className="flex flex-col gap-3 rounded-xl border border-[var(--border-subtle)] bg-[var(--foundation)] p-3.5">
-            <div>
-              <h4 className="text-[12.5px] font-semibold leading-tight">
-                What would it take to refill the pool?
-              </h4>
-              <p className="mt-1 max-w-[78ch] text-[10.5px] leading-relaxed text-[var(--tertiary)]">
-                These three assumptions determine whether an arbitrageur can buy
-                discounted Senior, redeem it, and refill the SLP profitably.
-                Nothing about request expiry, NAV cadence, or oracle policy is
-                needed for the models on this page.
+          <details
+            className="group rounded-xl border border-[var(--border-subtle)] bg-[var(--foundation)] p-3.5"
+            open={missingExitEconomics.length > 0}
+          >
+            <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 rounded-lg outline-none focus-visible:ring-2 focus-visible:ring-[var(--foreground)]">
+              <span className="min-w-0">
+                <strong className="block text-[12.5px] font-semibold leading-tight">
+                  Refill feasibility assumptions
+                </strong>
+                <span className="mt-1 block text-[10.5px] leading-relaxed text-[var(--tertiary)]">
+                  {missingExitEconomics.length > 0
+                    ? `Required for the exact exit recommendation · missing: ${missingExitEconomics.join(", ")}`
+                    : `${entryPointSettlementDays}-day redemption · ${conversionDays === 0 ? "same-day conversion" : `${conversionDays}-day conversion`} · ${conversionCostBps === null ? "conversion cost pending" : `${dollars(conversionCostBps / 100)} stressed cost`}`}
+                </span>
+              </span>
+              <span className="shrink-0 text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--tertiary)] group-open:hidden">
+                {missingExitEconomics.length > 0 ? "Complete" : "Review"}
+              </span>
+              <span className="hidden shrink-0 text-[10px] font-semibold uppercase tracking-[0.08em] text-[var(--tertiary)] group-open:inline">
+                Close
+              </span>
+            </summary>
+            <div className="mt-3 flex flex-col gap-3 border-t border-[var(--border-subtle)] pt-3">
+              <p className="max-w-[82ch] text-[10.5px] leading-relaxed text-[var(--secondary)]">
+                These values do not reshape the E-CLP directly. The canonical
+                exit recommendation uses them to check whether an arbitrageur
+                could buy discounted Senior, wait for redemption and any
+                conversion, then refill the SLP after covering time and costs.
               </p>
+              <div className="grid grid-cols-1 items-start gap-3 lg:grid-cols-3">
+                <DayV3NumberField
+                  label="Senior redemption wait"
+                  max={194}
+                  min={1}
+                  note="A longer wait increases the arbitrageur's cost of capital, so refilling needs a deeper discount."
+                  onChange={onEntryPointSettlementDays}
+                  origin={inputOrigin(inputOrigins.settlement)}
+                  placeholder="Enter days"
+                  presets={[
+                    { label: "1 day", value: 1 },
+                    { label: "7 days", value: 7 },
+                    { label: "30 days", value: 30 },
+                    { label: "90 days", value: 90 },
+                  ]}
+                  suffix="days"
+                  value={entryPointSettlementDays}
+                  wholeNumber
+                  required
+                />
+                <DayV3NumberField
+                  label="Underlying-to-exit conversion time"
+                  max={365}
+                  min={0}
+                  note="Use zero when the redeemed underlying asset is already the SLP's exit asset; otherwise this adds to the refill wait."
+                  onChange={onConversionDays}
+                  origin={inputOrigin(inputOrigins.conversionDays)}
+                  placeholder="Enter days"
+                  presets={[
+                    { label: "Same day", value: 0 },
+                    { label: "1 day", value: 1 },
+                    { label: "7 days", value: 7 },
+                  ]}
+                  suffix="days"
+                  value={conversionDays}
+                  wholeNumber
+                  required
+                />
+                <DayV3NumberField
+                  label="Stressed conversion cost per $100"
+                  max={99.99}
+                  min={0}
+                  note="Use a conservative estimate for the external underlying-to-exit conversion. A higher cost requires a deeper refill discount; exclude the SLP swap fee, which is modeled separately."
+                  onChange={(value) =>
+                    onConversionCostBps(value === null ? null : value * 100)
+                  }
+                  origin={inputOrigin(inputOrigins.conversionCost)}
+                  placeholder="Enter cost"
+                  prefix="$"
+                  presets={[
+                    { label: "No cost", value: 0 },
+                    { label: "$0.25", value: 0.25 },
+                    { label: "$0.50", value: 0.5 },
+                    { label: "$1.00", value: 1 },
+                  ]}
+                  step={0.05}
+                  suffix="per $100"
+                  value={
+                    conversionCostBps === null ? null : conversionCostBps / 100
+                  }
+                  required
+                />
+              </div>
             </div>
-            <div className="grid grid-cols-1 items-start gap-3 lg:grid-cols-3">
-              <DayV3NumberField
-                label="Days until Senior redeems for the underlying asset"
-                max={194}
-                min={1}
-                note="A longer redemption wait requires a larger discount before refilling becomes attractive."
-                onChange={onEntryPointSettlementDays}
-                origin={inputOrigin(inputOrigins.settlement)}
-                placeholder="Enter days"
-                presets={[
-                  { label: "1 day", value: 1 },
-                  { label: "7 days", value: 7 },
-                  { label: "30 days", value: 30 },
-                  { label: "90 days", value: 90 },
-                ]}
-                suffix="days"
-                value={entryPointSettlementDays}
-                wholeNumber
-                required
-              />
-              <DayV3NumberField
-                label="Additional days to convert the underlying asset"
-                max={365}
-                min={0}
-                note="Use zero when the redeemed asset is already the SLP's exit asset."
-                onChange={onConversionDays}
-                origin={inputOrigin(inputOrigins.conversionDays)}
-                placeholder="Enter days"
-                presets={[
-                  { label: "Same day", value: 0 },
-                  { label: "1 day", value: 1 },
-                  { label: "7 days", value: 7 },
-                ]}
-                suffix="days"
-                value={conversionDays}
-                wholeNumber
-                required
-              />
-              <DayV3NumberField
-                label="Stressed conversion cost per $100"
-                max={99.99}
-                min={0}
-                note="Use a conservative all-in spread and execution estimate for stressed pool conditions."
-                onChange={(value) =>
-                  onConversionCostBps(value === null ? null : value * 100)
-                }
-                origin={inputOrigin(inputOrigins.conversionCost)}
-                placeholder="Enter cost"
-                prefix="$"
-                presets={[
-                  { label: "No cost", value: 0 },
-                  { label: "$0.25", value: 0.25 },
-                  { label: "$0.50", value: 0.5 },
-                  { label: "$1.00", value: 1 },
-                ]}
-                step={0.05}
-                suffix="per $100"
-                value={
-                  conversionCostBps === null ? null : conversionCostBps / 100
-                }
-                required
-              />
-            </div>
-          </div>
+          </details>
         ) : null}
 
         {exitDisabled ? (

@@ -1,6 +1,6 @@
 "use client";
 
-import { memo } from "react";
+import { memo, useEffect, useRef, useState } from "react";
 
 import DayV3Button from "@/components/day-v3/DayV3Button";
 import DayV3DocsLink from "@/components/day-v3/DayV3DocsLink";
@@ -28,6 +28,7 @@ export type DayV3PremiumCurveEditorProps = {
   riskYtPct: number;
   slpModeledApy: number;
   slpEnabled?: boolean;
+  slpPending?: boolean;
   targetUtilization: number;
 };
 
@@ -96,7 +97,7 @@ function CurveCard({
           minLabel={pct(ytMin / 100)}
           onChange={onYtPct}
           size="sm"
-          step={0.0001}
+          step={0.1}
           value={bounded(ytPct, ytMin, ytMax)}
         />
         <div className="flex flex-col justify-between rounded-xl border border-[var(--border-subtle)] bg-[var(--foundation)] px-3 py-2.5">
@@ -142,15 +143,68 @@ function DayV3PremiumCurveEditor({
   riskYtPct,
   slpModeledApy,
   slpEnabled = true,
+  slpPending = false,
   targetUtilization,
 }: DayV3PremiumCurveEditorProps) {
+  const [riskEditor, setRiskEditor] = useState({
+    draft: riskYtPct,
+    source: riskYtPct,
+  });
+  const [liqEditor, setLiqEditor] = useState({
+    draft: liqYtPct,
+    source: liqYtPct,
+  });
+  const onRiskYtPctRef = useRef(onRiskYtPct);
+  const onLiqYtPctRef = useRef(onLiqYtPct);
+  useEffect(() => {
+    onRiskYtPctRef.current = onRiskYtPct;
+  }, [onRiskYtPct]);
+  useEffect(() => {
+    onLiqYtPctRef.current = onLiqYtPct;
+  }, [onLiqYtPct]);
+  // Reset actions and linked URLs can replace the parent value. React's
+  // documented adjusted-state pattern keeps the local drag draft in sync
+  // without a second render caused by a setState-in-effect cycle.
+  if (!Object.is(riskEditor.source, riskYtPct)) {
+    setRiskEditor({ draft: riskYtPct, source: riskYtPct });
+  }
+  if (!Object.is(liqEditor.source, liqYtPct)) {
+    setLiqEditor({ draft: liqYtPct, source: liqYtPct });
+  }
+  const riskDraftPct = riskEditor.draft;
+  const liqDraftPct = liqEditor.draft;
+
+  useEffect(() => {
+    if (!juniorEnabled || Object.is(riskDraftPct, riskYtPct)) return;
+    const timeout = window.setTimeout(
+      () => onRiskYtPctRef.current(riskDraftPct),
+      120,
+    );
+    return () => window.clearTimeout(timeout);
+  }, [juniorEnabled, riskDraftPct, riskYtPct]);
+
+  useEffect(() => {
+    if (!slpEnabled || Object.is(liqDraftPct, liqYtPct)) return;
+    const timeout = window.setTimeout(
+      () => onLiqYtPctRef.current(liqDraftPct),
+      120,
+    );
+    return () => window.clearTimeout(timeout);
+  }, [liqDraftPct, liqYtPct, slpEnabled]);
+
+  if (!juniorEnabled && !slpEnabled) {
+    return null;
+  }
+
   const activeCurveLabels = [
     ...(juniorEnabled ? ["Junior"] : []),
     ...(slpEnabled ? ["SLP"] : []),
   ];
   const activeCurveSummary = [
-    ...(juniorEnabled ? [`Jr ${pct(riskYtPct / 100)}`] : []),
-    ...(slpEnabled ? [`SLP ${pct(liqYtPct / 100)}`] : []),
+    ...(juniorEnabled ? [`Jr ${pct(riskDraftPct / 100)}`] : []),
+    ...(slpEnabled
+      ? [slpPending ? "SLP pending" : `SLP ${pct(liqDraftPct / 100)}`]
+      : []),
   ].join(" · ");
   return (
     <DayV3Group
@@ -164,7 +218,9 @@ function DayV3PremiumCurveEditor({
       index={index}
       status={
         validationIssues.length === 0
-          ? { label: "Ready", tone: "complete" }
+          ? slpPending
+            ? { label: "Review", tone: "review" }
+            : { label: "Set", tone: "complete" }
           : {
               label: "Needs input",
               tone: "incomplete",
@@ -223,30 +279,45 @@ function DayV3PremiumCurveEditor({
             capPct={riskCapPct}
             description="Sets the share of Senior yield paid to Junior as first-loss coverage is used."
             docs="coverage"
-            onYtPct={onRiskYtPct}
+            onYtPct={(value) =>
+              setRiskEditor((current) => ({ ...current, draft: value }))
+            }
             paidTo="Jr"
             modeledApy={juniorModeledApy}
             targetUtilization={targetUtilization}
             title="Junior yield share"
             y0Pct={riskY0Pct}
             y100Pct={riskY100Pct}
-            ytPct={riskYtPct}
+            ytPct={riskDraftPct}
           />
         ) : null}
-        {slpEnabled ? (
+        {slpEnabled && !slpPending ? (
           <CurveCard
             capPct={liqCapPct}
             description="Sets the share of Senior yield paid to SLP as exit liquidity is used."
             docs="slpTranche"
-            onYtPct={onLiqYtPct}
+            onYtPct={(value) =>
+              setLiqEditor((current) => ({ ...current, draft: value }))
+            }
             paidTo="SLP"
             modeledApy={slpModeledApy}
             targetUtilization={targetUtilization}
             title="SLP yield share"
             y0Pct={liqY0Pct}
             y100Pct={liqY100Pct}
-            ytPct={liqYtPct}
+            ytPct={liqDraftPct}
           />
+        ) : slpEnabled ? (
+          <section className="flex min-w-0 flex-col justify-center gap-2 rounded-xl border border-dashed border-[var(--border-subtle)] px-4 py-5">
+            <strong className="text-[13px] font-semibold">
+              SLP yield share is awaiting exit validation
+            </strong>
+            <p className="max-w-[60ch] text-[10.5px] leading-relaxed text-[var(--secondary)]">
+              V3 will expose the SLP share after it knows the exact pool capital
+              and fee inputs. It does not treat an unresolved pool as a 0% SLP
+              allocation.
+            </p>
+          </section>
         ) : null}
       </div>
     </DayV3Group>

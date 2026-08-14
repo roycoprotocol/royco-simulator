@@ -3,6 +3,7 @@
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
+import DayV3Backtest from "@/components/day-v3/DayV3Backtest";
 import DayV3Chart, { type DayV3Point } from "@/components/day-v3/DayV3Chart";
 import DayV3Comparison, {
   DAY_V3_TONE_DOT,
@@ -30,6 +31,7 @@ import DayV3ModelGroup, {
 import DayV3NumberField from "@/components/day-v3/DayV3NumberField";
 import DayV3PremiumCurveEditor from "@/components/day-v3/DayV3PremiumCurveEditor";
 import DayV3SegmentedControl from "@/components/day-v3/DayV3SegmentedControl";
+import DayV3Source from "@/components/day-v3/DayV3Source";
 import DayV3YieldModels from "@/components/day-v3/DayV3YieldModels";
 import { useDayV3PoolDesign } from "@/components/day-v3/useDayV3PoolDesign";
 import {
@@ -41,6 +43,7 @@ import {
 } from "@/components/ui/card";
 import {
   buildDayV3Query,
+  boundDayV3YieldShareAtTarget,
   DAY_V3_STARTER_DEFAULTS,
   dayV3MinimumLiquidityForPoolFunding,
   deriveDayV3StartingYieldCurvePolicy,
@@ -131,9 +134,12 @@ export default function DayV3Summary({
       !markets.some((candidate) => candidate.id === linked?.market),
   );
   const [marketId, setMarketId] = useState(initialMarket.id);
+  const [importedMarket, setImportedMarket] = useState<DayMarket | null>(null);
   const selectedMarket =
     markets.find((candidate) => candidate.id === marketId) ?? initialMarket;
-  const market = customSource ? CUSTOM_SOURCE_MARKET : selectedMarket;
+  const market = customSource
+    ? (importedMarket ?? CUSTOM_SOURCE_MARKET)
+    : selectedMarket;
   const defaults = useMemo(
     () => normalizeDayV3Defaults(market.defaults),
     [market.defaults],
@@ -167,6 +173,8 @@ export default function DayV3Summary({
   >(linked?.minimumProceedsPer100 ?? null);
   const modeledProtectedDrawdownPct = protectedDrawdownPct;
   const modeledImmediateExitSharePct = immediateExitSharePct;
+  const protectionEnabled = (modeledProtectedDrawdownPct ?? 0) > 0;
+  const exitEnabled = (modeledImmediateExitSharePct ?? 0) > 0;
   const protectionDisabled = modeledProtectedDrawdownPct === 0;
   const exitDisabled = modeledImmediateExitSharePct === 0;
   const [entryPointSettlementDays, setEntryPointSettlementDays] = useState<
@@ -180,7 +188,7 @@ export default function DayV3Summary({
   >(linked?.collateralToExitCostBps ?? null);
   const deploymentTarget = linked?.target ?? DAY_V3_STARTER_DEFAULTS.target;
   const observationDays = recoveryDaysInput ?? 0;
-  const maintainCoverage = false;
+  const [maintainCoverage, setMaintainCoverage] = useState(false);
   // The merged simulator exposes only target yield shares. Legacy curve-shape
   // anchors stay inactive even when an old link contains them.
   const riskShareOverride = activeManualOverrides.jrYieldShareAtTargetPct;
@@ -216,6 +224,7 @@ export default function DayV3Summary({
     setRecoveryMode(null);
     setImmediateExitSharePct(null);
     setMinimumProceedsPer100(null);
+    setImportedMarket(null);
     setEntryPointSettlementDays(null);
     setCollateralToExitDays(null);
     setCollateralToExitCostBps(null);
@@ -475,12 +484,9 @@ export default function DayV3Summary({
   // the main simulator uses after measuring input lag.
   const inputs = useDeferredValue(immediateModelInput);
   const modelUpdating = inputs !== immediateModelInput;
-  // A pool-dependent answer is displayed only after canonical policy resolves.
-  const modeledReturnPolicyResolved = inputs.policyBasis !== "unresolved";
   const returnDisplayState = dayV3ReturnDisplayState({
     modelUpdating,
     sourceApyResolved: sourceApyPct !== null,
-    returnPolicyResolved: modeledReturnPolicyResolved,
   });
 
   // One place decides what the engine is actually run with, so the panel that
@@ -511,13 +517,21 @@ export default function DayV3Summary({
     const targetShareDesign = {
       junior: {
         ...startingDesign.junior,
-        yTargetPct:
-          inputs.riskShareOverride ?? startingDesign.junior.yTargetPct,
+        yTargetPct: boundDayV3YieldShareAtTarget({
+          targetPct:
+            inputs.riskShareOverride ?? startingDesign.junior.yTargetPct,
+          y0Pct: startingDesign.junior.y0Pct,
+          y100Pct: startingDesign.junior.y100Pct,
+        }),
       },
       slp: {
         ...startingDesign.slp,
-        yTargetPct:
-          inputs.liqShareOverride ?? startingDesign.slp.yTargetPct,
+        yTargetPct: boundDayV3YieldShareAtTarget({
+          targetPct:
+            inputs.liqShareOverride ?? startingDesign.slp.yTargetPct,
+          y0Pct: startingDesign.slp.y0Pct,
+          y100Pct: startingDesign.slp.y100Pct,
+        }),
       },
     };
     const design = manualCurveComplete
@@ -561,8 +575,12 @@ export default function DayV3Summary({
     };
   }, [inputs, simulationDefaults]);
 
-  const model = useMemo(() => {
-    const { coverage, minLiquidity } = resolved;
+  // Capital sizing, loss absorption, and pool depth do not depend on how yield
+  // is split. Keeping them in a separate shared-engine run prevents a yield
+  // slider tick from rebuilding the expensive stress and exit explainers.
+  const structuralModel = useMemo(() => {
+    const coverage = inputs.coveragePct / 100;
+    const minLiquidity = inputs.liquidityPct / 100;
     const effective = {
       ...simulationDefaults,
       coverage,
@@ -571,22 +589,7 @@ export default function DayV3Summary({
       observationDays: inputs.observationDays,
       eclpBandWidth: inputs.bandPct / 100,
       maintainCoverage: inputs.maintainCoverage,
-      riskYDM: {
-        ...simulationDefaults.riskYDM,
-        y0: resolved.y0,
-        yTarget: resolved.riskYieldShare,
-        y100: resolved.y100,
-      },
-      liqYDM: {
-        ...simulationDefaults.liqYDM,
-        y0: resolved.liqY0,
-        yTarget: resolved.liquidityYieldShare,
-        y100: resolved.liqY100,
-      },
     };
-    // The same terms `runDayTargetScenario` assembles for itself. Building them
-    // once here means the rates and the loss waterfall are two readings of one
-    // market rather than two markets that happen to share sliders.
     const terms: DayEditableTerms = {
       coverage,
       minLiquidity,
@@ -595,21 +598,78 @@ export default function DayV3Summary({
       riskYieldShare: effective.riskYDM.yTarget,
       liquidityYieldShare: effective.liqYDM.yTarget,
     };
-    // Where each position's yield comes from, measured by switching each
-    // premium off and re-running. Differences between engine runs, so the
-    // components sum to the engine's own totals rather than approximating them.
-    const zeroCurve = { mode: "static" as const, y0: 0, yTarget: 0, y100: 0 };
+    const cfg = {
+      ...buildDayMarketConfig(effective, terms),
+      ...(inputs.engineOverrides ?? {}),
+    };
+    const balances = buildDayInitialBalances(effective, terms);
+    const opening = new Sim(cfg, balances);
+    const openingSeniorNAV = opening.last().stEffectiveNAV;
+    const requestedExitNAV =
+      (openingSeniorNAV * inputs.immediateExitSharePct) / 100;
+    return {
+      balances,
+      pool: {
+        concentration: cfg.eclpParams?.lambda ?? DAY_ECLP_SIMULATION_LAMBDA,
+        stableYield: cfg.stableYield,
+        swapFeeBps: inputs.engineOverrides?.swapFeeBps ?? null,
+        turnoverPerYear: cfg.poolTurnoverPerYear,
+        seniorWeight: dayPoolSeniorWeight(cfg),
+      },
+      illustrativeExit: {
+        openingSeniorNAV,
+        quote: opening.previewSecondarySell(requestedExitNAV),
+      },
+      explainer: buildDayExplainerMetrics(cfg, balances),
+    };
+  }, [
+    inputs.bandPct,
+    inputs.coveragePct,
+    inputs.engineOverrides,
+    inputs.immediateExitSharePct,
+    inputs.liquidityPct,
+    inputs.maintainCoverage,
+    inputs.observationDays,
+    inputs.sourceApyPct,
+    simulationDefaults,
+  ]);
+
+  const baseReturnTerms = useMemo(
+    () => ({
+      ...simulationDefaults,
+      coverage: inputs.coveragePct / 100,
+      minLiquidity: inputs.liquidityPct / 100,
+      sourceApy: inputs.sourceApyPct / 100,
+      observationDays: inputs.observationDays,
+      eclpBandWidth: inputs.bandPct / 100,
+      maintainCoverage: inputs.maintainCoverage,
+    }),
+    [
+      inputs.bandPct,
+      inputs.coveragePct,
+      inputs.liquidityPct,
+      inputs.maintainCoverage,
+      inputs.observationDays,
+      inputs.sourceApyPct,
+      simulationDefaults,
+    ],
+  );
+  const zeroCurve = useMemo(
+    () => ({ mode: "static" as const, y0: 0, yTarget: 0, y100: 0 }),
+    [],
+  );
+  const baseReturns = useMemo(() => {
     const runWithoutPremiums = (
       carryOverrides: Partial<
         Pick<
-          typeof effective,
+          typeof baseReturnTerms,
           "sourceApy" | "stableYield" | "poolTurnoverPerYear"
         >
       > = {},
     ) =>
       runDayTargetScenario(
         {
-          ...effective,
+          ...baseReturnTerms,
           ...carryOverrides,
           riskYDM: zeroCurve,
           liqYDM: zeroCurve,
@@ -630,37 +690,8 @@ export default function DayV3Summary({
       poolTurnoverPerYear: 0,
     });
     const noPremiums = runWithoutPremiums();
-    const riskOnly = runDayTargetScenario(
-      {
-        ...effective,
-        liqYDM: zeroCurve,
-      },
-      {},
-      inputs.engineOverrides ?? {},
-    );
-    // Held rather than rebuilt, so the pool economics quoted to the reader are
-    // the ones this run used and cannot drift from them.
-    const cfg = {
-      ...buildDayMarketConfig(effective, terms),
-      ...(inputs.engineOverrides ?? {}),
-    };
-    // Hoisted out of the explainer call so the capital stack the issuer is asked
-    // to raise and the rates they are quoted are the same market, seeded once.
-    const balances = buildDayInitialBalances(effective, terms);
-    const opening = new Sim(cfg, balances);
-    const openingSeniorNAV = opening.last().stEffectiveNAV;
-    const requestedExitNAV =
-      (openingSeniorNAV * inputs.immediateExitSharePct) / 100;
-    const illustrativeExitQuote =
-      opening.previewSecondarySell(requestedExitNAV);
     return {
-      scenario: runDayTargetScenario(
-        effective,
-        {},
-        inputs.engineOverrides ?? {},
-      ),
       noPremiums,
-      riskOnly,
       poolCarry: {
         seniorShareCarry:
           seniorShareCarryOnly.liquidityApy - zeroPoolCarry.liquidityApy,
@@ -670,24 +701,88 @@ export default function DayV3Summary({
         swapFeeIncome:
           noPremiums.liquidityApy - seniorAndExitAssetCarry.liquidityApy,
       } satisfies DayV3PoolCarryBreakdown,
-      balances,
-      pool: {
-        concentration: cfg.eclpParams?.lambda ?? DAY_ECLP_SIMULATION_LAMBDA,
-        stableYield: cfg.stableYield,
-        swapFeeBps: inputs.engineOverrides?.swapFeeBps ?? null,
-        turnoverPerYear: cfg.poolTurnoverPerYear,
-        // Measured off this run's own config, so the split the capital stack
-        // reports is the split the engine seeded.
-        seniorWeight: dayPoolSeniorWeight(cfg),
-      },
-      illustrativeExit: {
-        openingSeniorNAV,
-        quote: illustrativeExitQuote,
-      },
-      explainer: buildDayExplainerMetrics(cfg, balances),
     };
-  }, [inputs, resolved, simulationDefaults]);
-  const scenario = model.scenario;
+  }, [baseReturnTerms, inputs.engineOverrides, zeroCurve]);
+  const riskOnly = useMemo(
+    () =>
+      runDayTargetScenario(
+        {
+          ...baseReturnTerms,
+          riskYDM: {
+            ...simulationDefaults.riskYDM,
+            y0: resolved.y0,
+            yTarget: resolved.riskYieldShare,
+            y100: resolved.y100,
+          },
+          liqYDM: zeroCurve,
+        },
+        {},
+        inputs.engineOverrides ?? {},
+      ),
+    [
+      baseReturnTerms,
+      inputs.engineOverrides,
+      resolved.riskYieldShare,
+      resolved.y0,
+      resolved.y100,
+      simulationDefaults.riskYDM,
+      zeroCurve,
+    ],
+  );
+  const scenario = useMemo(
+    () =>
+      runDayTargetScenario(
+        {
+          ...baseReturnTerms,
+          riskYDM: {
+            ...simulationDefaults.riskYDM,
+            y0: resolved.y0,
+            yTarget: resolved.riskYieldShare,
+            y100: resolved.y100,
+          },
+          liqYDM: {
+            ...simulationDefaults.liqYDM,
+            y0: resolved.liqY0,
+            yTarget: resolved.liquidityYieldShare,
+            y100: resolved.liqY100,
+          },
+        },
+        {},
+        inputs.engineOverrides ?? {},
+      ),
+    [
+      baseReturnTerms,
+      inputs.engineOverrides,
+      resolved.liqY0,
+      resolved.liqY100,
+      resolved.liquidityYieldShare,
+      resolved.riskYieldShare,
+      resolved.y0,
+      resolved.y100,
+      simulationDefaults.liqYDM,
+      simulationDefaults.riskYDM,
+    ],
+  );
+  const model = useMemo(
+    () => ({
+      scenario,
+      noPremiums: baseReturns.noPremiums,
+      riskOnly,
+      poolCarry: baseReturns.poolCarry,
+      ...structuralModel,
+    }),
+    [baseReturns, riskOnly, scenario, structuralModel],
+  );
+  const backtestConfigOverrides = useMemo(
+    () =>
+      inputs.engineOverrides
+        ? {
+            eclpParams: inputs.engineOverrides.eclpParams,
+            swapFeeBps: inputs.engineOverrides.swapFeeBps,
+          }
+        : {},
+    [inputs.engineOverrides],
+  );
 
   const chartData = useMemo<DayV3Point[]>(() => {
     const grow = (apy: number, months: number) =>
@@ -738,8 +833,6 @@ export default function DayV3Summary({
       slpYieldShareAtFullPct: manualOverrides.slpYieldShareAtFullPct,
     },
   });
-  // replaceState rather than a router push: this fires on every slider tick, and
-  // a history entry per pixel of drag would make the back button useless.
   // replaceState rather than a router push: this fires on every slider tick, and
   // a history entry per pixel of drag would make the back button useless. It is
   // also why the link is read on the server instead of in an effect here.
@@ -805,15 +898,15 @@ export default function DayV3Summary({
       name: "Sr",
       short: "Sr",
       apy: scenario.seniorApy,
-      holds: protectionDisabled
+      holds: !protectionEnabled
         ? "The strategy asset, with no first-loss buffer"
         : "The strategy asset, protected by Jr",
       role:
-        protectionDisabled && exitDisabled
+        !protectionEnabled && !exitEnabled
           ? "Holds the source directly"
-          : protectionDisabled
+          : !protectionEnabled
             ? "Holds the source and pays for an exit"
-            : exitDisabled
+            : !exitEnabled
               ? "Holds the source and pays for cover"
               : "Holds the source, pays for cover and an exit",
       holdsSource: true,
@@ -823,44 +916,49 @@ export default function DayV3Summary({
           ? "Loses value only after Jr is exhausted"
           : "Unprotected. No Jr capital stands in front of it",
       funded: true,
+      pending: false,
     },
     {
       tone: "junior" as const,
       name: "Jr",
       short: "Jr",
       apy: scenario.juniorApy,
-      holds: protectionDisabled
+      holds: !protectionEnabled
         ? "No first-loss tranche is funded"
         : "First-loss coverage for Sr",
-      role: protectionDisabled
+      role: !protectionEnabled
         ? "Disabled by the issuer"
         : "Takes the first losses, paid a premium for it",
       holdsSource: true,
       ...breakdown("juniorApy"),
-      risk: protectionDisabled
+      risk: !protectionEnabled
         ? "Senior absorbs losses from the first dollar"
         : "Absorbs the first losses, in full",
-      // While the deferred accountant snapshot catches up, the rate is hidden
-      // as updating. Do not simultaneously assert the stale funding state.
-      funded: modelUpdating || resolved.coverage > 0,
+      funded: resolved.coverage > 0,
+      pending: false,
     },
     {
       tone: "liquidity" as const,
       name: "SLP",
       short: "SLP",
       apy: scenario.liquidityApy,
-      holds: exitDisabled
+      holds: !exitEnabled
         ? "No immediate exit pool is funded"
-        : "The pool Sr exits into",
-      role: exitDisabled
+        : canonicalEngineOverrides === null
+          ? "Exit pool awaiting validation"
+          : "The pool Sr exits into",
+      role: !exitEnabled
         ? "Disabled by the issuer"
         : "Supplies exit liquidity, paid a premium for it",
       holdsSource: false,
       ...breakdown("liquidityApy"),
-      risk: exitDisabled
+      risk: !exitEnabled
         ? "No one-trade exit is promised"
-        : "Holds Sr shares when Sr sells",
-      funded: modelUpdating || resolved.minLiquidity > 0,
+        : canonicalEngineOverrides === null
+          ? "Complete the Senior exit to validate SLP capital and returns"
+          : "Holds Sr shares when Sr sells",
+      funded: resolved.minLiquidity > 0,
+      pending: exitEnabled && canonicalEngineOverrides === null,
     },
   ];
 
@@ -904,7 +1002,7 @@ export default function DayV3Summary({
                   ? model.scenario.juniorApy * 100
                   : null,
               status: "recommended",
-            message: `${protectionRecommendation.reason}${returnDisplayState === "updating" ? " Recalculating the return with the current pool design…" : returnDisplayState === "ready" ? " Current market fees are included in the displayed return." : " Junior return remains unresolved until the exit design supplies every return input."}`,
+            message: `${protectionRecommendation.reason}${canonicalEngineOverrides ? " Current market fees are included in the displayed return." : " The forward return remains visible while exact pool terms are being checked."}`,
             }
           : {
               coveragePct: null,
@@ -938,7 +1036,7 @@ export default function DayV3Summary({
     message: exitDisabled
       ? "Immediate Senior exit is off. No SLP capital, pool quote, or E-CLP parameters are required for this scenario."
       : !exitGoalsComplete
-        ? "Complete the Senior exit inputs above to resolve a pool design."
+        ? "Complete the required input highlighted above to resolve the exact pool design. Forward APYs remain available in the meantime."
         : hasPoolOverride
           ? "This link contains manual pool overrides. Outcomes are withheld until the canonical service revalidates those exact fields."
           : activePoolDesign.status === "resolved" && !liquidityResolved
@@ -992,16 +1090,21 @@ export default function DayV3Summary({
   };
   const displayedReturnState = returnDisplayState;
   const premiumCurveEditor =
-    !protectionDisabled || !exitDisabled ? (
+    protectionEnabled || exitEnabled ? (
       <DayV3PremiumCurveEditor
         curveOverridden={curveOverridden}
-        index={2}
-        juniorEnabled={!protectionDisabled}
+        index={4}
+        juniorEnabled={protectionEnabled}
         juniorModeledApy={scenario.juniorApy}
         liqCapPct={resolved.liquidityCeiling * 100}
         liqY0Pct={resolved.liqY0 * 100}
         liqY100Pct={resolved.liqY100 * 100}
-        liqYtPct={resolved.liquidityYieldShare * 100}
+        liqYtPct={boundDayV3YieldShareAtTarget({
+          targetPct:
+            liqShareOverride ?? resolved.liquidityYieldShare * 100,
+          y0Pct: resolved.liqY0 * 100,
+          y100Pct: resolved.liqY100 * 100,
+        })}
         onLiqYtPct={(value) =>
           updateYieldCurveOverride("slpYieldShareAtTargetPct", value)
         }
@@ -1012,9 +1115,14 @@ export default function DayV3Summary({
         riskCapPct={resolved.riskCeiling * 100}
         riskY0Pct={resolved.y0 * 100}
         riskY100Pct={resolved.y100 * 100}
-        riskYtPct={resolved.riskYieldShare * 100}
+        riskYtPct={boundDayV3YieldShareAtTarget({
+          targetPct: riskShareOverride ?? resolved.riskYieldShare * 100,
+          y0Pct: resolved.y0 * 100,
+          y100Pct: resolved.y100 * 100,
+        })}
         slpModeledApy={scenario.liquidityApy}
-        slpEnabled={!exitDisabled}
+        slpEnabled={exitEnabled}
+        slpPending={exitEnabled && canonicalEngineOverrides === null}
         targetUtilization={DAY_TARGET_UTILIZATION}
         validationIssues={startingCurveIssues}
       />
@@ -1039,31 +1147,30 @@ export default function DayV3Summary({
         collateralToExitCostBps !== null));
   const simulationSourceComplete = sourceApyPct !== null;
   const simulationCurveComplete = startingCurveIssues.length === 0;
-  type ActiveSectionState = "confirmed" | "missing";
+  const yieldSplitVisible = protectionEnabled || exitEnabled;
+  type ActiveSectionState = "set" | "missing";
   const activeSectionStates: ActiveSectionState[] = [
-    simulationSourceComplete ? "confirmed" : "missing",
-    simulationCurveComplete ? "confirmed" : "missing",
-    advancedProtectionReady ? "confirmed" : "missing",
-    advancedExitComplete ? "confirmed" : "missing",
+    simulationSourceComplete ? "set" : "missing",
+    advancedProtectionReady ? "set" : "missing",
+    advancedExitComplete ? "set" : "missing",
+    ...(yieldSplitVisible
+      ? ([simulationCurveComplete ? "set" : "missing"] as const)
+      : []),
   ];
-  const confirmedSectionCount = activeSectionStates.filter(
-    (state) => state === "confirmed",
+  const completedSectionCount = activeSectionStates.filter(
+    (state) => state === "set",
   ).length;
   const missingSectionCount = activeSectionStates.filter(
     (state) => state === "missing",
   ).length;
+  const pendingValidationCount =
+    exitEnabled && exitView.status !== "recommended" ? 1 : 0;
   const inputSteps = [
     {
       complete: simulationSourceComplete,
       detail: "Choose a listed source or enter a custom net yield.",
       id: "day-v3-source-inputs",
       label: "Choose the yield source",
-    },
-    {
-      complete: simulationCurveComplete,
-      detail: "Adjust the Junior and SLP shares paid at target utilization.",
-      id: "day-v3-premium-inputs",
-      label: "Adjust the yield split",
     },
     {
       complete: advancedProtectionReady,
@@ -1073,10 +1180,21 @@ export default function DayV3Summary({
     },
     {
       complete: advancedExitComplete,
-      detail: "Choose the exit promise and the assumptions that determine whether the SLP can be refilled.",
+      detail: "Choose the immediate exit amount and minimum payout.",
       id: "day-v3-exit-inputs",
       label: "Set the Senior exit",
     },
+    ...(yieldSplitVisible
+      ? [
+          {
+            complete: simulationCurveComplete,
+            detail:
+              "Set how Senior yield is shared with each active supporting tranche.",
+            id: "day-v3-premium-inputs",
+            label: "Adjust the yield split",
+          },
+        ]
+      : []),
   ];
   const nextInputStep = inputSteps.find((step) => !step.complete) ?? null;
   const defaultOpenInputId = nextInputStep?.id ?? null;
@@ -1101,24 +1219,29 @@ export default function DayV3Summary({
               Design the market
             </h2>
             <p className="text-[11px] text-[var(--tertiary)]">
-              Set the yield split, protection, and immediate exit in one place.
+              Choose the source, protection, and exit; then set the yield split for the active tranches.
             </p>
           </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-[var(--border-subtle)] pt-3">
           <strong className="font-mono text-[11.5px] tabular-nums text-[var(--secondary)]">
-            {confirmedSectionCount} confirmed
+            {completedSectionCount} of {activeSectionStates.length} answers provided
           </strong>
           {missingSectionCount > 0 ? (
             <span className="font-mono text-[11px] tabular-nums text-[var(--red-emphasis)]">
               {missingSectionCount} missing
             </span>
           ) : null}
+          {pendingValidationCount > 0 ? (
+            <span className="font-mono text-[11px] tabular-nums text-[var(--secondary)]">
+              {pendingValidationCount} awaiting validation
+            </span>
+          ) : null}
           <span aria-hidden="true" className="flex min-w-24 flex-1 gap-1.5 sm:max-w-36">
             {activeSectionStates.map((state, index) => (
               <span
-                className={`h-1.5 flex-1 rounded-full ${state === "confirmed" ? "bg-[var(--theme-green)]" : "bg-[var(--border-subtle)]"}`}
+                className={`h-1.5 flex-1 rounded-full ${state === "set" ? "bg-[var(--theme-green)]" : "bg-[var(--border-subtle)]"}`}
                 key={index}
               />
             ))}
@@ -1138,7 +1261,7 @@ export default function DayV3Summary({
             key="yield-source"
             status={
               sourceReadiness.complete
-                ? { label: "Confirmed", tone: "complete" }
+                ? { label: "Set", tone: "complete" }
                 : {
                     label: "Missing",
                     tone: "incomplete",
@@ -1203,8 +1326,28 @@ export default function DayV3Summary({
                 />
               )}
             </div>
+            {customSource ? (
+              <div className="flex flex-col gap-3">
+                <DayV3Source
+                  onImport={(nextMarket) => {
+                    setImportedMarket(nextMarket);
+                    setSourceApyPct(nextMarket.defaults.sourceApy * 100);
+                  }}
+                />
+                {importedMarket && importedMarket.series.length >= 3 ? (
+                  <a
+                    className={dayV3ButtonVariants({
+                      size: "sm",
+                      variant: "secondary",
+                    })}
+                    href="#day-v3-history-models"
+                  >
+                    View historical backtest
+                  </a>
+                ) : null}
+              </div>
+            ) : null}
           </DayV3Group>
-          {premiumCurveEditor}
           <DayV3Goals
             conversionCostBps={collateralToExitCostBps}
             conversionDays={collateralToExitDays}
@@ -1212,7 +1355,7 @@ export default function DayV3Summary({
             entryPointSettlementDays={entryPointSettlementDays}
             exit={exitView}
             exitSharePct={immediateExitSharePct}
-            indexOffset={2}
+            indexOffset={1}
             inputOrigins={{
               conversionCost: starterFields.has("conversion-cost")
                 ? "illustrative"
@@ -1309,6 +1452,7 @@ export default function DayV3Summary({
             recoveryDays={recoveryDaysInput}
             recoveryMode={recoveryMode}
           />
+          {premiumCurveEditor}
         </DayV3GroupAccordion>
       </section>
 
@@ -1317,14 +1461,24 @@ export default function DayV3Summary({
         className="overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--foundation)] shadow-[0_6px_22px_-14px_rgba(23,25,31,0.4)]"
       >
         <div className="flex flex-wrap items-center justify-between gap-3 px-5 pb-2 pt-4">
-          <h2
-            className="text-[13px] font-semibold tracking-[-0.01em]"
-            id="day-v3-positions-heading"
-          >
-            Scenario returns at these terms
-          </h2>
+          <div className="flex items-center gap-2">
+            <h2
+              className="text-[13px] font-semibold tracking-[-0.01em]"
+              id="day-v3-positions-heading"
+            >
+              Scenario returns at these terms
+            </h2>
+            {modelUpdating ? <Badge tone="neutral">updating</Badge> : null}
+          </div>
           <DayV3DocsLink label="Yield split" topic="yieldSplit" />
         </div>
+        <p aria-live="polite" className="sr-only" role="status">
+          {!modelUpdating && displayedReturnState === "ready"
+            ? `Scenario returns updated. Senior ${pct(positions[0].apy)}. Junior ${positions[1].funded ? pct(positions[1].apy) : "off"}. SLP ${positions[2].pending ? "awaiting exit validation" : positions[2].funded ? pct(positions[2].apy) : "off"}.`
+            : modelUpdating
+              ? "Scenario returns updating."
+              : "Enter a source yield to calculate scenario returns."}
+        </p>
 
         {/* Three peers, scanned across: identical slots, so the eye compares
             the rate first. The compact footer below keeps the terms attached
@@ -1346,16 +1500,22 @@ export default function DayV3Summary({
                 </span>
               </div>
               <strong className="mt-1 block font-mono text-[22px] leading-none tabular-nums">
-                {displayedReturnState === "updating"
-                  ? "…"
-                  : displayedReturnState === "ready" && position.funded
+                {displayedReturnState === "ready" && position.funded
                     ? pct(position.apy)
+                    : displayedReturnState === "ready" && position.pending
+                      ? "—"
                     : displayedReturnState === "ready"
                       ? "0.0%"
                       : "—"}
               </strong>
               <span className="mt-1 block truncate text-[9px] text-[var(--tertiary)]">
-                {displayedReturnState === "ready" ? "per year" : "not ready"}
+                {displayedReturnState === "ready"
+                  ? position.pending
+                    ? "validating"
+                    : position.funded
+                      ? "per year"
+                      : "off"
+                  : "not ready"}
               </span>
             </div>
           ))}
@@ -1386,7 +1546,9 @@ export default function DayV3Summary({
                     {position.name}
                   </CardTitle>
                   {position.funded ? null : (
-                    <Badge tone="neutral">not funded</Badge>
+                    <Badge tone="neutral">
+                      {position.pending ? "validating" : "not funded"}
+                    </Badge>
                   )}
                 </div>
                 <CardDescription>{position.holds}</CardDescription>
@@ -1399,25 +1561,21 @@ export default function DayV3Summary({
                       position.funded ? undefined : { color: "var(--tertiary)" }
                     }
                   >
-                    {displayedReturnState === "updating"
-                      ? "…"
-                      : displayedReturnState === "ready" && position.funded
+                    {displayedReturnState === "ready" && position.funded
                         ? pct(position.apy)
+                        : displayedReturnState === "ready" && position.pending
+                          ? "—"
                         : displayedReturnState === "ready"
                           ? "0.0%"
                           : "—"}
                   </span>
                   <span className="text-[11px] text-[var(--tertiary)]">
-                    {displayedReturnState === "updating"
-                      ? "updating model"
-                      : displayedReturnState === "missing-source"
+                    {position.pending
+                        ? "complete exit inputs"
+                        : displayedReturnState === "missing-source"
                         ? "enter source yield"
-                        : displayedReturnState === "missing-policy"
-                          ? activePoolDesign.status === "resolving"
-                            ? "checking market terms"
-                            : activePoolDesign.status === "infeasible"
-                              ? "change exit design"
-                              : "market terms unavailable"
+                        : modelUpdating
+                          ? "a year · updating"
                           : "a year"}
                   </span>
                 </div>
@@ -1433,7 +1591,22 @@ export default function DayV3Summary({
           <strong className="font-semibold text-[var(--foreground)]">
             APY inputs:
           </strong>{" "}
-          {sourceApyPct === null ? "source yield missing" : `${sourceApyPct.toFixed(1)}% source yield`} · Junior receives {(resolved.riskYieldShare * 100).toFixed(1)}% · SLP receives {(resolved.liquidityYieldShare * 100).toFixed(1)}% at 90% utilization.
+          {sourceApyPct === null
+            ? "Source yield missing."
+            : `${sourceApyPct.toFixed(1)}% source yield. `}
+          At 90% utilization: {protectionEnabled
+            ? `Junior receives ${(resolved.riskYieldShare * 100).toFixed(1)}% of Senior yield`
+            : "Junior is off"}; {exitEnabled
+            ? canonicalEngineOverrides
+              ? `SLP receives ${(resolved.liquidityYieldShare * 100).toFixed(1)}% of Senior yield`
+              : "SLP share awaits exit validation"
+            : "SLP is off"}.
+          {!canonicalEngineOverrides && exitEnabled ? (
+            <span className="ml-1 font-medium text-[var(--red-emphasis)]">
+              {" "}
+              SLP capital and fee inputs are awaiting Senior exit validation.
+            </span>
+          ) : null}
         </div>
       </section>
 
@@ -1459,58 +1632,56 @@ export default function DayV3Summary({
           </p>
         </div>
 
-        {modelUpdating ? (
-          <Card data-model-state="updating" weight="quiet">
-            <CardHeader>
-              <CardTitle className="text-[17px]">
-                Updating every model…
-              </CardTitle>
-              <CardDescription>
-                Rebuilding capital, stress, exit, and return models from one consistent accountant snapshot.
-              </CardDescription>
-            </CardHeader>
-          </Card>
-        ) : (
           <DayV3ModelAccordion>
                 <DayV3ModelGroup
-                  id="day-v3-risk-models"
+                  id="day-v3-capital-models"
                   index={1}
                   preview={
                     protectionView.status === "missing-goal" &&
                     exitView.status === "missing-goal"
                       ? "Complete Senior protection and the exit promise above to size Junior and SLP capital."
-                      : `${protectedDrawdownPct === null ? "Protection pending" : `${protectedDrawdownPct.toFixed(1)}% protection`} + ${immediateExitSharePct === null ? "exit pending" : `$${immediateExitSharePct.toFixed(1)} exit`} → ${protectionDisabled ? "$0 Junior" : `$${model.balances.jt.toFixed(1)} Junior`} + ${exitDisabled ? "$0 SLP" : `$${model.balances.lt.toFixed(1)} SLP`}`
+                      : `${protectedDrawdownPct === null ? "Protection pending" : `${protectedDrawdownPct.toFixed(1)}% source drawdown`} + ${immediateExitSharePct === null ? "exit pending" : `$${immediateExitSharePct.toFixed(1)} exit`} → ${!protectionEnabled ? "$0 Junior" : `$${model.balances.jt.toFixed(1)} Junior`} + ${!exitEnabled ? "$0 SLP" : exitView.slpPer100 === null ? "SLP pending" : `$${exitView.slpPer100.toFixed(1)} SLP`}`
                   }
-                  title="Capital and protection"
+                  title="Capital stack"
                 >
                   <DayV3CapitalStack
                     defaults={defaults}
                     poolSeniorWeight={model.pool.seniorWeight}
                     balances={model.balances}
                     coverage={resolved.coverage}
+                    liquidityPending={exitEnabled && exitView.slpPer100 === null}
                     minLiquidity={resolved.minLiquidity}
                     targetUtilization={DAY_TARGET_UTILIZATION}
                     unit={returnUnit}
                   />
-                  <div className="border-t border-[var(--border-subtle)] pt-4">
-                    <h3 className="mb-3 text-[13px] font-semibold">
-                      Who absorbs a source loss
-                    </h3>
-                    <DayV3LossWaterfall
-                      metrics={model.explainer.coverage}
-                      unit={returnUnit}
-                    />
-                  </div>
+                </DayV3ModelGroup>
+
+                <DayV3ModelGroup
+                  id="day-v3-risk-models"
+                  index={2}
+                  preview={
+                    protectedDrawdownPct === null
+                      ? "Choose Senior protection above to model the loss path."
+                      : protectionDisabled
+                        ? "Protection is off · Senior absorbs source losses from the first dollar."
+                        : `Junior absorbs a ${protectedDrawdownPct.toFixed(1)}% source fall before Senior loses value.`
+                  }
+                  title="Senior protection"
+                >
+                  <DayV3LossWaterfall
+                    metrics={model.explainer.coverage}
+                    unit={returnUnit}
+                  />
                 </DayV3ModelGroup>
 
                 <DayV3ModelGroup
                   id="day-v3-exit-models"
-                  index={2}
+                  index={3}
                   preview={
                     exitDisabled
                       ? "Immediate pool exit is off · no SLP or execution curve."
                       : exitView.status === "missing-goal"
-                        ? "Complete both exit questions above to model capacity, proceeds, and pool depth."
+                        ? "Complete the required input highlighted above to model capacity, proceeds, and pool depth."
                         : exitView.status === "infeasible"
                           ? "No feasible pool at the current exit size, payout floor, timing, and external spread assumption."
                           : exitView.status === "unresolved"
@@ -1565,13 +1736,13 @@ export default function DayV3Summary({
 
             <DayV3ModelGroup
               id="day-v3-return-models"
-              index={3}
+              index={4}
               preview={
                 sourceApyPct === null
                   ? "Enter the source yield above to calculate Senior, Junior, and SLP APYs."
                   : displayedReturnState !== "ready"
                     ? "Complete the exit choices or retry market validation to inspect growth, composition, and premium curves."
-                    : `${sourceApyPct.toFixed(1)}% source → Senior ${pct(scenario.seniorApy)} · Junior ${protectionDisabled ? "not funded" : pct(scenario.juniorApy)} · SLP ${exitDisabled ? "not funded" : pct(scenario.liquidityApy)}.`
+                    : `${sourceApyPct.toFixed(1)}% source → Senior ${pct(scenario.seniorApy)} · Junior ${!protectionEnabled ? "not funded" : pct(scenario.juniorApy)} · SLP ${!exitEnabled ? "not funded" : canonicalEngineOverrides === null ? "pending" : pct(scenario.liquidityApy)}.`
               }
               title="How the returns are produced"
             >
@@ -1666,17 +1837,46 @@ export default function DayV3Summary({
               ) : null}
             </DayV3ModelGroup>
 
+            <DayV3ModelGroup
+              id="day-v3-history-models"
+              index={5}
+              preview={
+                market.series.length >= 3
+                  ? `${market.series.length.toLocaleString()} dated observations · ${market.series[0]?.date} to ${market.series[market.series.length - 1]?.date}`
+                  : "No dated history yet · add it under Yield source."
+              }
+              title="Historical backtest"
+            >
+              <DayV3Backtest
+                bandPct={inputs.bandPct}
+                coveragePct={inputs.coveragePct}
+                customSource={customSource}
+                liqSharePct={resolved.liquidityYieldShare * 100}
+                liqY0Pct={resolved.liqY0 * 100}
+                liqY100Pct={resolved.liqY100 * 100}
+                liquidityPct={inputs.liquidityPct}
+                maintainCoverage={maintainCoverage}
+                market={market}
+                observationDays={inputs.observationDays}
+                onMaintainCoverage={setMaintainCoverage}
+                poolConfigOverrides={backtestConfigOverrides}
+                riskSharePct={resolved.riskYieldShare * 100}
+                riskY0Pct={resolved.y0 * 100}
+                riskY100Pct={resolved.y100 * 100}
+                sourceApyPct={inputs.sourceApyPct}
+              />
+            </DayV3ModelGroup>
+
           </DayV3ModelAccordion>
-        )}
       </section>
 
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-[var(--border-subtle)] bg-[var(--foundation)] px-5 py-4">
           <div className="min-w-0">
             <strong className="text-[13px] font-semibold">
-              Ready to continue?
+              Finish in Royco Deploy
             </strong>
             <p className="mt-1 text-[10.5px] leading-relaxed text-[var(--secondary)]">
-              Royco Deploy collects final contract policy and revalidates the
+              Royco Deploy collects final contract settings and revalidates the
               live market before deployment.
             </p>
           </div>
@@ -1686,7 +1886,7 @@ export default function DayV3Summary({
             rel="noreferrer"
             target="_blank"
           >
-            Continue in Royco Deploy
+            Open Royco Deploy
           </a>
       </div>
 

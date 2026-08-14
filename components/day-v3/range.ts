@@ -21,7 +21,10 @@ export function dayV3RangeStyle(value: number, min: number, max: number): CSSPro
   const ratio = span > 0 ? (value - min) / span : 0;
   const filled = Math.min(100, Math.max(0, ratio * 100));
   return {
-    height: 6,
     background: `linear-gradient(to right, var(--foreground) ${filled}%, color-mix(in srgb, var(--foreground) 14%, transparent) ${filled}%)`,
+    backgroundPosition: "center",
+    backgroundRepeat: "no-repeat",
+    backgroundSize: "100% 6px",
+    minHeight: 44,
   };
 }

@@ -56,7 +56,7 @@ export default function DayV3ModelGroup({
   preview,
   title,
 }: {
-  children: React.ReactNode;
+  children?: React.ReactNode;
   id: string;
   index: number;
   preview: React.ReactNode;
@@ -76,6 +76,7 @@ export default function DayV3ModelGroup({
     <section
       className="flex scroll-mt-6 flex-col rounded-xl border border-[var(--border-subtle)] bg-[var(--card)] px-4 py-2.5 shadow-[0_4px_18px_-16px_rgba(23,25,31,0.55)]"
       data-model-group={id}
+      id={id}
     >
       <button
         aria-controls={contentId}
@@ -91,7 +92,11 @@ export default function DayV3ModelGroup({
           {index}
         </span>
         <span className="flex min-w-0 flex-1 flex-col gap-1">
-          <span className="text-[13.5px] font-semibold leading-tight">
+          <span
+            aria-level={3}
+            className="text-[13.5px] font-semibold leading-tight"
+            role="heading"
+          >
             {title}
           </span>
           <span className="text-[11px] leading-snug text-[var(--secondary)]">
@@ -116,12 +121,12 @@ export default function DayV3ModelGroup({
           </svg>
         </span>
       </button>
-      <div
-        className="mt-3 flex flex-col gap-4 border-t border-[var(--border-subtle)] pt-4"
-        hidden={!open}
-        id={contentId}
-      >
-        {children}
+      <div id={contentId}>
+        {open ? (
+          <div className="mt-3 flex flex-col gap-4 border-t border-[var(--border-subtle)] pt-4">
+            {children}
+          </div>
+        ) : null}
       </div>
     </section>
   );

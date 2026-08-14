@@ -9,10 +9,12 @@ const hero = read("components/day-v3/DayV3Hero.tsx");
 const goals = read("components/day-v3/DayV3Goals.tsx");
 const editor = read("components/day-v3/DayV3PremiumCurveEditor.tsx");
 const modeModel = read("lib/day-v3/mode-model.ts");
+const modelState = read("lib/day-v3/model-state.ts");
 const yieldCurves = read("lib/day-v3/yield-curves.ts");
+const backtest = read("components/day-v3/DayV3Backtest.tsx");
 
-// One workflow must retain every forward model that explains how an issuer's
-// four inputs change returns, capital, protection, and immediate exits.
+// One workflow must retain every model that explains how an issuer's four
+// inputs change returns, capital, protection, immediate exits, and history.
 const modelFamilies = [
   ["position return cards", "Scenario returns at these terms"],
   ["capital stack", "<DayV3CapitalStack"],
@@ -22,6 +24,7 @@ const modelFamilies = [
   ["one-year growth chart", "<DayV3Chart"],
   ["position/yield composition table", "<DayV3Comparison"],
   ["visible premium curves", "<DayV3YieldModels"],
+  ["historical backtest", "<DayV3Backtest"],
 ];
 for (const [name, marker] of modelFamilies) {
   assert.ok(summary.includes(marker), `Unified V3 is missing ${name}`);
@@ -44,8 +47,23 @@ assert.match(
 );
 assert.match(
   summary,
-  /modelUpdating[\s\S]*Updating every model/,
-  "V3 must hide stale model evidence while its atomic snapshot updates",
+  /dayV3ReturnDisplayState\(\{[\s\S]*modelUpdating,[\s\S]*sourceApyResolved:/,
+  "The APY display must receive update state and source-yield readiness",
+);
+assert.match(
+  modelState,
+  /if \(!input\.sourceApyResolved\) return "missing-source";[\s\S]*return "ready";/,
+  "A deferred shared-accountant snapshot must remain a visible APY answer",
+);
+assert.doesNotMatch(
+  modelState,
+  /if \(input\.modelUpdating\) return "updating"/,
+  "An in-flight refresh must not replace numeric APYs with a loading state",
+);
+assert.match(
+  summary,
+  /\{modelUpdating \? <Badge tone="neutral">updating<\/Badge> : null\}[\s\S]*modelUpdating[\s\S]*"a year · updating"/,
+  "Model updates must be communicated beside still-visible APY cards",
 );
 
 // The mode split is gone. Legacy URL parsing lives in url-state; no component
@@ -68,8 +86,9 @@ assert.doesNotMatch(
   "The unified flow must not show mode-specific badges or actions",
 );
 
-// The questionnaire has exactly four ordered input groups. Source and target
-// yield split live in Summary/editor; protection and exit live in DayV3Goals.
+// The questionnaire has exactly four ordered input groups. Source comes first,
+// protection and exit live in DayV3Goals, and the tranche-aware yield split is
+// always last.
 const inputSurface = `${summary}\n${editor}\n${goals}`;
 const inputGroups = [
   ["day-v3-source-inputs", "Yield source"],
@@ -86,8 +105,18 @@ for (const [id, label] of inputGroups) {
 }
 assert.match(
   summary,
-  /id="day-v3-source-inputs"[\s\S]*premiumCurveEditor[\s\S]*<DayV3Goals/,
-  "The visible input flow must be source, target yield split, protection, then exit",
+  /id="day-v3-source-inputs"[\s\S]*<DayV3Goals[\s\S]*\{premiumCurveEditor\}/,
+  "The visible input flow must be source, protection, exit, then yield split",
+);
+assert.match(
+  summary,
+  /const premiumCurveEditor =[\s\S]*protectionEnabled \|\| exitEnabled[\s\S]*juniorEnabled=\{protectionEnabled\}[\s\S]*slpEnabled=\{exitEnabled\}/,
+  "The last yield-split step must render only the active supporting tranches",
+);
+assert.match(
+  editor,
+  /if \(!juniorEnabled && !slpEnabled\) \{[\s\S]*return null;[\s\S]*activeCurveLabels =[\s\S]*juniorEnabled[\s\S]*slpEnabled/,
+  "The yield editor must disappear with no supporting tranche and label the active ones",
 );
 assert.doesNotMatch(
   `${summary}\n${editor}`,
@@ -129,13 +158,10 @@ assert.match(
   "The immediate-exit choice must stay inside Senior exit",
 );
 for (const [name, marker] of [
-  [
-    "redemption settlement time",
-    /Days until Senior redeems for the underlying asset/,
-  ],
+  ["redemption settlement time", /Senior redemption wait/],
   [
     "underlying conversion time",
-    /Additional days to convert the underlying asset/,
+    /Underlying-to-exit conversion time/,
   ],
   ["stressed conversion cost", /Stressed conversion cost per \$100/],
 ]) {
@@ -147,8 +173,18 @@ for (const [name, marker] of [
 }
 assert.match(
   exitGroup,
-  /What would it take to refill the pool\?[\s\S]*entryPointSettlementDays[\s\S]*conversionDays[\s\S]*conversionCostBps/,
-  "All three refill assumptions must stay folded into Senior exit",
+  /<details[\s\S]*Refill feasibility assumptions[\s\S]*Senior redemption wait[\s\S]*Underlying-to-exit conversion time[\s\S]*Stressed conversion cost per \$100[\s\S]*<\/details>/,
+  "All three refill assumptions must stay collapsed and clearly labeled inside Senior exit",
+);
+assert.match(
+  exitGroup,
+  /do not reshape the E-CLP directly[\s\S]*arbitrageur[\s\S]*buy discounted Senior[\s\S]*refill the SLP/,
+  "The folded assumptions must explain that they test arbitrage refill feasibility",
+);
+assert.match(
+  exitGroup,
+  /Use zero when the redeemed underlying asset is already the SLP's exit asset[\s\S]*conservative estimate for the external underlying-to-exit conversion[\s\S]*exclude the SLP swap fee/,
+  "Conversion time and stressed cost must explain when and how to answer them",
 );
 
 // There is one exact, unconditional pool-design request for the unified flow.
@@ -171,9 +207,11 @@ assert.match(
 // Every model family is shared because there is no mode branch around the
 // capital/protection, E-CLP, or APY explanation groups.
 for (const id of [
+  "day-v3-capital-models",
   "day-v3-risk-models",
   "day-v3-exit-models",
   "day-v3-return-models",
+  "day-v3-history-models",
 ]) {
   assert.equal(
     summary.match(new RegExp(`id="${id}"`, "g"))?.length,
@@ -181,12 +219,26 @@ for (const id of [
     `Unified V3 must render exactly one ${id} model group`,
   );
 }
+const capitalModelStart = summary.indexOf('id="day-v3-capital-models"');
+const protectionModelStart = summary.indexOf('id="day-v3-risk-models"');
+const exitModelStart = summary.indexOf('id="day-v3-exit-models"');
+assert.ok(
+  capitalModelStart >= 0 &&
+    protectionModelStart > capitalModelStart &&
+    exitModelStart > protectionModelStart,
+  "Capital stack and protection must remain separate, ordered model groups",
+);
+const capitalModelGroup = summary.slice(capitalModelStart, protectionModelStart);
+const protectionModelGroup = summary.slice(protectionModelStart, exitModelStart);
+assert.match(capitalModelGroup, /<DayV3CapitalStack/);
+assert.doesNotMatch(capitalModelGroup, /<DayV3LossWaterfall/);
+assert.match(protectionModelGroup, /<DayV3LossWaterfall/);
+assert.doesNotMatch(protectionModelGroup, /<DayV3CapitalStack/);
 
 // Removed deployment-form surfaces cannot return under a different name.
 for (const [name, marker] of [
   ["market operations", /<DayV3OperationalFacts|day-v3-deployment-setup-inputs/],
   ["request policy", /<DayV3DeploymentPolicy|day-v3-request-policy-inputs/],
-  ["historical evidence", /<DayV3Backtest|day-v3-history-models/],
   ["Protected Exit", /day-v3-protected-exit-inputs|protectedExitView/],
   ["deployment handoff", /<DayV3Deployment|deploymentPanel/],
 ]) {
@@ -201,6 +253,16 @@ assert.doesNotMatch(
   /summary="Deployment mapping"|day-v3-deployment-setup-inputs|day-v3-protected-exit-inputs/,
   "Removed deployment sections must not be nested inside issuer inputs",
 );
+
+for (const marker of [
+  "Historical backtest",
+  "Backtest window",
+  "<DayV3BacktestChart",
+  "Coverage restoration",
+  "<TableHead>Month</TableHead>",
+]) {
+  assert.ok(backtest.includes(marker), `Historical model lost: ${marker}`);
+}
 
 // Hidden legacy curve anchors remain derived and cannot affect the unified UI.
 assert.equal(

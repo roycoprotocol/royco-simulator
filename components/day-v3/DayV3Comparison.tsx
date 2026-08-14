@@ -36,6 +36,9 @@ export type DayV3PositionBreakdown = {
   short: string;
   apy: number;
   funded: boolean;
+  /** Exact capital or fee inputs are still being validated. This is distinct
+   * from an issuer intentionally leaving the position unfunded. */
+  pending?: boolean;
   role: string;
   /** Engine-measured starting contribution for the sequential breakdown. */
   base: number;
@@ -336,7 +339,9 @@ export default function DayV3Comparison({
                       <DayV3ToneDot tone={position.tone} />
                       {position.name}
                       {position.funded ? null : (
-                        <Badge tone="neutral">not funded</Badge>
+                        <Badge tone="neutral">
+                          {position.pending ? "validating" : "not funded"}
+                        </Badge>
                       )}
                     </span>
                   </TableCell>
@@ -344,13 +349,19 @@ export default function DayV3Comparison({
                     {position.role}
                   </TableCell>
                   <TableCell className="text-right font-mono tabular-nums">
-                    {unitAmount(
-                      position.funded ? 100 * (1 + position.apy) : 100,
-                      unit,
-                    )}
+                    {position.pending
+                      ? "—"
+                      : unitAmount(
+                          position.funded ? 100 * (1 + position.apy) : 100,
+                          unit,
+                        )}
                   </TableCell>
                   <TableCell className="text-right font-mono font-semibold tabular-nums">
-                    {position.funded ? pct(position.apy) : "0.0%"}
+                    {position.pending
+                      ? "—"
+                      : position.funded
+                        ? pct(position.apy)
+                        : "0.0%"}
                   </TableCell>
                   <TableCell className="text-right">
                     <span

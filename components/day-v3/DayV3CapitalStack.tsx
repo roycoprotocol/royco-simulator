@@ -33,6 +33,7 @@ function DayV3CapitalStack({
   balances,
   coverage,
   defaults,
+  liquidityPending = false,
   minLiquidity,
   poolSeniorWeight,
   targetUtilization,
@@ -43,6 +44,7 @@ function DayV3CapitalStack({
   /** Needed to size the same stack at 100% utilization, which is the floor the
    *  requirement is literally met at. */
   defaults: DaySimulatorDefaults;
+  liquidityPending?: boolean;
   minLiquidity: number;
   /** How much of the pool sits in Senior shares, so the in-source figure counts
    *  the pool's Senior leg and not its exit-asset leg. */
@@ -57,6 +59,63 @@ function DayV3CapitalStack({
   const per100 = (value: number) => (st > 0 ? (value / st) * 100 : 0);
   const total = st + jt + lt;
   const share = (value: number) => (total > 0 ? (value / total) * 100 : 0);
+
+  if (liquidityPending) {
+    return (
+      <Card weight="primary">
+        <CardHeader>
+          <div className="flex items-baseline justify-between gap-2">
+            <CardTitle>Capital stack</CardTitle>
+            <DayV3DocsLink label="How tranching works" topic="tranching" />
+          </div>
+        </CardHeader>
+        <CardContent className="flex flex-col gap-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+            <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--foundation)] px-4 py-3">
+              <span className="text-[9px] font-semibold uppercase tracking-[0.1em] text-[var(--tertiary)]">
+                Senior
+              </span>
+              <strong className="mt-2 block font-mono text-[22px] tabular-nums">
+                {unitRatio(100, unit)}
+              </strong>
+              <span className="text-[10.5px] text-[var(--tertiary)]">
+                reference amount
+              </span>
+            </div>
+            <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--foundation)] px-4 py-3">
+              <span className="text-[9px] font-semibold uppercase tracking-[0.1em] text-[var(--tertiary)]">
+                Junior
+              </span>
+              <strong className="mt-2 block font-mono text-[22px] tabular-nums">
+                {coverage > 0
+                  ? unitRatio(per100(jt), unit)
+                  : unitRatio(0, unit)}
+              </strong>
+              <span className="text-[10.5px] text-[var(--tertiary)]">
+                first-loss capital
+              </span>
+            </div>
+            <div className="rounded-xl border border-dashed border-[var(--border-subtle)] px-4 py-3">
+              <span className="text-[9px] font-semibold uppercase tracking-[0.1em] text-[var(--tertiary)]">
+                SLP
+              </span>
+              <strong className="mt-2 block font-mono text-[22px] tabular-nums">
+                —
+              </strong>
+              <span className="text-[10.5px] text-[var(--red-emphasis)]">
+                validating exit pool
+              </span>
+            </div>
+          </div>
+          <p className="rounded-lg border border-dashed border-[var(--border-subtle)] px-3.5 py-3 text-[11px] leading-relaxed text-[var(--secondary)]">
+            Senior and Junior sizing is available now. SLP capital and total
+            market capital appear after the Senior exit is validated; no zero
+            or fallback pool size is assumed.
+          </p>
+        </CardContent>
+      </Card>
+    );
+  }
 
   /**
    * A capital stack, drawn as one, with every leg's proportion inside its own
@@ -133,7 +192,7 @@ function DayV3CapitalStack({
     <Card weight="primary">
       <CardHeader>
         <div className="flex items-baseline justify-between gap-2">
-          <CardTitle>What it takes to open</CardTitle>
+          <CardTitle>Capital stack</CardTitle>
           <DayV3DocsLink label="How tranching works" topic="tranching" />
         </div>
       </CardHeader>

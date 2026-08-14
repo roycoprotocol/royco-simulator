@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 
 import {
+  boundDayV3YieldShareAtTarget,
   deriveDayV3StartingYieldCurvePolicy,
   validateDayV3YieldCurveDesign,
   type DayV3StartingYieldCurveDefaults,
@@ -18,6 +19,17 @@ const close = (actual: number, expected: number) =>
     Math.abs(actual - expected) < 1e-10,
     `expected ${actual} to equal ${expected}`,
   );
+
+assert.equal(
+  boundDayV3YieldShareAtTarget({ targetPct: 30, y0Pct: 3, y100Pct: 27 }),
+  27,
+  "legacy target-only overrides must be bounded to the derived full-utilization anchor",
+);
+assert.equal(
+  boundDayV3YieldShareAtTarget({ targetPct: 1, y0Pct: 3, y100Pct: 27 }),
+  3,
+  "target-only overrides must not fall below the derived zero-utilization anchor",
+);
 
 const valid = validateDayV3YieldCurveDesign({
   junior: { y0Pct: 2, yTargetPct: 12, y100Pct: 18 },

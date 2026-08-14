@@ -174,7 +174,11 @@ export default function DayV3Group({
       </span>
       <span className="flex min-w-0 flex-1 flex-col gap-1">
         <span className="grid min-w-0 grid-cols-1 items-baseline gap-x-3 gap-y-1 sm:grid-cols-[180px_minmax(0,1fr)]">
-          <span className="text-[13px] font-semibold leading-tight">
+          <span
+            aria-level={3}
+            className="text-[13px] font-semibold leading-tight"
+            role="heading"
+          >
             {status?.tone === "incomplete" && status.missing?.length ? (
               <span
                 aria-hidden="true"

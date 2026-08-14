@@ -75,7 +75,9 @@ const missingMarkup = renderToStaticMarkup(
 );
 assert.match(missingMarkup, /aria-required="true"/);
 assert.match(missingMarkup, /required=""/);
-assert.match(missingMarkup, /aria-label="Required"/);
+assert.match(missingMarkup, /aria-labelledby="day-v3-number-/);
+assert.match(missingMarkup, /aria-hidden="true"[^>]*>\*/);
+assert.doesNotMatch(missingMarkup, /aria-label="Required"/);
 assert.match(missingMarkup, />Missing</);
 
 console.log("Day V3 stable numeric field: PASS");

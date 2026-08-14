@@ -243,11 +243,13 @@ assert.match(
   /\$10\.0 immediate exit → \$12\.4 SLP · \$9\.6 proceeds · \$95\.0 floor/,
 );
 assert.equal(
-  (goalsMarkup.match(/Section status: Confirmed/g) ?? []).length,
+  (goalsMarkup.match(/Section status: Set/g) ?? []).length,
   2,
   "both goal groups are complete when every modeled input is present",
 );
-assert.match(goalsMarkup, /aria-label="Required"/);
+assert.match(goalsMarkup, /aria-required="true"/);
+assert.match(goalsMarkup, /aria-labelledby="day-v3-number-/);
+assert.doesNotMatch(goalsMarkup, /aria-label="Required"/);
 assert.match(goalsMarkup, /Should Senior have first-loss protection/);
 assert.match(goalsMarkup, /How should temporary losses be observed/);
 assert.match(goalsMarkup, /aria-label="Observation mode"/);
@@ -255,10 +257,12 @@ assert.match(goalsMarkup, /Allow recovery/);
 assert.match(goalsMarkup, /How long should a temporary loss have to recover/);
 assert.match(goalsMarkup, /Observation Period Duration/);
 assert.match(goalsMarkup, /Should Senior have an immediate pool exit/);
-assert.match(goalsMarkup, /What would it take to refill the pool/);
-assert.match(goalsMarkup, /Days until Senior redeems for the underlying asset/);
-assert.match(goalsMarkup, /Additional days to convert the underlying asset/);
+assert.match(goalsMarkup, /Refill feasibility assumptions/);
+assert.match(goalsMarkup, /These values do not reshape the E-CLP directly/);
+assert.match(goalsMarkup, /Senior redemption wait/);
+assert.match(goalsMarkup, /Underlying-to-exit conversion time/);
 assert.match(goalsMarkup, /Stressed conversion cost per \$100/);
+assert.match(goalsMarkup, /<details/);
 assert.match(goalsMarkup, /Model assumption/);
 assert.doesNotMatch(goalsMarkup, /solver/i);
 assert.doesNotMatch(goalsMarkup, /Recovery timing/);

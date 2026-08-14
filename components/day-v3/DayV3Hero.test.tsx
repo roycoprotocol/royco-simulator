@@ -20,14 +20,9 @@ assert.match(hero, /lg:grid-cols-\[minmax\(0,1\.35fr\)_minmax\(390px,0\.65fr\)\]
 assert.match(hero, /Underlying yield/);
 assert.match(hero, /First-loss buffer/);
 assert.match(hero, /Exit liquidity/);
-assert.match(hero, /Junior absorbs losses first/);
-assert.match(hero, /SLP supports exits/);
-assert.match(hero, /Senior retains payment priority/);
-assert.match(hero, /One workflow/);
-assert.match(hero, />Yield split</);
-assert.match(hero, />Protection</);
-assert.match(hero, />Immediate exit</);
-assert.match(hero, />Outcomes</);
+assert.doesNotMatch(hero, /How the structure works/);
+assert.doesNotMatch(hero, /Junior absorbs losses first/);
+assert.doesNotMatch(hero, /One workflow/);
 assert.doesNotMatch(hero, /Simple/);
 assert.doesNotMatch(hero, /Advanced/);
 assert.doesNotMatch(hero, /Simulation mode/);

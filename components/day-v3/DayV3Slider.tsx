@@ -93,6 +93,7 @@ export default function DayV3Slider({
           // string. The note is worth keeping in the name: "coverage,
           // first-loss requirement" is the useful reading.
           aria-label={note ? `${label}, ${note}` : label}
+          aria-valuetext={display}
           className="day-v3-range"
           max={max}
           min={min}
