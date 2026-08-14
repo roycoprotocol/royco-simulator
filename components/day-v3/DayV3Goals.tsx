@@ -3,9 +3,7 @@
 import DayV3Button from "@/components/day-v3/DayV3Button";
 import DayV3Group from "@/components/day-v3/DayV3Group";
 import DayV3NumberField from "@/components/day-v3/DayV3NumberField";
-import DayV3Origin, {
-  type DayV3VisibleOrigin,
-} from "@/components/day-v3/DayV3Origin";
+import type { DayV3VisibleOrigin } from "@/components/day-v3/DayV3Origin";
 import DayV3QuoteAsset from "@/components/day-v3/DayV3QuoteAsset";
 import DayV3SegmentedControl from "@/components/day-v3/DayV3SegmentedControl";
 import {
@@ -100,30 +98,6 @@ export type DayV3RecoveryView = {
   message: string;
 };
 
-function ResultTile({
-  label,
-  note,
-  value,
-}: {
-  label: string;
-  note: string;
-  value: string;
-}) {
-  return (
-    <div className="flex min-w-0 flex-col gap-0.5 border-t border-[var(--border-subtle)] pt-2.5">
-      <span className="text-[9.5px] font-semibold uppercase tracking-[0.1em] text-[var(--tertiary)]">
-        {label}
-      </span>
-      <span className="font-mono text-[18px] font-bold leading-none tracking-[-0.02em] tabular-nums">
-        {value}
-      </span>
-      <span className="text-[10px] leading-snug text-[var(--tertiary)]">
-        {note}
-      </span>
-    </div>
-  );
-}
-
 const fixed = (value: MaybeNumber, digits = 1) =>
   value === null ? "—" : value.toFixed(digits);
 
@@ -184,8 +158,6 @@ export default function DayV3Goals({
 }) {
   const inputOrigin = (origin: DayV3VisibleOrigin | undefined) =>
     origin ?? "your-answer";
-  const poolResultOrigin: DayV3VisibleOrigin =
-    exit.status === "recommended" ? "derived" : "illustrative";
   const protectionDisabled = drawdownPct === 0;
   const exitDisabled = exitSharePct === 0;
   const protectionComplete =
@@ -361,50 +333,20 @@ export default function DayV3Goals({
           </div>
         ) : null}
 
-        {protection.status === "recommended" ||
-        protection.status === "disabled" ? (
-          <div
-            aria-live="polite"
-            className="rounded-xl border border-[var(--border-subtle)] bg-[var(--card)] px-4 py-4"
-            data-status={protection.status}
-            role="status"
-          >
-            <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <strong className="text-[12px] font-semibold">
-                Protection result
-              </strong>
-              <span className="flex items-center gap-2 text-[10px] text-[var(--tertiary)]">
-                Per $100 Senior
-                <DayV3Origin origin="recommended" />
-              </span>
-            </div>
-            <div className="mt-2.5 grid grid-cols-1 gap-x-4 gap-y-3 sm:grid-cols-2">
-              <ResultTile
-                label="On-chain Minimum Coverage"
-                note="contract ratio · tested at 100% utilization"
-                value={`${fixed(protection.coveragePct ?? 0)}%`}
-              />
-              <ResultTile
-                label="Junior to open"
-                note="per $100 Senior at the 90% operating target"
-                value={dollars(protection.juniorPer100 ?? 0)}
-              />
-            </div>
-            <p className="mt-2.5 text-[10px] leading-snug text-[var(--tertiary)]">
-              {protection.message}
-            </p>
-          </div>
-        ) : (
-          <p
-            aria-live="polite"
-            className="rounded-xl border border-dashed border-[var(--border-subtle)] px-4 py-3 text-[10.5px] leading-relaxed text-[var(--secondary)]"
-            role="status"
-          >
-            {protection.status === "missing-goal"
-              ? "Choose a protected drawdown and observation mode to calculate the Junior capital required."
-              : protection.message}
-          </p>
-        )}
+        {/* The result band that used to sit here repeated Minimum Coverage
+            and Junior capital, both of which the capital stack states with
+            their 100%-utilized floors beside them. What is not stated
+            elsewhere is whether the goal was met, so that is all that stays. */}
+        <p
+          aria-live="polite"
+          className="rounded-xl border border-dashed border-[var(--border-subtle)] px-3.5 py-2.5 text-[10.5px] leading-snug text-[var(--secondary)]"
+          data-status={protection.status}
+          role="status"
+        >
+          {protection.status === "missing-goal"
+            ? "Choose a protected drawdown and observation mode to size the Junior capital required."
+            : protection.message}
+        </p>
       </DayV3Group>
 
       <DayV3Group
@@ -539,58 +481,16 @@ export default function DayV3Goals({
           </div>
         ) : null}
 
+        {/* Same reasoning: SLP funding and Minimum Liquidity are stated in the
+            capital stack, the payout floor and proceeds in the exit model. Only
+            the status of the design belongs beside the inputs. */}
         {exitDisabled ? (
-          <p className="rounded-xl border border-dashed border-[var(--border-subtle)] px-4 py-3 text-[10.5px] leading-relaxed text-[var(--secondary)]">
+          <p className="rounded-xl border border-dashed border-[var(--border-subtle)] px-3.5 py-2.5 text-[10.5px] leading-snug text-[var(--secondary)]">
             Immediate exit is off, so this design requires no SLP funding.
           </p>
-        ) : exit.status === "recommended" || exit.status === "illustrative" ? (
-          <div className="rounded-xl border border-[var(--border-subtle)] bg-[var(--card)] px-4 py-3">
-            <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <strong className="text-[12px] font-semibold">Exit result</strong>
-              <span className="flex items-center gap-2 text-[10px] text-[var(--tertiary)]">
-                Per $100 Senior
-                <DayV3Origin origin={poolResultOrigin} />
-              </span>
-            </div>
-            <div className="mt-2.5 grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-4">
-            <ResultTile
-              label="SLP required"
-              note="per $100 Senior"
-              value={dollars(exit.slpPer100)}
-            />
-            <ResultTile
-              label="Minimum Liquidity"
-              note="deployment requirement"
-              value={`${fixed(exit.minimumLiquidityPct, 2)}%`}
-            />
-            <ResultTile
-              label="Lowest payout"
-              note="fee-inclusive, per $100"
-              value={dollars(exit.lowestPayoutPer100)}
-            />
-            <ResultTile
-              label="Expected proceeds"
-              note="received for the selected sale"
-              value={dollars(exit.proceeds)}
-            />
-            </div>
-          </div>
-        ) : exit.status === "resolving" ? (
-          <div className="grid grid-cols-2 gap-4 rounded-xl border border-[var(--border-subtle)] bg-[var(--card)] px-4 py-3">
-            <ResultTile
-              label="Illustrative SLP"
-              note="per $100 Senior"
-              value={dollars(exit.slpPer100)}
-            />
-            <ResultTile
-              label="Illustrative liquidity"
-              note="used for scenario APY"
-              value={`${fixed(exit.minimumLiquidityPct, 2)}%`}
-            />
-          </div>
         ) : exit.status === "missing-goal" ? (
-          <p className="rounded-xl border border-dashed border-[var(--border-subtle)] px-4 py-3 text-[10.5px] leading-relaxed text-[var(--secondary)]">
-            Choose the exit amount and payout above to check the exact pool result.
+          <p className="rounded-xl border border-dashed border-[var(--border-subtle)] px-3.5 py-2.5 text-[10.5px] leading-snug text-[var(--secondary)]">
+            Choose the exit amount and payout above to size the pool.
           </p>
         ) : null}
 

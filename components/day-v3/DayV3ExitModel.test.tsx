@@ -322,14 +322,27 @@ assert.doesNotMatch(goalsMarkup, /day-v3-premium-inputs/);
 assert.doesNotMatch(goalsMarkup, /day-v3-protected-exit-inputs/);
 assert.match(goalsMarkup, /Out of every \$100 Senior, how much should be sellable/);
 assert.match(goalsMarkup, /least a seller should receive for \$100 Senior/);
-assert.match(goalsMarkup, /SLP required/);
-assert.match(goalsMarkup, /Minimum Liquidity/);
-assert.match(goalsMarkup, /Lowest payout/);
-assert.match(goalsMarkup, /Expected proceeds/);
-assert.match(goalsMarkup, />\$12\.4</);
-assert.match(goalsMarkup, />10\.90%</);
-assert.match(goalsMarkup, />\$96\.2</);
-assert.match(goalsMarkup, />\$9\.6</);
+// The input sections no longer restate results. SLP funding and Minimum
+// Liquidity belong to the capital stack, the payout floor and proceeds to the
+// exit model; repeating them beside the controls made a reader check two
+// places for one number and cost roughly 300px of the questionnaire.
+for (const moved of [
+  /SLP required/,
+  /Minimum Liquidity/,
+  /Lowest payout/,
+  /Expected proceeds/,
+  />\$12\.4</,
+  />10\.90%</,
+  />\$96\.2</,
+]) {
+  assert.doesNotMatch(goalsMarkup, moved);
+}
+// The collapsed section header still carries the headline result, so the
+// numbers have not simply vanished from this surface.
+assert.match(
+  goalsMarkup,
+  /\$10\.0 immediate exit → \$12\.4 SLP · \$9\.6 proceeds · \$95\.0 floor/,
+);
 assert.doesNotMatch(goalsMarkup, /Maximum discount/);
 assert.doesNotMatch(goalsMarkup, /See .*impact/i);
 
@@ -364,8 +377,9 @@ const checkingMarkup = renderToStaticMarkup(
 );
 assert.match(checkingMarkup, /Section status: Set/);
 assert.match(checkingMarkup, /data-section-status="complete">Set/);
-assert.match(checkingMarkup, /Illustrative SLP/);
-assert.match(checkingMarkup, /Illustrative liquidity/);
+// A refreshing pool no longer draws its own illustrative tiles beside the
+// inputs; the section header keeps carrying the last valid figures.
+assert.doesNotMatch(checkingMarkup, /Illustrative SLP|Illustrative liquidity/);
 
 const infeasibleMarkup = renderToStaticMarkup(
   <DayV3Goals

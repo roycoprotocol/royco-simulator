@@ -56,6 +56,89 @@ function Line({
   );
 }
 
+
+/**
+ * The whole question in one picture: two discounts against one threshold.
+ *
+ * The section was four columns of basis points, which is the arithmetic but not
+ * the answer. A reader wants to see whether the bar clears the line, and how
+ * much room is left either way, so the hurdle is drawn as a threshold across a
+ * shared scale rather than stated as a fourth number to hold in your head.
+ */
+function DiscountBars({
+  hurdleBps,
+  rows,
+}: {
+  hurdleBps: number;
+  rows: { clears: boolean; label: string; note: string; valueBps: number | null }[];
+}) {
+  const measured = rows
+    .map((row) => row.valueBps)
+    .filter((value): value is number => value !== null);
+  // Leave headroom past whichever is larger so neither the tallest bar nor the
+  // threshold ever sits flush against the edge, where it stops reading.
+  const scale = Math.max(hurdleBps, ...measured, 1) * 1.18;
+  const hurdleLeft = (hurdleBps / scale) * 100;
+
+  return (
+    <div className="flex flex-col gap-2.5">
+      <div className="relative flex flex-col gap-2.5">
+        {rows.map((row) => (
+          <div className="flex flex-col gap-1" key={row.label}>
+            <span className="flex items-baseline justify-between gap-3">
+              <span className="text-[10.5px] font-medium text-[var(--secondary)]">
+                {row.label}
+              </span>
+              <span className="font-mono text-[11px] font-semibold tabular-nums">
+                {row.valueBps === null
+                  ? "—"
+                  : `${row.valueBps.toFixed(0)} bps`}
+              </span>
+            </span>
+            <span
+              aria-hidden="true"
+              className="relative block h-3 overflow-hidden rounded-full bg-[var(--foundation)]"
+            >
+              <span
+                className="absolute inset-y-0 left-0 rounded-full"
+                style={{
+                  background: row.clears
+                    ? "var(--theme-green)"
+                    : "color-mix(in srgb, var(--theme-gold) 70%, transparent)",
+                  width: `${Math.min(100, ((row.valueBps ?? 0) / scale) * 100)}%`,
+                }}
+              />
+            </span>
+            <span className="text-[9.5px] leading-snug text-[var(--tertiary)]">
+              {row.note}
+            </span>
+          </div>
+        ))}
+
+        {/* One threshold across both bars, so the comparison is spatial. */}
+        <span
+          aria-hidden="true"
+          className="pointer-events-none absolute inset-y-0"
+          style={{ left: `${Math.min(99, hurdleLeft)}%` }}
+        >
+          <span className="absolute inset-y-0 block w-px bg-[var(--foreground)] opacity-45" />
+        </span>
+      </div>
+
+      <div className="flex items-center gap-2 text-[9.5px] text-[var(--tertiary)]">
+        <span
+          aria-hidden="true"
+          className="inline-block h-3 w-px bg-[var(--foreground)] opacity-45"
+        />
+        <span>
+          The {hurdleBps.toFixed(0)} bps this desk needs. A bar past the line is
+          a refill worth doing.
+        </span>
+      </div>
+    </div>
+  );
+}
+
 /**
  * Does this design work for arbitrageurs?
  *
@@ -223,23 +306,28 @@ export default function DayV3RestockCheck({
             </div>
 
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              <section className="rounded-lg border border-[var(--border-subtle)] bg-[var(--background)] px-3 py-2">
-                <h4 className="border-b border-[var(--border-subtle)] pb-1.5 text-[9.5px] font-semibold uppercase tracking-[0.11em] text-[var(--tertiary)]">
+              <section className="rounded-lg border border-[var(--border-subtle)] bg-[var(--background)] px-3 py-2.5">
+                <h4 className="mb-2.5 border-b border-[var(--border-subtle)] pb-1.5 text-[9.5px] font-semibold uppercase tracking-[0.11em] text-[var(--tertiary)]">
                   What the desk is paid
                 </h4>
-                <Line
-                  label="Worst-case Senior discount"
-                  note={`the deepest this design permits, from ${worstCaseSource}`}
-                  value={bps(check.worstCaseDiscountBps)}
-                />
-                <Line
-                  label="Discount at the selected sale"
-                  note={
-                    unpriced
-                      ? "priced once the live template sizes the pool"
-                      : `${dollars(selectedSalePer100)} of every $100 Senior, sold at once`
-                  }
-                  value={bps(check.selectedDiscountBps)}
+                <DiscountBars
+                  hurdleBps={hurdle.hurdleBps}
+                  rows={[
+                    {
+                      clears: (check.worstCaseMarginBps ?? -1) >= 0,
+                      label: "Worst-case Senior discount",
+                      note: `the deepest this design permits, from ${worstCaseSource}`,
+                      valueBps: check.worstCaseDiscountBps,
+                    },
+                    {
+                      clears: (check.selectedMarginBps ?? -1) >= 0,
+                      label: "Discount at the selected sale",
+                      note: unpriced
+                        ? "priced once the live template sizes the pool"
+                        : `${dollars(selectedSalePer100)} of every $100 Senior, sold at once`,
+                      valueBps: check.selectedDiscountBps,
+                    },
+                  ]}
                 />
               </section>
 

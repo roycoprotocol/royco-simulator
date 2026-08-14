@@ -1241,21 +1241,6 @@ export default function DayV3Summary({
   const simulationSourceComplete = sourceApyPct !== null;
   const simulationCurveComplete = startingCurveIssues.length === 0;
   const yieldSplitVisible = protectionEnabled || exitEnabled;
-  type ActiveSectionState = "set" | "missing";
-  const activeSectionStates: ActiveSectionState[] = [
-    simulationSourceComplete ? "set" : "missing",
-    advancedProtectionReady ? "set" : "missing",
-    advancedExitComplete ? "set" : "missing",
-    ...(yieldSplitVisible
-      ? ([simulationCurveComplete ? "set" : "missing"] as const)
-      : []),
-  ];
-  const completedSectionCount = activeSectionStates.filter(
-    (state) => state === "set",
-  ).length;
-  const missingSectionCount = activeSectionStates.filter(
-    (state) => state === "missing",
-  ).length;
   const inputSteps = [
     {
       complete: simulationSourceComplete,
@@ -1315,25 +1300,6 @@ export default function DayV3Summary({
               Choose the source, protection, and exit; then set the yield split for the active tranches.
             </p>
           </div>
-        </div>
-
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-t border-[var(--border-subtle)] pt-3">
-          <strong className="font-mono text-[11.5px] tabular-nums text-[var(--secondary)]">
-            {completedSectionCount} of {activeSectionStates.length} answers provided
-          </strong>
-          {missingSectionCount > 0 ? (
-            <span className="font-mono text-[11px] tabular-nums text-[var(--red-emphasis)]">
-              {missingSectionCount} missing
-            </span>
-          ) : null}
-          <span aria-hidden="true" className="flex min-w-24 flex-1 gap-1.5 sm:max-w-36">
-            {activeSectionStates.map((state, index) => (
-              <span
-                className={`h-1.5 flex-1 rounded-full ${state === "set" ? "bg-[var(--theme-green)]" : "bg-[var(--border-subtle)]"}`}
-                key={index}
-              />
-            ))}
-          </span>
         </div>
 
         <DayV3GroupAccordion defaultOpenId={defaultOpenInputId}>

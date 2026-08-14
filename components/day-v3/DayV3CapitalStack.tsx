@@ -192,7 +192,7 @@ function DayV3CapitalStack({
       floorRatio: per100(floor.jt),
       description:
         coverage > 0
-          ? `First-loss capital; ${pct(targetUtilization)} opening target includes headroom above the 100%-utilized requirement`
+          ? `First-loss capital; meets ${pct(coverage)} Minimum Coverage, and the ${pct(targetUtilization)} opening target adds headroom above the 100%-utilized requirement`
           : "No first-loss protection",
       funded: coverage > 0,
       fill: "var(--theme-brown)",
