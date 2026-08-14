@@ -2042,11 +2042,11 @@ export default function DayV3Summary({
             {customSource ? (
               <DayV3Disclosure
                 className="border-t border-[var(--border-subtle)] pt-3"
-                description="Optional · adds recovery evidence and a historical backtest"
+                description="Adds recovery evidence and a historical backtest"
                 summary={
                   draftMarket
                     ? `Historical data · ${draftMarket.series.length.toLocaleString("en-US")} observations`
-                    : "Historical data"
+                    : "Historical data · optional"
                 }
                 variant="inline"
               >
