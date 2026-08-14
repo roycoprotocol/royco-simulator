@@ -151,11 +151,13 @@ export default function DayV3Goals({
   onRecoveryMode,
   onResetExit,
   onResetProtection,
+  onSwapFeeBps,
   protection,
   quoteAssetLabel,
   quoteAssetYieldPct,
   recoveryDays,
   recoveryMode,
+  swapFeeBps,
 }: {
   drawdownPct: MaybeNumber;
   exit: DayV3ExitView;
@@ -177,11 +179,14 @@ export default function DayV3Goals({
   onRecoveryMode: (value: "none" | "window") => void;
   onResetExit: () => void;
   onResetProtection: () => void;
+  onSwapFeeBps: (value: MaybeNumber) => void;
   protection: DayV3ProtectionView;
   quoteAssetLabel: string;
   quoteAssetYieldPct: MaybeNumber;
   recoveryDays: MaybeNumber;
   recoveryMode: "none" | "window" | null;
+  /** The issuer's own pool fee. `null` inherits the live template's. */
+  swapFeeBps: MaybeNumber;
 }) {
   const inputOrigin = (origin: DayV3VisibleOrigin | undefined) =>
     origin ?? "your-answer";
@@ -534,7 +539,9 @@ export default function DayV3Goals({
             <DayV3QuoteAsset
               label={quoteAssetLabel}
               onLabel={onQuoteAssetLabel}
+              onSwapFeeBps={onSwapFeeBps}
               onYieldPct={onQuoteAssetYieldPct}
+              swapFeeBps={swapFeeBps}
               yieldOrigin={inputOrigin(inputOrigins.quoteAsset)}
               yieldPct={quoteAssetYieldPct}
             />

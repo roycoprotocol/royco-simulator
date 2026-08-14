@@ -16,6 +16,12 @@ export interface DayV3UrlState extends DayV3GoalDraft {
   quoteAssetLabel: string | null;
   /** The issuer's answer for what that asset earns while the SLP holds it. */
   quoteAssetYieldPct: number | null;
+  /**
+   * The pool's trading fee. `null` is the honest default: it means the live
+   * template's own fee decides, and the market's declared fee stands in until
+   * that template resolves. A number here is the issuer's own fee policy.
+   */
+  swapFeeBps: number | null;
   /** An outside desk's annual cost of capital, for the pool-refill check. */
   marketMakerCostOfCapitalPct: number | null;
   /** Days from buying discounted Senior to receiving the underlying at NAV. */
@@ -377,6 +383,10 @@ export function readDayV3UrlState(search: string): DayV3UrlState {
     sourceApyPct: finite(params.get("apy"), 0, 30),
     quoteAssetLabel: label(params.get("quote")),
     quoteAssetYieldPct: finite(params.get("quoteApy"), 0, 30),
+    // `previewSecondarySell` throws outside 0–10000 bps, inside a render-time
+    // memo with no error boundary above it, so this bound is what keeps a
+    // hand-edited link from crashing the page rather than a cosmetic range.
+    swapFeeBps: finite(params.get("fee"), 0.01, 10_000),
     marketMakerCostOfCapitalPct: finite(params.get("mmCost"), 0, 100),
     redemptionDays: integer(params.get("mmDays"), 0, 365),
     protectedDrawdownPct,
@@ -461,6 +471,10 @@ export function buildDayV3Query(state: DayV3UrlWriteState): string {
   if (state.immediateExitSharePct !== 0) {
     if (state.quoteAssetLabel) params.set("quote", state.quoteAssetLabel);
     setNumber("quoteApy", state.quoteAssetYieldPct);
+    // Only a hand-set fee is written. A null fee means the live template's own
+    // fee decides, and serializing a placeholder for it would turn an inherited
+    // policy into a stated one the moment a link was shared.
+    setNumber("fee", state.swapFeeBps);
     setNumber("mmCost", state.marketMakerCostOfCapitalPct);
     setWholeDays("mmDays", state.redemptionDays);
   }

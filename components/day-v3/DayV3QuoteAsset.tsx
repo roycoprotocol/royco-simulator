@@ -32,17 +32,26 @@ const QUOTE_ASSET_SUGGESTIONS = [
 export default function DayV3QuoteAsset({
   label,
   onLabel,
+  onSwapFeeBps,
   onYieldPct,
+  swapFeeBps,
   yieldOrigin = "your-answer",
   yieldPct,
 }: {
   label: string;
   onLabel: (value: string) => void;
+  onSwapFeeBps: (value: number | null) => void;
   onYieldPct: (value: number | null) => void;
+  swapFeeBps: number | null;
   yieldOrigin?: DayV3VisibleOrigin;
   yieldPct: number | null;
 }) {
   const [draft, setDraft] = useState({ text: label, source: label });
+  // An empty field is not the reader's answer and it is not the template's
+  // either until one resolves, so it is labelled for what it is: the fee the
+  // model is assuming. A hand-set fee is always the issuer's own override.
+  const feeOrigin: DayV3VisibleOrigin =
+    swapFeeBps === null ? "model-assumption" : "manual-override";
   // A parent reset (switching source, clearing the exit) replaces the label.
   // React's adjusted-state pattern re-seeds the draft without a second render.
   if (!Object.is(draft.source, label)) {
@@ -130,6 +139,41 @@ export default function DayV3QuoteAsset({
           suffix="% a year"
           value={yieldPct}
         />
+
+        <div className="flex min-w-0 flex-col gap-2">
+          <DayV3NumberField
+            className="bg-[var(--foundation)]"
+            label="What swap fee should the pool charge on a Senior sale?"
+            max={10000}
+            min={0.01}
+            note="Leave this empty to charge whatever the live template charges, or the market's declared fee until that template resolves. A fee set here prices every quote on this page and withholds the canonical pool result, which was solved at the template's own fee. From 100 bps up the fee alone reaches the 1% near-NAV reference, so no positive trade can meet it and the exit-cost model stops reporting a near-NAV sale. At 10000 bps every quote fills nothing and that model reads as no secondary pool route even though the SLP is funded."
+            onChange={onSwapFeeBps}
+            origin={feeOrigin}
+            placeholder="Use the live fee"
+            presets={[
+              { label: "1 bps", value: 1 },
+              { label: "5 bps", value: 5 },
+              { label: "10 bps", value: 10 },
+              { label: "30 bps", value: 30 },
+              { label: "100 bps", value: 100 },
+            ]}
+            step={1}
+            suffix="bps"
+            value={swapFeeBps}
+          />
+          {/* Outside the field: it clears the reader's answer rather than
+              choosing another one, so it does not belong among the presets. */}
+          <div className="flex flex-wrap gap-1.5">
+            <DayV3Button
+              aria-pressed={swapFeeBps === null}
+              onClick={() => onSwapFeeBps(null)}
+              size="sm"
+              variant={swapFeeBps === null ? "primary" : "quiet"}
+            >
+              Use the live fee
+            </DayV3Button>
+          </div>
+        </div>
       </div>
     </div>
   );

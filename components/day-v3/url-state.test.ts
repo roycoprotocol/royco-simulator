@@ -135,6 +135,7 @@ const query = buildDayV3Query({
   sourceApyPct: 8.25,
   quoteAssetLabel: "sUSDS",
   quoteAssetYieldPct: 4.5,
+  swapFeeBps: 30,
   marketMakerCostOfCapitalPct: 12,
   redemptionDays: 7,
   protectedDrawdownPct: 18,
@@ -190,6 +191,7 @@ assert.deepEqual(
     "convert",
     "convertCost",
     "exit",
+    "fee",
     "jr90",
     "m",
     "mmCost",
@@ -496,6 +498,30 @@ assert.equal(
   24,
 );
 assert.equal(readDayV3UrlState("quoteApy=-1&mmCost=101&mmDays=400").quoteAssetYieldPct, null);
+
+// The pool fee's bounds are what keep `previewSecondarySell` from throwing
+// INVALID_SWAP_FEE inside a render-time memo, so they are asserted at the edge
+// rather than assumed. Zero is out of range: a zero-fee pool is not a design
+// this simulator offers, and 0.01 is the canonical service's own floor.
+assert.equal(readDayV3UrlState("fee=30").swapFeeBps, 30);
+assert.equal(readDayV3UrlState("fee=0").swapFeeBps, null);
+assert.equal(readDayV3UrlState("fee=0.01").swapFeeBps, 0.01);
+assert.equal(readDayV3UrlState("fee=10000").swapFeeBps, 10_000);
+assert.equal(readDayV3UrlState("fee=10001").swapFeeBps, null);
+assert.equal(readDayV3UrlState("fee=-5").swapFeeBps, null);
+assert.equal(readDayV3UrlState("fee=abc").swapFeeBps, null);
+assert.equal(readDayV3UrlState("").swapFeeBps, null);
+assert.equal(
+  buildDayV3Query({ ...reported, swapFeeBps: null }).includes("fee="),
+  false,
+  "an inherited fee is never written as a stated one",
+);
+assert.equal(
+  new URLSearchParams(buildDayV3Query({ ...reported, swapFeeBps: 0.01 })).get(
+    "fee",
+  ),
+  "0.01",
+);
 assert.equal(readDayV3UrlState("mmCost=101").marketMakerCostOfCapitalPct, null);
 assert.equal(readDayV3UrlState("mmDays=400").redemptionDays, null);
 assert.equal(readDayV3UrlState("mmDays=7.5").redemptionDays, null);
@@ -506,7 +532,7 @@ const noExitQuery = buildDayV3Query({
   ...readDayV3UrlState(query),
   immediateExitSharePct: 0,
 });
-for (const dropped of ["quote", "quoteApy", "mmCost", "mmDays"]) {
+for (const dropped of ["quote", "quoteApy", "fee", "mmCost", "mmDays"]) {
   assert.equal(
     new URLSearchParams(noExitQuery).has(dropped),
     false,
