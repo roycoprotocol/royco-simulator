@@ -91,23 +91,25 @@ export default function DayV3QuoteAsset({
           type="text"
           value={draft.text}
         />
-        <span className="flex flex-wrap gap-1.5 pt-0.5">
-          {QUOTE_ASSET_SUGGESTIONS.map((suggestion) => (
-            <DayV3Button
-              aria-pressed={label === suggestion}
-              key={suggestion}
-              onClick={() => {
-                setDraft({ text: suggestion, source: suggestion });
-                onLabel(suggestion);
-              }}
-              size="sm"
-              variant={label === suggestion ? "primary" : "quiet"}
-            >
-              {suggestion}
-            </DayV3Button>
-          ))}
-        </span>
       </label>
+      {/* Outside the label: a button nested in one steals the label's click and
+          ends up focusing the text field instead of choosing the asset. */}
+      <div aria-label="Common quote assets" className="flex flex-wrap gap-1.5">
+        {QUOTE_ASSET_SUGGESTIONS.map((suggestion) => (
+          <DayV3Button
+            aria-pressed={label === suggestion}
+            key={suggestion}
+            onClick={() => {
+              setDraft({ text: suggestion, source: suggestion });
+              onLabel(suggestion);
+            }}
+            size="sm"
+            variant={label === suggestion ? "primary" : "quiet"}
+          >
+            {suggestion}
+          </DayV3Button>
+        ))}
+      </div>
 
       <DayV3NumberField
         className="bg-[var(--foundation)]"

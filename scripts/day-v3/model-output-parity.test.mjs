@@ -12,6 +12,7 @@ const modeModel = read("lib/day-v3/mode-model.ts");
 const modelState = read("lib/day-v3/model-state.ts");
 const yieldCurves = read("lib/day-v3/yield-curves.ts");
 const backtest = read("components/day-v3/DayV3Backtest.tsx");
+const modelGroup = read("components/day-v3/DayV3ModelGroup.tsx");
 
 // One workflow must retain every model that explains how an issuer's four
 // inputs change returns, capital, protection, immediate exits, and history.
@@ -134,8 +135,12 @@ assert.match(
   "Only the two visible target yield shares may remain active",
 );
 
-const protectionGroupStart = goals.indexOf('id="day-v3-protection-inputs"');
-const exitGroupStart = goals.indexOf('id="day-v3-exit-inputs"');
+const protectionGroupStart = goals.indexOf(
+  "Should Senior have first-loss protection?",
+);
+const exitGroupStart = goals.indexOf(
+  "Should Senior have an immediate pool exit?",
+);
 assert.ok(
   protectionGroupStart >= 0 && exitGroupStart > protectionGroupStart,
   "Senior protection must precede Senior exit",
@@ -157,16 +162,36 @@ assert.match(
   /Should Senior have an immediate pool exit\?/,
   "The immediate-exit choice must stay inside Senior exit",
 );
-for (const marker of [
+// The guard here used to ban the four refill-assumption labels outright. What
+// it was actually protecting is that no refill input may gate a result: the
+// removed block fed the canonical pool request and withheld pool sizing until
+// every operational fact was answered. The simulator now asks a market maker's
+// cost of capital and redemption wait so a reader can see whether the discount
+// their design creates is worth arbitraging, and those answers reach only the
+// local scenario check. Assert that boundary, not the absence of the words.
+assert.match(
+  exitGroup,
+  /<DayV3RestockCheck[\s\S]*view=\{restock\}/,
+  "Senior exit must show whether a refill trade pays at the terms on screen",
+);
+assert.doesNotMatch(
+  goals,
   /Refill feasibility assumptions/,
-  /Senior redemption wait/,
-  /Underlying-to-exit conversion time/,
-  /Stressed conversion cost per \$100/,
+  "The blocking deployment-facts form must not return",
+);
+assert.doesNotMatch(
+  summary,
+  /marketMakerCostOfCapitalPct[\s\S]{0,400}poolDesignGoals|poolDesignGoals[\s\S]{0,400}marketMakerCostOfCapitalPct/,
+  "Refill assumptions must never enter the canonical pool-design request",
+);
+for (const gate of [
+  /advancedExitComplete =\s*exitInputReadiness\.complete/,
+  /const exitInputReadiness = dayV3ExitInputReadiness\(\{\s*enabled: !exitDisabled,\s*exitSharePct: immediateExitSharePct,\s*minimumProceedsPer100,\s*\}\)/,
 ]) {
-  assert.doesNotMatch(
-    exitGroup,
-    marker,
-    "Deployment-only refill assumptions must not block the simulator",
+  assert.match(
+    summary,
+    gate,
+    "Exit readiness must stay the two visible goals, with no refill inputs added",
   );
 }
 
@@ -296,6 +321,44 @@ for (const marker of [
 ]) {
   assert.ok(exitCost.includes(marker), `Atomic exit model lost: ${marker}`);
 }
+
+
+// The pool's quote side is an issuer answer now, not a flat zero. It has to
+// reach the accountant run *and* the backtest, or the projection and the
+// history would price the same pool with two different exit assets.
+assert.match(
+  summary,
+  /stableYield: modeledQuoteAssetYieldPct \/ 100/,
+  "The quote asset's yield must feed the shared accountant's pool carry",
+);
+assert.match(
+  summary,
+  /quoteAssetYieldPct=\{inputs\.quoteAssetYieldPct\}/,
+  "The historical backtest must run on the same quote asset as the projection",
+);
+assert.match(
+  backtest,
+  /\.\.\.market\.defaults, stableYield: quoteAssetYieldInput \/ 100/,
+  "The backtest must not fall back to the market template's own exit-asset yield",
+);
+
+// A tranche the issuer switched off has no model to show, so its result
+// section is inert rather than an accordion over an empty market.
+for (const [marker, name] of [
+  [/disabledReason=\{\s*protectionDisabled/, "Junior"],
+  [/disabledReason=\{\s*exitDisabled/, "SLP"],
+]) {
+  assert.match(
+    summary,
+    marker,
+    `The ${name} result section must grey out when its tranche is off`,
+  );
+}
+assert.match(
+  modelGroup,
+  /const disabled = Boolean\(disabledReason\);[\s\S]*if \(disabled\) return;/,
+  "A disabled model section must not open",
+);
 
 console.log(
   `Day V3 unified model architecture: PASS (${modelFamilies.length}/${modelFamilies.length} shared model families)`,

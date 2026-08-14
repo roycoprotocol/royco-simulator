@@ -90,7 +90,6 @@ import {
 // `runDayTargetScenario`, the same target-scenario entry point the interactive
 // simulator uses, so v2 and /day-sim can never disagree.
 const pct = (value: number) => `${(value * 100).toFixed(1)}%`;
-const dollars = (value: number) => `$${value.toFixed(1)}`;
 const DAY_TARGET_UTILIZATION = 0.9;
 const CUSTOM_SOURCE_ID = "custom";
 /** A non-accruing stablecoin, so the model opens where it always has: at 0%. */
@@ -1297,8 +1296,6 @@ export default function DayV3Summary({
             docs="tranching"
             docsLabel="How tranching works"
             id="day-v3-source-inputs"
-            impactHref="#day-v3-return-models"
-            impactLabel="See return impact"
             index={1}
             key="yield-source"
             status={
@@ -1667,12 +1664,15 @@ export default function DayV3Summary({
                 </DayV3ModelGroup>
 
                 <DayV3ModelGroup
+                  disabledReason={
+                    exitDisabled
+                      ? "Immediate exit is off. No SLP is funded, so there is no pool, no execution curve, and no refill economics to model."
+                      : null
+                  }
                   id="day-v3-exit-models"
                   index={3}
                   preview={
-                    exitDisabled
-                      ? "Immediate pool exit is off · no SLP or execution curve."
-                      : exitView.status === "missing-goal"
+                    exitView.status === "missing-goal"
                         ? "Complete the required input highlighted above to model capacity, proceeds, and pool depth."
                         : exitView.status === "infeasible"
                           ? "No feasible pool at the current exit size, payout floor, timing, and external spread assumption."

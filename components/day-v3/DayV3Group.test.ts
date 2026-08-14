@@ -13,22 +13,29 @@ assert.equal(
   "a closed accordion opens the requested section",
 );
 
-const impactProps: ComponentProps<typeof DayV3Group> = {
+const headerProps: ComponentProps<typeof DayV3Group> = {
   children: createElement("p", null, "Inputs"),
   collapsible: true,
-  impactHref: "#day-v3-risk-models",
-  impactLabel: "See loss impact",
+  docs: "coverage",
+  docsLabel: "How Junior protects Senior",
   index: 2,
   status: { label: "Example", tone: "review" },
   subtitle: "Choose a loss",
   title: "Senior protection",
 };
-const impactMarkup = renderToStaticMarkup(
-  createElement(DayV3Group, impactProps),
+const headerMarkup = renderToStaticMarkup(
+  createElement(DayV3Group, headerProps),
 );
-assert.match(impactMarkup, /Section status: Example/);
-assert.match(impactMarkup, /href="#day-v3-risk-models"/);
-assert.match(impactMarkup, /See loss impact/);
+assert.match(headerMarkup, /Section status: Example/);
+// The header carries the choice and nothing else. Jump links to the model
+// sections lived here and were pure noise beside every heading.
+assert.doesNotMatch(headerMarkup, /See loss impact|See impact|day-v3-risk-models/);
+// Reference material reads as a footer, after the controls it explains.
+const docsIndex = headerMarkup.indexOf("How Junior protects Senior");
+assert.ok(
+  docsIndex > headerMarkup.indexOf(">Inputs<"),
+  "the docs link must follow the section body, not precede it",
+);
 assert.equal(
   nextDayV3AccordionOpenId("source", "protection"),
   "protection",

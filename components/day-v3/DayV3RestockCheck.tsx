@@ -85,6 +85,7 @@ export default function DayV3RestockCheck({
     check.status !== "unavailable";
   const pays = resolved && check.status === "profitable";
   const everPays = resolved && check.breakEvenSalePer100 !== null;
+  const unpriced = resolved && check.status === "no-promised-sale";
 
   return (
     <section
@@ -184,16 +185,20 @@ export default function DayV3RestockCheck({
             >
               {pays
                 ? `Refill pays by ${bps(check.promisedMarginBps)} after the promised sale`
-                : everPays
-                  ? `Refill does not pay until ${dollars(check.breakEvenSalePer100)} of every $100 Senior has been sold`
-                  : "No sale this pool can absorb pays for a refill"}
+                : !everPays
+                  ? "No sale this pool can absorb pays for a refill"
+                  : unpriced
+                    ? `Refill pays once ${dollars(check.breakEvenSalePer100)} of every $100 Senior has been sold`
+                    : `Refill does not pay until ${dollars(check.breakEvenSalePer100)} of every $100 Senior has been sold`}
             </strong>
             <p className="mt-1 text-[10.5px] leading-relaxed text-[var(--secondary)]">
               {pays
                 ? `Selling ${dollars(promisedSalePer100)} of every $100 Senior leaves the pool ${bps(check.promisedDiscountBps)} below NAV, against a ${bps(hurdle.hurdleBps)} hurdle. A desk on these terms is paid to buy that Senior and redeem it, which is what puts the pool back and restores capacity for the next seller.`
-                : everPays
-                  ? `The promised ${dollars(promisedSalePer100)} sale only moves the pool ${bps(check.promisedDiscountBps)} below NAV, short of the ${bps(hurdle.hurdleBps)} hurdle. The pool has to be drawn deeper before a refill is worth doing, so capacity does not come back on its own after a sale of the size you promised.`
-                  : `Even fully drained the pool is only ${bps(check.worstCaseDiscountBps)} below NAV, against a ${bps(hurdle.hurdleBps)} hurdle. Nothing brings this desk in. Shorten the redemption wait, allow a deeper payout floor, or expect the SLP to carry the position rather than see it arbitraged back.`}
+                : !everPays
+                  ? `Even fully drained the pool is only ${bps(check.worstCaseDiscountBps)} below NAV, against a ${bps(hurdle.hurdleBps)} hurdle. Nothing brings this desk in. Shorten the redemption wait, allow a deeper payout floor, or expect the SLP to carry the position rather than see it arbitraged back.`
+                  : unpriced
+                    ? `Choose an exit amount above to see whether the sale you promise reaches that depth on its own.`
+                    : `The promised ${dollars(promisedSalePer100)} sale only moves the pool ${bps(check.promisedDiscountBps)} below NAV, short of the ${bps(hurdle.hurdleBps)} hurdle. The pool has to be drawn deeper before a refill is worth doing, so capacity does not come back on its own after a sale of the size you promised.`}
             </p>
           </div>
 
@@ -204,7 +209,11 @@ export default function DayV3RestockCheck({
               </h5>
               <Line
                 label="Discount after the promised sale"
-                note={`the pool's own move on ${dollars(promisedSalePer100)} of every $100 Senior`}
+                note={
+                  unpriced
+                    ? "choose an exit amount above"
+                    : `the pool's own move on ${dollars(promisedSalePer100)} of every $100 Senior`
+                }
                 value={bps(check.promisedDiscountBps)}
               />
               <Line

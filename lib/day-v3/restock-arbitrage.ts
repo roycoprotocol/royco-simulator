@@ -109,7 +109,16 @@ export interface DayV3RestockCheckInputs {
 }
 
 export interface DayV3RestockCheck {
-  status: "unavailable" | "profitable" | "unprofitable";
+  /**
+   * `no-promised-sale` is distinct from `unprofitable`: with no exit amount
+   * chosen there is no trade to price yet, and reporting that as a failed
+   * refill would be an answer to a question nobody asked.
+   */
+  status:
+    | "unavailable"
+    | "no-promised-sale"
+    | "profitable"
+    | "unprofitable";
   /** Discount reached by the promised sale. */
   promisedDiscountBps: number | null;
   /** Discount at the point the pool can absorb no more — the deepest it goes. */
@@ -187,9 +196,11 @@ export function dayV3RestockCheck(
 
   return {
     status:
-      promisedDiscountBps !== null && promisedDiscountBps >= hurdle.hurdleBps
-        ? "profitable"
-        : "unprofitable",
+      promisedDiscountBps === null
+        ? "no-promised-sale"
+        : promisedDiscountBps >= hurdle.hurdleBps
+          ? "profitable"
+          : "unprofitable",
     promisedDiscountBps,
     worstCaseDiscountBps,
     promisedMarginBps:

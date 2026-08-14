@@ -204,4 +204,27 @@ assert.equal(
   "unavailable",
 );
 
+// With no exit amount chosen there is no trade to price. Reporting that as an
+// unprofitable refill would answer a question the reader has not asked yet.
+const unpriced = dayV3RestockCheck({
+  quoteSell,
+  openingSeniorNAV,
+  capacityNAV,
+  promisedSalePer100: null,
+  hurdle: dayV3RestockHurdle({
+    costOfCapitalPct: 12,
+    redemptionDays: 7,
+    seniorApyPct: 6,
+    swapFeeBps: 10,
+  }),
+});
+assert.equal(unpriced.status, "no-promised-sale");
+assert.equal(unpriced.promisedDiscountBps, null);
+assert.equal(unpriced.promisedMarginBps, null);
+assert.ok(
+  (unpriced.breakEvenSalePer100 ?? 0) > 0,
+  "the depth a refill needs is still answerable without a chosen exit",
+);
+assert.equal(unpriced.worstCaseDiscountBps, short.worstCaseDiscountBps);
+
 console.log("Day V3 restock arbitrage check: PASS");

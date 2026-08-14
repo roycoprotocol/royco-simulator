@@ -30,7 +30,7 @@ assert.match(markup, /Yield split/);
 assert.match(markup, /aria-expanded="false"/);
 assert.match(markup, /Jr 13\.0% · SLP 5\.0% at 90\.0% utilization/);
 assert.match(markup, /Section status: Set/);
-assert.match(markup, /See return impact/);
+assert.doesNotMatch(markup, /See return impact/);
 assert.match(markup, /Junior yield share/);
 assert.match(markup, /SLP yield share/);
 assert.match(markup, /Jr share at 90% utilization/);
@@ -195,7 +195,7 @@ const unresolvedPoolSlpMarkup = renderToStaticMarkup(
 );
 assert.match(unresolvedPoolSlpMarkup, /Jr 13\.0% · SLP 5\.0%/);
 assert.match(unresolvedPoolSlpMarkup, /Section status: Set/);
-assert.match(unresolvedPoolSlpMarkup, /SLP APY basis:/);
+assert.match(unresolvedPoolSlpMarkup, /Why the SLP rate is what it is:/);
 assert.doesNotMatch(unresolvedPoolSlpMarkup, /awaiting exit validation/);
 assert.equal(unresolvedPoolSlpMarkup.match(/type="range"/g)?.length, 2);
 

@@ -474,4 +474,44 @@ assert.equal(readDayV3UrlState("redeem=7").entryPointSettlementDays, 7);
 assert.equal(query.includes("settle=7"), true);
 assert.equal(query.includes("redeem="), false);
 
+
+// The quote asset, its yield, and the refill-check terms are modeled inputs:
+// they move SLP carry, the position comparison, and the refill verdict, so a
+// link that dropped them would describe a different market.
+const quote = readDayV3UrlState(query);
+assert.equal(quote.quoteAssetLabel, "sUSDS");
+assert.equal(quote.quoteAssetYieldPct, 4.5);
+assert.equal(quote.marketMakerCostOfCapitalPct, 12);
+assert.equal(quote.redemptionDays, 7);
+
+// Free text is the only string this contract carries and it is rendered back
+// into the page, so it is bounded and stripped rather than trusted.
+assert.equal(
+  readDayV3UrlState("quote=%3Cscript%3Ealert(1)%3C%2Fscript%3E").quoteAssetLabel,
+  "scriptalert1script",
+);
+assert.equal(readDayV3UrlState("quote=%20%20").quoteAssetLabel, null);
+assert.equal(
+  readDayV3UrlState(`quote=${"A".repeat(80)}`).quoteAssetLabel?.length,
+  24,
+);
+assert.equal(readDayV3UrlState("quoteApy=-1&mmCost=101&mmDays=400").quoteAssetYieldPct, null);
+assert.equal(readDayV3UrlState("mmCost=101").marketMakerCostOfCapitalPct, null);
+assert.equal(readDayV3UrlState("mmDays=400").redemptionDays, null);
+assert.equal(readDayV3UrlState("mmDays=7.5").redemptionDays, null);
+
+// With no immediate exit there is no pool, no quote side, and nothing to
+// arbitrage, so none of it belongs in the link.
+const noExitQuery = buildDayV3Query({
+  ...readDayV3UrlState(query),
+  immediateExitSharePct: 0,
+});
+for (const dropped of ["quote", "quoteApy", "mmCost", "mmDays"]) {
+  assert.equal(
+    new URLSearchParams(noExitQuery).has(dropped),
+    false,
+    `${dropped} must not survive an exit-off design`,
+  );
+}
+
 console.log("Day V3 independent goal URL state: PASS");
