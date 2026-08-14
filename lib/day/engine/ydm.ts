@@ -46,44 +46,6 @@ export function ydmShare(
   return clamp(y, 0, 1);
 }
 
-// Drift the kink value Y_T toward wherever utilization is pushing it. Exp-based
-// so Y_T stays strictly positive; clamped to the configured bounds. No-op for
-// static curves. Mirrors AdaptiveCurveYDM: Y_T *= exp(speed * normDelta * dt).
-export function adaptYTargetWithAverage(
-  cfg: YDMConfig,
-  yTarget: number,
-  utilization: number,
-  dtSec: number,
-  targetUtil: number,
-): { next: number; average: number } {
-  if (cfg.mode !== "adaptive" || dtSec <= 0) {
-    return { next: yTarget, average: yTarget };
-  }
-  // Same U<=100% cap as ydmShare so drift and curve output share one effective
-  // utilization (the contract derives both from a single WAD-capped value).
-  const u = utilization > 1 ? 1 : utilization;
-  let delta: number;
-  if (u >= targetUtil) delta = (u - targetUtil) / (1 - targetUtil);
-  else delta = (u - targetUtil) / targetUtil;
-  delta = clamp(delta, -1, 1);
-  const speed = (cfg.maxAdaptSpeedPerYear ?? 1.0) / YEAR_SEC;
-  const linearAdaptation = speed * delta * dtSec;
-  const lo = cfg.minYTarget ?? 1e-4;
-  const hi = cfg.maxYTarget ?? 1.0;
-  const next = clamp(yTarget * Math.exp(linearAdaptation), lo, hi);
-  const midpoint = clamp(yTarget * Math.exp(linearAdaptation / 2), lo, hi);
-  // BaseAdaptiveCurveYDM uses a Simpson-like endpoint/midpoint average for the
-  // continuously adapting curve over the elapsed checkpoint.
-  const average = (yTarget + next + 2 * midpoint) / 4;
-  return { next, average };
-}
-
-export function adaptYTarget(
-  cfg: YDMConfig,
-  yTarget: number,
-  utilization: number,
-  dtSec: number,
-  targetUtil: number,
-): number {
-  return adaptYTargetWithAverage(cfg, yTarget, utilization, dtSec, targetUtil).next;
-}
+// Adaptive target evolution is intentionally not exposed through a floating-
+// point helper. Production callers use `adaptYTargetWadWithAverage` in
+// engine.ts, whose BigInt implementation mirrors Solady expWad to the wei.

@@ -40,8 +40,9 @@ export type Op =
 
 export interface StepInput {
   dtSec: number;
-  stReturn: number; // ST underlying return over the step (e.g. apy*dt, or a shock)
-  jtReturn: number; // JT underlying return over the step
+  stReturn: number; // coinvested collateral return over the step
+  /** @deprecated v1.1.0 has one collateral return; retained for adapters. */
+  jtReturn: number;
   op?: Op;
   label?: string;
 }
@@ -77,13 +78,13 @@ export class Sim {
 
   step(input: StepInput) {
     if (input.dtSec < 0) throw new Error("INVALID_STEP: elapsed time cannot be negative");
-    if (input.stReturn < -1 || input.jtReturn < -1) {
-      throw new Error("INVALID_STEP: a tranche raw NAV cannot fall below zero");
+    if (input.stReturn < -1) {
+      throw new Error("INVALID_STEP: collateral NAV cannot fall below zero");
     }
     const s = this._state;
     s.t += BigInt(Math.round(input.dtSec));
     const newStRaw = applyReturn(s.stRawNAV, input.stReturn);
-    const newJtRaw = applyReturn(s.jtRawNAV, input.jtReturn);
+    const newJtRaw = applyReturn(s.jtRawNAV, input.stReturn);
 
     accruePoolCarry(s, this.cfg, input.dtSec);
     const ex = reconcile(s, this.cfg, newStRaw, newJtRaw);
@@ -121,15 +122,15 @@ function applyOp(state: LiveState, cfg: MarketConfig, op: Op) {
 export function defaultConfig(over: Partial<MarketConfig> = {}): MarketConfig {
   const cfg: MarketConfig = {
     coverage: 0.2,
-    beta: 1, // compatibility field; current Day accounting uses one collateral NAV
+    beta: 1, // deprecated compatibility field; v1.1.0 is always coinvested
     targetUtilization: 0.9,
     liquidationUtilization: 1.5,
     fixedTermDurationSec: 30 * 24 * 3600,
     fixedTermGracePeriodSec: 0,
     stProtocolFee: 0,
     jtProtocolFee: 0,
-    yieldShareProtocolFee: 0.45,
-    ltYieldShareProtocolFee: 0.45,
+    yieldShareProtocolFee: 0,
+    ltYieldShareProtocolFee: 0,
     riskYDM: { mode: "static", y0: 0.35, yTarget: 0.35, y100: 0.35 },
     maxJTYieldShare: 0.35,
     minLiquidity: 0.12,
@@ -139,12 +140,18 @@ export function defaultConfig(over: Partial<MarketConfig> = {}): MarketConfig {
     stableYield: 0.035,
     swapFeeBps: 10,
     poolTurnoverPerYear: 8,
-    eclpBandWidth: 0.02,
+    eclpBandWidth: 0.1,
     reinvestLiquidityPremium: true,
-    stSelfLiquidationBonus: 0.01,
+    stSelfLiquidationBonus: 0.02,
     dustTolerance: 1e-6,
     ...over,
   };
+  // v1.1.0 removed the split-collateral beta model. Normalize legacy configs
+  // rather than allowing a displayed beta value to imply different math.
+  cfg.beta = 1;
+  if (cfg.fixedTermGracePeriodSec < 0) {
+    throw new Error("INVALID_FIXED_TERM_GRACE: grace cannot be negative");
+  }
   // When a caller replaces a curve but omits the contract cap, derive the
   // least-restrictive cap that preserves every configured curve endpoint.
   if (over.maxJTYieldShare === undefined) {
@@ -160,10 +167,10 @@ export function defaultConfig(over: Partial<MarketConfig> = {}): MarketConfig {
 }
 
 // A year-long monthly accrual at a given APY (split across 12 months).
-export function steadyYear(apy: number, jtBeta: number, stableYield = 0.035): StepInput[] {
+export function steadyYear(apy: number, _jtBeta: number, _stableYield = 0.035): StepInput[] {
+  void _jtBeta;
+  void _stableYield;
   const dt = YEAR_SEC / 12;
   const stR = Math.pow(1 + apy, 1 / 12) - 1;
-  const jtAnnualReturn = jtBeta === 1 ? apy : stableYield;
-  const jtR = Math.pow(1 + jtAnnualReturn, 1 / 12) - 1;
-  return Array.from({ length: 12 }, () => ({ dtSec: dt, stReturn: stR, jtReturn: jtR }));
+  return Array.from({ length: 12 }, () => ({ dtSec: dt, stReturn: stR, jtReturn: stR }));
 }

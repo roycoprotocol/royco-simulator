@@ -63,7 +63,7 @@ const erasedAmount = erasure?.amountNAV ?? 0;
 const navPerIndexPoint = (sim.state.jtShares * first.jtPrice) / 100;
 
 check(
-  'engine emits an exact structured erased amount from the coinvested collateral loss',
+  'engine emits an exact structured erased amount',
   approx(erasedAmount, (senior + junior) * 0.01),
   `amount=${erasedAmount}`,
 );
