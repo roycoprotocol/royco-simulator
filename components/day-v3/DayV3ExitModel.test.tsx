@@ -42,12 +42,14 @@ assert.match(resolvedMarkup, /Selected sale \/ \$100/);
 assert.match(resolvedMarkup, /Modeled capacity \/ \$100/);
 assert.match(resolvedMarkup, /Minimum payout \/ \$100/);
 assert.match(resolvedMarkup, /Lowest modeled payout \/ \$100/);
-assert.match(resolvedMarkup, />\$9\.62</);
-assert.match(resolvedMarkup, />\$12\.40</);
-assert.match(resolvedMarkup, />71\.0%?</);
+assert.match(resolvedMarkup, /Proceeds: \$9\.62 after the live swap fee/);
 assert.match(resolvedMarkup, /Swap fee: 10 bps/);
 assert.match(resolvedMarkup, /Minimum liquidity: 10\.90%/);
 assert.doesNotMatch(resolvedMarkup, /Live policy:/);
+// SLP funding and the refill point are stated once each, in the exit result
+// band and in the arbitrage test. This card does not repeat them.
+assert.doesNotMatch(resolvedMarkup, /SLP required/);
+assert.doesNotMatch(resolvedMarkup, /Refill point|Deploy only/);
 
 const illustrative: DayV3ExitView = {
   ...resolved,
@@ -75,8 +77,7 @@ assert.match(
   /Shows how the selected exit size and payout affect one trade/,
 );
 assert.match(illustrativeMarkup, /Modeled capacity/);
-assert.match(illustrativeMarkup, /after the modeled swap fee/);
-assert.match(illustrativeMarkup, />\$9\.62</);
+assert.match(illustrativeMarkup, /Proceeds: \$9\.62 after the modeled swap fee/);
 assert.doesNotMatch(illustrativeMarkup, />—</);
 
 const unresolved: DayV3ExitView = {
@@ -97,8 +98,7 @@ assert.match(
   unresolvedMarkup,
   /Refreshing the live template and recalculating this model/,
 );
-assert.doesNotMatch(unresolvedMarkup, />\$9\.62</);
-assert.doesNotMatch(unresolvedMarkup, />\$12\.40</);
+assert.doesNotMatch(unresolvedMarkup, /Proceeds:/);
 
 const disabled: DayV3ExitView = {
   ...resolved,

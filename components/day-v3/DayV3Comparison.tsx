@@ -268,23 +268,22 @@ export default function DayV3Comparison({
         {/* Simulate has no control for either share, so it has to say where they
             came from. Otherwise the two premiums are numbers that appear from
             nowhere and the reader cannot tell whether they were chosen. */}
-        <p className="max-w-[76ch] rounded-lg border border-dashed border-[var(--border-subtle)] px-3.5 py-2.5 text-[11px] leading-relaxed text-[var(--secondary)]">
-          {shares.curveOverridden
-            ? "Issuer-edited static yield-share curves. "
-            : "Illustrative V3 yield-share curves. "}
+        {/* Simulate has no control for either share, so it has to say where
+            they came from. Five lines of it, though, pushed the table itself
+            below the fold of its own card. */}
+        <p className="rounded-lg border border-dashed border-[var(--border-subtle)] px-3 py-2 text-[10px] leading-snug text-[var(--secondary)]">
           At the {pct(shares.targetUtilization)} target, Jr receives{" "}
           <strong className="font-mono font-semibold tabular-nums">
             {pct(shares.riskSharePct / 100)}
           </strong>{" "}
-          of Sr yield at {pct(shares.coveragePct / 100)} minimum coverage; SLP
-          receives{" "}
+          of Sr yield at {pct(shares.coveragePct / 100)} coverage; SLP receives{" "}
           <strong className="font-mono font-semibold tabular-nums">
             {pct(shares.liqSharePct / 100)}
           </strong>{" "}
-          at {pct(shares.liquidityPct / 100)} minimum liquidity.{" "}
+          at {pct(shares.liquidityPct / 100)} liquidity.{" "}
           {shares.curveOverridden
-            ? "These anchors drive every model here. RWA deployment must still validate the final registered YDM policy."
-            : "These are visible starting assumptions—not facts supplied by the custom source. Adjust the yield split above."}
+            ? "Issuer-edited curves; deployment still validates the registered YDM policy."
+            : "Illustrative starting curves, not source facts — adjust them in the yield split."}
         </p>
         <Table>
           <TableHeader>

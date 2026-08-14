@@ -127,11 +127,11 @@ export default function DayV3ExitModel({
             ? "Immediate Senior exit is off, so this design has no SLP or pool execution."
             : illustrative
               ? "Shows how the selected exit size and payout affect one trade, per $100 Senior."
-              : "Shows the fee-inclusive result for one Senior sale using the selected market terms, per $100 Senior. Larger sales move farther through the pool and receive a larger discount. Arbitrageurs can later buy discounted Senior, redeem it for the underlying asset, and refill the SLP when that trade covers their time, costs, and fees."}
+              : "What you asked for against what the sized pool delivers, per $100 Senior. Larger sales move farther through the pool and take a larger discount."}
         </CardNote>
       </CardHeader>
 
-      <CardContent className="px-4 pb-4 flex flex-col gap-5">
+      <CardContent className="px-4 pb-4 flex flex-col gap-4">
         {!disabled ? (
           <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
             <ComparisonBar
@@ -167,48 +167,15 @@ export default function DayV3ExitModel({
               value="0.00%"
             />
           </div>
-        ) : modeled ? (
-          <div className="grid grid-cols-2 gap-x-5 gap-y-4 sm:grid-cols-4">
-            <Outcome
-              label={illustrative ? "Modeled capacity" : "Selected sale"}
-              note={
-                illustrative ? "one-trade pool limit" : "Senior sold at once"
-              }
-              value={dollars(exit.sellablePer100, 2)}
-            />
-            <Outcome
-              label="Proceeds"
-              note={
-                illustrative
-                  ? "after the modeled swap fee"
-                  : "after the live swap fee"
-              }
-              value={dollars(exit.proceeds, 2)}
-            />
-            <Outcome
-              label="SLP required"
-              note="funding per $100 Senior"
-              value={dollars(exit.slpPer100, 2)}
-            />
-            <Outcome
-              label="Refill point"
-              note="finalized with market operations in Royco Deploy"
-              value={
-                exit.restockPoint === null
-                  ? "Deploy only"
-                  : `${exit.restockPoint.toFixed(1)}%`
-              }
-            />
-          </div>
-        ) : needsInputs ? (
+        ) : modeled ? null : needsInputs ? (
           <div className="rounded-xl border border-dashed border-[var(--border-subtle)] bg-[var(--foundation)] px-4 py-5 text-center">
             <strong className="text-[13px] font-semibold">
               Complete the exit terms above
             </strong>
-            <p className="mx-auto mt-1 max-w-[58ch] text-[11.5px] leading-relaxed text-[var(--secondary)]">
-              Choose the amount Senior can sell and the minimum payout. This
-              model will then show capacity, proceeds, SLP funding, and the pool
-              curve without a row of empty values.
+            <p className="mx-auto mt-1 max-w-[58ch] text-[11px] leading-snug text-[var(--secondary)]">
+              Choose the amount Senior can sell and the minimum payout, and this
+              model shows capacity, proceeds and the pool curve rather than a
+              row of empty values.
             </p>
           </div>
         ) : exit.status === "resolving" || exit.message ? (
@@ -221,6 +188,14 @@ export default function DayV3ExitModel({
 
         {!disabled ? (
           <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-[var(--border-subtle)] pt-3 text-[10px] text-[var(--tertiary)]">
+            {modeled ? (
+              <span className="font-semibold text-[var(--secondary)]">
+                Proceeds: {dollars(exit.proceeds, 2)}{" "}
+                {illustrative
+                  ? "after the modeled swap fee"
+                  : "after the live swap fee"}
+              </span>
+            ) : null}
             <span>
               Swap fee:{" "}
               {exit.swapFeeBps === null
