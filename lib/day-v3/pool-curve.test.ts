@@ -93,6 +93,11 @@ assert.equal(dayV3PremiumBpsOf(null), null);
 assert.deepEqual(DAY_V3_POOL_PREMIUM_BPS_RANGE, { min: 0, max: 50 });
 assert.deepEqual(DAY_V3_POOL_LAMBDA_RANGE, { min: 100, max: 1000 });
 assert.equal(DAY_V3_POOL_LAMBDA, 300);
+// The literal the deploy step solves for: `tilt: "0.90"` is 90% quote, so 10%
+// Senior. Asserted against the number rather than against the constant — a
+// block that solves for the constant and then checks the constant holds for any
+// value of it, and 0.05 would have passed.
+assert.equal(DAY_V3_POOL_DEFAULT_SENIOR_WEIGHT, 0.1);
 assert.ok(
   DAY_V3_POOL_LAMBDA >= DAY_V3_POOL_LAMBDA_RANGE.min &&
     DAY_V3_POOL_LAMBDA <= DAY_V3_POOL_LAMBDA_RANGE.max,
@@ -125,7 +130,7 @@ for (const [bandPct, lambda] of [
   );
   assert.ok(rests !== null);
   assert.ok(
-    Math.abs(rests - DAY_V3_POOL_DEFAULT_SENIOR_WEIGHT) < 1e-6,
+    Math.abs(rests - 0.1) < 1e-6,
     `${bandPct}% / ${lambda}: solved ${bps.toFixed(2)} bps rests at ${(rests * 100).toFixed(4)}%`,
   );
 }
@@ -139,5 +144,20 @@ assert.equal(
   dayV3PremiumForRestingWeight({ bandPct: 2, lambda: 300, seniorWeight: 0 }),
   null,
 );
+
+// The derived premiums themselves, so a change to the solve is deliberate.
+// These are what an empty premium field shows.
+for (const [bandPct, lambda, expected] of [
+  [2, 250, 8.29],
+  [5, 250, 8.81],
+  [2, 300, 7.06],
+] as [number, number, number][]) {
+  const bps = dayV3PremiumForRestingWeight({ bandPct, lambda, seniorWeight: 0.1 });
+  assert.ok(bps !== null);
+  assert.ok(
+    Math.abs(bps - expected) < 0.01,
+    `${bandPct}% / ${lambda}: derived ${bps.toFixed(2)} bps, expected ${expected}`,
+  );
+}
 
 console.log("Day V3 pool curve from premium: PASS");

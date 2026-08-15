@@ -642,6 +642,35 @@ assert.doesNotMatch(
   "the hardcoded coverage-restoration default must not come back",
 );
 
+// The deployment-shaped default curve — the change that takes a market off the
+// engine's axis-aligned lambda-1 fallback and onto the pool the deploy step
+// would build. Deleting either half left the whole suite green while every
+// issuer-facing exit discount moved, so both halves are pinned: the derive, and
+// the spread that actually hands it to the engine.
+assert.match(
+  summary,
+  /const derived = dayV3PremiumForRestingWeight\(\{[\s\S]{0,200}?seniorWeight: DAY_V3_POOL_DEFAULT_SENIOR_WEIGHT,/,
+  "the default pool curve must be derived for the split the deploy step solves for",
+);
+assert.match(
+  summary,
+  /\.\.\.\(premiumCurve \? \{ eclpParams: premiumCurve \} : \{\}\)/,
+  "the derived curve must actually reach the engine, not just be computed",
+);
+
+// It must never displace a curve that is already the real pool. A live template
+// wins, and so does a market's own declared curve while it survives the band.
+assert.match(
+  summary,
+  /if \(canonicalEngineOverrides\) return null;/,
+  "a live template's curve outranks the derived default",
+);
+assert.match(
+  summary,
+  /const declaredCurveSurvives =[\s\S]{0,240}?if \(declaredCurveSurvives\) return null;/,
+  "a market's own declared curve outranks the derived default",
+);
+
 console.log(
   `Day V3 unified model architecture: PASS (${modelFamilies.length}/${modelFamilies.length} shared model families)`,
 );

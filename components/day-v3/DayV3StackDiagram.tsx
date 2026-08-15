@@ -314,7 +314,10 @@ function DayV3StackDiagram({
         {lt > 0
           ? // Named here rather than in the leg table: the pool is two-sided,
             // and this is the place it is actually drawn.
-            `${money(lt, unit)} to exit into · ${(poolSeniorWeight * 100).toFixed(0)}% Senior / ${((1 - poolSeniorWeight) * 100).toFixed(0)}% ${exitAssetLabel}`
+            // Same precision the composition panel four lines below uses. At `toFixed(0)`
+            // a thin Senior leg rounded to "0% Senior / 100%", asserting a
+            // single-asset pool — the one thing that panel exists to deny.
+            `${money(lt, unit)} to exit into · ${(poolSeniorWeight * 100).toFixed(poolSeniorWeight < 0.1 ? 2 : 1)}% Senior / ${((1 - poolSeniorWeight) * 100).toFixed(poolSeniorWeight < 0.1 ? 2 : 1)}% ${exitAssetLabel}`
           : "no pool funded"}
       </text>
     </svg>

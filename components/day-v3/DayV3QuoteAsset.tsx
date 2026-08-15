@@ -186,14 +186,17 @@ export default function DayV3QuoteAsset({
         min={0.01}
         note={
           restingSeniorWeight === null
-            ? "Sets the pool's balance point: beta is 1 + this premium, and the resting composition follows from the curve. Empty leaves the market's own."
-            : `Sets the pool's balance point. At this premium the pool rests on ${(restingSeniorWeight * 100).toFixed(restingSeniorWeight < 0.1 ? 2 : 1)}% Senior shares and ${((1 - restingSeniorWeight) * 100).toFixed(2)}% ${label}. Wider means more Senior inventory and less depth for a seller. Empty leaves the market's own.`
+            ? "Sets the pool's balance point: beta is 1 + this premium, and the resting composition follows from the curve. Empty models the pool at the premium shown."
+            : `Sets the pool's balance point. The pool currently rests on ${(restingSeniorWeight * 100).toFixed(restingSeniorWeight < 0.1 ? 2 : 1)}% Senior shares and ${((1 - restingSeniorWeight) * 100).toFixed(2)}% ${label}. Wider means more Senior inventory and less depth for a seller. Empty models the pool at the premium shown.`
         }
         onChange={onPoolPremiumBps}
         origin={poolPremiumBps === null ? "model-assumption" : "manual-override"}
+        // The premium actually in force, whatever set it — the market's own
+        // declared curve, a live template, or the modeled default. Calling it
+        // "the market's own" was false whenever it was not.
         placeholder={
           defaultPremiumBps === null
-            ? "Use the market's own"
+            ? "Use the modeled premium"
             : `${defaultPremiumBps.toFixed(2)} bps`
         }
         presets={[

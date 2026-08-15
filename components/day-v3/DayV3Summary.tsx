@@ -525,6 +525,20 @@ export default function DayV3Summary({
     }
     // A live template's own curve is the real pool and always wins.
     if (canonicalEngineOverrides) return null;
+    // So does the market's own declared curve, whenever it survives.
+    // `buildDayMarketConfig` keeps `defaults.eclpParams` while the requested
+    // band still equals the declared one (runtime.ts:168-172), and in that
+    // state the engine is already pricing the real pool — injecting here would
+    // replace a market's actual 3 bp curve with a synthesized 8.3 bp one.
+    // Measured on susdai at its own 2% band: the declared curve quotes a 10%
+    // sale at 46.01 bps and the injected curve at 53.30, so overriding it made
+    // the exit worse AND wrong. Only the fallback is worth replacing — at a 5%
+    // band, where the declared curve is dropped, the fallback quotes 246.63 bps
+    // against the deployable pool's 65.33.
+    const declaredCurveSurvives =
+      defaults.eclpParams !== undefined &&
+      Math.abs(floorBandPct / 100 - defaults.eclpBandWidth) < 1e-12;
+    if (declaredCurveSurvives) return null;
     // Otherwise build the pool the deploy step would build for this band at its
     // own 90/10 default, rather than leaving the engine's fallback.
     //
@@ -549,7 +563,8 @@ export default function DayV3Summary({
         });
   }, [
     canonicalEngineOverrides,
-    defaults.eclpParams?.lambda,
+    defaults.eclpBandWidth,
+    defaults.eclpParams,
     floorBandPct,
     poolPremiumBps,
     premiumOverridden,
@@ -1387,7 +1402,13 @@ export default function DayV3Summary({
         : hasPoolOverride
           ? feeOverridden
             ? `This design charges a hand-set ${swapFeeBps} bps swap fee. The canonical pool outcomes are withheld because they were solved at the live template's own fee, which this page cannot ask it to change. Every model below is priced at ${swapFeeBps} bps.`
-            : "This link contains manual pool overrides. Outcomes are withheld until the canonical service revalidates those exact fields."
+            : premiumOverridden
+              ? // Not "this link": the premium is a field on this page, and the
+                // canonical service takes no premium input — it reports one as a
+                // derived, scenario-only output — so there is nothing for it to
+                // revalidate and no wording that implies it might.
+                `This design sets its own ${poolPremiumBps} bps maximum premium, which is the pool's balance point. The canonical pool outcomes are withheld because they were solved at the template's own curve, and the premium is an output of that solve rather than an input to it. Every model below is priced at the curve this premium implies.`
+              : "Outcomes are withheld while manual pool overrides are in effect, until the canonical service revalidates those exact fields."
           : activePoolDesign.status === "resolved" && !liquidityResolved
             ? (liquidityRecommendation?.reason ??
               "The pool was resolved, but its Minimum Liquidity mapping is unavailable.")
