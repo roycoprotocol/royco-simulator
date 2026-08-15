@@ -43,7 +43,10 @@ const termsFor = (id: string): DayV3HistoricalTerms => {
 // no answer" and "the answer is zero" are different statements and only one of
 // them may render as "0.0%".
 assert.equal(dayV3RealizedReturns(market("dualmint"), termsFor("dualmint")), null);
-assert.equal(dayV3RealizedReturns(market("muga"), termsFor("muga")), null);
+assert.equal(
+  dayV3RealizedReturns(market("blockhouse"), termsFor("blockhouse")),
+  null,
+);
 
 // The realized figures are the shared runner's own, not a second derivation.
 for (const id of ["jbbb", "susdai", "acred", "makina-dbit"]) {

@@ -114,13 +114,6 @@ const GROUPS: Group[] = [
         accent: '#6bb3f0',
       },
       {
-        name: 'Muga',
-        desc: 'Muga Glasgow Cosmic.',
-        href: '/muga',
-        build: 'day-shell',
-        accent: '#6bb3f0',
-      },
-      {
         name: 'Apollo Diversified Credit',
         desc: 'ACRED — business-first Day market overview.',
         href: '/internal/acred',

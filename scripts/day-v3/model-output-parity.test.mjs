@@ -621,8 +621,10 @@ assert.match(
 );
 
 // Coverage restoration follows the market's own manifest. Held at a hardcoded
-// `false`, every market but muga opened contradicting its own declared design
-// and reported "Coverage restoration is off" for a market that restores it.
+// `false`, every market opened contradicting its own declared design and
+// reported "Coverage restoration is off" for a market that restores it. Read
+// rather than pinned to `true`, so a market that declares otherwise is drawn
+// as it declares itself.
 assert.match(
   summary,
   /useState\(\s*\n?\s*initialMarket\.defaults\.maintainCoverage,?\s*\n?\s*\)/,

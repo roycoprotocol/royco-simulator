@@ -61,12 +61,12 @@ function Aside({
  * coverage requirement priced at this market's own ratio, or that moving the
  * requirement would move it.
  *
- * The ratio is shown rather than asserted as 1x, because it is not always 1x.
+ * The ratio is shown rather than asserted as 1x, because it need not be 1x.
  * `issuer-presets.ts` states the rule as Jr at 1x its requirement and SLP at
- * 0.5x, and twelve of the thirteen markets sit exactly there, but `muga` is a
- * reverse market pricing 6.7% coverage at 1.4%. `dayV3EffectiveShares` scales
- * from each market's OWN default for that reason, so the copy has to read the
- * ratio off the market too instead of restating the headline rule.
+ * 0.5x, and every current market sits exactly there — but a reverse market
+ * pricing 6.7% coverage at 1.4% does not, and the registry has held one before.
+ * `dayV3EffectiveShares` scales from each market's OWN default for that reason,
+ * so the copy reads the ratio off the market rather than restating the rule.
  */
 function TargetBasis({
   derivedPct,

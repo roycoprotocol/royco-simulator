@@ -13,7 +13,7 @@
   "components/day-simulator/DayDeploymentInputs.tsx": "19f030bdba7c277ca96f0294bc090343540938a124eb0ae349d010ff64dbbee1",
   "components/day-simulator/DaySimulatorPageShell.tsx": "eb49a4fb13a26951b7d9664aeb4d32c925a5a24bbbdce495a690bb512a225ed8",
   "components/day-simulator/DayTimeframeBrush.tsx": "7b59cb83cd3501f727110f7b375b2a4cf0a16b22bf04cd5d796823d513909430",
-  "lib/day-markets/registry.ts": "fae85517ec07337ab189af3ed1645942916b70a48d83b1abca71d530d778a2cd",
+  "lib/day-markets/registry.ts": "928a33ecbb7ba00aa4be9e7bbd500e93edcf8cf08ffb43a2262e9f7d7daf9c2e",
   "lib/day-simulator-template/capital-sizing.test.ts": "b86fa540002a5c4ad42c716d2386e91f9052653cd63dd76db8c4cc79d71829fa",
   "lib/day-simulator-template/capital-sizing.ts": "89c187eec3cb599614f0ef9597fd7722337f681e753ccedba3bcf8e4c436f541",
   "lib/day-simulator-template/config-export.test.ts": "20b042631e34cfb4716e86f1e5ebbf5c0aa6e2b70ae9ebfd18ebefa662268a78",
@@ -64,7 +64,7 @@
   "scripts/day-simulator/verify-runtime.ts": "2d797bcd7cf976c71889d74c5ece3dc84d5bce94d6ea3766b272f08f5b1610c4",
   "scripts/day-simulator/verify.mjs": "d85b10098723c21787af0e8739f1f9d73eaec1fde60932a4a1b615971392117e",
   "docs/NEW_DAY_SIMULATOR.md": "3ea014ee0839f715c1a5469ee4a0ce4161f4e2cc20ab622f1cd7605b4b0048d5",
-  "package.json": "a56d4221c3a51ddb3d0e47800dad4f72ae3e91f36756637f05a63baed4808060",
+  "package.json": "4323d91873d8e8be5981e3849ce18de070c9b3db737de79471810156fb0e4b78",
   "lib/day-simulator-template/backtest.test.ts": "d978f6fe8755d22778a51ac3699d5ae1de36dcfa8690ba65ffcc481afc93cb6f",
   "lib/day-simulator-template/backtest.ts": "d2495ef2256bb3b529df60bb6e13dfb28fa774476661a3573b2c896e8137c8e6"
 }

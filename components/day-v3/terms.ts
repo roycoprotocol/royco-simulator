@@ -11,12 +11,13 @@ import type { DaySimulatorDefaults } from "@/lib/day-simulator-template/market";
  * moves, and holding it fixed is the one answer that leaves that line.
  *
  * The scaling is relative to the market's own default rather than a flat
- * `coverage * DAY_JR_PREMIUM_PER_COVERAGE`. Twelve of the thirteen registry
- * markets sit exactly on the flat rule and the two forms agree for them, but
- * `muga` is a reverse market with bespoke terms (6.7% coverage priced at 1.4%),
- * and the flat form would overwrite its real numbers with invented ones. Scaling
- * from the default reproduces every market exactly at its own terms and keeps
- * the proportionality as the slider moves.
+ * `coverage * DAY_JR_PREMIUM_PER_COVERAGE`. Every registry market currently
+ * sits exactly on the flat rule, so today the two forms agree everywhere — but
+ * they are not the same rule. A reverse market pricing 6.7% coverage at 1.4%
+ * (the removed `muga` was one) has bespoke terms that the flat form would
+ * overwrite with invented numbers. Scaling from each market's own default
+ * reproduces any market exactly at its own terms and keeps the proportionality
+ * as the slider moves, so it stays.
  *
  * A requirement of zero pays zero, which is the behaviour this replaces: a
  * tranche with no capital in it cannot be paid a premium, or Sr keeps

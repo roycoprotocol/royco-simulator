@@ -243,12 +243,12 @@ export default function DayV3Summary({
   const exitDisabled = modeledImmediateExitSharePct === 0;
   const observationDays = recoveryDaysInput ?? 0;
   // Seeded from the market's own manifest rather than hardcoded. The page held
-  // this at `false` while 12 of the 13 markets declare `maintainCoverage: true`,
-  // so every one of them opened contradicting its own design and reported
-  // "Outside Junior capital 0.0% — Coverage restoration is off" for a market
-  // that restores coverage. muga declares `false` and keeps it: a market that
-  // has said it does not top Junior back up must not be shown as though it
-  // does.
+  // this at `false` while every market declares `maintainCoverage: true`, so
+  // each one opened contradicting its own design and reported "Outside Junior
+  // capital 0.0% — Coverage restoration is off" for a market that restores
+  // coverage. Read from the manifest rather than pinned to `true`, because a
+  // market that declares it does not top Junior back up must not be drawn as
+  // though it does — the registry has held one, and may again.
   const [maintainCoverage, setMaintainCoverage] = useState(
     initialMarket.defaults.maintainCoverage,
   );

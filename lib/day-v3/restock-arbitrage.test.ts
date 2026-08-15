@@ -339,7 +339,7 @@ const discountAtFloor = (marketId: string, floorPer100: number) => {
   const quote = sim.previewSecondarySell(sim.last().stEffectiveNAV * 0.1);
   return dayV3QuoteDiscountBps(quote) as number;
 };
-for (const marketId of ["susdai", "muga", "acred"]) {
+for (const marketId of ["susdai", "reusde", "acred"]) {
   const tightFloor = discountAtFloor(marketId, 99);
   const wideFloor = discountAtFloor(marketId, 50);
   assert.ok(
