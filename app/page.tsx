@@ -1,3 +1,3 @@
-// V3 is the current Day simulator at the root. Both versioned routes remain
+// V4 is the current Day simulator at the root. Every versioned route remains
 // available for regression review and direct links.
-export { default, metadata } from "./v3/page";
+export { default, metadata } from "./v4/page";
