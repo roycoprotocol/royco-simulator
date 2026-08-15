@@ -8,6 +8,7 @@ import {
   Legend,
   Line,
   LineChart,
+  ReferenceArea,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -24,6 +25,41 @@ export type DayV3BacktestPoint = {
   strategy: number;
 };
 
+/**
+ * A stretch of history the market spent inside an Observation Period.
+ *
+ * A count alone hides the shape of the thing. JBBB records 146 of these across
+ * its history and spends 63.6% of its life inside one, which "146" does not
+ * say; ACRED's cluster in a single quarter and then stop. Drawn on the path,
+ * both facts are the first thing a reader sees.
+ *
+ * `expired` marks the windows that ran to the full Observation Period without
+ * the source recovering. Those are the consequential ones: the loss became
+ * permanent for Junior, and its recovery claim was erased.
+ */
+export type DayV3BacktestBand = {
+  start: string;
+  end: string;
+  /** Days the period actually ran, sampled at the series' own cadence. */
+  days: number;
+  /** The Observation Period the terms asked for. */
+  targetDays: number;
+  expired: boolean;
+};
+
+/**
+ * How long a period ran, and against what.
+ *
+ * An expired period rarely lands exactly on its target: the series is sampled
+ * at its own cadence, so a 7-day term is closed by the first reading at or past
+ * day 7. Saying "7d" when the reading came at 12d hides which of the two
+ * numbers the accountant used.
+ */
+const periodLength = (band: DayV3BacktestBand) =>
+  band.expired && band.targetDays > 0 && band.days !== band.targetDays
+    ? `${band.targetDays}d term, next reading at ${band.days}d`
+    : `${band.days}d`;
+
 const SERIES = [
   ["strategy", "Source", "#596270"],
   ["senior", "Sr", "#1d4987"],
@@ -32,9 +68,11 @@ const SERIES = [
 ] as const;
 
 function DayV3BacktestChart({
+  bands = [],
   data,
   unit,
 }: {
+  bands?: DayV3BacktestBand[];
   data: DayV3BacktestPoint[];
   unit: DayV3Unit;
 }) {
@@ -60,14 +98,92 @@ function DayV3BacktestChart({
             width={52}
           />
           <Tooltip
-            contentStyle={{
-              background: "#fcfbf8",
-              border: "1px solid #e4e0d6",
-              borderRadius: 8,
-              fontSize: 11,
+            content={(props) => {
+              const { active, label, payload } = props as {
+                active?: boolean;
+                label?: string;
+                payload?: ReadonlyArray<{
+                  color?: string;
+                  name?: string;
+                  value?: number;
+                }>;
+              };
+              if (!active || !payload?.length || typeof label !== "string") {
+                return null;
+              }
+              // Which period this reading sits in. Shading says a band exists;
+              // only this says what the band is and how long it ran.
+              const band = bands.find(
+                (item) => label >= item.start && label <= item.end,
+              );
+              return (
+                <div
+                  style={{
+                    background: "#fcfbf8",
+                    border: "1px solid #e4e0d6",
+                    borderRadius: 8,
+                    fontSize: 11,
+                    padding: "6px 8px",
+                  }}
+                >
+                  <div style={{ fontWeight: 600, marginBottom: 3 }}>{label}</div>
+                  {payload.map((entry) => (
+                    <div key={entry.name} style={{ color: entry.color }}>
+                      {entry.name}{" "}
+                      {typeof entry.value === "number"
+                        ? unitAmount(entry.value, unit)
+                        : "—"}
+                    </div>
+                  ))}
+                  {band ? (
+                    <div
+                      style={{
+                        borderTop: "1px solid #e4e0d6",
+                        color: band.expired ? "#8a6512" : "#596270",
+                        marginTop: 4,
+                        paddingTop: 4,
+                      }}
+                    >
+                      {band.expired ? "Expired " : ""}Observation Period ·{" "}
+                      {periodLength(band)}
+                      <div style={{ color: "#596270", opacity: 0.8 }}>
+                        {band.start} to {band.end}
+                      </div>
+                    </div>
+                  ) : (
+                    <div
+                      style={{
+                        borderTop: "1px solid #e4e0d6",
+                        color: "#596270",
+                        marginTop: 4,
+                        opacity: 0.8,
+                        paddingTop: 4,
+                      }}
+                    >
+                      No Observation Period open
+                    </div>
+                  )}
+                </div>
+              );
             }}
-            formatter={(value: number, name: string) => [unitAmount(value, unit), name]}
           />
+          {/* Behind the lines, not over them: these are the conditions the
+              path was produced under, and a band that dims the series it
+              explains is worse than no band. A single-point window would draw
+              nothing, so it is widened to the next reading. */}
+          {bands
+            .filter((band) => band.end > band.start)
+            .map((band, index) => (
+            <ReferenceArea
+              fill={band.expired ? "#b4881f" : "#596270"}
+              fillOpacity={band.expired ? 0.2 : 0.09}
+              ifOverflow="extendDomain"
+              key={`${band.start}-${band.end}-${index}`}
+              stroke="none"
+              x1={band.start}
+              x2={band.end}
+            />
+          ))}
           <Legend iconType="plainline" wrapperStyle={{ fontSize: 11, paddingTop: 4 }} />
           {SERIES.map(([key, label, color]) => (
             <Line

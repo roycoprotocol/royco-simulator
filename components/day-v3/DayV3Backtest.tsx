@@ -4,6 +4,7 @@ import { memo, useDeferredValue, useMemo, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import DayV3BacktestChart, {
+  type DayV3BacktestBand,
   type DayV3BacktestPoint,
 } from "@/components/day-v3/DayV3BacktestChart";
 import DayV3SegmentedControl from "@/components/day-v3/DayV3SegmentedControl";
@@ -259,6 +260,24 @@ function DayV3Backtest({
     view,
   ]);
 
+  // The windows themselves, in the chart's own x-values. `observationBands`
+  // already carries the dates; `expired` is the half that matters and only
+  // `observationPeriods` has it, so they are zipped here rather than reading
+  // two lists that are the same list.
+  const observationBands = useMemo<DayV3BacktestBand[]>(
+    () =>
+      result
+        ? result.observationPeriods.map((period) => ({
+            start: period.startDate,
+            end: period.endDate,
+            days: period.days,
+            targetDays: period.targetDays,
+            expired: period.expired,
+          }))
+        : [],
+    [result],
+  );
+
   const chartData = useMemo<DayV3BacktestPoint[]>(
     () =>
       result
@@ -466,7 +485,48 @@ function DayV3Backtest({
             only place breaking it. */}
         <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
           <div className="flex min-w-0 flex-col gap-3">
-            <DayV3BacktestChart data={chartData} unit={returnUnit} />
+            <DayV3BacktestChart
+              bands={observationBands}
+              data={chartData}
+              unit={returnUnit}
+            />
+
+            {/* Shading with no key is decoration. Both tones are named, and
+                the share of history is stated, because "146 windows" over four
+                years and over four months are different markets. */}
+            {observationBands.length > 0 ? (
+              <div className="flex flex-col gap-1.5 rounded-xl border border-[var(--border-subtle)] bg-[var(--foundation)] px-3 py-3">
+                <span className="text-[9.5px] font-semibold uppercase tracking-[0.1em] text-[var(--tertiary)]">
+                  Observation Periods on the path
+                </span>
+                <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5">
+                  <span className="flex items-center gap-1.5 text-[10.5px] leading-snug text-[var(--secondary)]">
+                    <span
+                      aria-hidden="true"
+                      className="size-3 shrink-0 rounded-[3px] border border-[var(--border-subtle)]"
+                      style={{ background: "rgba(89,98,112,0.16)" }}
+                    />
+                    Open, then closed by a recovery
+                  </span>
+                  {expiredRecoveryPeriods > 0 ? (
+                    <span className="flex items-center gap-1.5 text-[10.5px] leading-snug text-[var(--secondary)]">
+                      <span
+                        aria-hidden="true"
+                        className="size-3 shrink-0 rounded-[3px] border border-[var(--border-subtle)]"
+                        style={{ background: "rgba(180,136,31,0.34)" }}
+                      />
+                      Ran the full {observationDays} days and expired
+                    </span>
+                  ) : null}
+                </div>
+                <span className="text-[10px] leading-snug text-[var(--tertiary)]">
+                  {`This market spent ${pct(1 - result.outsideObservationPct / 100)} of the window inside one, across ${result.observationEvents} ${result.observationEvents === 1 ? "period" : "periods"}. The longest ran ${result.maxObservedObservationDays} ${result.maxObservedObservationDays === 1 ? "day" : "days"} against the ${observationDays}-day term. `}
+                  {expiredRecoveryPeriods > 0
+                    ? `${expiredRecoveryPeriods} reached that term without the source recovering, and Junior's recovery claim was erased.`
+                    : "None reached that term, so every covered loss was still recoverable when its period closed."}
+                </span>
+              </div>
+            ) : null}
 
             {/* The window controls the chart immediately above it, so it lives
                 with that chart rather than interrupting the result summary. */}

@@ -37,6 +37,7 @@ import DayV3SegmentedControl from "@/components/day-v3/DayV3SegmentedControl";
 import DayV3Source from "@/components/day-v3/DayV3Source";
 import DayV3YieldModels from "@/components/day-v3/DayV3YieldModels";
 import { useDayV3SimulationPoolDesign } from "@/components/day-v3/useDayV3SimulationPoolDesign";
+import { dayV3RealizedReturns } from "@/lib/day-v3/historical-returns";
 import {
   Card,
   CardContent,
@@ -990,6 +991,31 @@ export default function DayV3Summary({
     return overrides;
   }, [inputs.engineOverrides]);
 
+  // What the same terms did over this market's real path, when it has one.
+  // Deferred: the scenario cards above must commit while a slider is still
+  // moving, and this is a few hundred engine steps behind them.
+  const historicalTerms = useDeferredValue({
+    bandPct: inputs.bandPct,
+    coveragePct: inputs.coveragePct,
+    liqSharePct: resolved.liquidityYieldShare * 100,
+    liqY0Pct: resolved.liqY0 * 100,
+    liqY100Pct: resolved.liqY100 * 100,
+    liquidityPct: inputs.liquidityPct,
+    maintainCoverage,
+    observationDays: inputs.observationDays,
+    poolTurnoverPerYear: inputs.poolTurnoverPerYear,
+    quoteAssetYieldPct: inputs.quoteAssetYieldPct,
+    riskSharePct: resolved.riskYieldShare * 100,
+    riskY0Pct: resolved.y0 * 100,
+    riskY100Pct: resolved.y100 * 100,
+    sourceApyPct: inputs.sourceApyPct,
+  });
+  const realized = useMemo(
+    () =>
+      dayV3RealizedReturns(market, historicalTerms, backtestConfigOverrides),
+    [backtestConfigOverrides, historicalTerms, market],
+  );
+
   const chartData = useMemo<DayV3Point[]>(() => {
     const grow = (apy: number, months: number) =>
       100 * (1 + apy) ** (months / 12);
@@ -1118,6 +1144,7 @@ export default function DayV3Summary({
       name: "Sr",
       short: "Sr",
       apy: scenario.seniorApy,
+      realizedApy: realized?.seniorApy ?? 0,
       holds: !protectionEnabled
         ? "The strategy asset, with no first-loss buffer"
         : "The strategy asset, protected by Jr",
@@ -1143,6 +1170,7 @@ export default function DayV3Summary({
       name: "Jr",
       short: "Jr",
       apy: scenario.juniorApy,
+      realizedApy: realized?.juniorApy ?? 0,
       holds: !protectionEnabled
         ? "No first-loss tranche is funded"
         : "First-loss coverage for Sr",
@@ -1162,6 +1190,7 @@ export default function DayV3Summary({
       name: "SLP",
       short: "SLP",
       apy: scenario.liquidityApy,
+      realizedApy: realized?.liquidityApy ?? 0,
       holds: !exitEnabled
         ? "No immediate exit pool is funded"
         : "The pool Sr exits into",
@@ -1782,6 +1811,29 @@ export default function DayV3Summary({
                 <p className="border-t border-[var(--border-subtle)] pt-2 text-[12px] leading-relaxed text-[var(--secondary)]">
                   {position.risk}
                 </p>
+                {/* The projection is one of two answers on a market with a
+                    dated path, and on jbbb the quieter one is +10.2% a year
+                    against −71.2%. Printing only the first, four sections
+                    above a backtest that says otherwise, left the reader to
+                    find the contradiction on their own. */}
+                {realized && position.funded ? (
+                  <div className="flex items-baseline justify-between gap-2 border-t border-[var(--border-subtle)] pt-2">
+                    <span className="min-w-0 text-[10px] leading-snug text-[var(--tertiary)]">
+                      Over this market&apos;s own history
+                    </span>
+                    <span
+                      className="shrink-0 font-mono text-[13px] font-bold tabular-nums"
+                      style={{
+                        color:
+                          position.realizedApy < 0
+                            ? "var(--red-emphasis)"
+                            : "var(--foreground)",
+                      }}
+                    >
+                      {pct(position.realizedApy)}
+                    </span>
+                  </div>
+                ) : null}
               </CardContent>
             </Card>
           ))}

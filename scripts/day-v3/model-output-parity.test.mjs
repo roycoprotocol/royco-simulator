@@ -12,6 +12,8 @@ const modeModel = read("lib/day-v3/mode-model.ts");
 const modelState = read("lib/day-v3/model-state.ts");
 const yieldCurves = read("lib/day-v3/yield-curves.ts");
 const backtest = read("components/day-v3/DayV3Backtest.tsx");
+const backtestChart = read("components/day-v3/DayV3BacktestChart.tsx");
+const historicalReturns = read("lib/day-v3/historical-returns.ts");
 const modelGroup = read("components/day-v3/DayV3ModelGroup.tsx");
 const quoteAsset = read("components/day-v3/DayV3QuoteAsset.tsx");
 const simulationPoolDesign = read("lib/day-v3/simulation-pool-design.ts");
@@ -572,6 +574,50 @@ assert.match(
   backtest,
   /try \{\s*\n\s*return \[runDayHistoricalBacktest\(\{/,
   "the historical backtest must not be able to take the page down",
+);
+
+// A market with a dated path has two answers, and the scenario cards showed
+// only the forward one. jbbb projects Junior at +10.2% a year while the same
+// terms over its real 2022 path give −71.2%, four sections further down.
+assert.match(
+  summary,
+  /const realized = useMemo\(\s*\n?\s*\(\) =>\s*\n?\s*dayV3RealizedReturns\(market, historicalTerms, backtestConfigOverrides\)/,
+  "the scenario cards must be given what these terms did over the market's own history",
+);
+assert.match(
+  summary,
+  /realizedApy: realized\?\.seniorApy[\s\S]{0,900}?realizedApy: realized\?\.juniorApy[\s\S]{0,900}?realizedApy: realized\?\.liquidityApy/,
+  "all three tranches carry their realized figure, not just the protected one",
+);
+// It must be the shared runner's own number. A second derivation of a return
+// is the one thing this architecture does not permit.
+assert.match(
+  historicalReturns,
+  /runDayHistoricalBacktest\(\{/,
+  "realized returns come from the shared backtest runner",
+);
+assert.doesNotMatch(
+  historicalReturns,
+  /Math\.pow|\*\* \(1 ?\/|dayAnnualizedReturn\(/,
+  "realized returns must not be re-annualized here; the runner already did it",
+);
+
+// Observation Periods are drawn on the path, not left as a count. The root
+// simulator has always shaded them; V3 rendered "8" and nothing else.
+assert.match(
+  backtest,
+  /bands=\{observationBands\}/,
+  "the backtest chart must be given the Observation Periods it is plotting",
+);
+assert.match(
+  backtestChart,
+  /<ReferenceArea/,
+  "Observation Periods must be shaded on the chart",
+);
+assert.match(
+  backtestChart,
+  /\.filter\(\(band\) => band\.end > band\.start\)/,
+  "a zero-width period draws nothing and must not be emitted as a band",
 );
 
 console.log(
