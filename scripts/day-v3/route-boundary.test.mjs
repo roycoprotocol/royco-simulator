@@ -64,7 +64,9 @@ assert.doesNotMatch(v2Route, /day-v3|\/v3/);
 assert.match(v3Route, /components\/day-v3\/DayV3Summary/);
 assert.match(v3Route, /index:\s*false/);
 assert.match(v3Route, /follow:\s*false/);
-assert.match(rootRoute, /export \{ default, metadata \} from "\.\/v3\/page"/);
+// The root serves V4, which is V3 in a two-pane frame — so the root still
+// renders the V3 model, one level of re-export further out.
+assert.match(rootRoute, /export \{ default, metadata \} from "\.\/v4\/page"/);
 assert.doesNotMatch(rootRoute, /\.\/v2\/page/);
 assert.match(
   globalStyles,
