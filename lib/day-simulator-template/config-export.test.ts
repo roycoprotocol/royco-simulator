@@ -11,6 +11,7 @@ import {
   type DayConfigExportInput,
 } from "./config-export";
 import { DAY_ISSUER_PRESETS, matchDayIssuerPreset } from "./issuer-presets";
+import { DAY_ECLP_SIMULATION_LAMBDA } from "@/lib/day/engine/engine";
 
 const stability = DAY_ISSUER_PRESETS[0];
 
@@ -157,7 +158,10 @@ assert.deepEqual(payload.deploymentBrief.yieldModels.seniorLp, {
 assert.equal(payload.deploymentBrief.exitPool.maximumDiscountBps, 1_000);
 assert.equal(payload.deploymentBrief.exitPool.maximumDiscountWithinDeployRange, false);
 assert.equal(payload.deploymentBrief.exitPool.simulationConcentration, 1);
-assert.equal(payload.deploymentBrief.exitPool.deploymentDefaultConcentration, 250);
+assert.equal(
+  payload.deploymentBrief.exitPool.deploymentDefaultConcentration,
+  DAY_ECLP_SIMULATION_LAMBDA,
+);
 assert.equal(payload.deploymentBrief.compatibility.modeledTermsCompatible, false);
 assert.ok(payload.deploymentBrief.compatibility.issues.length > 0);
 assert.equal(payload.deploymentBrief.settlementDefaults.depositDelaySeconds, 300);

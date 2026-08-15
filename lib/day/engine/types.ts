@@ -37,13 +37,15 @@ export interface YDMConfig {
 export interface MarketConfig {
   // ---- Dawn coverage parameters (RoycoAccountant) ----
   coverage: number; // COV  in [0.01, 1)            -> min senior protection
-  /** @deprecated Current Royco Day uses one coinvested collateral NAV. Kept so
-   * older callers can load, but contract accounting always treats it as 1. */
+  /** @deprecated Royco Day v1.1.0 has one coinvested collateral ledger. This
+   * field remains only so older callers continue to deserialize; accounting
+   * always treats Senior and Junior as claims on the same collateral. */
   beta: number;
   targetUtilization: number; // U*  (kink), default 0.90    -> TARGET_UTILIZATION_WAD
   liquidationUtilization: number; // > 1.0           -> liquidationUtilizationWAD
   fixedTermDurationSec: number; // 0 => permanently perpetual
-  fixedTermGracePeriodSec: number; // deployment-age lockout before a term can begin
+  /** Seconds after deployment before a Junior loss may start a fixed term. */
+  fixedTermGracePeriodSec: number;
 
   // ---- Protocol fees (taken from yield; 0 in fixed term) ----
   stProtocolFee: number; // on ST kept yield
@@ -83,9 +85,8 @@ export interface MarketConfig {
   dustTolerance: number; // NAV dust (abs) treated as zero
 }
 
-// The liquidity-tranche pool (E-CLP BPT: ST shares / quote asset). Its starting
-// composition is read from the configured E-CLP at the 1.0 mark.
-// Modeled by value: the pool earns swap fees (fee × volume)
+// The liquidity-tranche pool (E-CLP BPT: ~10% ST shares / 90% T-bill stable).
+// Modeled by value, not by curve mechanics: the pool earns swap fees (fee × volume)
 // plus the T-bill rate on its stable leg plus net senior yield on its ST-share leg.
 export interface PoolState {
   stShares: bigint; // WAD ST shares held in the pool
@@ -97,9 +98,11 @@ export interface LiveState {
   marketState: MarketState;
   fixedTermEndSec: bigint; // 0 if perpetual
 
-  // checkpointed NAVs (NAV units)
-  stRawNAV: bigint; // WAD ST pure asset value
-  jtRawNAV: bigint; // WAD JT pure asset value
+  // checkpointed NAVs (NAV units). Royco Day v1.1.0 has one collateral NAV.
+  // The two raw fields are retained as compatibility bookkeeping for existing
+  // charts/adapters; all contract-facing accounting consumes their sum.
+  stRawNAV: bigint;
+  jtRawNAV: bigint;
   stEffectiveNAV: bigint; // WAD ST redemption value
   jtEffectiveNAV: bigint; // WAD JT redemption value
   stImpermanentLoss: bigint; // WAD presentation diagnostic
@@ -114,6 +117,7 @@ export interface LiveState {
   // do not remove assets from effective NAV.
   protocolSTShares: bigint;
   protocolJTShares: bigint;
+  /** @deprecated v1.1.0 carves the LPT protocol fee out as Senior shares. */
   protocolLTShares: bigint;
 
   // liquidity tranche
@@ -174,7 +178,7 @@ export interface Snapshot {
   stIL: number;
   jtIL: number;
   // health
-  coverageRequiredNAV: number; // ceil(COV * total collateral NAV)
+  coverageRequiredNAV: number; // ceil(COV * (stRaw + beta * jtRaw))
   liquidityRequiredNAV: number; // ceil(MIN_LIQUIDITY * stEffective)
   utilization: number;
   liquidityUtilization: number;
@@ -196,7 +200,12 @@ export interface Snapshot {
 
 export interface SecondaryExitQuote {
   requestedNAV: number;
+  /** Gross Senior input accepted from the seller. */
   filledNAV: number;
+  /** Senior input that reaches the E-CLP after the exact-input swap fee. */
+  effectiveInputNAV: number;
+  /** Swap fee retained in the pool for SLP. */
+  swapFeeNAV: number;
   stableOutNAV: number;
   unfilledNAV: number;
   executionPrice: number;

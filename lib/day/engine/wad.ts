@@ -56,6 +56,25 @@ export function toWad(value: number | string): bigint {
   return negative ? -result : result;
 }
 
+/** Converts a decimal to WAD with mathematical floor rounding. This is used
+ * for positive exact-input swap outputs, where rounding proceeds down in the
+ * recipient's favor rather than to the nearest representable WAD. */
+export function toWadFloor(value: number | string): bigint {
+  if (typeof value === 'number' && !Number.isFinite(value)) {
+    throw new Error(`cannot convert non-finite number to WAD: ${value}`);
+  }
+  const expanded = expandScientific(String(value));
+  const negative = expanded.startsWith('-');
+  const unsigned = negative ? expanded.slice(1) : expanded;
+  const [wholeText = '0', fractionText = ''] = unsigned.split('.');
+  const padded = `${fractionText}${'0'.repeat(18)}`;
+  let result = BigInt(wholeText || '0') * WAD + BigInt(padded.slice(0, 18) || '0');
+  if (negative && fractionText.slice(18).split('').some((digit) => digit !== '0')) {
+    result += 1n;
+  }
+  return negative ? -result : result;
+}
+
 export const fromWad = (value: bigint): number => Number(value) / 1e18;
 export const minWad = (a: bigint, b: bigint): bigint => (a < b ? a : b);
 export const maxWad = (a: bigint, b: bigint): bigint => (a > b ? a : b);

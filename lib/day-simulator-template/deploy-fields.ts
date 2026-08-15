@@ -160,32 +160,31 @@ export function dayAbsoluteFromExitBufferPct(
   return (exitBufferPct / 100) * coveragePct;
 }
 
-/** Floor applied before inverting, so a zero threshold cannot divide by zero.
- *  Matches the guard the engine config has always used. */
+/** Floor applied before inversion so an unresolved zero cannot produce
+ *  Infinity. This preserves the guard used by the shared runtime. */
 export const DAY_EXIT_BUFFER_MIN_PCT = 0.01;
 
 /**
- * `exitBufferPct` and `liquidationUtilization` are the same setting inverted.
+ * `exitBufferPct` and `liquidationUtilization` are one Protected Exit setting
+ * expressed on two scales:
  *
- *     liquidationUtilization = 100 / exitBufferPct
- *     exitBufferPct          = 100 / liquidationUtilization
+ *   liquidationUtilization = 100 / exitBufferPct
+ *   exitBufferPct          = 100 / liquidationUtilization
  *
- * `exitBufferPct` is a PERCENTAGE: the share of the coverage requirement still
- * standing when the protected exit arms. `liquidationUtilization` is a RATIO:
- * the coverage utilization at that same moment, which is the form the engine
- * config and the accountant both take. 50% standing is 2.0x utilization; 99.91%
- * standing is 1.0009x.
- *
- * Both directions live here so that no caller open-codes the inversion. Three
- * spellings of it used to be scattered across the codebase in two different
- * scales (`100 / v` returning a ratio, `10000 / v` returning a percent), which
- * is what made the setting hard to read.
+ * The first value is a percentage of the Minimum Coverage requirement still
+ * standing. The second is the dimensionless utilization ratio consumed by the
+ * accountant. Keeping both directions here prevents callers from open-coding
+ * the inversion or accidentally treating the percentage as a ratio.
  */
-export function dayLiquidationUtilizationFromExitBuffer(exitBufferPct: number): number {
+export function dayLiquidationUtilizationFromExitBuffer(
+  exitBufferPct: number,
+): number {
   return 100 / Math.max(exitBufferPct, DAY_EXIT_BUFFER_MIN_PCT);
 }
 
-export function dayExitBufferFromLiquidationUtilization(liquidationUtilization: number): number {
+export function dayExitBufferFromLiquidationUtilization(
+  liquidationUtilization: number,
+): number {
   return 100 / Math.max(liquidationUtilization, DAY_EXIT_BUFFER_MIN_PCT);
 }
 

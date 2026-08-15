@@ -42,3 +42,6 @@ next-env.d.ts
 
 # local planning/spec docs (superpowers skills)
 docs/superpowers/
+
+# local Claude settings
+/.claude-myapp-backup/settings.local.json

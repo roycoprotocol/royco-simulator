@@ -53,7 +53,7 @@ for (const coveragePct of [1, 5, 10, 20, 66.67]) {
       `got ${back}`,
     );
     // Both express the same on-chain multiple.
-    const engineMultiple = 100 / bufferPct;
+    const engineMultiple = dayLiquidationUtilizationFromExitBuffer(bufferPct);
     const flowMultiple = coveragePct / absolute;
     check(
       `both units give the same liquidation multiple (${coveragePct}, ${bufferPct})`,
@@ -304,20 +304,16 @@ for (const [id, rule] of Object.entries(DAY_DEPLOY_FIELD_RULES)) {
 }
 
 // ---------------------------------------------------------------------------
-// The protected-exit threshold is one setting in two scales. The converters are
-// the only place the inversion is written, so they are the only place it can go
-// wrong: a caller that open-codes `100 / v` against a percent-scaled value is
-// off by 100x and reads as plausible either way.
+// One Protected Exit setting, expressed as percent standing and utilization.
 // ---------------------------------------------------------------------------
 
-// The relationship itself, at the anchors a reader can check by hand.
 check(
-  '100% of the requirement standing is 1.0x utilization',
+  '100% of the requirement standing is 1x utilization',
   dayLiquidationUtilizationFromExitBuffer(100) === 1,
   String(dayLiquidationUtilizationFromExitBuffer(100)),
 );
 check(
-  '50% standing is 2.0x utilization',
+  '50% standing is 2x utilization',
   dayLiquidationUtilizationFromExitBuffer(50) === 2,
   String(dayLiquidationUtilizationFromExitBuffer(50)),
 );
@@ -327,7 +323,6 @@ check(
   String(dayLiquidationUtilizationFromExitBuffer(10)),
 );
 
-// Round-trips, which is what "consistent" has to mean in practice.
 for (const pct of [0.01, 1, 5, 12.5, 50, 71.43, 99.91, 100]) {
   const back = dayExitBufferFromLiquidationUtilization(
     dayLiquidationUtilizationFromExitBuffer(pct),
@@ -339,18 +334,16 @@ for (const pct of [0.01, 1, 5, 12.5, 50, 71.43, 99.91, 100]) {
   );
 }
 
-// The floor keeps a zero threshold finite rather than Infinity.
 check(
-  'a zero threshold is floored, not divided by zero',
+  'a zero threshold is floored rather than divided by zero',
   Number.isFinite(dayLiquidationUtilizationFromExitBuffer(0)),
   String(dayLiquidationUtilizationFromExitBuffer(0)),
 );
 
-// The two scales are genuinely different numbers, which is the trap this guards.
 check(
-  'the absolute and share-of-requirement units are not interchangeable',
-  dayAbsoluteFromExitBufferPct(50, 10) === 5
-    && dayExitBufferPctFromAbsolute(5, 10) === 50,
+  'absolute coverage and share-of-requirement units remain distinct',
+  dayAbsoluteFromExitBufferPct(50, 10) === 5 &&
+    dayExitBufferPctFromAbsolute(5, 10) === 50,
 );
 
 console.log(`deploy-fields: ${passed} checks passed`);

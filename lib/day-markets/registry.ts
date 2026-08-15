@@ -6,7 +6,6 @@ import { MARKET as MAKINA_DBIT_MARKET } from "@/lib/day-markets/makina-dbit/mark
 import { MARKET as MAKINA_DETH_MARKET } from "@/lib/day-markets/makina-deth/market";
 import { MARKET as MAKINA_DUSD_MARKET } from "@/lib/day-markets/makina-dusd/market";
 import { MARKET as MAKINA_USDSHFMK_MARKET } from "@/lib/day-markets/makina-usdshfmk/market";
-import { MARKET as MUGA_MARKET } from "@/lib/day-markets/muga/market";
 import { PARETO_FALCONX_DAY_MARKET } from "@/lib/day-markets/pareto-falconx/market";
 import { MARKET as REUSDE_MARKET } from "@/lib/day-markets/reusde/market";
 import { MARKET as SUSDAI_MARKET } from "@/lib/day-markets/susdai/market";
@@ -26,7 +25,6 @@ export const DAY_MARKETS: readonly DayMarket[] = [
   MAKINA_USDSHFMK_MARKET,
   DUALMINT_MARKET,
   BLOCKHOUSE_MARKET,
-  MUGA_MARKET,
 ];
 
 // The explorer opens on JBBB because it is the only sample whose real history

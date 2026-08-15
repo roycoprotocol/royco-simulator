@@ -4,7 +4,7 @@ import {
   newMarket,
 } from '@/lib/day/engine/engine';
 import type { MarketConfig } from '@/lib/day/engine/types';
-import { WAD, toWad } from '@/lib/day/engine/wad';
+import { toWad } from '@/lib/day/engine/wad';
 import type { DaySimulatorDefaults } from '@/lib/day-simulator-template/market';
 
 /**
@@ -31,20 +31,21 @@ import type { DaySimulatorDefaults } from '@/lib/day-simulator-template/market';
  *  bisection valid here: more capital standing behind the same requirement is
  *  always less utilized. */
 function solveCapital(
-  utilizationOf: (capital: number) => number,
+  utilizationOf: (capital: number) => bigint,
   target: number,
   upperHint: number,
 ): number {
   if (!(target > 0) || upperHint <= 0) return 0;
+  const targetWad = toWad(target);
   // Grow the bracket until the upper bound is genuinely under-utilized. A fixed
   // multiple would silently return the bound itself on an extreme setting.
   let high = upperHint;
-  for (let i = 0; i < 80 && utilizationOf(high) > target; i += 1) high *= 2;
+  for (let i = 0; i < 80 && utilizationOf(high) > targetWad; i += 1) high *= 2;
   let low = 0;
   for (let i = 0; i < 200; i += 1) {
     const mid = (low + high) / 2;
     if (mid === low || mid === high) break;
-    if (utilizationOf(mid) > target) low = mid;
+    if (utilizationOf(mid) > targetWad) low = mid;
     else high = mid;
   }
   return high;
@@ -126,8 +127,7 @@ export function dayCapitalAtUtilization(
       ? solveCapital(
           (capital) => {
             const jtRaw = toWad(capital);
-            const util = coverageUtilizationWad(stRaw, jtRaw, 1, coverageWad, jtRaw);
-            return Number(util) / Number(WAD);
+            return coverageUtilizationWad(stRaw, jtRaw, 1, coverageWad, jtRaw);
           },
           utilization,
           st,
@@ -138,12 +138,11 @@ export function dayCapitalAtUtilization(
     terms.minLiquidity > 0
       ? solveCapital(
           (capital) => {
-            const util = liquidityUtilizationWad(
+            return liquidityUtilizationWad(
               stRaw,
               toWad(terms.minLiquidity),
               toWad(capital),
             );
-            return Number(util) / Number(WAD);
           },
           utilization,
           st,

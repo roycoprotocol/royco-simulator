@@ -18,7 +18,7 @@ import {
   type Snapshot,
   type YDMConfig,
 } from './types';
-import { adaptYTargetWithAverage, YEAR_SEC } from './ydm';
+import { YEAR_SEC } from './ydm';
 import {
   Rounding,
   UINT256_MAX,
@@ -28,6 +28,7 @@ import {
   mulDiv,
   saturatingSub,
   toWad,
+  toWadFloor,
 } from './wad';
 import {
   type EclpParams,
@@ -35,19 +36,12 @@ import {
   eclpParamsForWeight,
   eclpSellValue,
   eclpTVL,
-  reservesPerL,
 } from './eclp';
 
 /** Fixed concentration used by the simulator's E-CLP quote model. Exported so
  * the UI can disclose the exact venue assumption without restating it. */
-export const DAY_ECLP_SIMULATION_LAMBDA = 250;
-export const DAY_ECLP_CANONICAL_PARAMS: EclpParams = {
-  alpha: 0.98,
-  beta: 1.0003,
-  c: 0.707106781186547524,
-  s: 0.707106781186547524,
-  lambda: DAY_ECLP_SIMULATION_LAMBDA,
-};
+export const DAY_ECLP_SIMULATION_LAMBDA = 1;
+const LT_WEIGHT_WAD = toWad('0.1');
 const VIRTUAL_SHARES = 1n;
 const VIRTUAL_VALUE = 1n;
 // Equivalent to the contract's finite dilution protection for a wiped tranche.
@@ -76,10 +70,10 @@ export function coverageUtilizationWad(
   jtEffective: bigint,
 ): bigint {
   if (coverageWad === 0n) return 0n;
-  const exposure = stRaw + jtRaw;
-  if (exposure === 0n) return 0n;
+  const collateralNAV = stRaw + jtRaw;
+  if (collateralNAV === 0n) return 0n;
   if (jtEffective === 0n) return UINT256_MAX;
-  return mulDiv(exposure, coverageWad, jtEffective, Rounding.Ceil);
+  return mulDiv(collateralNAV, coverageWad, jtEffective, Rounding.Ceil);
 }
 
 export function liquidityUtilizationWad(
@@ -147,26 +141,12 @@ function eclpParamsFor(cfg: MarketConfig): EclpParams {
   return eclpCache.params;
 }
 
-function poolSeniorWeightWad(cfg: MarketConfig): bigint {
-  const reserves = reservesPerL(eclpParamsFor(cfg), 1);
-  const total = reserves.x + reserves.y;
-  if (!(total > 0) || !Number.isFinite(total)) return 0n;
-  return toWad(Math.max(0, Math.min(1, reserves.x / total)));
-}
-
-export function valueForSharesWad(
-  shares: bigint,
-  totalValue: bigint,
-  totalSupply: bigint,
-): bigint {
-  if (shares <= 0n) return 0n;
-  return mulDiv(totalValue + VIRTUAL_VALUE, shares, totalSupply + VIRTUAL_SHARES);
-}
-
-export const stPriceWad = (state: LiveState): bigint =>
-  valueForSharesWad(WAD, state.stEffectiveNAV, state.stShares);
-export const jtPriceWad = (state: LiveState): bigint =>
-  valueForSharesWad(WAD, state.jtEffectiveNAV, state.jtShares);
+export const stPriceWad = (state: LiveState): bigint => state.stShares > 0n
+  ? mulDiv(state.stEffectiveNAV + VIRTUAL_VALUE, WAD, state.stShares + VIRTUAL_SHARES)
+  : WAD;
+export const jtPriceWad = (state: LiveState): bigint => state.jtShares > 0n
+  ? mulDiv(state.jtEffectiveNAV + VIRTUAL_VALUE, WAD, state.jtShares + VIRTUAL_SHARES)
+  : WAD;
 
 export const poolValueWad = (state: LiveState): bigint =>
   mulDiv(state.pool.stShares, stPriceWad(state), WAD) + state.pool.stable;
@@ -184,7 +164,7 @@ export const ltOwnedSTValueWad = (state: LiveState): bigint =>
 export const ltEffectiveNAVWad = (state: LiveState, cfg: MarketConfig): bigint =>
   ltRawNAVWad(state, cfg) + ltOwnedSTValueWad(state);
 export const ltPriceWad = (state: LiveState, cfg: MarketConfig): bigint => state.ltShares > 0n
-  ? valueForSharesWad(WAD, ltEffectiveNAVWad(state, cfg), state.ltShares)
+  ? mulDiv(ltEffectiveNAVWad(state, cfg) + VIRTUAL_VALUE, WAD, state.ltShares + VIRTUAL_SHARES)
   : WAD;
 
 export const stPrice = (state: LiveState) => fromWad(stPriceWad(state));
@@ -206,15 +186,119 @@ export function sharesForValueWad(
   const effectiveSupply = totalSupply + VIRTUAL_SHARES;
   const denominator = totalValue + VIRTUAL_VALUE;
   const fairShares = mulDiv(effectiveSupply, value, denominator);
-  let cap = UINT256_MAX;
-  if (mulDiv(effectiveSupply, WAD - MAX_MINT_DILUTION_WAD, MAX_MINT_DILUTION_WAD, Rounding.Ceil) > denominator) {
-    cap = mulDiv(effectiveSupply, MAX_MINT_DILUTION_WAD, WAD - MAX_MINT_DILUTION_WAD);
-  }
+  const clampArmed = mulDiv(
+    effectiveSupply,
+    WAD - MAX_MINT_DILUTION_WAD,
+    MAX_MINT_DILUTION_WAD,
+    Rounding.Ceil,
+  ) > denominator;
+  if (!clampArmed) return fairShares;
+  const cap = mulDiv(
+    effectiveSupply,
+    MAX_MINT_DILUTION_WAD,
+    WAD - MAX_MINT_DILUTION_WAD,
+  );
   return minWad(fairShares, cap);
+}
+
+/** Current Royco tranche redemption pricing, including the one-wei virtual
+ * value/share offset used by the onchain ERC-4626 surfaces. */
+export function valueForSharesWad(
+  shares: bigint,
+  totalValue: bigint,
+  totalSupply: bigint,
+): bigint {
+  if (shares <= 0n) return 0n;
+  return mulDiv(totalValue + VIRTUAL_VALUE, shares, totalSupply + VIRTUAL_SHARES);
 }
 
 export function sharesForValue(value: number, totalValue: number, totalSupply: number): number {
   return fromWad(sharesForValueWad(toWad(value), toWad(totalValue), toWad(totalSupply)));
+}
+
+export interface FeeAndLiquidityPremiumWadInput {
+  stEffective: bigint;
+  jtEffective: bigint;
+  grossLiquidityPremium: bigint;
+  stProtocolFee: bigint;
+  jtProtocolFee: bigint;
+  lptProtocolFee: bigint;
+  stSupply: bigint;
+  jtSupply: bigint;
+  lptSupply: bigint;
+  reinvestSucceeded: boolean;
+}
+
+export interface FeeAndLiquidityPremiumWadResult {
+  stSupplyAfter: bigint;
+  jtSupplyAfter: bigint;
+  lptSupplyAfter: bigint;
+  premiumShares: bigint;
+  stFeeShares: bigint;
+  jtFeeShares: bigint;
+  lptFeeShares: bigint;
+  idlePremiumShares: bigint;
+}
+
+/** Exact share-mint surface of FeeAndLiquidityPremiumLogic. Current Royco Day
+ * carves the LPT fee out as protocol-owned Senior shares and never mints LPT
+ * fee shares. A failed reinvestment leaves the premium's Senior shares idle. */
+export function processFeeAndLiquidityPremiumWad(
+  input: FeeAndLiquidityPremiumWadInput,
+): FeeAndLiquidityPremiumWadResult {
+  const retainedSeniorNAV = saturatingSub(
+    input.stEffective,
+    input.grossLiquidityPremium + input.stProtocolFee,
+  );
+  const premiumShares = sharesForValueWad(
+    saturatingSub(input.grossLiquidityPremium, input.lptProtocolFee),
+    retainedSeniorNAV,
+    input.stSupply,
+  );
+  const stFeeShares = sharesForValueWad(
+    input.stProtocolFee + input.lptProtocolFee,
+    retainedSeniorNAV,
+    input.stSupply,
+  );
+  const jtFeeShares = sharesForValueWad(
+    input.jtProtocolFee,
+    saturatingSub(input.jtEffective, input.jtProtocolFee),
+    input.jtSupply,
+  );
+  return {
+    stSupplyAfter: input.stSupply + premiumShares + stFeeShares,
+    jtSupplyAfter: input.jtSupply + jtFeeShares,
+    lptSupplyAfter: input.lptSupply,
+    premiumShares,
+    stFeeShares,
+    jtFeeShares,
+    lptFeeShares: 0n,
+    idlePremiumShares: input.reinvestSucceeded ? 0n : premiumShares,
+  };
+}
+
+export interface RawNAVClaimsWad {
+  stClaimOnST: bigint;
+  stClaimOnJT: bigint;
+  jtClaimOnST: bigint;
+  jtClaimOnJT: bigint;
+}
+
+export function rawNAVClaimsWad(
+  _stRaw: bigint,
+  _jtRaw: bigint,
+  stEffective: bigint,
+  jtEffective: bigint,
+): RawNAVClaimsWad {
+  // Compatibility projection for callers written before Royco Day moved to a
+  // single coinvested collateral asset. Both tranches now redeem that asset;
+  // there are no cross-asset claim legs.
+  return {
+    stClaimOnST: stEffective,
+    stClaimOnJT: 0n,
+    jtClaimOnST: jtEffective,
+    jtClaimOnJT: 0n,
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -232,16 +316,80 @@ export function ydmShareWad(
   const configuredTarget = toWad(cfg.yTarget);
   const lowerSpread = configuredTarget - toWad(cfg.y0);
   const upperSpread = toWad(cfg.y100) - configuredTarget;
-  const y0 = saturatingSub(liveTarget, lowerSpread);
-  const y100 = minWad(WAD, liveTarget + upperSpread);
-  if (utilization < targetUtilizationWad) {
-    const slope = mulDiv(liveTarget - y0, WAD, targetUtilizationWad);
-    return y0 + mulDiv(slope, utilization, WAD);
+  if (utilization <= targetUtilizationWad) {
+    if (targetUtilizationWad === 0n) return liveTarget;
+    const normalizedMagnitude = mulDiv(targetUtilizationWad - utilization, WAD, targetUtilizationWad);
+    const adjustment = mulDiv(normalizedMagnitude, lowerSpread, WAD);
+    return saturatingSub(liveTarget, adjustment);
   }
   const denominator = WAD - targetUtilizationWad;
   if (denominator === 0n) return liveTarget;
-  const slope = mulDiv(y100 - liveTarget, WAD, denominator);
-  return liveTarget + mulDiv(slope, utilization - targetUtilizationWad, WAD);
+  const normalizedMagnitude = mulDiv(utilization - targetUtilizationWad, WAD, denominator);
+  const adjustment = mulDiv(normalizedMagnitude, upperSpread, WAD);
+  return minWad(WAD, liveTarget + adjustment);
+}
+
+const EXP_WAD_ZERO_THRESHOLD = -41446531673892822313n;
+const EXP_WAD_OVERFLOW_THRESHOLD = 135305999368893231589n;
+const MAX_LINEAR_ADAPTATION_WAD = 135305999368893231588n;
+
+/** Exact BigInt port of Solady FixedPointMathLib.expWad used by the canonical
+ * AdaptiveCurveYDM_V2. Signed BigInt division truncates toward zero, matching
+ * EVM `sdiv`; signed right shifts match `sar`. */
+function expWad(xInput: bigint): bigint {
+  let x = xInput;
+  if (x <= EXP_WAD_ZERO_THRESHOLD) return 0n;
+  if (x >= EXP_WAD_OVERFLOW_THRESHOLD) throw new Error('EXP_WAD_OVERFLOW');
+  x = (x << 78n) / (5n ** 18n);
+  const k = (((x << 96n) / 54916777467707473351141471128n) + (2n ** 95n)) >> 96n;
+  x -= k * 54916777467707473351141471128n;
+
+  let y = x + 1346386616545796478920950773328n;
+  y = ((y * x) >> 96n) + 57155421227552351082224309758442n;
+  let p = y + x - 94201549194550492254356042504812n;
+  p = ((p * y) >> 96n) + 28719021644029726153956944680412240n;
+  p = p * x + (4385272521454847904659076985693276n << 96n);
+
+  let q = x - 2855989394907223263936484059900n;
+  q = ((q * x) >> 96n) + 50020603652535783019961831881945n;
+  q = ((q * x) >> 96n) - 533845033583426703283633433725380n;
+  q = ((q * x) >> 96n) + 3604857256930695427073651918091429n;
+  q = ((q * x) >> 96n) - 14423608567350463180887372962807573n;
+  q = ((q * x) >> 96n) + 26449188498355588339934803723976023n;
+
+  const r = p / q;
+  return (r * 3822833074963236453042738258902158003155416615667n) >> (195n - k);
+}
+
+export function adaptYTargetWadWithAverage(
+  cfg: YDMConfig,
+  current: bigint,
+  utilizationWad: bigint,
+  elapsed: bigint,
+  targetUtilizationWad: bigint,
+): { next: bigint; average: bigint } {
+  if (cfg.mode !== 'adaptive' || elapsed <= 0n) return { next: current, average: current };
+  const utilization = minWad(utilizationWad, WAD);
+  const maxDelta = utilization > targetUtilizationWad
+    ? WAD - targetUtilizationWad
+    : targetUtilizationWad;
+  if (maxDelta === 0n) return { next: current, average: current };
+  const normalizedDelta = ((utilization - targetUtilizationWad) * WAD) / maxDelta;
+  const speedAtBoundaryWad = toWad(cfg.maxAdaptSpeedPerYear ?? 1) / BigInt(YEAR_SEC);
+  const currentSpeedWad = (speedAtBoundaryWad * normalizedDelta) / WAD;
+  const linear = currentSpeedWad * elapsed;
+  const boundedLinear = linear > MAX_LINEAR_ADAPTATION_WAD
+    ? MAX_LINEAR_ADAPTATION_WAD
+    : linear;
+  const minTarget = toWad(cfg.minYTarget ?? 1e-4);
+  const maxTarget = toWad(cfg.maxYTarget ?? 1);
+  const computeTarget = (adaptation: bigint): bigint => {
+    const candidate = mulDiv(current, expWad(adaptation), WAD);
+    return candidate < minTarget ? minTarget : candidate > maxTarget ? maxTarget : candidate;
+  };
+  const next = computeTarget(boundedLinear);
+  const midpoint = computeTarget(boundedLinear / 2n);
+  return { next, average: (current + next + 2n * midpoint) / 4n };
 }
 
 function adaptTarget(
@@ -251,14 +399,13 @@ function adaptTarget(
   elapsed: bigint,
   targetUtilization: number,
 ): { next: bigint; average: bigint } {
-  const result = adaptYTargetWithAverage(
+  return adaptYTargetWadWithAverage(
     cfg,
-    fromWad(current),
-    utilizationNumber(utilizationWad),
-    Number(elapsed),
-    targetUtilization,
+    current,
+    utilizationWad,
+    elapsed,
+    toWad(targetUtilization),
   );
-  return { next: toWad(result.next), average: toWad(result.average) };
 }
 
 export interface ReconcileExtras {
@@ -303,8 +450,9 @@ export function reconcile(
   const oldJtRaw = state.jtRawNAV;
   const oldStEffective = state.stEffectiveNAV;
   const oldJtEffective = state.jtEffectiveNAV;
-  const oldCollateral = oldStRaw + oldJtRaw;
-  const newCollateral = newStRaw + newJtRaw;
+  let oldCollateralNAV = oldStRaw + oldJtRaw;
+  const newCollateralNAV = newStRaw + newJtRaw;
+  const deltaCollateralNAV = newCollateralNAV - oldCollateralNAV;
 
   const coverageWad = toWad(cfg.coverage);
   const minLiquidityWad = toWad(cfg.minLiquidity);
@@ -374,33 +522,36 @@ export function reconcile(
   let liquidityShareUsed = 0n;
   let premiumsPaid = false;
 
-  if (newCollateral < oldCollateral) {
-    let loss = oldCollateral - newCollateral;
-    const juniorLoss = minWad(loss, jtEffective);
-    if (juniorLoss > 0n) {
-      jtEffective -= juniorLoss;
-      jtImpermanentLoss += juniorLoss;
-      loss -= juniorLoss;
+  // v1.1.0 has one coinvested collateral mark. Losses consume Junior first,
+  // including Junior's own pro-rata economic loss, and every absorbed wei is
+  // recorded as recoverable Junior IL. Gains repay that ledger before any
+  // residual appreciation is split between the restored effective claims.
+  if (deltaCollateralNAV < 0n) {
+    let loss = -deltaCollateralNAV;
+    const juniorAbsorption = minWad(loss, jtEffective);
+    if (juniorAbsorption > 0n) {
+      jtEffective -= juniorAbsorption;
+      jtImpermanentLoss += juniorAbsorption;
+      loss -= juniorAbsorption;
     }
     if (loss > 0n) {
       stEffective -= loss;
       stImpermanentLoss += loss;
     }
-  } else if (newCollateral > oldCollateral) {
-    const totalGain = newCollateral - oldCollateral;
-    let gain = totalGain;
+  } else if (deltaCollateralNAV > 0n) {
+    let gain = deltaCollateralNAV;
     const recovery = minWad(gain, jtImpermanentLoss);
     if (recovery > 0n) {
       jtImpermanentLoss -= recovery;
       jtEffective += recovery;
       gain -= recovery;
+      oldCollateralNAV += recovery;
     }
-    stImpermanentLoss = saturatingSub(stImpermanentLoss, totalGain);
-    const restoredCollateral = oldCollateral + recovery;
+    stImpermanentLoss = saturatingSub(stImpermanentLoss, deltaCollateralNAV);
     if (gain > 0n) {
-      const stGain = restoredCollateral === 0n
+      const stGain = oldCollateralNAV === 0n
         ? gain
-        : mulDiv(gain, stEffective, restoredCollateral);
+        : mulDiv(gain, stEffective, oldCollateralNAV);
       const jtGain = gain - stGain;
       if (jtGain > 0n) {
         if (jtGain > dust) {
@@ -409,48 +560,59 @@ export function reconcile(
         jtEffective += jtGain;
       }
       if (stGain > 0n) {
-      premiumsPaid = stGain > dust;
-      let elapsedSincePremium = state.t - state.lastPremiumPaymentSec;
-      if (elapsedSincePremium === 0n) elapsedSincePremium = 1n;
-      const instantaneousRisk = minWad(
-        ydmShareWad(cfg.riskYDM, state.riskYTarget, preCoverage, targetUtilWad),
-        toWad(cfg.maxJTYieldShare),
-      );
-      const instantaneousLiquidity = minWad(
-        ydmShareWad(cfg.liqYDM, state.liqYTarget, preLiquidity, liquidityTargetWad),
-        toWad(cfg.maxLTYieldShare),
-      );
-      riskShareUsed = state.twRiskShareSeconds > 0n
-        ? state.twRiskShareSeconds / elapsedSincePremium
-        : instantaneousRisk;
-      liquidityShareUsed = state.twLiqShareSeconds > 0n
-        ? state.twLiqShareSeconds / elapsedSincePremium
-        : instantaneousLiquidity;
-      if (riskShareUsed + liquidityShareUsed > WAD) {
-        throw new Error('PREMIUMS_EXCEED_SENIOR_YIELD');
-      }
-      const juniorPremium = mulDiv(stGain, riskShareUsed, WAD);
-      liquidityPremium = mulDiv(stGain, liquidityShareUsed, WAD);
-      const retainedSeniorGain = stGain - juniorPremium - liquidityPremium;
-      if (juniorPremium > 0n) {
-        if (premiumsPaid) {
-          jtProtocolFee += mulDiv(juniorPremium, toWad(cfg.yieldShareProtocolFee), WAD);
+        premiumsPaid = stGain > dust;
+        const elapsedSincePremium = state.t - state.lastPremiumPaymentSec;
+        const samePremiumBlock = elapsedSincePremium === 0n;
+        const instantaneousRisk = minWad(
+          ydmShareWad(cfg.riskYDM, state.riskYTarget, preCoverage, targetUtilWad),
+          toWad(cfg.maxJTYieldShare),
+        );
+        const instantaneousLiquidity = minWad(
+          ydmShareWad(cfg.liqYDM, state.liqYTarget, preLiquidity, liquidityTargetWad),
+          toWad(cfg.maxLTYieldShare),
+        );
+
+        // RoycoDayAccountant selects one branch for both tranches based only on
+        // elapsed time. A zero accumulator in a nonzero window must therefore
+        // remain zero; it must not fall back to a newly observed spot rate.
+        riskShareUsed = samePremiumBlock
+          ? instantaneousRisk
+          : state.twRiskShareSeconds / elapsedSincePremium;
+        liquidityShareUsed = samePremiumBlock
+          ? instantaneousLiquidity
+          : state.twLiqShareSeconds / elapsedSincePremium;
+
+        // Match the contract's single mulDiv. Dividing the weighted accumulator
+        // first would introduce a second floor and can lose one wei.
+        const juniorPremium = samePremiumBlock
+          ? mulDiv(stGain, instantaneousRisk, WAD)
+          : mulDiv(stGain, state.twRiskShareSeconds, elapsedSincePremium * WAD);
+        liquidityPremium = samePremiumBlock
+          ? mulDiv(stGain, instantaneousLiquidity, WAD)
+          : mulDiv(stGain, state.twLiqShareSeconds, elapsedSincePremium * WAD);
+        if (juniorPremium + liquidityPremium > stGain) {
+          throw new Error('PREMIUMS_EXCEED_SENIOR_YIELD');
         }
-        jtEffective += juniorPremium;
-      }
-      if (liquidityPremium > 0n && premiumsPaid) {
-        ltProtocolFee = mulDiv(liquidityPremium, toWad(cfg.ltYieldShareProtocolFee), WAD);
-      }
-      if (premiumsPaid) {
-        stProtocolFee = mulDiv(retainedSeniorGain, toWad(cfg.stProtocolFee), WAD);
-      }
-      // LT premium remains in ST effective NAV; ownership moves by minting ST shares.
-      stEffective += retainedSeniorGain + liquidityPremium;
+        const retainedSeniorGain = stGain - juniorPremium - liquidityPremium;
+        if (juniorPremium > 0n) {
+          if (premiumsPaid) {
+            jtProtocolFee += mulDiv(juniorPremium, toWad(cfg.yieldShareProtocolFee), WAD);
+          }
+          jtEffective += juniorPremium;
+        }
+        if (liquidityPremium > 0n && premiumsPaid) {
+          ltProtocolFee = mulDiv(liquidityPremium, toWad(cfg.ltYieldShareProtocolFee), WAD);
+        }
+        if (premiumsPaid) {
+          stProtocolFee = mulDiv(retainedSeniorGain, toWad(cfg.stProtocolFee), WAD);
+        }
+        // LT premium remains in ST effective NAV; ownership moves by minting ST shares.
+        stEffective += retainedSeniorGain + liquidityPremium;
       }
     }
   }
 
-  if (newCollateral !== stEffective + jtEffective) {
+  if (newCollateralNAV !== stEffective + jtEffective) {
     throw new Error('NAV_CONSERVATION_VIOLATION');
   }
 
@@ -463,19 +625,19 @@ export function reconcile(
   );
   const expired = initialState === MarketState.FIXED_TERM && state.fixedTermEndSec <= state.t;
   const breached = coverageAfter >= toWad(cfg.liquidationUtilization);
-  const noSenior = stEffective === 0n;
+  const noSeniorToProtect = stEffective === 0n;
   const juniorWiped = jtEffective === 0n;
-  const inDeploymentGrace = state.t < asSeconds(cfg.fixedTermGracePeriodSec);
+  const withinDeploymentGrace = state.t < asSeconds(cfg.fixedTermGracePeriodSec);
   let nextState: MarketState;
   let erased = 0n;
   if (
     cfg.fixedTermDurationSec === 0 ||
-    noSenior ||
+    noSeniorToProtect ||
     juniorWiped ||
     jtImpermanentLoss <= dust ||
     expired ||
     breached ||
-    inDeploymentGrace
+    withinDeploymentGrace
   ) {
     erased = jtImpermanentLoss;
     jtImpermanentLoss = 0n;
@@ -520,31 +682,30 @@ export function reconcile(
 
   let feeNAV = 0n;
   if (nextState === MarketState.PERPETUAL) {
-    const preMintSeniorSupply = state.stShares;
-    const retainedSeniorNAV = saturatingSub(stEffective, liquidityPremium + stProtocolFee);
-    const netLiquidityPremium = saturatingSub(liquidityPremium, ltProtocolFee);
-    const premiumShares = sharesForValueWad(netLiquidityPremium, retainedSeniorNAV, preMintSeniorSupply);
-    const seniorFeeShares = sharesForValueWad(stProtocolFee + ltProtocolFee, retainedSeniorNAV, preMintSeniorSupply);
-    state.stShares += premiumShares + seniorFeeShares;
-    state.protocolSTShares += seniorFeeShares;
-
-    // The current kernel mints the LPT premium net of its protocol fee as ST
-    // shares. The fee is remitted as ST shares; it never mints LPT shares.
-    if (cfg.reinvestLiquidityPremium) state.pool.stShares += premiumShares;
-    else state.ltOwnedSTShares += premiumShares;
-
-    const juniorFeeShares = sharesForValueWad(
+    const processed = processFeeAndLiquidityPremiumWad({
+      stEffective,
+      jtEffective,
+      grossLiquidityPremium: liquidityPremium,
+      stProtocolFee,
       jtProtocolFee,
-      saturatingSub(jtEffective, jtProtocolFee),
-      state.jtShares,
-    );
-    state.jtShares += juniorFeeShares;
-    state.protocolJTShares += juniorFeeShares;
+      lptProtocolFee: ltProtocolFee,
+      stSupply: state.stShares,
+      jtSupply: state.jtShares,
+      lptSupply: state.ltShares,
+      reinvestSucceeded: cfg.reinvestLiquidityPremium,
+    });
+    state.stShares = processed.stSupplyAfter;
+    state.jtShares = processed.jtSupplyAfter;
+    state.ltShares = processed.lptSupplyAfter;
+    state.protocolSTShares += processed.stFeeShares;
+    state.protocolJTShares += processed.jtFeeShares;
 
-    state.stRawNAV = newStRaw;
-    state.jtRawNAV = newJtRaw;
-    state.stEffectiveNAV = stEffective;
-    state.jtEffectiveNAV = jtEffective;
+    // FeeAndLiquidityPremiumLogic attempts to reinvest the full premium. The
+    // market config chooses the deterministic outcome of that contract call;
+    // it does not choose or freeze the venue's variable yield/volume economics.
+    if (cfg.reinvestLiquidityPremium) state.pool.stShares += processed.premiumShares;
+    else state.ltOwnedSTShares += processed.idlePremiumShares;
+
     feeNAV = stProtocolFee + jtProtocolFee + ltProtocolFee;
   }
 
@@ -597,7 +758,8 @@ export interface PostOpAccountingResult {
 /** Wei-exact mirror of RoycoDayAccountant.postOpSyncTrancheAccounting. */
 export function postOpAccountingWad(
   state: Pick<LiveState, 'stRawNAV' | 'jtRawNAV' | 'stEffectiveNAV' | 'jtEffectiveNAV' | 'jtImpermanentLoss'>,
-  cfg: Pick<MarketConfig, 'beta' | 'coverage' | 'liquidationUtilization' | 'minLiquidity'>,
+  cfg: Pick<MarketConfig, 'beta' | 'coverage' | 'minLiquidity'> &
+    Partial<Pick<MarketConfig, 'liquidationUtilization'>>,
   input: {
     operation: ContractOperation;
     stRaw: bigint;
@@ -608,12 +770,13 @@ export function postOpAccountingWad(
     enforce: boolean;
   },
 ): PostOpAccountingResult {
-  const oldCollateral = state.stRawNAV + state.jtRawNAV;
+  const previousCollateral = state.stRawNAV + state.jtRawNAV;
   const collateral = input.stRaw + input.jtRaw;
-  const deltaCollateral = collateral - oldCollateral;
+  const deltaCollateral = collateral - previousCollateral;
   const deltaLT = input.ltRaw - input.previousLTRaw;
   let stEffective = state.stEffectiveNAV;
   let jtEffective = state.jtEffectiveNAV;
+  const jtIL = state.jtImpermanentLoss;
   const invalid = (): never => { throw new Error('INVALID_POST_OP_STATE'); };
 
   if (input.operation === 'ST_DEPOSIT') {
@@ -624,18 +787,23 @@ export function postOpAccountingWad(
     jtEffective += deltaCollateral;
   } else if (input.operation === 'LT_DEPOSIT') {
     if (deltaLT <= 0n || deltaCollateral !== 0n || input.bonus !== 0n) invalid();
-  } else if (input.operation === 'LT_REDEEM') {
-    if (deltaLT >= 0n || deltaCollateral !== 0n || input.bonus !== 0n) invalid();
-  } else if (input.operation === 'ST_REDEEM') {
-    if (deltaCollateral >= 0n || deltaLT !== 0n || input.bonus > jtEffective || -deltaCollateral < input.bonus) invalid();
-    jtEffective -= input.bonus;
-    stEffective -= -deltaCollateral - input.bonus;
   } else {
-    if (deltaCollateral >= 0n || deltaLT !== 0n || input.bonus !== 0n) invalid();
-    jtEffective -= -deltaCollateral;
+    if (input.operation === 'ST_REDEEM') {
+      if (deltaCollateral >= 0n || deltaLT !== 0n) invalid();
+      const totalRedemption = -deltaCollateral;
+      if (input.bonus > jtEffective || totalRedemption < input.bonus) invalid();
+      jtEffective -= input.bonus;
+      stEffective -= totalRedemption - input.bonus;
+    } else if (input.operation === 'JT_REDEEM') {
+      if (deltaCollateral >= 0n || deltaLT !== 0n || input.bonus !== 0n) invalid();
+      const totalRedemption = -deltaCollateral;
+      jtEffective -= totalRedemption;
+    } else {
+      if (deltaLT >= 0n || deltaCollateral !== 0n || input.bonus !== 0n) invalid();
+    }
   }
 
-  if (collateral !== stEffective + jtEffective) {
+  if (input.stRaw + input.jtRaw !== stEffective + jtEffective) {
     throw new Error('NAV_CONSERVATION_VIOLATION');
   }
   const coverageUtilWAD = coverageUtilizationWad(
@@ -657,7 +825,7 @@ export function postOpAccountingWad(
     ) throw new Error('COVERAGE_REQUIREMENT_VIOLATED');
     if (
       input.operation === 'JT_DEPOSIT' &&
-      coverageUtilWAD >= toWad(cfg.liquidationUtilization)
+      coverageUtilWAD >= toWad(cfg.liquidationUtilization ?? Number.MAX_SAFE_INTEGER)
     ) throw new Error('JT_DEPOSIT_BLOCKED_DURING_LIQUIDATION');
     if (
       (input.operation === 'ST_DEPOSIT' || input.operation === 'LT_REDEEM') &&
@@ -670,7 +838,7 @@ export function postOpAccountingWad(
     ltRaw: input.ltRaw,
     stEffective,
     jtEffective,
-    jtIL: state.jtImpermanentLoss,
+    jtIL,
     coverageUtilWAD,
     liquidityUtilWAD,
   };
@@ -678,31 +846,44 @@ export function postOpAccountingWad(
 
 export interface SelfLiquidationWadInput {
   bonusWAD: bigint;
+  stRaw: bigint;
+  jtRaw: bigint;
   stEffective: bigint;
   jtEffective: bigint;
   coverageUtilWAD: bigint;
   liquidationUtilWAD: bigint;
-  claimCollateral: bigint;
+  jtCoinvested: boolean;
+  claimST: bigint;
+  claimJT: bigint;
   claimNAV: bigint;
 }
 
 /** Wei-exact mirror of SelfLiquidationLogic for a precomputed Senior claim. */
 export function selfLiquidationClaimWad(input: SelfLiquidationWadInput): {
   bonus: bigint;
-  claimCollateral: bigint;
+  claimST: bigint;
+  claimJT: bigint;
   claimNAV: bigint;
 } {
   if (input.coverageUtilWAD < input.liquidationUtilWAD || input.jtEffective === 0n) {
-    return { bonus: 0n, claimCollateral: input.claimCollateral, claimNAV: input.claimNAV };
+    return { bonus: 0n, claimST: input.claimST, claimJT: input.claimJT, claimNAV: input.claimNAV };
   }
   const desired = mulDiv(input.claimNAV, input.bonusWAD, WAD);
-  const utilizationNeutralMax = input.stEffective === 0n
-    ? 0n
-    : mulDiv(input.claimNAV, input.jtEffective, input.stEffective);
+  if (input.claimNAV === 0n || input.stEffective === 0n) {
+    return { bonus: 0n, claimST: input.claimST, claimJT: input.claimJT, claimNAV: input.claimNAV };
+  }
+  const utilizationNeutralMax = mulDiv(
+    input.claimNAV,
+    input.jtEffective,
+    input.stEffective,
+  );
   const bonus = minWad(desired, minWad(input.jtEffective, utilizationNeutralMax));
   return {
     bonus,
-    claimCollateral: input.claimCollateral + bonus,
+    // Legacy output names: the single current collateral claim is represented
+    // by claimST. claimJT no longer identifies a second asset leg.
+    claimST: input.claimST + bonus,
+    claimJT: input.claimJT,
     claimNAV: input.claimNAV + bonus,
   };
 }
@@ -717,13 +898,15 @@ function blocked(state: LiveState, msg: string): OpResult {
   return { ok: false, events: [{ t: Number(state.t), kind: 'blocked', msg, level: 'warn' }] };
 }
 
-/** The contract holds one collateral asset. The two raw fields are retained as
- * display buckets, so withdrawals reduce them pro rata without affecting any
- * contract-facing calculation. */
-function removeCollateralWad(state: LiveState, amount: bigint): void {
-  const total = state.stRawNAV + state.jtRawNAV;
-  if (amount <= 0n) return;
-  if (amount > total) throw new Error('INSUFFICIENT_COLLATERAL');
+const collateralNAVWad = (state: Pick<LiveState, 'stRawNAV' | 'jtRawNAV'>) =>
+  state.stRawNAV + state.jtRawNAV;
+
+/** Debit the compatibility raw buckets pro-rata. The onchain market has one
+ * collateral ledger; only the sum is contract-facing. */
+function debitCollateralNAV(state: LiveState, amount: bigint): void {
+  const total = collateralNAVWad(state);
+  if (amount < 0n || amount > total) throw new Error('COLLATERAL_DEBIT_EXCEEDS_BALANCE');
+  if (amount === 0n) return;
   const fromST = total === 0n ? 0n : mulDiv(amount, state.stRawNAV, total);
   state.stRawNAV -= fromST;
   state.jtRawNAV -= amount - fromST;
@@ -766,7 +949,7 @@ export function jtDeposit(state: LiveState, cfg: MarketConfig, amount: number): 
     state.jtEffectiveNAV + amountWad,
   );
   if (coverageAfter >= toWad(cfg.liquidationUtilization)) {
-    return blocked(state, 'JT deposit blocked: the deposit would leave coverage at or above the Protected Exit threshold.');
+    return blocked(state, 'JT deposit blocked during coverage liquidation.');
   }
   const shares = sharesForValueWad(amountWad, state.jtEffectiveNAV, state.jtShares);
   state.jtRawNAV += amountWad;
@@ -791,7 +974,7 @@ export function stRedeem(state: LiveState, cfg: MarketConfig, shareAmount: numbe
       : 0n;
     bonus = minWad(desired, minWad(state.jtEffectiveNAV, neutralCap));
   }
-  removeCollateralWad(state, redemptionNAV + bonus);
+  debitCollateralNAV(state, redemptionNAV + bonus);
   state.stEffectiveNAV -= redemptionNAV;
   state.stShares -= shares;
   if (bonus > 0n) state.jtEffectiveNAV -= bonus;
@@ -809,16 +992,16 @@ export function jtRedeem(state: LiveState, cfg: MarketConfig, shareAmount: numbe
   if (shares <= 0n || state.jtShares <= 0n) return blocked(state, 'JT redeem blocked: shares must be positive.');
   if (shares > state.jtShares) shares = state.jtShares;
   const redemptionNAV = valueForSharesWad(shares, state.jtEffectiveNAV, state.jtShares);
-  const totalCollateral = state.stRawNAV + state.jtRawNAV;
+  const collateralAfter = collateralNAVWad(state) - redemptionNAV;
   const coverageAfter = coverageUtilizationWad(
-    saturatingSub(totalCollateral, redemptionNAV),
+    collateralAfter,
     0n,
     cfg.beta,
     toWad(cfg.coverage),
     state.jtEffectiveNAV - redemptionNAV,
   );
   if (coverageAfter > WAD && !bypass) return blocked(state, `JT redeem blocked: coverage requirement would break (utilization ${(utilizationNumber(coverageAfter) * 100).toFixed(1)}% > 100%).`);
-  removeCollateralWad(state, redemptionNAV);
+  debitCollateralNAV(state, redemptionNAV);
   state.jtEffectiveNAV -= redemptionNAV;
   state.jtShares -= shares;
   return { ok: true, events: [{ t: Number(state.t), kind: 'jt-redeem', msg: `JT redeem ${fromWad(shares).toFixed(2)} shares → ${fmt(redemptionNAV)}.`, level: 'info' }] };
@@ -830,9 +1013,8 @@ export function ltDeposit(state: LiveState, cfg: MarketConfig, amount: number): 
   const shares = sharesForValueWad(amountWad, ltEffectiveNAVWad(state, cfg), state.ltShares);
   const rawBefore = ltRawNAVWad(state, cfg);
   if (rawBefore <= dustWad(cfg)) {
-    const seniorWeight = poolSeniorWeightWad(cfg);
-    state.pool.stShares += mulDiv(amountWad, seniorWeight, stPriceWad(state));
-    state.pool.stable += mulDiv(amountWad, WAD - seniorWeight, WAD);
+    state.pool.stShares += mulDiv(amountWad, LT_WEIGHT_WAD, stPriceWad(state));
+    state.pool.stable += mulDiv(amountWad, WAD - LT_WEIGHT_WAD, WAD);
   } else {
     state.pool.stShares += mulDiv(state.pool.stShares, amountWad, rawBefore);
     state.pool.stable += mulDiv(state.pool.stable, amountWad, rawBefore);
@@ -847,17 +1029,17 @@ export function ltRedeem(state: LiveState, cfg: MarketConfig, shareAmount: numbe
   if (shares <= 0n || state.ltShares <= 0n) return blocked(state, 'SLP redemption blocked: shares must be positive.');
   if (shares > state.ltShares) shares = state.ltShares;
   const effectiveSupply = state.ltShares + VIRTUAL_SHARES;
-  const poolSTOut = mulDiv(state.pool.stShares, shares, effectiveSupply);
-  const stableOut = mulDiv(state.pool.stable, shares, effectiveSupply);
+  const redeemedPoolSTShares = mulDiv(state.pool.stShares, shares, effectiveSupply);
+  const redeemedStable = mulDiv(state.pool.stable, shares, effectiveSupply);
+  const premiumSharesOut = mulDiv(state.ltOwnedSTShares, shares, effectiveSupply);
   const poolAfter = {
-    stShares: state.pool.stShares - poolSTOut,
-    stable: state.pool.stable - stableOut,
+    stShares: state.pool.stShares - redeemedPoolSTShares,
+    stable: state.pool.stable - redeemedStable,
   };
   const rawAfter = ltRawNAVWad({ ...state, pool: poolAfter }, cfg);
   const liquidityAfter = liquidityUtilizationWad(state.stEffectiveNAV, toWad(cfg.minLiquidity), rawAfter);
   if (liquidityAfter > WAD && !bypass) return blocked(state, `SLP redemption blocked: secondary liquidity would fall below minimum (liquidity utilization ${(utilizationNumber(liquidityAfter) * 100).toFixed(0)}% > 100% after redemption).`);
-  const bptOut = valueForSharesWad(shares, ltRawNAVWad(state, cfg), state.ltShares);
-  const premiumSharesOut = mulDiv(shares, state.ltOwnedSTShares, effectiveSupply);
+  const bptOut = mulDiv(ltRawNAVWad(state, cfg), shares, effectiveSupply);
   const premiumValueOut = mulDiv(premiumSharesOut, stPriceWad(state), WAD);
   state.pool = poolAfter;
   state.ltOwnedSTShares -= premiumSharesOut;
@@ -872,10 +1054,19 @@ export function secondarySell(state: LiveState, cfg: MarketConfig, amount: numbe
   const stableOut = toWad(quote.stableOutNAV);
   const filled = toWad(quote.filledNAV);
   const unfilled = toWad(quote.unfilledNAV);
+  // Balancer exact-input swaps are atomic. The partial-fill quote is useful for
+  // displaying pool capacity, but executing a larger order must leave the pool
+  // untouched rather than silently accepting only the fillable portion.
+  if (unfilled > 0n) {
+    return blocked(
+      state,
+      `Secondary sell blocked: the pool can fill at most ${fmt(filled)} ST in one atomic trade; reduce the ${fmt(toWad(quote.requestedNAV))} ST order.`,
+    );
+  }
   state.pool.stShares += mulDiv(filled, WAD, priceWad);
-  state.pool.stable = saturatingSub(state.pool.stable, stableOut);
-  const events: SimEvent[] = [{ t: Number(state.t), kind: 'secondary-sell', msg: `Secondary sell ${fmt(filled)} ST → ${fmt(stableOut)} stable (${(quote.slippage * 100).toFixed(1)}% slippage). Pool now ${(poolPctST(state) * 100).toFixed(0)}% ST.`, level: quote.slippage > 0.05 ? 'danger' : 'info' }];
-  if (unfilled > dustWad(cfg)) events.push({ t: Number(state.t), kind: 'secondary-sell', msg: `${fmt(unfilled)} of the ST sale could not fill — stable assets are depleted and the pool is all-ST. Remaining holders must wait for primary redemption, which is paused during the Observation Period.`, level: 'danger' });
+  if (stableOut > state.pool.stable) throw new Error('SECONDARY_EXIT_OUTPUT_EXCEEDS_POOL');
+  state.pool.stable -= stableOut;
+  const events: SimEvent[] = [{ t: Number(state.t), kind: 'secondary-sell', msg: `Secondary sell ${fmt(filled)} ST → ${fmt(stableOut)} stable (${(quote.slippage * 100).toFixed(1)}% all-in cost, including ${fmt(toWad(quote.swapFeeNAV))} swap fee). Pool now ${(poolPctST(state) * 100).toFixed(0)}% ST.`, level: quote.slippage > 0.05 ? 'danger' : 'info' }];
   return { ok: true, events };
 }
 
@@ -890,10 +1081,37 @@ export function previewSecondarySell(
 ): SecondaryExitQuote {
   const requested = toWad(Math.max(0, amount));
   const priceWad = stPriceWad(state);
+  const swapFeeWad = toWad(cfg.swapFeeBps / 10_000);
+  if (swapFeeWad < 0n || swapFeeWad > WAD) {
+    throw new Error('INVALID_SWAP_FEE');
+  }
   if (requested === 0n || priceWad === 0n || state.pool.stable === 0n) {
     return {
       requestedNAV: fromWad(requested),
       filledNAV: 0,
+      effectiveInputNAV: 0,
+      swapFeeNAV: 0,
+      stableOutNAV: 0,
+      unfilledNAV: fromWad(requested),
+      executionPrice: 0,
+      slippage: requested === 0n ? 0 : 1,
+      poolPctSTAfter: poolPctST(state),
+    };
+  }
+  const feeForGross = (gross: bigint) => mulDiv(
+    gross,
+    swapFeeWad,
+    WAD,
+    Rounding.Ceil,
+  );
+  const netForGross = (gross: bigint) => saturatingSub(gross, feeForGross(gross));
+  const requestedNet = netForGross(requested);
+  if (requestedNet === 0n) {
+    return {
+      requestedNAV: fromWad(requested),
+      filledNAV: 0,
+      effectiveInputNAV: 0,
+      swapFeeNAV: 0,
       stableOutNAV: 0,
       unfilledNAV: fromWad(requested),
       executionPrice: 0,
@@ -903,14 +1121,45 @@ export function previewSecondarySell(
   }
   const seniorLeg = mulDiv(state.pool.stShares, priceWad, WAD);
   const params = eclpParamsFor(cfg);
+  const requestedNetNumber = fromWad(requestedNet);
   const rawQuote = eclpSellValue(
     params,
     fromWad(seniorLeg),
     fromWad(state.pool.stable),
-    fromWad(requested),
+    requestedNetNumber,
   );
-  const stableOut = toWad(rawQuote.stableOut);
-  const filled = toWad(rawQuote.filled);
+  const netCapacity = minWad(toWad(rawQuote.filled), requestedNet);
+
+  // The E-CLP reports capacity in fee-adjusted units. Convert that capacity
+  // back to the largest gross seller amount whose rounded-up fee still fits.
+  let filled = requested;
+  const fullFillTolerance = Math.max(1e-12, requestedNetNumber * 1e-12);
+  if (rawQuote.filled + fullFillTolerance < requestedNetNumber) {
+    let low = 0n;
+    let high = requested;
+    while (low < high) {
+      const middle = (low + high + 1n) / 2n;
+      if (netForGross(middle) <= netCapacity) low = middle;
+      else high = middle - 1n;
+    }
+    filled = low;
+  }
+  const swapFee = filled > 0n ? feeForGross(filled) : 0n;
+  const effectiveInput = saturatingSub(filled, swapFee);
+  const appliedQuote = effectiveInput > 0n
+    ? eclpSellValue(
+        params,
+        fromWad(seniorLeg),
+        fromWad(state.pool.stable),
+        fromWad(effectiveInput),
+      )
+    : { stableOut: 0, filled: 0 };
+  // The E-CLP adapter is float-based. Quantize outputs down, then cap them at
+  // the actual reserve so a boundary quote can never create a sub-wei overdraft.
+  const stableOut = minWad(
+    toWadFloor(Math.max(0, appliedQuote.stableOut)),
+    state.pool.stable,
+  );
   const unfilled = saturatingSub(requested, filled);
   const poolAfter: LiveState = {
     ...state,
@@ -922,6 +1171,8 @@ export function previewSecondarySell(
   return {
     requestedNAV: fromWad(requested),
     filledNAV: fromWad(filled),
+    effectiveInputNAV: fromWad(effectiveInput),
+    swapFeeNAV: fromWad(swapFee),
     stableOutNAV: fromWad(stableOut),
     unfilledNAV: fromWad(unfilled),
     executionPrice: filled > 0n ? fromWad(stableOut) / fromWad(filled) : 0,
@@ -1044,7 +1295,6 @@ export function newMarket(cfg: MarketConfig, init: { st: number; jt: number; lt:
   const st = toWad(init.st);
   const jt = toWad(init.jt);
   const liquidity = toWad(init.lt);
-  const seniorWeight = poolSeniorWeightWad(cfg);
   const state: LiveState = {
     t: 0n,
     marketState: MarketState.PERPETUAL,
@@ -1062,8 +1312,8 @@ export function newMarket(cfg: MarketConfig, init: { st: number; jt: number; lt:
     protocolJTShares: 0n,
     protocolLTShares: 0n,
     pool: {
-      stShares: mulDiv(liquidity, seniorWeight, WAD),
-      stable: mulDiv(liquidity, WAD - seniorWeight, WAD),
+      stShares: mulDiv(liquidity, LT_WEIGHT_WAD, WAD),
+      stable: mulDiv(liquidity, WAD - LT_WEIGHT_WAD, WAD),
     },
     ltOwnedSTShares: 0n,
     riskYTarget: toWad(cfg.riskYDM.yTarget),

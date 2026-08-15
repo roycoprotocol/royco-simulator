@@ -33,8 +33,17 @@ export function Card({
   );
 }
 
+/**
+ * `pb-3` is load-bearing. The header and the content are adjacent siblings with
+ * nothing between them, so when padding moved into this primitive and the
+ * per-card `pb-4` overrides were deleted with it, every heading ended up
+ * touching the first line of its own content — most visibly on the three
+ * position cards, where a 44px APY sat flush against its caption.
+ */
 export function CardHeader({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("flex flex-col gap-1 px-5 pt-5", className)} {...props} />;
+  return (
+    <div className={cn("flex flex-col gap-1 px-4 pb-3 pt-4", className)} {...props} />
+  );
 }
 
 /**
@@ -66,6 +75,20 @@ export function CardDescription({ className, ...props }: HTMLAttributes<HTMLPara
   );
 }
 
+/**
+ * A description sized for a card sitting inside a numbered section, where the
+ * group already carries a subtitle and a second relaxed 12px paragraph reads as
+ * a competing one. Same element, one step down.
+ */
+export function CardNote({ className, ...props }: HTMLAttributes<HTMLParagraphElement>) {
+  return (
+    <p
+      className={cn("text-[10.5px] leading-snug text-[var(--tertiary)]", className)}
+      {...props}
+    />
+  );
+}
+
 export function CardContent({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("px-5 pb-5", className)} {...props} />;
+  return <div className={cn("px-4 pb-4", className)} {...props} />;
 }

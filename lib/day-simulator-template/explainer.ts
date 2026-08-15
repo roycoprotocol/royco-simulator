@@ -13,6 +13,8 @@ export type CoverageLossPoint = {
 
 export type LiquidityCurvePoint = {
   sellNAV: number;
+  effectiveInputNAV: number;
+  swapFeeNAV: number;
   executionPrice: number;
   slippage: number;
 };
@@ -74,6 +76,12 @@ function findSellAtSlippage(
   boundary: SecondaryExitQuote,
   target: number,
 ): { sellNAV: number; quote: SecondaryExitQuote } {
+  // The exact-input fee alone reaches the reference at this point; every
+  // positive E-CLP trade adds some curve impact, so no positive trade can
+  // honestly be described as meeting the target.
+  if (sim.cfg.swapFeeBps / 10_000 >= target) {
+    return { sellNAV: 0, quote: sim.previewSecondarySell(0) };
+  }
   if (boundary.slippage <= target) {
     return { sellNAV: boundary.filledNAV, quote: sim.previewSecondarySell(boundary.filledNAV) };
   }
@@ -105,12 +113,16 @@ export function buildDayExplainerMetrics(
     const quote = opening.previewSecondarySell(sellNAV);
     return {
       sellNAV: quote.filledNAV,
+      effectiveInputNAV: quote.effectiveInputNAV,
+      swapFeeNAV: quote.swapFeeNAV,
       executionPrice: quote.executionPrice,
       slippage: quote.slippage,
     };
   });
   curve.push({
     sellNAV: reference.sellNAV,
+    effectiveInputNAV: reference.quote.effectiveInputNAV,
+    swapFeeNAV: reference.quote.swapFeeNAV,
     executionPrice: reference.quote.executionPrice,
     slippage: reference.quote.slippage,
   });

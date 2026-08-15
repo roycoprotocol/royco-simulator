@@ -37,6 +37,21 @@ bun dev
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
+### Day V3 service configuration
+
+Day V3 delegates E-CLP policy and fee resolution to the canonical RWA deploy
+service. Production deployments must configure both values below; there is no
+production fallback fee or local pool solver.
+
+```bash
+DAY_V3_POOL_DESIGN_SERVICE_URL=https://rwa.example/api/deploy-market/pool-design/v1
+DAWN_RWA_PROXY_SHARED_SECRET=<same high-entropy secret configured by RWA>
+```
+
+The shared secret authenticates proxy-to-proxy traffic and preserves a stable,
+privacy-safe client key for rate limiting. Rotate it in both applications at
+the same time.
+
 You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.

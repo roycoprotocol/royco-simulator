@@ -15,8 +15,8 @@ import {
   buildDayMarketConfig,
   runDayTargetScenario,
 } from "./runtime";
-import { annualizedSeriesApy, hasObservedDrawdown } from "./series";
 import { dayLiquidationUtilizationFromExitBuffer } from "./deploy-fields";
+import { annualizedSeriesApy, hasObservedDrawdown } from "./series";
 
 const market = manifest as DayMarketManifest;
 assert.deepEqual(validateDayMarketCustomization(market.customization), []);
@@ -24,13 +24,15 @@ assert.deepEqual(describeDayMarketCustomizations(market.customization), []);
 
 const authorizedCustomization = {
   explicitlyAuthorized: true,
-  authorizationNote: "User explicitly authorized hiding Backtest for this market.",
+  authorizationNote:
+    "User explicitly authorized hiding Backtest for this market.",
   hiddenSections: ["backtest" as const],
   copyOverrides: { heroTitle: "A market-specific factual headline." },
   vaultTabs: { group: "test-vaults", label: "Test vault" },
   backtestDisplay: {
     returnUnit: "ETH" as const,
-    footnote: "The historical path excludes a transient oracle mark. A same-block sync belongs in a separate stress scenario.",
+    footnote:
+      "The historical path excludes a transient oracle mark. A same-block sync belongs in a separate stress scenario.",
   },
 };
 assert.deepEqual(validateDayMarketCustomization(authorizedCustomization), []);
@@ -43,29 +45,39 @@ assert.deepEqual(describeDayMarketCustomizations(authorizedCustomization), [
 ]);
 assert.equal(isDaySectionVisible(authorizedCustomization, "backtest"), false);
 assert.equal(isDaySectionVisible(authorizedCustomization, "roles"), true);
-assert.ok(validateDayMarketCustomization({
-  ...authorizedCustomization,
-  explicitlyAuthorized: false,
-}).some((issue) => issue.includes("explicit authorization")));
-assert.ok(validateDayMarketCustomization({
-  ...authorizedCustomization,
-  hiddenSections: ["accounting" as never],
-}).some((issue) => issue.includes("unsupported hidden section")));
-assert.ok(validateDayMarketCustomization({
-  ...authorizedCustomization,
-  vaultTabs: { group: "", label: "Test vault" },
-}).some((issue) => issue.includes("vaultTabs.group")));
-assert.ok(validateDayMarketCustomization({
-  ...authorizedCustomization,
-  backtestDisplay: { returnUnit: "EUR" as never },
-}).some((issue) => issue.includes("returnUnit")));
-assert.ok(validateDayMarketCustomization({
-  ...authorizedCustomization,
-  backtestDisplay: {
-    returnUnit: "USD",
-    footnote: "First sentence. Second sentence. Third sentence.",
-  },
-}).some((issue) => issue.includes("two sentences")));
+assert.ok(
+  validateDayMarketCustomization({
+    ...authorizedCustomization,
+    explicitlyAuthorized: false,
+  }).some((issue) => issue.includes("explicit authorization")),
+);
+assert.ok(
+  validateDayMarketCustomization({
+    ...authorizedCustomization,
+    hiddenSections: ["accounting" as never],
+  }).some((issue) => issue.includes("unsupported hidden section")),
+);
+assert.ok(
+  validateDayMarketCustomization({
+    ...authorizedCustomization,
+    vaultTabs: { group: "", label: "Test vault" },
+  }).some((issue) => issue.includes("vaultTabs.group")),
+);
+assert.ok(
+  validateDayMarketCustomization({
+    ...authorizedCustomization,
+    backtestDisplay: { returnUnit: "EUR" as never },
+  }).some((issue) => issue.includes("returnUnit")),
+);
+assert.ok(
+  validateDayMarketCustomization({
+    ...authorizedCustomization,
+    backtestDisplay: {
+      returnUnit: "USD",
+      footnote: "First sentence. Second sentence. Third sentence.",
+    },
+  }).some((issue) => issue.includes("two sentences")),
+);
 
 const reverseMarket = {
   strategyCap: 1_500_000,
@@ -100,16 +112,19 @@ const forwardTest = {
     {
       id: "bad" as const,
       label: "Bad",
-      description: "Only the minimum distribution receivable is recovered after a 60-day delay.",
+      description:
+        "Only the minimum distribution receivable is recovered after a 60-day delay.",
       paymentDelayDays: 60,
       terminalRecovery: { kind: "amount" as const, amount: 1_400_000 },
     },
   ],
-  tailRiskDisclosure: "Force majeure or obligor default could impair the support receivable.",
+  tailRiskDisclosure:
+    "Force majeure or obligor default could impair the support receivable.",
 };
 const forwardCustomization = {
   explicitlyAuthorized: true,
-  authorizationNote: "User approved a finite forward test for this reverse market.",
+  authorizationNote:
+    "User approved a finite forward test for this reverse market.",
   hiddenSections: ["junior-funding" as const],
   copyOverrides: {},
   forwardTest,
@@ -120,17 +135,26 @@ assert.deepEqual(describeDayMarketCustomizations(forwardCustomization), [
   "hide section: junior-funding",
   "finite forward test: 90 days with good/normal/bad scenarios",
   "omit initial zero-return period from forward chart and monthly table",
-    "reverse market: Muga-funded Jr capped at 100000",
-    "Sr cap: 1400000",
+  "reverse market: Muga-funded Jr capped at 100000",
+  "Sr cap: 1400000",
 ]);
-assert.ok(validateDayMarketCustomization({
-  ...forwardCustomization,
-  forwardTest: { ...forwardTest, omitInitialZeroReturnPeriod: "yes" as never },
-}).some((issue) => issue.includes("omitInitialZeroReturnPeriod must be boolean")));
-assert.ok(validateDayMarketCustomization({
-  ...forwardCustomization,
-  reverseMarket: undefined,
-}).some((issue) => issue.includes("requires customization.reverseMarket")));
+assert.ok(
+  validateDayMarketCustomization({
+    ...forwardCustomization,
+    forwardTest: {
+      ...forwardTest,
+      omitInitialZeroReturnPeriod: "yes" as never,
+    },
+  }).some((issue) =>
+    issue.includes("omitInitialZeroReturnPeriod must be boolean"),
+  ),
+);
+assert.ok(
+  validateDayMarketCustomization({
+    ...forwardCustomization,
+    reverseMarket: undefined,
+  }).some((issue) => issue.includes("requires customization.reverseMarket")),
+);
 const twoOutcomeForwardTest = {
   ...forwardTest,
   termDays: 120,
@@ -139,30 +163,39 @@ const twoOutcomeForwardTest = {
     {
       id: "expected" as const,
       label: "Expected",
-      description: "Full principal and contractual interest are paid at maturity.",
+      description:
+        "Full principal and contractual interest are paid at maturity.",
       paymentDelayDays: 0,
       terminalRecovery: { kind: "full" as const },
     },
     {
       id: "bad" as const,
       label: "Bad",
-      description: "Only the minimum distribution receivable is recovered after a 60-day delay.",
+      description:
+        "Only the minimum distribution receivable is recovered after a 60-day delay.",
       paymentDelayDays: 60,
       terminalRecovery: { kind: "amount" as const, amount: 1_400_000 },
     },
   ],
 };
-assert.deepEqual(validateDayMarketCustomization({
-  ...forwardCustomization,
-  forwardTest: twoOutcomeForwardTest,
-}), []);
-assert.ok(validateDayMarketCustomization({
-  ...forwardCustomization,
-  forwardTest: {
-    ...twoOutcomeForwardTest,
-    scenarios: twoOutcomeForwardTest.scenarios.slice(0, 1),
-  },
-}).some((issue) => issue.includes("either expected and bad, or good, normal, and bad")));
+assert.deepEqual(
+  validateDayMarketCustomization({
+    ...forwardCustomization,
+    forwardTest: twoOutcomeForwardTest,
+  }),
+  [],
+);
+assert.ok(
+  validateDayMarketCustomization({
+    ...forwardCustomization,
+    forwardTest: {
+      ...twoOutcomeForwardTest,
+      scenarios: twoOutcomeForwardTest.scenarios.slice(0, 1),
+    },
+  }).some((issue) =>
+    issue.includes("either expected and bad, or good, normal, and bad"),
+  ),
+);
 const terms = {
   coverage: market.defaults.coverage,
   minLiquidity: market.defaults.minLiquidity,
@@ -171,6 +204,48 @@ const terms = {
   riskYieldShare: market.defaults.riskYDM.yTarget,
   liquidityYieldShare: market.defaults.liqYDM.yTarget,
 };
+
+// V3 supplies exact canonical E-CLP parameters and the live template fee. The
+// shared runtime must consume both rather than regenerating either one.
+const canonicalEclp = {
+  alpha: 0.99,
+  beta: 1.02,
+  c: 1,
+  s: 0,
+  lambda: 100,
+};
+const canonicalRun = runDayTargetScenario(
+  market.defaults,
+  {},
+  {
+    swapFeeBps: 0,
+    eclpParams: canonicalEclp,
+  },
+);
+const liveFeeRun = runDayTargetScenario(
+  market.defaults,
+  {},
+  {
+    swapFeeBps: 100,
+    eclpParams: canonicalEclp,
+  },
+);
+const alternateCurveRun = runDayTargetScenario(
+  market.defaults,
+  {},
+  {
+    swapFeeBps: 0,
+    eclpParams: {
+      alpha: 0.95,
+      beta: 1.2,
+      c: 1,
+      s: 0,
+      lambda: 1_000,
+    },
+  },
+);
+assert.notEqual(liveFeeRun.liquidityApy, canonicalRun.liquidityApy);
+assert.notEqual(alternateCurveRun.liquidityApy, canonicalRun.liquidityApy);
 
 const copy = buildDayMarketCopy(market);
 assert.equal(copy.eyebrow, "ROYCO DAY · PARETO FALCONX MARKET");
@@ -184,15 +259,21 @@ assert.equal(
   "The source APY is derived from 11 fee-inclusive irregular price observations supplied by Pareto Credit. Simulator outputs are mechanism simulations, not historical backtests, forecasts, or an announced product.",
 );
 
-assert.equal(hasObservedDrawdown([
-  { date: "2026-01-01", price: 1 },
-  { date: "2026-02-01", price: 1.01 },
-  { date: "2026-03-01", price: 1.02 },
-]), false);
-assert.equal(hasObservedDrawdown([
-  { date: "2026-01-01", price: 1 },
-  { date: "2026-02-01", price: 0.99 },
-]), true);
+assert.equal(
+  hasObservedDrawdown([
+    { date: "2026-01-01", price: 1 },
+    { date: "2026-02-01", price: 1.01 },
+    { date: "2026-03-01", price: 1.02 },
+  ]),
+  false,
+);
+assert.equal(
+  hasObservedDrawdown([
+    { date: "2026-01-01", price: 1 },
+    { date: "2026-02-01", price: 0.99 },
+  ]),
+  true,
+);
 assert.equal(hasObservedDrawdown([]), false);
 assert.equal(hasObservedDrawdown(falconXSeries), false);
 
@@ -223,12 +304,8 @@ const config = buildDayMarketConfig(market.defaults, terms);
 assert.equal(config.targetUtilization, 0.9);
 assert.equal(config.liqTargetUtilization, 0.9);
 assert.equal(config.fixedTermDurationSec, 7 * 86_400);
-assert.equal(config.fixedTermGracePeriodSec, 7 * 86_400);
-assert.ok(Math.abs(config.liquidationUtilization - 3 / 2.99) < 1e-12);
-// The manifest's exitBufferPct is the share of the coverage requirement still
-// standing when the protected exit arms; the engine takes the inverse of it as a
-// utilization ratio. Asserted through the shared converter as well as against the
-// literal above, so the config and the converter cannot drift apart.
+assert.equal(config.fixedTermGracePeriodSec, 0);
+assert.equal(config.liquidationUtilization, 1.0033444816053512);
 assert.equal(
   config.liquidationUtilization,
   dayLiquidationUtilizationFromExitBuffer(market.defaults.exitBufferPct),
@@ -244,8 +321,18 @@ for (const exitBufferPct of [1, 5, 50, 99.91]) {
   );
 }
 assert.equal(config.eclpBandWidth, market.defaults.eclpBandWidth);
-assert.equal(config.yieldShareProtocolFee, market.defaults.jtYieldShareProtocolFee);
-assert.equal(config.ltYieldShareProtocolFee, market.defaults.ltYieldShareProtocolFee);
+assert.deepEqual(config.eclpParams, market.defaults.eclpParams);
+assert.equal(config.maxJTYieldShare, market.defaults.maxJTYieldShare);
+assert.equal(config.maxLTYieldShare, market.defaults.maxLTYieldShare);
+assert.equal(config.dustTolerance, market.defaults.dustTolerance);
+assert.equal(
+  config.yieldShareProtocolFee,
+  market.defaults.jtYieldShareProtocolFee,
+);
+assert.equal(
+  config.ltYieldShareProtocolFee,
+  market.defaults.ltYieldShareProtocolFee,
+);
 assert.equal(config.reinvestLiquidityPremium, true);
 
 const tighterBandConfig = buildDayMarketConfig(market.defaults, {
@@ -253,13 +340,18 @@ const tighterBandConfig = buildDayMarketConfig(market.defaults, {
   eclpBandWidth: 0.05,
 });
 assert.equal(tighterBandConfig.eclpBandWidth, 0.05);
+assert.equal(tighterBandConfig.eclpParams, undefined);
 
 const yields = runDayTargetScenario(market.defaults);
-assert.ok(Math.abs(yields.seniorApy - 0.08790227464146527) < 1e-12);
-assert.ok(Math.abs(yields.juniorApy - 0.1309043150652931) < 1e-12);
-assert.ok(Math.abs(yields.liquidityApy - 0.09316543116293063) < 1e-12);
+assert.ok(Math.abs(yields.seniorApy - 0.08879351730331564) < 1e-12);
+assert.ok(Math.abs(yields.juniorApy - 0.12948094983927905) < 1e-12);
+assert.ok(Math.abs(yields.liquidityApy - 0.09248415968695323) < 1e-12);
 
-const forwardSeries = buildDayForwardSeries(0.114, market.defaults.stableYield, "2026-07-20");
+const forwardSeries = buildDayForwardSeries(
+  0.114,
+  market.defaults.stableYield,
+  "2026-07-20",
+);
 assert.equal(forwardSeries.length, 13);
 assert.ok(Math.abs(annualizedSeriesApy(forwardSeries) - 0.114) < 1e-12);
 assert.equal(forwardSeries[0].date, "2026-07-20");
@@ -272,13 +364,14 @@ const goodForwardSeries = buildDayFiniteForwardSeries(
   "good",
   7,
 );
-assert.deepEqual(goodForwardSeries.map((point) => point.date), [
-  "2026-07-21",
-  "2026-08-20",
-  "2026-09-19",
-  "2026-10-19",
-]);
-assert.ok(Math.abs(goodForwardSeries.at(-1)!.price - Math.pow(1.1709, 90 / 365)) < 1e-12);
+assert.deepEqual(
+  goodForwardSeries.map((point) => point.date),
+  ["2026-07-21", "2026-08-20", "2026-09-19", "2026-10-19"],
+);
+assert.ok(
+  Math.abs(goodForwardSeries.at(-1)!.price - Math.pow(1.1709, 90 / 365)) <
+    1e-12,
+);
 
 const normalForwardSeries = buildDayFiniteForwardSeries(
   0.1709,
@@ -289,7 +382,10 @@ const normalForwardSeries = buildDayFiniteForwardSeries(
   7,
 );
 assert.equal(normalForwardSeries.at(-1)!.date, "2026-12-18");
-assert.equal(normalForwardSeries.at(-1)!.price, goodForwardSeries.at(-1)!.price);
+assert.equal(
+  normalForwardSeries.at(-1)!.price,
+  goodForwardSeries.at(-1)!.price,
+);
 
 const badForwardSeries = buildDayFiniteForwardSeries(
   0.1709,
@@ -301,7 +397,9 @@ const badForwardSeries = buildDayFiniteForwardSeries(
 );
 assert.equal(badForwardSeries.at(-2)!.date, "2026-12-18");
 assert.equal(badForwardSeries.at(-1)!.date, "2026-12-25");
-assert.ok(Math.abs(badForwardSeries.at(-1)!.price - 1_400_000 / 1_500_000) < 1e-12);
+assert.ok(
+  Math.abs(badForwardSeries.at(-1)!.price - 1_400_000 / 1_500_000) < 1e-12,
+);
 
 const expectedForwardSeries = buildDayFiniteForwardSeries(
   0.1709,
@@ -311,14 +409,14 @@ const expectedForwardSeries = buildDayFiniteForwardSeries(
   "expected",
   7,
 );
-assert.deepEqual(expectedForwardSeries.map((point) => point.date), [
-  "2026-07-21",
-  "2026-08-20",
-  "2026-09-19",
-  "2026-10-19",
-  "2026-11-18",
-]);
-assert.ok(Math.abs(expectedForwardSeries.at(-1)!.price - Math.pow(1.1709, 120 / 365)) < 1e-12);
+assert.deepEqual(
+  expectedForwardSeries.map((point) => point.date),
+  ["2026-07-21", "2026-08-20", "2026-09-19", "2026-10-19", "2026-11-18"],
+);
+assert.ok(
+  Math.abs(expectedForwardSeries.at(-1)!.price - Math.pow(1.1709, 120 / 365)) <
+    1e-12,
+);
 
 const twoOutcomeBadForwardSeries = buildDayFiniteForwardSeries(
   0.1709,
@@ -330,7 +428,10 @@ const twoOutcomeBadForwardSeries = buildDayFiniteForwardSeries(
 );
 assert.equal(twoOutcomeBadForwardSeries.at(-2)!.date, "2027-01-17");
 assert.equal(twoOutcomeBadForwardSeries.at(-1)!.date, "2027-01-24");
-assert.ok(Math.abs(twoOutcomeBadForwardSeries.at(-1)!.price - 1_400_000 / 1_500_000) < 1e-12);
+assert.ok(
+  Math.abs(twoOutcomeBadForwardSeries.at(-1)!.price - 1_400_000 / 1_500_000) <
+    1e-12,
+);
 
 console.log("Strict Day market copy factory: PASS");
 console.log("Authorized Day presentation deviations: PASS");

@@ -65,8 +65,8 @@
   "targets": {
     "seniorApyMin": 0.0866,
     "seniorApyMax": 0.0916,
-    "juniorApyMin": 0.1774,
-    "juniorApyMax": 0.1974
+    "juniorApyMin": 0.1195,
+    "juniorApyMax": 0.1395
   },
   "certification": {
     "intakeConfirmed": true
