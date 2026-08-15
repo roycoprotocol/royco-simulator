@@ -4,6 +4,7 @@ import { useState } from "react";
 
 import DayV3Button from "@/components/day-v3/DayV3Button";
 import DayV3NumberField from "@/components/day-v3/DayV3NumberField";
+import { DAY_V3_POOL_PREMIUM_BPS_RANGE } from "@/lib/day-v3/pool-curve";
 import DayV3Origin, {
   type DayV3VisibleOrigin,
 } from "@/components/day-v3/DayV3Origin";
@@ -39,6 +40,10 @@ const QUOTE_ASSET_SUGGESTIONS = [
 export default function DayV3QuoteAsset({
   label,
   onLabel,
+  defaultPremiumBps,
+  onPoolPremiumBps,
+  poolPremiumBps,
+  restingSeniorWeight,
   onSwapFeeBps,
   onTurnoverPerYear,
   onYieldPct,
@@ -49,6 +54,13 @@ export default function DayV3QuoteAsset({
 }: {
   label: string;
   onLabel: (value: string) => void;
+  /** What the pool rests on today, in bps, so an empty field can say so. */
+  defaultPremiumBps: number | null;
+  onPoolPremiumBps: (value: number | null) => void;
+  /** The maximum premium the issuer will accept, in bps. Null uses the market's. */
+  poolPremiumBps: number | null;
+  /** Where the resulting curve rests, 0..1, for the field's own readout. */
+  restingSeniorWeight: number | null;
   onSwapFeeBps: (value: number | null) => void;
   onTurnoverPerYear: (value: number | null) => void;
   onYieldPct: (value: number | null) => void;
@@ -166,6 +178,36 @@ export default function DayV3QuoteAsset({
         step={0.5}
         suffix="x pool value"
         value={turnoverPerYear}
+      />
+
+      <DayV3NumberField
+        label="What premium will you let Senior trade at, at most?"
+        max={DAY_V3_POOL_PREMIUM_BPS_RANGE.max}
+        min={0.01}
+        note={
+          restingSeniorWeight === null
+            ? "Sets the pool's balance point: beta is 1 + this premium, and the resting composition follows from the curve. Empty models the pool at the premium shown."
+            : `Sets the pool's balance point. The pool currently rests on ${(restingSeniorWeight * 100).toFixed(restingSeniorWeight < 0.1 ? 2 : 1)}% Senior shares and ${((1 - restingSeniorWeight) * 100).toFixed(2)}% ${label}. Wider means more Senior inventory and less depth for a seller. Empty models the pool at the premium shown.`
+        }
+        onChange={onPoolPremiumBps}
+        origin={poolPremiumBps === null ? "model-assumption" : "manual-override"}
+        // The premium actually in force, whatever set it — the market's own
+        // declared curve, a live template, or the modeled default. Calling it
+        // "the market's own" was false whenever it was not.
+        placeholder={
+          defaultPremiumBps === null
+            ? "Use the modeled premium"
+            : `${defaultPremiumBps.toFixed(2)} bps`
+        }
+        presets={[
+          { label: "3 bps", value: 3 },
+          { label: "10 bps", value: 10 },
+          { label: "30 bps", value: 30 },
+          { label: "50 bps", value: DAY_V3_POOL_PREMIUM_BPS_RANGE.max },
+        ]}
+        step={0.5}
+        suffix="bps"
+        value={poolPremiumBps}
       />
 
       <div className="flex min-w-0 flex-col gap-2">

@@ -36,12 +36,28 @@ import {
   eclpParamsForWeight,
   eclpSellValue,
   eclpTVL,
+  reservesPerL,
 } from './eclp';
 
 /** Fixed concentration used by the simulator's E-CLP quote model. Exported so
  * the UI can disclose the exact venue assumption without restating it. */
 export const DAY_ECLP_SIMULATION_LAMBDA = 1;
-const LT_WEIGHT_WAD = toWad('0.1');
+/**
+ * Where the pool rests, as a share of its value held in Senior shares.
+ *
+ * This used to be a flat `0.1` applied to every market. It is not a free
+ * constant: an E-CLP rests at whatever composition its own parameters imply,
+ * and seeding it anywhere else opens the pool off its own peg. Measured before
+ * this change: the eleven markets that declare a curve all rest at 3.884%
+ * Senior and were every one of them seeded at 10%, holding 2.6x the Senior
+ * their curve was built to carry.
+ *
+ * The seed is now read from the curve, which is what the deployment interface
+ * does (`stableShareAtPeg` in royco-rwa-frontend, and `solveBeta` for the
+ * inverse). `0.1` survives only as the weight the *fallback* curve is solved
+ * for, so a market that declares no curve of its own is unchanged.
+ */
+const DAY_FALLBACK_POOL_SENIOR_WEIGHT = 0.1;
 const VIRTUAL_SHARES = 1n;
 const VIRTUAL_VALUE = 1n;
 // Equivalent to the contract's finite dilution protection for a wiped tranche.
@@ -121,6 +137,41 @@ export function liquidityUtilization(
 // ---------------------------------------------------------------------------
 
 let eclpCache: { key: string; params: EclpParams } | null = null;
+/**
+ * The Senior share the configured curve rests at, 0..1.
+ *
+ * `reservesPerL(params, 1)` is the pool's composition at price 1, and at the
+ * peg both legs are already NAV-denominated, so the Senior share is simply
+ * `x / (x + y)`. This is the same quantity the deployment interface calls the
+ * resting split.
+ */
+/**
+ * The curve this config actually prices on.
+ *
+ * Either the one the market declared, or the fallback solved for
+ * `DAY_FALLBACK_POOL_SENIOR_WEIGHT` at the configured band. Exported because a
+ * page that wants to state the pool's composition or the premium behind it
+ * cannot get either from `cfg.eclpParams` alone — that field is empty whenever
+ * the band is the issuer's rather than the market's, which in V3 is always.
+ */
+export function poolCurveFor(cfg: MarketConfig): EclpParams {
+  return eclpParamsFor(cfg);
+}
+
+export function poolSeniorWeightAtPeg(cfg: MarketConfig): number {
+  // A market that supplies no curve gets the fallback, which is *solved for*
+  // this weight — so the weight is known exactly and re-deriving it by
+  // bisection would only add error. Measured: doing so moved JBBB's boundary
+  // sell in the 14th significant digit, which is noise but is noise this
+  // function has no reason to introduce.
+  if (!cfg.eclpParams) return DAY_FALLBACK_POOL_SENIOR_WEIGHT;
+  const r = reservesPerL(cfg.eclpParams, 1);
+  const total = r.x + r.y;
+  if (!Number.isFinite(total) || total <= 0) return DAY_FALLBACK_POOL_SENIOR_WEIGHT;
+  const w = r.x / total;
+  return Number.isFinite(w) && w > 0 && w < 1 ? w : DAY_FALLBACK_POOL_SENIOR_WEIGHT;
+}
+
 function eclpParamsFor(cfg: MarketConfig): EclpParams {
   const supplied = cfg.eclpParams;
   const key = supplied
@@ -132,7 +183,7 @@ function eclpParamsFor(cfg: MarketConfig): EclpParams {
       params:
         supplied ??
         eclpParamsForWeight(
-          0.1,
+          DAY_FALLBACK_POOL_SENIOR_WEIGHT,
           DAY_ECLP_SIMULATION_LAMBDA,
           cfg.eclpBandWidth,
         ),
@@ -1013,8 +1064,11 @@ export function ltDeposit(state: LiveState, cfg: MarketConfig, amount: number): 
   const shares = sharesForValueWad(amountWad, ltEffectiveNAVWad(state, cfg), state.ltShares);
   const rawBefore = ltRawNAVWad(state, cfg);
   if (rawBefore <= dustWad(cfg)) {
-    state.pool.stShares += mulDiv(amountWad, LT_WEIGHT_WAD, stPriceWad(state));
-    state.pool.stable += mulDiv(amountWad, WAD - LT_WEIGHT_WAD, WAD);
+    // First deposit into an empty pool seeds it, so it uses the same resting
+    // split `newMarket` does. Every later deposit is pro-rata to what is there.
+    const weight = toWad(poolSeniorWeightAtPeg(cfg));
+    state.pool.stShares += mulDiv(amountWad, weight, stPriceWad(state));
+    state.pool.stable += mulDiv(amountWad, WAD - weight, WAD);
   } else {
     state.pool.stShares += mulDiv(state.pool.stShares, amountWad, rawBefore);
     state.pool.stable += mulDiv(state.pool.stable, amountWad, rawBefore);
@@ -1311,10 +1365,15 @@ export function newMarket(cfg: MarketConfig, init: { st: number; jt: number; lt:
     protocolSTShares: 0n,
     protocolJTShares: 0n,
     protocolLTShares: 0n,
-    pool: {
-      stShares: mulDiv(liquidity, LT_WEIGHT_WAD, WAD),
-      stable: mulDiv(liquidity, WAD - LT_WEIGHT_WAD, WAD),
-    },
+    pool: (() => {
+      // Seeded at the curve's own resting split, so the pool opens at its peg
+      // rather than off it.
+      const weight = toWad(poolSeniorWeightAtPeg(cfg));
+      return {
+        stShares: mulDiv(liquidity, weight, WAD),
+        stable: mulDiv(liquidity, WAD - weight, WAD),
+      };
+    })(),
     ltOwnedSTShares: 0n,
     riskYTarget: toWad(cfg.riskYDM.yTarget),
     liqYTarget: toWad(cfg.liqYDM.yTarget),

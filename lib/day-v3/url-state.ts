@@ -24,6 +24,13 @@ export interface DayV3UrlState extends DayV3GoalDraft {
    * that template resolves. A number here is the issuer's own fee policy.
    */
   swapFeeBps: number | null;
+  /**
+   * The pool's balance point, carried as the maximum premium in bps that sets
+   * it. `null` leaves the curve solved for the simulator's own resting weight.
+   * Beta is `1 + premium`, so this is the whole of the balance point: a wider
+   * premium band rests on more Senior inventory and less exit depth.
+   */
+  poolPremiumBps: number | null;
   /** An outside desk's annual cost of capital, for the pool-refill check. */
   marketMakerCostOfCapitalPct: number | null;
   /** Days from buying discounted Senior to receiving the underlying at NAV. */
@@ -394,6 +401,11 @@ export function readDayV3UrlState(search: string): DayV3UrlState {
     // around it: 10000 bps arrived here and compounded modeled fee income past
     // what the engine can hold, taking the backtest down.
     swapFeeBps: finite(params.get("fee"), 0.01, 1_000),
+    // The pool's balance point, carried as the premium that sets it — the same
+    // quantity the deployment interface takes, in the range it accepts
+    // (`PREMIUM_BP = { min: 0, max: 50 }`). A link that carried a premium the
+    // deploy step would reject would describe a market nobody can ship.
+    poolPremiumBps: finite(params.get("premiumBps"), 0.01, 50),
     marketMakerCostOfCapitalPct: finite(params.get("mmCost"), 0, 100),
     redemptionDays: integer(params.get("mmDays"), 0, 365),
     protectedDrawdownPct,
@@ -483,6 +495,7 @@ export function buildDayV3Query(state: DayV3UrlWriteState): string {
     // fee decides, and serializing a placeholder for it would turn an inherited
     // policy into a stated one the moment a link was shared.
     setNumber("fee", state.swapFeeBps);
+    setNumber("premiumBps", state.poolPremiumBps);
     setNumber("mmCost", state.marketMakerCostOfCapitalPct);
     setWholeDays("mmDays", state.redemptionDays);
   }

@@ -39,6 +39,17 @@ import DayV3YieldModels from "@/components/day-v3/DayV3YieldModels";
 import { useDayV3SimulationPoolDesign } from "@/components/day-v3/useDayV3SimulationPoolDesign";
 import { dayV3RealizedReturns } from "@/lib/day-v3/historical-returns";
 import {
+  dayV3PremiumBpsOf,
+  dayV3RestingSeniorWeight,
+} from "@/lib/day-v3/pool-curve";
+import { poolCurveFor } from "@/lib/day/engine/engine";
+import {
+  DAY_V3_POOL_DEFAULT_SENIOR_WEIGHT,
+  DAY_V3_POOL_LAMBDA,
+  dayV3PoolCurveFromPremium,
+  dayV3PremiumForRestingWeight,
+} from "@/lib/day-v3/pool-curve";
+import {
   Card,
   CardContent,
   CardNote,
@@ -228,6 +239,13 @@ export default function DayV3Summary({
     linked?.swapFeeBps ?? null,
   );
   const feeOverridden = swapFeeBps !== null;
+  // The pool's balance point, set the way deployment sets it: by the maximum
+  // premium. Empty leaves the curve solved for the simulator's own resting
+  // weight, which is the behaviour every existing link describes.
+  const [poolPremiumBps, setPoolPremiumBps] = useState<number | null>(
+    linked?.poolPremiumBps ?? null,
+  );
+  const premiumOverridden = poolPremiumBps !== null;
   // An outside desk's terms. These describe who might arbitrage the pool back
   // to NAV; they price nothing in the market itself and never gate a result.
   const [marketMakerCostOfCapitalPct, setMarketMakerCostOfCapitalPct] =
@@ -410,7 +428,7 @@ export default function DayV3Summary({
       activeManualOverrides.depthAtNav,
       activeManualOverrides.maximumPremiumPct,
       activeManualOverrides.poolCapitalPer100,
-    ].some((value) => value !== null) || feeOverridden;
+    ].some((value) => value !== null) || feeOverridden || premiumOverridden;
   const rawCanonicalPoolDesign =
     activePoolDesign.status === "resolved" ||
     activePoolDesign.status === "resolving"
@@ -483,11 +501,78 @@ export default function DayV3Summary({
   // the spread below and silently discard it — the reader would drag "maximum
   // discount" from 1% to 20% and watch every quote on the page stay put.
   const hasCurveOverride =
+    premiumOverridden ||
     activeManualOverrides.maximumDiscountPct !== null ||
     activeManualOverrides.depthAtNav !== null ||
     activeManualOverrides.maximumPremiumPct !== null;
+  const floorBandPct =
+    exitEnabled && minimumProceedsPer100 !== null
+      ? Math.min(99, Math.max(0.01, 100 - minimumProceedsPer100))
+      : defaults.eclpBandWidth * 100;
+  // The curve an issuer-set premium implies. Same construction the deployment
+  // interface uses: alpha from the band, beta from the premium, the shipped
+  // 45-degree rotation, and the configured concentration.
+  const premiumCurve = useMemo(() => {
+    // The market's own concentration when it declares one — more faithful to
+    // that market than any constant — and deployment's default otherwise.
+    const lambda = defaults.eclpParams?.lambda ?? DAY_V3_POOL_LAMBDA;
+    if (premiumOverridden) {
+      return dayV3PoolCurveFromPremium({
+        bandPct: floorBandPct,
+        premiumBps: poolPremiumBps as number,
+        lambda,
+      });
+    }
+    // A live template's own curve is the real pool and always wins.
+    if (canonicalEngineOverrides) return null;
+    // So does the market's own declared curve, whenever it survives.
+    // `buildDayMarketConfig` keeps `defaults.eclpParams` while the requested
+    // band still equals the declared one (runtime.ts:168-172), and in that
+    // state the engine is already pricing the real pool — injecting here would
+    // replace a market's actual 3 bp curve with a synthesized 8.3 bp one.
+    // Measured on susdai at its own 2% band: the declared curve quotes a 10%
+    // sale at 46.01 bps and the injected curve at 53.30, so overriding it made
+    // the exit worse AND wrong. Only the fallback is worth replacing — at a 5%
+    // band, where the declared curve is dropped, the fallback quotes 246.63 bps
+    // against the deployable pool's 65.33.
+    const declaredCurveSurvives =
+      defaults.eclpParams !== undefined &&
+      Math.abs(floorBandPct / 100 - defaults.eclpBandWidth) < 1e-12;
+    if (declaredCurveSurvives) return null;
+    // Otherwise build the pool the deploy step would build for this band at its
+    // own 90/10 default, rather than leaving the engine's fallback.
+    //
+    // That fallback is axis-aligned at lambda 1, and the deploy step is always
+    // a 45-degree rotation at lambda 100-1000. Both rest at 10% Senior, so the
+    // composition was never the problem — the shape was. Measured at a 10%
+    // sale: susdai 99.4 bps of discount on the fallback against 53.3 on the
+    // deployable pool, jbbb 49.8 against 35.4, acred 40.0 against 15.3. The
+    // simulator was quoting exits roughly twice as expensive as the pool an
+    // issuer would actually get.
+    const derived = dayV3PremiumForRestingWeight({
+      bandPct: floorBandPct,
+      lambda,
+      seniorWeight: DAY_V3_POOL_DEFAULT_SENIOR_WEIGHT,
+    });
+    return derived === null
+      ? null
+      : dayV3PoolCurveFromPremium({
+          bandPct: floorBandPct,
+          premiumBps: derived,
+          lambda,
+        });
+  }, [
+    canonicalEngineOverrides,
+    defaults.eclpBandWidth,
+    defaults.eclpParams,
+    floorBandPct,
+    poolPremiumBps,
+    premiumOverridden,
+  ]);
   const engineOverrides = useMemo<DayV3EngineOverrides | null>(() => {
-    if (!canonicalEngineOverrides && !feeOverridden) return null;
+    if (!canonicalEngineOverrides && !feeOverridden && !premiumCurve) {
+      return null;
+    }
     const canonical = canonicalEngineOverrides ?? {};
     const canonicalPolicy = Object.fromEntries(
       Object.entries(canonical).filter(([key]) => key !== "eclpParams"),
@@ -495,8 +580,15 @@ export default function DayV3Summary({
     return {
       ...(hasCurveOverride ? canonicalPolicy : canonical),
       ...(feeOverridden ? { swapFeeBps: swapFeeBps as number } : {}),
+      ...(premiumCurve ? { eclpParams: premiumCurve } : {}),
     } as DayV3EngineOverrides;
-  }, [canonicalEngineOverrides, feeOverridden, hasCurveOverride, swapFeeBps]);
+  }, [
+    canonicalEngineOverrides,
+    feeOverridden,
+    hasCurveOverride,
+    premiumCurve,
+    swapFeeBps,
+  ]);
   const canonicalPoolRecommendation =
     canonicalPoolDesign?.recommendation ?? null;
   const liquidityRecommendation = useMemo(
@@ -526,10 +618,6 @@ export default function DayV3Summary({
   // shared engine, the band moves the deepest fill exactly as you would expect
   // — 1% band gives 0.60% discount, 5% gives 2.63%, 20% gives 10.59% — so the
   // floor the issuer set is the honest local band.
-  const floorBandPct =
-    exitEnabled && minimumProceedsPer100 !== null
-      ? Math.min(99, Math.max(0.01, 100 - minimumProceedsPer100))
-      : defaults.eclpBandWidth * 100;
   const effectiveBandPct = canonicalPoolRecommendation
     ? canonicalPoolRecommendation.fields.maximumDiscountBps.value / 100
     : floorBandPct;
@@ -760,6 +848,11 @@ export default function DayV3Summary({
         swapFeeBps: cfg.swapFeeBps,
         turnoverPerYear: cfg.poolTurnoverPerYear,
         seniorWeight: dayPoolSeniorWeight(cfg),
+        // Where the curve rests, and the premium that put it there. The engine
+        // now seeds the pool at this composition, so the two agree; reading
+        // both keeps the page honest if they ever stop agreeing again.
+        restingSeniorWeight: dayV3RestingSeniorWeight(poolCurveFor(cfg)),
+        premiumBps: dayV3PremiumBpsOf(poolCurveFor(cfg)),
       },
       illustrativeExit: {
         openingSeniorNAV,
@@ -1057,6 +1150,7 @@ export default function DayV3Summary({
     quoteAssetYieldPct,
     poolTurnoverPerYear,
     swapFeeBps,
+    poolPremiumBps,
     marketMakerCostOfCapitalPct,
     redemptionDays,
     // Legacy links still parse these fields, but the simulator no longer asks
@@ -1308,7 +1402,13 @@ export default function DayV3Summary({
         : hasPoolOverride
           ? feeOverridden
             ? `This design charges a hand-set ${swapFeeBps} bps swap fee. The canonical pool outcomes are withheld because they were solved at the live template's own fee, which this page cannot ask it to change. Every model below is priced at ${swapFeeBps} bps.`
-            : "This link contains manual pool overrides. Outcomes are withheld until the canonical service revalidates those exact fields."
+            : premiumOverridden
+              ? // Not "this link": the premium is a field on this page, and the
+                // canonical service takes no premium input — it reports one as a
+                // derived, scenario-only output — so there is nothing for it to
+                // revalidate and no wording that implies it might.
+                `This design sets its own ${poolPremiumBps} bps maximum premium, which is the pool's balance point. The canonical pool outcomes are withheld because they were solved at the template's own curve, and the premium is an output of that solve rather than an input to it. Every model below is priced at the curve this premium implies.`
+              : "Outcomes are withheld while manual pool overrides are in effect, until the canonical service revalidates those exact fields."
           : activePoolDesign.status === "resolved" && !liquidityResolved
             ? (liquidityRecommendation?.reason ??
               "The pool was resolved, but its Minimum Liquidity mapping is unavailable.")
@@ -1623,6 +1723,10 @@ export default function DayV3Summary({
           <DayV3Goals
             drawdownPct={protectedDrawdownPct}
             exit={exitView}
+            defaultPremiumBps={model.pool.premiumBps}
+            onPoolPremiumBps={setPoolPremiumBps}
+            poolPremiumBps={poolPremiumBps}
+            restingSeniorWeight={model.pool.restingSeniorWeight}
             exitSharePct={immediateExitSharePct}
             indexOffset={1}
             inputOrigins={{
@@ -1975,6 +2079,7 @@ export default function DayV3Summary({
                   <DayV3CapitalStack
                     defaults={defaults}
                     exitAssetLabel={quoteAssetLabel}
+                    poolPremiumBps={model.pool.premiumBps}
                     poolSeniorWeight={model.pool.seniorWeight}
                     balances={model.balances}
                     coverage={resolved.coverage}

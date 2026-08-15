@@ -84,6 +84,7 @@ const urlState: DayV3UrlState = {
   quoteAssetYieldPct: 4.5,
   poolTurnoverPerYear: 8,
   swapFeeBps: 30,
+  poolPremiumBps: null,
   marketMakerCostOfCapitalPct: 12,
   redemptionDays: 7,
   protectedDrawdownPct: 12.5,

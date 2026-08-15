@@ -30,6 +30,7 @@ const legacyState: DayV3UrlState = {
   quoteAssetYieldPct: 0,
   poolTurnoverPerYear: 8,
   swapFeeBps: 30,
+  poolPremiumBps: null,
   marketMakerCostOfCapitalPct: 12,
   redemptionDays: 7,
   protectedDrawdownPct: 15,

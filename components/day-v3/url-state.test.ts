@@ -137,6 +137,7 @@ const query = buildDayV3Query({
   quoteAssetYieldPct: 4.5,
   poolTurnoverPerYear: 8,
   swapFeeBps: 30,
+  poolPremiumBps: null,
   marketMakerCostOfCapitalPct: 12,
   redemptionDays: 7,
   protectedDrawdownPct: 18,
@@ -575,5 +576,28 @@ for (const dropped of ["quote", "quoteApy", "fee", "mmCost", "mmDays"]) {
 // is a way into the app and not a way around it. 10000 bps compounded modeled
 // fee income past what the engine can hold and took the backtest down.
 assert.equal(readDayV3UrlState("m=custom&apy=8&fee=10000").swapFeeBps, null);
+
+// The pool's balance point, carried as the premium that sets it. Bounded to the
+// range the deploy step accepts, so a link cannot describe a market that cannot
+// ship. Pinned in both directions: without this, deleting either the reader or
+// the writer left the whole suite green while a shared link silently reverted
+// the pool.
+assert.equal(readDayV3UrlState("premiumBps=30").poolPremiumBps, 30);
+assert.equal(readDayV3UrlState("premiumBps=0.01").poolPremiumBps, 0.01);
+assert.equal(readDayV3UrlState("premiumBps=50").poolPremiumBps, 50);
+assert.equal(readDayV3UrlState("premiumBps=50.1").poolPremiumBps, null);
+assert.equal(readDayV3UrlState("premiumBps=0").poolPremiumBps, null);
+assert.equal(readDayV3UrlState("premiumBps=-5").poolPremiumBps, null);
+assert.equal(readDayV3UrlState("premiumBps=abc").poolPremiumBps, null);
+assert.equal(readDayV3UrlState("m=custom&apy=8").poolPremiumBps, null);
+{
+  const written = buildDayV3Query({ ...reported, poolPremiumBps: 30 });
+  assert.match(written, /premiumBps=30/);
+  assert.equal(readDayV3UrlState(written).poolPremiumBps, 30);
+  assert.ok(
+    !buildDayV3Query({ ...reported, poolPremiumBps: null }).includes("premiumBps="),
+    "an unset premium is never serialized",
+  );
+}
 
 console.log("Day V3 independent goal URL state: PASS");

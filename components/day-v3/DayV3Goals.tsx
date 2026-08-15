@@ -122,6 +122,10 @@ export default function DayV3Goals({
   onResetExit,
   onResetProtection,
   poolTurnoverPerYear,
+  defaultPremiumBps,
+  onPoolPremiumBps,
+  poolPremiumBps,
+  restingSeniorWeight,
   onSwapFeeBps,
   protection,
   quoteAssetLabel,
@@ -160,6 +164,10 @@ export default function DayV3Goals({
   recoveryMode: "none" | "window" | null;
   /** The issuer's own pool fee. `null` inherits the live template's. */
   swapFeeBps: MaybeNumber;
+  defaultPremiumBps: MaybeNumber;
+  onPoolPremiumBps: (value: number | null) => void;
+  poolPremiumBps: MaybeNumber;
+  restingSeniorWeight: MaybeNumber;
 }) {
   const inputOrigin = (origin: DayV3VisibleOrigin | undefined) =>
     origin ?? "your-answer";
@@ -477,6 +485,10 @@ export default function DayV3Goals({
             <DayV3QuoteAsset
               label={quoteAssetLabel}
               onLabel={onQuoteAssetLabel}
+              defaultPremiumBps={defaultPremiumBps}
+              onPoolPremiumBps={onPoolPremiumBps}
+              poolPremiumBps={poolPremiumBps}
+              restingSeniorWeight={restingSeniorWeight}
               onSwapFeeBps={onSwapFeeBps}
               onTurnoverPerYear={onPoolTurnoverPerYear}
               onYieldPct={onQuoteAssetYieldPct}
