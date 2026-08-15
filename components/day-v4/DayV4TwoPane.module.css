@@ -688,11 +688,34 @@
     [data-model-group]
     > button[aria-expanded="true"] {
     position: sticky;
-    top: calc(var(--v4-stack-top, 0px) + var(--v4-gap));
+    /*
+     * Flush against the returns, not a gap below them. At
+     * `stack-top + gap` the section's own content scrolled through the 24px
+     * band between the two — the drawdown slider and the top of its chart were
+     * visible above the header that was supposed to be covering them.
+     */
+    top: var(--v4-stack-top, 0px);
     z-index: 1;
-    /* Opaque, so the section's own content passes beneath it rather than
-       through it. Matches the card it sits on. */
+    /*
+     * Opaque, and wide enough to actually cover. The button is inset by the
+     * group card's own `px-4 py-3`, so a background on the button alone left
+     * three strips — above it and down both sides — for content to scroll
+     * through. The negative margins pull the box out to the card's edges and
+     * the padding puts the content back where it was.
+     */
     background: var(--card);
+    /* `w-full` fixes the width to the container's, so negative side margins
+       would shift the box left rather than widen it — measured 33px short on
+       the right. `auto` lets the margins do what they are here for. */
+    width: auto;
+    margin: -12px -16px 0;
+    padding: 12px 16px;
+    /*
+     * A stuck header sitting directly on content it is covering has no edge,
+     * so the section's first rows read as though they belong to it. The rule
+     * is the same one the section already draws under its header when open.
+     */
+    border-bottom: 1px solid var(--border-subtle);
   }
 
   /*
