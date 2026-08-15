@@ -127,7 +127,7 @@ export default function DayV3ExitModel({
             ? "Immediate Senior exit is off, so this design has no SLP or pool execution."
             : illustrative
               ? "Shows how the selected exit size and payout affect one trade, per $100 Senior."
-              : "What you asked for against what the sized pool delivers, per $100 Senior. Larger sales move farther through the pool and take a larger discount."}
+              : "What you asked for against what the pool delivers, per $100 Senior."}
         </CardNote>
       </CardHeader>
 
@@ -136,15 +136,15 @@ export default function DayV3ExitModel({
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <ComparisonBar
               requested={promisedExitSharePct}
-              requestedLabel="Selected sale / $100"
+              requestedLabel="Sale you selected"
               modeled={modeled ? exit.sellablePer100 : null}
-              modeledLabel="Modeled capacity / $100"
+              modeledLabel="Capacity the pool has"
             />
             <ComparisonBar
               requested={minimumProceedsPer100}
-              requestedLabel="Minimum payout / $100"
+              requestedLabel="Payout floor you set"
               modeled={modeled ? exit.lowestPayoutPer100 : null}
-              modeledLabel="Lowest modeled payout / $100"
+              modeledLabel="Lowest the pool pays"
             />
           </div>
         ) : null}
@@ -196,24 +196,15 @@ export default function DayV3ExitModel({
                   : "after the live swap fee"}
               </span>
             ) : null}
-            <span>
-              Swap fee:{" "}
-              {exit.swapFeeBps === null
-                ? "unresolved"
-                : `${exit.swapFeeBps} bps`}
-            </span>
-            <span>
-              Minimum liquidity:{" "}
-              {exit.minimumLiquidityPct === null
-                ? "unresolved"
-                : `${exit.minimumLiquidityPct.toFixed(2)}%`}
-            </span>
-            <span>
-              Maximum discount:{" "}
-              {exit.maximumDiscountPct === null
-                ? "unresolved"
-                : `${exit.maximumDiscountPct.toFixed(2)}%`}
-            </span>
+            {/*
+              The swap fee, minimum liquidity and maximum discount used to be
+              listed here too. All three are pool terms rather than results of
+              this comparison, and all three are already stated by the cards
+              that use them — the refill check names the fee and the maximum
+              discount in the sentence that depends on them, and the depth curve
+              is drawn from the liquidity requirement. Repeating them here made
+              a four-number check look like a seven-number readout.
+            */}
           </div>
         ) : null}
       </CardContent>

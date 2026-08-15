@@ -43,13 +43,19 @@ const resolvedMarkup = renderToStaticMarkup(
 
 assert.match(resolvedMarkup, /data-model-state="recommended"/);
 assert.match(resolvedMarkup, /data-model-source="canonical-rwa-eclp-service"/);
-assert.match(resolvedMarkup, /Selected sale \/ \$100/);
-assert.match(resolvedMarkup, /Modeled capacity \/ \$100/);
-assert.match(resolvedMarkup, /Minimum payout \/ \$100/);
-assert.match(resolvedMarkup, /Lowest modeled payout \/ \$100/);
+// The four labels the comparison is made of. The "/ $100" each one carried is
+// gone — the card's own note already says "per $100 Senior", so every label
+// restated the basis a fourth time.
+assert.match(resolvedMarkup, /Sale you selected/);
+assert.match(resolvedMarkup, /Capacity the pool has/);
+assert.match(resolvedMarkup, /Payout floor you set/);
+assert.match(resolvedMarkup, /Lowest the pool pays/);
 assert.match(resolvedMarkup, /Proceeds: \$9\.62 after the live swap fee/);
-assert.match(resolvedMarkup, /Swap fee: 10 bps/);
-assert.match(resolvedMarkup, /Minimum liquidity: 10\.90%/);
+// The swap fee, minimum liquidity and maximum discount are pool terms, not
+// results of this comparison, and the cards that depend on them state them.
+assert.doesNotMatch(resolvedMarkup, /Swap fee: /);
+assert.doesNotMatch(resolvedMarkup, /Minimum liquidity: /);
+assert.doesNotMatch(resolvedMarkup, /Maximum discount: /);
 assert.doesNotMatch(resolvedMarkup, /Live policy:/);
 // SLP funding and the refill point are stated once each, in the exit result
 // band and in the arbitrage test. This card does not repeat them.
@@ -81,7 +87,7 @@ assert.match(
   illustrativeMarkup,
   /Shows how the selected exit size and payout affect one trade/,
 );
-assert.match(illustrativeMarkup, /Modeled capacity/);
+assert.match(illustrativeMarkup, /Capacity the pool has/);
 assert.match(illustrativeMarkup, /Proceeds: \$9\.62 after the modeled swap fee/);
 assert.doesNotMatch(illustrativeMarkup, />—</);
 

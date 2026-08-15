@@ -1697,7 +1697,12 @@ export default function DayV3Summary({
 
       <section
         aria-labelledby="day-v3-positions-heading"
-        className="overflow-hidden rounded-2xl border border-[var(--border-subtle)] bg-[var(--foundation)] shadow-[0_6px_22px_-14px_rgba(23,25,31,0.4)]"
+        // NOT `overflow-hidden`. The hover breakdown on each rate is absolutely
+        // positioned below its number, and a clipping ancestor cut it off two
+        // lines in — the reader saw "Source yield" and "Jr premium" and then a
+        // hard edge. The children that needed clipping (the compact row, the
+        // cards' coloured top rules) carry their own radius.
+        className="rounded-2xl border border-[var(--border-subtle)] bg-[var(--foundation)] shadow-[0_6px_22px_-14px_rgba(23,25,31,0.4)]"
       >
         <div className="flex flex-wrap items-center justify-between gap-3 px-4 pt-4">
           <div className="flex items-center gap-2">
@@ -1762,17 +1767,26 @@ export default function DayV3Summary({
         <div className="hidden grid-cols-1 gap-3 px-4 pb-4 pt-0 md:grid md:grid-cols-3">
           {positions.map((position) => (
             <Card
-              className="overflow-hidden"
               key={position.short}
               style={position.funded ? undefined : { borderStyle: "dashed" }}
               weight={position.funded ? "primary" : "default"}
             >
+              {/*
+                The card used to carry `overflow-hidden` so this rule would be
+                clipped to the rounded corner. That also clipped the hover
+                breakdown, which is absolutely positioned below the rate and is
+                taller than the space left under it — the reader got two lines
+                and a hard edge. The rule rounds its own top corners instead,
+                which is the same result without clipping anything else.
+              */}
               <div
                 aria-hidden="true"
                 style={{
                   background: position.funded
                     ? DAY_V3_TONE_DOT[position.tone]
                     : `color-mix(in srgb, ${DAY_V3_TONE_DOT[position.tone]} 30%, transparent)`,
+                  borderTopLeftRadius: 11,
+                  borderTopRightRadius: 11,
                   height: 3,
                 }}
               />
@@ -1808,21 +1822,43 @@ export default function DayV3Summary({
                       aria-hidden="true"
                       className="pointer-events-none absolute left-0 top-full z-20 mt-1 hidden w-[15rem] flex-col gap-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--card)] px-3 py-2 shadow-[0_8px_24px_-12px_rgba(23,25,31,0.45)] group-hover/apy:flex"
                     >
-                      {[
-                        ["Source yield", position.base],
-                        ["Jr premium", position.riskDelta],
-                        ["SLP premium", position.liqDelta],
-                      ].map(([label, value]) => (
+                      {(position.tone === "liquidity"
+                        ? // The SLP does not hold the source. Its capital is a
+                          // two-sided pool, so its pre-premium return is three
+                          // separate things: the Senior shares it holds, the
+                          // quote asset beside them, and fee income from
+                          // turnover. `poolCarry` is the engine-differential
+                          // decomposition already computed for section 5, so
+                          // these are measured legs and not a split invented
+                          // here.
+                          ([
+                            [
+                              "Senior shares in pool",
+                              model.poolCarry.seniorShareCarry,
+                            ],
+                            [
+                              `${quoteAssetLabel} in pool`,
+                              model.poolCarry.exitAssetCarry,
+                            ],
+                            ["Swap fee income", model.poolCarry.swapFeeIncome],
+                            ["Jr premium", position.riskDelta],
+                            ["SLP premium", position.liqDelta],
+                          ] as [string, number][])
+                        : ([
+                            ["Source yield", position.base],
+                            ["Jr premium", position.riskDelta],
+                            ["SLP premium", position.liqDelta],
+                          ] as [string, number][])
+                      ).map(([label, value]) => (
                         <span
                           className="flex items-baseline justify-between gap-3 text-[10.5px] text-[var(--secondary)]"
-                          key={label as string}
+                          key={label}
                         >
                           <span>{label}</span>
                           <span className="font-mono tabular-nums">
-                            {(value as number) >= 0 &&
-                            label !== "Source yield"
-                              ? `+${pct(value as number)}`
-                              : pct(value as number)}
+                            {value >= 0 && /premium|income/.test(label)
+                              ? `+${pct(value)}`
+                              : pct(value)}
                           </span>
                         </span>
                       ))}
@@ -1938,6 +1974,7 @@ export default function DayV3Summary({
                 >
                   <DayV3CapitalStack
                     defaults={defaults}
+                    exitAssetLabel={quoteAssetLabel}
                     poolSeniorWeight={model.pool.seniorWeight}
                     balances={model.balances}
                     coverage={resolved.coverage}

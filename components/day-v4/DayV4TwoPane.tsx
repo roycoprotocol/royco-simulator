@@ -93,6 +93,34 @@ export default function DayV4TwoPane(
     };
   }, []);
 
+  /**
+   * How far down the window the sticky scenario returns reach.
+   *
+   * An open model section is taller than the window, so its header — the row
+   * you click to close it — scrolls away, and the only way out of a section was
+   * to scroll back up through it. That header sticks instead, but it has to
+   * stop below the returns rather than under them, and the returns are as tall
+   * as their content. Measured here, published as one custom property.
+   */
+  useEffect(() => {
+    const root = shell.current;
+    if (!root) return;
+    const returns = root.querySelector<HTMLElement>(
+      'section[aria-labelledby="day-v3-positions-heading"]',
+    );
+    if (!returns) return;
+
+    const publish = () =>
+      root.style.setProperty(
+        "--v4-stack-top",
+        `${Math.round(returns.getBoundingClientRect().height)}px`,
+      );
+    publish();
+    const observer = new ResizeObserver(publish);
+    observer.observe(returns);
+    return () => observer.disconnect();
+  }, []);
+
   return (
     <div className={styles.shell} data-day-v4-layout="two-pane" ref={shell}>
       {/*
