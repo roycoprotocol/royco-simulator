@@ -263,11 +263,14 @@ function DayV3CapitalStack({
                     : "border-dashed border-[var(--border-subtle)]"
                 }`}
                 key={leg.name}
-                // The loss ordering, drawn rather than stated: a left edge in the
-                // leg's own colour on the two tranches that actually absorb, and
-                // none on the pool, which does not.
+                // Every funded leg carries its own colour, so the table and the
+                // chart beside it name the same three things the same way. The
+                // edge used to be reserved for the two legs that absorb losses,
+                // which read as the SLP row having been forgotten rather than
+                // as a statement about loss ordering — and that ordering is
+                // already drawn, bottom to top, in the stack to its left.
                 style={
-                  leg.lossLayer && leg.funded
+                  leg.funded
                     ? { borderLeftColor: leg.fill, borderLeftWidth: 3 }
                     : undefined
                 }

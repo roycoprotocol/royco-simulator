@@ -1793,7 +1793,58 @@ export default function DayV3Summary({
                 <CardNote>{position.holds}</CardNote>
               </CardHeader>
               <CardContent className="flex flex-col gap-3">
-                <div className="flex items-baseline gap-1">
+                <div className="group/apy relative flex items-baseline gap-1">
+                  {/*
+                    The same decomposition section 5 draws, on hover over the
+                    number it explains. `base`, `riskDelta` and `liqDelta` are
+                    already on the position — measured by ablation, so the
+                    parts sum to the engine's own total — and this is the one
+                    place the reader is looking when they wonder where the rate
+                    came from. Pointer-only by design: the route it matters on
+                    is desktop, and the same numbers are in section 5 in full.
+                  */}
+                  {displayedReturnState === "ready" && position.funded ? (
+                    <span
+                      aria-hidden="true"
+                      className="pointer-events-none absolute left-0 top-full z-20 mt-1 hidden w-[15rem] flex-col gap-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--card)] px-3 py-2 shadow-[0_8px_24px_-12px_rgba(23,25,31,0.45)] group-hover/apy:flex"
+                    >
+                      {[
+                        ["Source yield", position.base],
+                        ["Jr premium", position.riskDelta],
+                        ["SLP premium", position.liqDelta],
+                      ].map(([label, value]) => (
+                        <span
+                          className="flex items-baseline justify-between gap-3 text-[10.5px] text-[var(--secondary)]"
+                          key={label as string}
+                        >
+                          <span>{label}</span>
+                          <span className="font-mono tabular-nums">
+                            {(value as number) >= 0 &&
+                            label !== "Source yield"
+                              ? `+${pct(value as number)}`
+                              : pct(value as number)}
+                          </span>
+                        </span>
+                      ))}
+                      <span className="flex items-baseline justify-between gap-3 border-t border-[var(--border-subtle)] pt-1 text-[10.5px] font-semibold">
+                        <span>{position.name} APY</span>
+                        <span className="font-mono tabular-nums">
+                          {pct(position.apy)}
+                        </span>
+                      </span>
+                      {realized ? (
+                        <span className="flex items-baseline justify-between gap-3 text-[10px] text-[var(--tertiary)]">
+                          <span>
+                            Over history, {inputs.observationDays}-day
+                            observation
+                          </span>
+                          <span className="font-mono tabular-nums">
+                            {pct(position.realizedApy)}
+                          </span>
+                        </span>
+                      ) : null}
+                    </span>
+                  ) : null}
                   <span
                     className="font-mono text-[clamp(34px,3.2vw,44px)] font-bold leading-[0.92] tracking-[-0.03em] tabular-nums"
                     style={
@@ -1873,7 +1924,7 @@ export default function DayV3Summary({
           </p>
         </div>
 
-          <DayV3ModelAccordion>
+          <DayV3ModelAccordion initialOpenId="day-v3-capital-models">
                 <DayV3ModelGroup
                   id="day-v3-capital-models"
                   index={1}
@@ -2072,7 +2123,10 @@ export default function DayV3Summary({
                 // was tried and is worse — the two premium curves go vertical
                 // at 541px and the column runs to 783px. The chart is simply
                 // taller instead, which fills the row with signal.
-                <div className="grid grid-cols-1 items-start gap-3 lg:grid-cols-2">
+                <div
+                  className="grid grid-cols-1 items-start gap-3 lg:grid-cols-2"
+                  data-v3-growth-row
+                >
                   <Card weight="quiet">
                     <CardHeader>
                       <CardTitle>Growth over a year</CardTitle>

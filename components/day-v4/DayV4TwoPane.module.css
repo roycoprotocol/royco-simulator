@@ -551,4 +551,124 @@
     [data-section-status="complete"] {
     display: none;
   }
+
+  /*
+   * One design across both columns.
+   *
+   * Measured, not guessed. The two sides disagreed on five things, every one
+   * of them a case of /v3 styling a results section and an inputs section
+   * differently because they never appeared side by side there:
+   *
+   *   eyebrow colour   rgb(23,25,31) left   vs rgb(89,98,112) right
+   *   description      rgb(89,98,112) left  vs rgb(75,82,96) right
+   *   step number      dark chip, light text, 9.5px  vs light chip, grey text, 10px
+   *   group title      13px left            vs 13.5px right
+   *   section heading  uppercase eyebrow    vs 13px sentence case (returns)
+   *
+   * The rail is the reference in every case, because it is the column the
+   * reader starts in.
+   */
+  .shell
+    :global(main.royco-v3)
+    > section[aria-labelledby="day-v3-models-heading"]
+    [class~="tracking-[0.12em]"] {
+    color: var(--foreground);
+  }
+
+  .shell
+    :global(main.royco-v3)
+    > section[aria-labelledby="day-v3-models-heading"]
+    > [class~="flex-col"]
+    [class~="text-[11px]"] {
+    color: var(--tertiary);
+  }
+
+  /* The step number: the rail's dark chip, not the models' light one. */
+  .shell
+    :global(main.royco-v3)
+    > section[aria-labelledby="day-v3-models-heading"]
+    [data-model-group]
+    [class~="size-7"] {
+    border-color: transparent;
+    background: var(--foreground);
+    color: var(--background);
+    font-size: 9.5px;
+  }
+
+  .shell
+    :global(main.royco-v3)
+    > section[aria-labelledby="day-v3-models-heading"]
+    [data-model-group]
+    [class~="text-[13.5px]"] {
+    font-size: 13px;
+  }
+
+  /*
+   * The scenario returns get the same section heading as the other two: an
+   * uppercase eyebrow at the rail's size, tracking and colour, on the same
+   * `px-4 py-4` the rail's container uses. It was a 13px sentence-case title
+   * with `pt-4` and no bottom padding, which made it the one heading on the
+   * page in a third style.
+   */
+  .shell
+    :global(main.royco-v3)
+    > section[aria-labelledby="day-v3-positions-heading"]
+    [id="day-v3-positions-heading"] {
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--foreground);
+  }
+
+  .shell
+    :global(main.royco-v3)
+    > section[aria-labelledby="day-v3-positions-heading"]
+    > [class~="pt-4"] {
+    padding-top: 16px;
+    padding-bottom: 4px;
+  }
+
+  /*
+   * The position comparison goes under the growth chart, not beside it.
+   *
+   * In /v3 the two share a 1132px row. Here the results column is 979px, so
+   * the comparison's "what it does" column wrapped to three and four lines and
+   * every row in the table was a different height. Full width, the rows are
+   * one line each and the chart gets the whole measure too.
+   */
+  .shell :global([data-v3-growth-row]) {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  /*
+   * Section descriptions and per-row previews, removed on request.
+   *
+   * The rail's groups are already down to a number, a name and a control; the
+   * models list kept a preview line under each name and a sentence under the
+   * heading promising that "the main answer stays in each collapsed row",
+   * which stops being true the moment the previews go. Both columns lose both,
+   * so the two sides stay identical and no line on the page describes
+   * behaviour the page no longer has.
+   */
+  .shell
+    :global(main.royco-v3)
+    > section[aria-labelledby="day-v3-models-heading"]
+    [data-model-group]
+    [class~="text-[11px]"][class~="leading-snug"] {
+    display: none;
+  }
+
+  .shell
+    :global(main.royco-v3)
+    > section[aria-labelledby="day-v3-models-heading"]
+    > [class~="flex-col"]
+    > [class~="text-[11px]"],
+  .shell
+    :global(main.royco-v3)
+    > section[aria-labelledby="day-v3-inputs-heading"]
+    > [class~="justify-between"]
+    p {
+    display: none;
+  }
 }

@@ -5,6 +5,7 @@ import { memo, useDeferredValue, useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import DayV3BacktestChart, {
   type DayV3BacktestBand,
+  type DayV3BacktestJuniorLoss,
   type DayV3BacktestPoint,
 } from "@/components/day-v3/DayV3BacktestChart";
 import DayV3SegmentedControl from "@/components/day-v3/DayV3SegmentedControl";
@@ -278,6 +279,17 @@ function DayV3Backtest({
     [result],
   );
 
+  const juniorLosses = useMemo<DayV3BacktestJuniorLoss[]>(
+    () =>
+      result
+        ? result.erasureEvents.map((event) => ({
+            date: event.date,
+            pctOfJuniorNav: event.forfeitPctOfJuniorNav,
+          }))
+        : [],
+    [result],
+  );
+
   const chartData = useMemo<DayV3BacktestPoint[]>(
     () =>
       result
@@ -488,6 +500,7 @@ function DayV3Backtest({
             <DayV3BacktestChart
               bands={observationBands}
               data={chartData}
+              juniorLosses={juniorLosses}
               unit={returnUnit}
             />
 

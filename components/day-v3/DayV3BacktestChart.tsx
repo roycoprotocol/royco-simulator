@@ -9,6 +9,7 @@ import {
   Line,
   LineChart,
   ReferenceArea,
+  ReferenceLine,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -55,6 +56,21 @@ export type DayV3BacktestBand = {
  * day 7. Saying "7d" when the reading came at 12d hides which of the two
  * numbers the accountant used.
  */
+/**
+ * A dated step where Junior's recovery claim was erased — the moment a covered
+ * loss stopped being recoverable and became Junior's, for good.
+ *
+ * The Observation Period bands say when the market was waiting to find out; these
+ * say when it found out, and how much it cost. `pctOfJuniorNav` is the share of
+ * Junior's own NAV forfeited at that step, which is the number the loss is
+ * actually measured in — an index-point figure would be a share of a basis the
+ * reader never chose.
+ */
+export type DayV3BacktestJuniorLoss = {
+  date: string;
+  pctOfJuniorNav: number;
+};
+
 const periodLength = (band: DayV3BacktestBand) =>
   band.expired && band.targetDays > 0 && band.days !== band.targetDays
     ? `${band.targetDays}d term, next reading at ${band.days}d`
@@ -70,10 +86,12 @@ const SERIES = [
 function DayV3BacktestChart({
   bands = [],
   data,
+  juniorLosses = [],
   unit,
 }: {
   bands?: DayV3BacktestBand[];
   data: DayV3BacktestPoint[];
+  juniorLosses?: DayV3BacktestJuniorLoss[];
   unit: DayV3Unit;
 }) {
   return (
@@ -116,6 +134,7 @@ function DayV3BacktestChart({
               const band = bands.find(
                 (item) => label >= item.start && label <= item.end,
               );
+              const loss = juniorLosses.find((item) => item.date === label);
               return (
                 <div
                   style={{
@@ -135,6 +154,19 @@ function DayV3BacktestChart({
                         : "—"}
                     </div>
                   ))}
+                  {loss ? (
+                    <div
+                      style={{
+                        borderTop: "1px solid #e4e0d6",
+                        color: "#8c3d3d",
+                        marginTop: 4,
+                        paddingTop: 4,
+                      }}
+                    >
+                      Jr loss realized · {loss.pctOfJuniorNav.toFixed(1)}% of
+                      Junior NAV
+                    </div>
+                  ) : null}
                   {band ? (
                     <div
                       style={{
@@ -182,6 +214,19 @@ function DayV3BacktestChart({
               stroke="none"
               x1={band.start}
               x2={band.end}
+            />
+          ))}
+          {/* One line per realized Junior loss. Kept faint because a market
+              that records many of them should read as a market that records
+              many of them, not as a chart with a grid drawn over it. */}
+          {juniorLosses.map((loss, index) => (
+            <ReferenceLine
+              ifOverflow="extendDomain"
+              key={`jr-loss-${loss.date}-${index}`}
+              stroke="#8c3d3d"
+              strokeOpacity={0.35}
+              strokeWidth={1}
+              x={loss.date}
             />
           ))}
           <Legend iconType="plainline" wrapperStyle={{ fontSize: 11, paddingTop: 4 }} />

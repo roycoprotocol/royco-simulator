@@ -25,10 +25,18 @@ export function nextDayV3ModelOpenId(
 
 export function DayV3ModelAccordion({
   children,
+  initialOpenId = null,
 }: {
   children: React.ReactNode;
+  /**
+   * The section open on arrival. A page whose every result is collapsed asks
+   * the reader to guess which one answers their question before it has shown
+   * them a single one, so the first model opens by default. Still one at a
+   * time: opening another closes this.
+   */
+  initialOpenId?: string | null;
 }) {
-  const [openId, setOpenId] = useState<string | null>(null);
+  const [openId, setOpenId] = useState<string | null>(initialOpenId);
   const value = useMemo<ModelAccordionValue>(
     () => ({
       openId,
