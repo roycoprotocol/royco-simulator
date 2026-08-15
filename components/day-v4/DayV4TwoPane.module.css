@@ -710,6 +710,12 @@
     width: auto;
     margin: -12px -16px 0;
     padding: 12px 16px;
+    /*
+     * A stuck header sitting directly on content it is covering has no edge,
+     * so the section's first rows read as though they belong to it. The rule
+     * is the same one the section already draws under its header when open.
+     */
+    border-bottom: 1px solid var(--border-subtle);
   }
 
   /*
