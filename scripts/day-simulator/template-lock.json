@@ -64,7 +64,7 @@
   "scripts/day-simulator/verify-runtime.ts": "2d797bcd7cf976c71889d74c5ece3dc84d5bce94d6ea3766b272f08f5b1610c4",
   "scripts/day-simulator/verify.mjs": "d85b10098723c21787af0e8739f1f9d73eaec1fde60932a4a1b615971392117e",
   "docs/NEW_DAY_SIMULATOR.md": "3ea014ee0839f715c1a5469ee4a0ce4161f4e2cc20ab622f1cd7605b4b0048d5",
-  "package.json": "71f7c7175e3fc23e5b118c73c78ad026ce2d6dc1c34a483335186dbdf7440760",
+  "package.json": "8e585dfdabcdc8d40cbbbed0e1855e5583416e0206bce8084718d804069826c4",
   "lib/day-simulator-template/backtest.test.ts": "d978f6fe8755d22778a51ac3699d5ae1de36dcfa8690ba65ffcc481afc93cb6f",
   "lib/day-simulator-template/backtest.ts": "d2495ef2256bb3b529df60bb6e13dfb28fa774476661a3573b2c896e8137c8e6"
 }
