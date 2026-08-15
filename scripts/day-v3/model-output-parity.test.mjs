@@ -671,6 +671,26 @@ assert.match(
   "a market's own declared curve outranks the derived default",
 );
 
+// The exit goal has to size the SLP. It did not: `liquidityPct` was the
+// market's declared constant, so asking for 50 of every 100 Senior to be
+// sellable left the SLP at the size it has at a goal of 5, while the exit model
+// reported the pool could only absorb 10 of the 50.
+assert.match(
+  summary,
+  /dayV3MinimumLiquidityForExitGoal\(\{/,
+  "the exit goal must be inverted into a Minimum Liquidity",
+);
+assert.match(
+  summary,
+  /liquidityRecommendation\?\.minimumLiquidity\.value \?\?\s*\n?\s*exitGoalSizing\?\.minimumLiquidityPct \?\?\s*\n?\s*defaults\.minLiquidity \* 100/,
+  "the canonical sizing outranks the local one, which outranks the market constant",
+);
+assert.doesNotMatch(
+  summary,
+  /const liquidityPct = exitDisabled\s*\n\s*\? 0\s*\n\s*: defaults\.minLiquidity \* 100;/,
+  "the SLP must never be sized by the market constant alone again",
+);
+
 console.log(
   `Day V3 unified model architecture: PASS (${modelFamilies.length}/${modelFamilies.length} shared model families)`,
 );
