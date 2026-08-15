@@ -1,0 +1,167 @@
+/*
+ * /v4 is /v3's component tree in a two-pane frame.
+ *
+ * Not one number, engine call, or line of copy differs between the two routes:
+ * `DayV3Summary` still owns every piece of state and every shared-accountant
+ * call, and this file only re-places the sections it already renders. That is
+ * deliberate. The moment the layout needs its own JSX it needs its own state,
+ * and a second copy of the state that drives `runDayTargetScenario` is exactly
+ * the drift `scripts/day-v3/model-output-parity.test.mjs` exists to prevent.
+ *
+ * It is also why the rules below key off ARIA relationships rather than child
+ * indexes: `aria-labelledby="day-v3-inputs-heading"` is the same handle the
+ * page already uses to name that section, so a section added or removed inside
+ * /v3 cannot silently shuffle the panes.
+ */
+
+.shell {
+  display: block;
+}
+
+/*
+ * Below `lg` the page is /v3, byte for byte. A 390px rail beside a results
+ * column at 768px leaves neither one a usable measure, so the whole two-pane
+ * frame lives inside this one query and the stacked page is the fallback.
+ */
+@media (min-width: 64rem) {
+  .shell {
+    /*
+     * The rail holds the same controls /v3 renders, minus their second column
+     * (see the `lg:grid-cols-2` rule at the bottom of this file), so one field
+     * per row. 27vw lands on 346px at 1280 and 389px at 1440 — a label, its
+     * control, and its note on one measure.
+     */
+    --v4-rail: clamp(320px, 27vw, 420px);
+    /* gap-6. The shell rhythm /v3 already uses; no new spacing value. */
+    --v4-gap: 24px;
+  }
+
+  .shell :global(main.royco-v3) {
+    /*
+     * 1440, up from /v3's 1180. The rail takes its width off the top, so the
+     * results column has to be measured net of it: at 1440 it still gets
+     * 1440 − 48 (px-6) − 389 (rail) − 24 (gap) = 979px, against the 1132px
+     * /v3 gives the same charts and tables. Their `lg:grid-cols-2` interiors
+     * therefore keep ~478px cells rather than /v3's ~554px — above the 541px
+     * that /v3's own comment records as too narrow only because that split was
+     * two model cards side by side inside a 1132px row, not one card in a
+     * 979px column. Going wider than 1440 buys the results nothing a laptop
+     * can show; going narrower starts halving those interiors for real.
+     */
+    max-width: 1440px;
+    /*
+     * Block, not grid.
+     *
+     * Two things have to stay on screen: the input rail, and the three
+     * scenario APYs the rail is being moved against. A grid item can only
+     * stick inside its own grid area, and a one-row area gives it nowhere to
+     * move — so in a grid only one of the two could ever stick, because only
+     * one item per column can be given a row span. In block layout every
+     * child's containing block is `main` itself, which is the whole page, so
+     * both stick for the entire scroll. The float below is what puts the rail
+     * beside the results instead of above them.
+     */
+    display: block;
+  }
+
+  /* `display: block` drops the flex `gap-6`, so the same rhythm is restored. */
+  .shell :global(main.royco-v3) > * + * {
+    margin-top: var(--v4-gap);
+  }
+
+  /*
+   * The results column: everything that is not the hero (which spans, above
+   * the split) and not the rail (which is pulled out of the column below).
+   */
+  .shell :global(main.royco-v3) > *:not(header) {
+    margin-left: calc(var(--v4-rail) + var(--v4-gap));
+  }
+
+  /* The left pane. */
+  .shell
+    :global(main.royco-v3)
+    > section[aria-labelledby="day-v3-inputs-heading"] {
+    float: left;
+    width: var(--v4-rail);
+    margin-left: 0;
+    position: sticky;
+    top: 0;
+    /*
+     * Independently scrollable. The four input groups open one at a time, but
+     * an open group — the Senior exit one carries five fields — can still
+     * outrun a 13-inch viewport, and a rail whose bottom cannot be reached is
+     * worse than no rail.
+     */
+    max-height: 100vh;
+    max-height: 100svh;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    z-index: 1;
+  }
+
+  /*
+   * The three APYs are the answer every input in the rail is being moved
+   * against, so they stay on screen while a model section is open beneath
+   * them. The section is opaque (`bg-[var(--foundation)]`), so the results
+   * scroll under it rather than through it.
+   */
+  .shell
+    :global(main.royco-v3)
+    > section[aria-labelledby="day-v3-positions-heading"] {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+  }
+
+  /*
+   * Tailwind's `sm:` and `lg:` are viewport queries, and the rail is ~390px
+   * inside a viewport that is by definition at least 1024px. So every row that
+   * opted into a second column on the assumption it had /v3's ~1132px to spend
+   * renders that second column anyway, in a third of the width: the input
+   * fields pair up into ~180px cells, and each group's heading gives its title
+   * 180px and its subtitle whatever is left, which is one word per line.
+   *
+   * These three templates are the whole set, and they are all the same
+   * assumption. Reverting them to the single column those same rows already
+   * use below `sm`/`lg` is what the rail's width actually calls for, and it is
+   * scoped to the rail so /v3 never has to know the rail exists. The grids
+   * that are honestly fine at this width — the preset rows at ~113px a button,
+   * the segmented controls — are deliberately left alone.
+   *
+   * Matched on the attribute rather than an escaped `.lg\:grid-cols-2` class
+   * so the rule does not depend on how Tailwind escapes a colon.
+   */
+  .shell
+    :global(main.royco-v3)
+    > section[aria-labelledby="day-v3-inputs-heading"]
+    [class~="lg:grid-cols-2"],
+  .shell
+    :global(main.royco-v3)
+    > section[aria-labelledby="day-v3-inputs-heading"]
+    [class~="sm:grid-cols-[180px_minmax(0,1fr)]"],
+  .shell
+    :global(main.royco-v3)
+    > section[aria-labelledby="day-v3-inputs-heading"]
+    [class~="sm:grid-cols-[minmax(0,1fr)_180px]"] {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  /*
+   * The same correction for the rows built as a label opposite a control:
+   * `flex-wrap` never fires on them because the label carries `min-w-0` and so
+   * has no min-content width to wrap against, which leaves the two on/off
+   * questions ("Should Senior have first-loss protection?", "Should Senior
+   * have an immediate pool exit?") crushed to a word per line beside a segment
+   * control that refuses to shrink. Stacking them is what wrapping would have
+   * done. Four elements in the rail match: those two, each group's
+   * docs-link/reset footer — which reads better stacked at this width anyway —
+   * and the rail's own heading row, which has one child and does not move.
+   */
+  .shell
+    :global(main.royco-v3)
+    > section[aria-labelledby="day-v3-inputs-heading"]
+    [class~="flex-wrap"][class~="items-center"][class~="justify-between"] {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
