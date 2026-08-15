@@ -2,8 +2,13 @@ import assert from "node:assert/strict";
 
 import { DAY_MARKETS } from "@/lib/day-markets/registry";
 import {
+  DAY_V3_POOL_DEFAULT_SENIOR_WEIGHT,
+  DAY_V3_POOL_LAMBDA,
+  DAY_V3_POOL_LAMBDA_RANGE,
+  DAY_V3_POOL_PREMIUM_BPS_RANGE,
   dayV3PoolCurveFromPremium,
   dayV3PremiumBpsOf,
+  dayV3PremiumForRestingWeight,
   dayV3RestingSeniorWeight,
 } from "@/lib/day-v3/pool-curve";
 
@@ -82,5 +87,57 @@ assert.equal(dayV3PoolCurveFromPremium({ bandPct: 100, premiumBps: 3, lambda: 25
 assert.equal(dayV3PoolCurveFromPremium({ bandPct: 2, premiumBps: 3, lambda: 0 }), null);
 assert.equal(dayV3RestingSeniorWeight(null), null);
 assert.equal(dayV3PremiumBpsOf(null), null);
+
+// The bounds are the deploy step's bounds. A simulator that lets an issuer
+// model a premium the deploy step would reject is not modelling their market.
+assert.deepEqual(DAY_V3_POOL_PREMIUM_BPS_RANGE, { min: 0, max: 50 });
+assert.deepEqual(DAY_V3_POOL_LAMBDA_RANGE, { min: 100, max: 1000 });
+assert.equal(DAY_V3_POOL_LAMBDA, 300);
+assert.ok(
+  DAY_V3_POOL_LAMBDA >= DAY_V3_POOL_LAMBDA_RANGE.min &&
+    DAY_V3_POOL_LAMBDA <= DAY_V3_POOL_LAMBDA_RANGE.max,
+  "the default concentration has to be one the deploy step accepts",
+);
+
+// The inverse, which is this module's `solveBeta`. Deployment derives its
+// default premium by solving for a 90/10 quote/Senior rest, so the same solve
+// has to land on exactly that here — this is where the "90/10 across the board"
+// actually comes from, and it is a default rather than a fixed split.
+for (const [bandPct, lambda] of [
+  [2, 250],
+  [2, 300],
+  [5, 250],
+  [5, 300],
+  [1, 300],
+] as [number, number][]) {
+  const bps = dayV3PremiumForRestingWeight({
+    bandPct,
+    lambda,
+    seniorWeight: DAY_V3_POOL_DEFAULT_SENIOR_WEIGHT,
+  });
+  assert.ok(bps !== null, `${bandPct}% / ${lambda} must solve for 90/10`);
+  assert.ok(
+    bps > 0 && bps <= DAY_V3_POOL_PREMIUM_BPS_RANGE.max,
+    `the 90/10 premium must be one the deploy step accepts, got ${bps}`,
+  );
+  const rests = dayV3RestingSeniorWeight(
+    dayV3PoolCurveFromPremium({ bandPct, premiumBps: bps, lambda }),
+  );
+  assert.ok(rests !== null);
+  assert.ok(
+    Math.abs(rests - DAY_V3_POOL_DEFAULT_SENIOR_WEIGHT) < 1e-6,
+    `${bandPct}% / ${lambda}: solved ${bps.toFixed(2)} bps rests at ${(rests * 100).toFixed(4)}%`,
+  );
+}
+
+// A weight no premium in range can reach is null, not a silently clamped one.
+assert.equal(
+  dayV3PremiumForRestingWeight({ bandPct: 2, lambda: 300, seniorWeight: 0.999 }),
+  null,
+);
+assert.equal(
+  dayV3PremiumForRestingWeight({ bandPct: 2, lambda: 300, seniorWeight: 0 }),
+  null,
+);
 
 console.log("Day V3 pool curve from premium: PASS");

@@ -34,12 +34,46 @@ import { reservesPerL, type EclpParams } from "@/lib/day/engine/eclp";
 export const DAY_V3_POOL_ROTATION = Math.SQRT1_2;
 
 /**
- * The concentration every listed market declares, and the one the deployment
- * interface builds with. An issuer-set premium models the pool that would
- * actually be deployed, so it is built at the deployed concentration rather
- * than the simulator's own fallback of 1.
+ * Concentration, and the range the deployment interface accepts.
+ *
+ *     LAMBDA_RANGE   = { min: 100, max: 1000 }
+ *     DEFAULT_LAMBDA = 300
+ *     royco-rwa-frontend/lib/deploy-market/pool-controls.ts
+ *
+ * The default is only reached for a market that declares no curve of its own;
+ * a listed market's declared lambda is more faithful to that market than any
+ * constant, so it wins when present.
  */
-export const DAY_V3_POOL_LAMBDA = 250;
+export const DAY_V3_POOL_LAMBDA = 300;
+export const DAY_V3_POOL_LAMBDA_RANGE = { min: 100, max: 1000 } as const;
+
+/**
+ * The premium range the deployment interface accepts, in bps.
+ *
+ *     PREMIUM_BP = { min: 0, max: 50 }
+ *     royco-rwa-frontend/lib/deploy-market/pool-controls.ts
+ *
+ * A simulator that lets an issuer model a premium the deploy step would reject
+ * is not modelling their market. Measured, 50 bps rests at 36.3% Senior at
+ * lambda 250 and 38.7% at 300 — already far past the 3.9% every listed market
+ * ships.
+ */
+export const DAY_V3_POOL_PREMIUM_BPS_RANGE = { min: 0, max: 50 } as const;
+
+/**
+ * The resting composition deployment derives its default premium for: 90%
+ * quote asset, 10% Senior.
+ *
+ *     tilt: "0.90"
+ *     royco-rwa-frontend/app/(main)/deploy-market/_components/steps/step-6-pool.tsx
+ *
+ * This is where the "90/10" comes from. It is not a hardcoded pool split — it
+ * is the split the *default* premium is solved for, and the issuer moves it by
+ * moving the premium. The simulator's own fallback curve is solved for the same
+ * 10% Senior, so the two agree on the default and differed only in never
+ * exposing the control.
+ */
+export const DAY_V3_POOL_DEFAULT_SENIOR_WEIGHT = 0.1;
 
 export type DayV3PoolCurveInputs = {
   /** The pool's maximum discount, in percent. Sets alpha, the band's floor. */
@@ -107,6 +141,48 @@ export function dayV3RestingSeniorWeight(
  * Lets the page report the balance point of a curve it did not build, which is
  * every listed market's declared curve and every canonical service response.
  */
+/**
+ * The premium that rests a curve on a given Senior share — the inverse of the
+ * construction above, and the simulator's equivalent of deployment's
+ * `solveBeta({ alpha, c, s, lambda, tilt })`.
+ *
+ * Bisection rather than the closed form: the sim already inverts this way in
+ * `eclpParamsForWeight`, the search is over a monotone function, and 80 halvings
+ * of a 0-to-500 bp interval resolve far finer than the two decimals of a bp the
+ * deploy step stores.
+ *
+ * Null when no premium in range produces the requested weight, which is a real
+ * answer — a very tight band cannot rest on much Senior at any premium.
+ */
+export function dayV3PremiumForRestingWeight(inputs: {
+  bandPct: number;
+  lambda: number;
+  seniorWeight: number;
+}): number | null {
+  const { bandPct, lambda, seniorWeight } = inputs;
+  if (!(seniorWeight > 0) || !(seniorWeight < 1)) return null;
+  let lo = 1e-6;
+  let hi = 500;
+  const weightAt = (bps: number) =>
+    dayV3RestingSeniorWeight(dayV3PoolCurveFromPremium({ bandPct, premiumBps: bps, lambda }));
+  const loW = weightAt(lo);
+  const hiW = weightAt(hi);
+  if (loW === null || hiW === null) return null;
+  if (seniorWeight < loW || seniorWeight > hiW) return null;
+  for (let i = 0; i < 80; i += 1) {
+    const mid = (lo + hi) / 2;
+    const w = weightAt(mid);
+    if (w === null) {
+      hi = mid;
+      continue;
+    }
+    if (w > seniorWeight) hi = mid;
+    else lo = mid;
+  }
+  const answer = (lo + hi) / 2;
+  return Number.isFinite(answer) && answer > 0 ? answer : null;
+}
+
 export function dayV3PremiumBpsOf(
   params: EclpParams | null | undefined,
 ): number | null {

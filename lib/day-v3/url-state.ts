@@ -402,10 +402,10 @@ export function readDayV3UrlState(search: string): DayV3UrlState {
     // what the engine can hold, taking the backtest down.
     swapFeeBps: finite(params.get("fee"), 0.01, 1_000),
     // The pool's balance point, carried as the premium that sets it — the same
-    // quantity the deployment interface takes. Bounded well inside where
-    // `eclpParamsForWeight`'s bisection stops resolving: at 300 bps the curve
-    // already rests past 50% Senior, which is not a design anyone deploys.
-    poolPremiumBps: finite(params.get("premiumBps"), 0.1, 300),
+    // quantity the deployment interface takes, in the range it accepts
+    // (`PREMIUM_BP = { min: 0, max: 50 }`). A link that carried a premium the
+    // deploy step would reject would describe a market nobody can ship.
+    poolPremiumBps: finite(params.get("premiumBps"), 0.01, 50),
     marketMakerCostOfCapitalPct: finite(params.get("mmCost"), 0, 100),
     redemptionDays: integer(params.get("mmDays"), 0, 365),
     protectedDrawdownPct,

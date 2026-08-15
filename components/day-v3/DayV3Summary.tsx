@@ -44,8 +44,10 @@ import {
 } from "@/lib/day-v3/pool-curve";
 import { poolCurveFor } from "@/lib/day/engine/engine";
 import {
+  DAY_V3_POOL_DEFAULT_SENIOR_WEIGHT,
   DAY_V3_POOL_LAMBDA,
   dayV3PoolCurveFromPremium,
+  dayV3PremiumForRestingWeight,
 } from "@/lib/day-v3/pool-curve";
 import {
   Card,
@@ -510,17 +512,48 @@ export default function DayV3Summary({
   // The curve an issuer-set premium implies. Same construction the deployment
   // interface uses: alpha from the band, beta from the premium, the shipped
   // 45-degree rotation, and the configured concentration.
-  const premiumCurve = useMemo(
-    () =>
-      premiumOverridden
-        ? dayV3PoolCurveFromPremium({
-            bandPct: floorBandPct,
-            premiumBps: poolPremiumBps as number,
-            lambda: DAY_V3_POOL_LAMBDA,
-          })
-        : null,
-    [floorBandPct, poolPremiumBps, premiumOverridden],
-  );
+  const premiumCurve = useMemo(() => {
+    // The market's own concentration when it declares one — more faithful to
+    // that market than any constant — and deployment's default otherwise.
+    const lambda = defaults.eclpParams?.lambda ?? DAY_V3_POOL_LAMBDA;
+    if (premiumOverridden) {
+      return dayV3PoolCurveFromPremium({
+        bandPct: floorBandPct,
+        premiumBps: poolPremiumBps as number,
+        lambda,
+      });
+    }
+    // A live template's own curve is the real pool and always wins.
+    if (canonicalEngineOverrides) return null;
+    // Otherwise build the pool the deploy step would build for this band at its
+    // own 90/10 default, rather than leaving the engine's fallback.
+    //
+    // That fallback is axis-aligned at lambda 1, and the deploy step is always
+    // a 45-degree rotation at lambda 100-1000. Both rest at 10% Senior, so the
+    // composition was never the problem — the shape was. Measured at a 10%
+    // sale: susdai 99.4 bps of discount on the fallback against 53.3 on the
+    // deployable pool, jbbb 49.8 against 35.4, acred 40.0 against 15.3. The
+    // simulator was quoting exits roughly twice as expensive as the pool an
+    // issuer would actually get.
+    const derived = dayV3PremiumForRestingWeight({
+      bandPct: floorBandPct,
+      lambda,
+      seniorWeight: DAY_V3_POOL_DEFAULT_SENIOR_WEIGHT,
+    });
+    return derived === null
+      ? null
+      : dayV3PoolCurveFromPremium({
+          bandPct: floorBandPct,
+          premiumBps: derived,
+          lambda,
+        });
+  }, [
+    canonicalEngineOverrides,
+    defaults.eclpParams?.lambda,
+    floorBandPct,
+    poolPremiumBps,
+    premiumOverridden,
+  ]);
   const engineOverrides = useMemo<DayV3EngineOverrides | null>(() => {
     if (!canonicalEngineOverrides && !feeOverridden && !premiumCurve) {
       return null;
@@ -1669,6 +1702,7 @@ export default function DayV3Summary({
           <DayV3Goals
             drawdownPct={protectedDrawdownPct}
             exit={exitView}
+            defaultPremiumBps={model.pool.premiumBps}
             onPoolPremiumBps={setPoolPremiumBps}
             poolPremiumBps={poolPremiumBps}
             restingSeniorWeight={model.pool.restingSeniorWeight}
