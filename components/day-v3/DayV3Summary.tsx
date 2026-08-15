@@ -38,6 +38,7 @@ import DayV3Source from "@/components/day-v3/DayV3Source";
 import DayV3YieldModels from "@/components/day-v3/DayV3YieldModels";
 import { useDayV3SimulationPoolDesign } from "@/components/day-v3/useDayV3SimulationPoolDesign";
 import { dayV3RealizedReturns } from "@/lib/day-v3/historical-returns";
+import { dayV3MinimumLiquidityForExitGoal } from "@/lib/day-v3/exit-goal-sizing";
 import {
   dayV3PremiumBpsOf,
   dayV3RestingSeniorWeight,
@@ -603,13 +604,52 @@ export default function DayV3Summary({
         : null,
     [canonicalPoolRecommendation, coveragePct, defaults],
   );
-  // Scenario APYs must remain available even when the canonical pool service
-  // is offline. The selected source's explicit starting Minimum Liquidity is
-  // therefore the disclosed comparison basis. Exact E-CLP sizing remains a
-  // separate result and never silently replaces this return-model denominator.
+  // What the exit goal actually costs in Minimum Liquidity.
+  //
+  // The protection goal sizes Junior through `coverage`, and always has. The
+  // exit goal sized nothing: this was `defaults.minLiquidity * 100`, a market
+  // constant, so an issuer could ask for $50 of every $100 Senior to be
+  // sellable and watch the SLP sit at $11.1 — the size it has at a $5 goal —
+  // while the exit model reported the pool could absorb $10.1 of the $50. The
+  // field's own note says this input "sets the SLP capital". It did not.
+  //
+  // Measured on susdai: coverage 15% -> 40% moves Junior $20.00 -> $80.00,
+  // while minimum liquidity 10% -> 25% moves the SLP $11.11 -> $27.78. Both
+  // legs respond to their term; only Junior's term was wired to its goal.
+  const exitGoalSizing = useMemo(
+    () =>
+      exitDisabled ||
+      modeledImmediateExitSharePct === null ||
+      minimumProceedsPer100 === null
+        ? null
+        : dayV3MinimumLiquidityForExitGoal({
+            defaults,
+            coveragePct,
+            bandPct: floorBandPct,
+            exitSharePct: modeledImmediateExitSharePct,
+            minimumProceedsPer100,
+            ...(premiumCurve ? { eclpParams: premiumCurve } : {}),
+            ...(swapFeeBps === null ? {} : { swapFeeBps }),
+          }),
+    [
+      coveragePct,
+      defaults,
+      exitDisabled,
+      floorBandPct,
+      minimumProceedsPer100,
+      modeledImmediateExitSharePct,
+      premiumCurve,
+      swapFeeBps,
+    ],
+  );
+  // The canonical service's own sizing wins when it has resolved — it prices
+  // the real venue. Then the local answer to the issuer's goal. The market's
+  // declared constant is the last resort, for a goal that cannot be sized.
   const liquidityPct = exitDisabled
     ? 0
-    : defaults.minLiquidity * 100;
+    : (liquidityRecommendation?.minimumLiquidity.value ??
+      exitGoalSizing?.minimumLiquidityPct ??
+      defaults.minLiquidity * 100);
   // The band IS the pool's maximum discount — when the template resolves this
   // reads its `maximumDiscountBps` directly. The fallback used the market's own
   // fixed `eclpBandWidth`, so with no live template the payout floor shaped
