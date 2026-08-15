@@ -620,6 +620,25 @@ assert.match(
   "a zero-width period draws nothing and must not be emitted as a band",
 );
 
+// Coverage restoration follows the market's own manifest. Held at a hardcoded
+// `false`, every market but muga opened contradicting its own declared design
+// and reported "Coverage restoration is off" for a market that restores it.
+assert.match(
+  summary,
+  /useState\(\s*\n?\s*initialMarket\.defaults\.maintainCoverage,?\s*\n?\s*\)/,
+  "coverage restoration must be seeded from the market, not hardcoded",
+);
+assert.match(
+  summary,
+  /setMaintainCoverage\(next\.defaults\.maintainCoverage\);/,
+  "switching market must adopt that market's coverage-restoration answer too",
+);
+assert.doesNotMatch(
+  summary,
+  /useState\(false\);\s*\n\s*\/\/ The merged simulator exposes only target yield shares/,
+  "the hardcoded coverage-restoration default must not come back",
+);
+
 console.log(
   `Day V3 unified model architecture: PASS (${modelFamilies.length}/${modelFamilies.length} shared model families)`,
 );

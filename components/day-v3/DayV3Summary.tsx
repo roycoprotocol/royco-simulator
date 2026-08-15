@@ -242,7 +242,16 @@ export default function DayV3Summary({
   const protectionDisabled = modeledProtectedDrawdownPct === 0;
   const exitDisabled = modeledImmediateExitSharePct === 0;
   const observationDays = recoveryDaysInput ?? 0;
-  const [maintainCoverage, setMaintainCoverage] = useState(false);
+  // Seeded from the market's own manifest rather than hardcoded. The page held
+  // this at `false` while 12 of the 13 markets declare `maintainCoverage: true`,
+  // so every one of them opened contradicting its own design and reported
+  // "Outside Junior capital 0.0% — Coverage restoration is off" for a market
+  // that restores coverage. muga declares `false` and keeps it: a market that
+  // has said it does not top Junior back up must not be shown as though it
+  // does.
+  const [maintainCoverage, setMaintainCoverage] = useState(
+    initialMarket.defaults.maintainCoverage,
+  );
   // The merged simulator exposes only target yield shares. Legacy curve-shape
   // anchors stay inactive even when an old link contains them.
   const riskShareOverride = activeManualOverrides.jrYieldShareAtTargetPct;
@@ -302,6 +311,9 @@ export default function DayV3Summary({
     setSwapFeeBps(null);
     setImportedMarket(null);
     setManualOverrides(EMPTY_DAY_V3_OVERRIDES);
+    // Adopted with the rest of the market's terms, for the same reason: the
+    // toggle must describe the market on screen, not the previous one.
+    setMaintainCoverage(next.defaults.maintainCoverage);
   };
 
   const selectMarket = (nextId: string) => {
