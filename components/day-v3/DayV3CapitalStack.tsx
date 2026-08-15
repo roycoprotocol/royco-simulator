@@ -33,6 +33,7 @@ function DayV3CapitalStack({
   balances,
   coverage,
   defaults,
+  exitAssetLabel,
   liquidityPending = false,
   minLiquidity,
   poolSeniorWeight,
@@ -44,6 +45,8 @@ function DayV3CapitalStack({
   /** Needed to size the same stack at 100% utilization, which is the floor the
    *  requirement is literally met at. */
   defaults: DaySimulatorDefaults;
+  /** What the pool's non-Senior side is held in, named by the issuer. */
+  exitAssetLabel: string;
   liquidityPending?: boolean;
   minLiquidity: number;
   /** How much of the pool sits in Senior shares, so the in-source figure counts
@@ -83,6 +86,8 @@ function DayV3CapitalStack({
           <div className="flex min-w-0 flex-col justify-center rounded-xl border border-[var(--border-subtle)] bg-[var(--foundation)] px-3 py-3">
             <div className="mx-auto w-full max-w-[360px]">
               <DayV3StackDiagram
+                exitAssetLabel={exitAssetLabel}
+                poolSeniorWeight={poolSeniorWeight}
                 jt={per100(jt)}
                 jtFloor={per100(floor.jt)}
                 lt={0}
@@ -205,7 +210,10 @@ function DayV3CapitalStack({
       floorRatio: per100(floor.lt),
       description:
         minLiquidity > 0
-          ? `Exit liquidity; meets ${pct(minLiquidity)} minimum liquidity at the ${pct(targetUtilization)} target`
+          ? // The pool's two sides are named in the diagram's caption instead.
+            // Spelling them out here ran the row to eight lines in a 979px
+            // column, and every leg's row is sized by the longest one.
+            `Exit liquidity; meets ${pct(minLiquidity)} minimum liquidity at the ${pct(targetUtilization)} target`
           : "No immediate pool exit",
       funded: minLiquidity > 0,
       fill: "var(--theme-green)",
@@ -229,6 +237,8 @@ function DayV3CapitalStack({
                 raw balances printed $40000000.0 on the Senior block: `initialST`
                 is a modelling basis, not anybody's raise. */}
             <DayV3StackDiagram
+                exitAssetLabel={exitAssetLabel}
+                poolSeniorWeight={poolSeniorWeight}
               jt={per100(jt)}
               jtFloor={per100(floor.jt)}
               lt={per100(lt)}

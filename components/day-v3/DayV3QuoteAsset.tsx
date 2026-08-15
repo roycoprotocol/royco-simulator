@@ -128,8 +128,7 @@ export default function DayV3QuoteAsset({
           ))}
         </div>
         <span className="text-[10px] leading-snug text-[var(--tertiary)]">
-          The pool&apos;s quote asset: the other side of every immediate exit,
-          and most of what the SLP holds at rest.
+          The other side of every exit, and most of what the SLP holds.
         </span>
       </div>
 
@@ -137,7 +136,7 @@ export default function DayV3QuoteAsset({
         label={`What net annual yield does ${label} earn in the pool?`}
         max={30}
         min={0}
-        note="0 for a quote asset that does not accrue. Anything above 0 is paid to the SLP and shows as exit-asset carry in the position comparison."
+        note="Paid to the SLP. 0 if the asset does not accrue."
         onChange={onYieldPct}
         origin={yieldOrigin}
         placeholder="Enter yield"
@@ -155,7 +154,7 @@ export default function DayV3QuoteAsset({
         label="How much does the pool trade in a year?"
         max={100}
         min={0}
-        note="Annual swap volume as a multiple of pool value. 0 makes no volume forecast, which is the honest default; anything above it pays the SLP fee income the pool has not been shown to earn."
+        note="Annual swap volume ÷ pool value. 0 forecasts none, which is the honest default; above it pays the SLP fee income the pool has not been shown to earn."
         onChange={onTurnoverPerYear}
         origin={yieldOrigin}
         placeholder="Enter a multiple"
@@ -177,7 +176,7 @@ export default function DayV3QuoteAsset({
           // past what the engine can hold.
           max={1000}
           min={0.01}
-          note="Empty charges whatever the live template charges, or the market's declared fee until it resolves. A fee set here prices every quote on this page and keeps the live template's curve while replacing what it charges to trade on it, so the canonical pool result — solved at the template's own fee — is withheld. From 100 bps the fee alone exceeds the near-NAV reference, so no positive trade can meet it."
+          note="Empty uses the live template's fee. A fee set here prices every quote and withholds the canonical pool result, which was solved at the template's own fee. From 100 bps no positive trade can clear it."
           onChange={onSwapFeeBps}
           origin={feeOrigin}
           placeholder="Use the live fee"

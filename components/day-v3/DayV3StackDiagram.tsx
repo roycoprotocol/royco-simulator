@@ -66,17 +66,23 @@ function money(value: number, unit: DayV3Unit) {
 }
 
 function DayV3StackDiagram({
+  exitAssetLabel,
   jt,
   jtFloor,
   lt,
   ltFloor,
+  poolSeniorWeight,
   st,
   unit,
 }: {
+  /** What the pool's non-Senior side is held in, named by the issuer. */
+  exitAssetLabel: string;
   jt: number;
   jtFloor: number;
   lt: number;
   ltFloor: number;
+  /** How much of the pool sits in Senior shares. */
+  poolSeniorWeight: number;
   st: number;
   unit: DayV3Unit;
 }) {
@@ -305,7 +311,11 @@ function DayV3StackDiagram({
         x={POOL_X}
         y={BOTTOM + 14}
       >
-        {lt > 0 ? `${money(lt, unit)} to exit into` : "no pool funded"}
+        {lt > 0
+          ? // Named here rather than in the leg table: the pool is two-sided,
+            // and this is the place it is actually drawn.
+            `${money(lt, unit)} to exit into · ${(poolSeniorWeight * 100).toFixed(0)}% Senior / ${((1 - poolSeniorWeight) * 100).toFixed(0)}% ${exitAssetLabel}`
+          : "no pool funded"}
       </text>
     </svg>
   );

@@ -655,6 +655,7 @@
     :global(main.royco-v3)
     > section[aria-labelledby="day-v3-models-heading"]
     [data-model-group]
+    > button[aria-expanded]
     [class~="text-[11px]"][class~="leading-snug"] {
     display: none;
   }
@@ -669,6 +670,91 @@
     > section[aria-labelledby="day-v3-inputs-heading"]
     > [class~="justify-between"]
     p {
+    display: none;
+  }
+
+  /*
+   * The open section's own header stays reachable.
+   *
+   * Section 5 opened is several screens tall, so the row you click to close it
+   * is off the top of the window by the time you have read it — the only way
+   * out was to scroll back up. Its header sticks just under the scenario
+   * returns instead, so closing is always one click from wherever you are.
+   * Only the open one: a stack of sticky collapsed rows would be a second
+   * navigation bar nobody asked for.
+   */
+  .shell
+    :global(main.royco-v3)
+    [data-model-group]
+    > button[aria-expanded="true"] {
+    position: sticky;
+    top: calc(var(--v4-stack-top, 0px) + var(--v4-gap));
+    z-index: 1;
+    /* Opaque, so the section's own content passes beneath it rather than
+       through it. Matches the card it sits on. */
+    background: var(--card);
+  }
+
+  /*
+   * One card-title size everywhere.
+   *
+   * `CardTitle` defaults to 15px and fifteen call sites override it to 13.5px,
+   * so which size a section got depended on whether whoever wrote it passed the
+   * override. "Growth over a year" and "Position comparison" sit one above the
+   * other at two different sizes for exactly that reason. Normalized here for
+   * every card in the results column rather than per section, so a card added
+   * later cannot reintroduce the split.
+   */
+  .shell :global(main.royco-v3) h2,
+  .shell :global(main.royco-v3) h3,
+  .shell :global(main.royco-v3) h4 {
+    font-size: 13.5px;
+  }
+
+  /* The eyebrows keep their own size — they are not card titles. */
+  .shell :global(main.royco-v3) [class~="tracking-[0.14em]"],
+  .shell :global(main.royco-v3) [class~="tracking-[0.12em]"],
+  .shell
+    :global(main.royco-v3)
+    > section[aria-labelledby="day-v3-positions-heading"]
+    [id="day-v3-positions-heading"] {
+    font-size: 11px;
+  }
+
+  /*
+   * One border treatment inside an open section.
+   *
+   * Flattening the duplicated card left the panels beneath it at three
+   * different weights — some bordered on `--border-subtle`, some on the card
+   * background, some with a shadow the others did not have. They are all the
+   * same kind of object, so they get the same edge.
+   */
+  .shell
+    :global(main.royco-v3)
+    > section[aria-labelledby="day-v3-models-heading"]
+    [data-model-group]
+    [class~="rounded-xl"],
+  .shell
+    :global(main.royco-v3)
+    > section[aria-labelledby="day-v3-models-heading"]
+    [data-model-group]
+    [class~="rounded-lg"] {
+    border-color: var(--border-subtle);
+    box-shadow: none;
+  }
+
+  /*
+   * The capital stack's leg rows, back to one line each. The leg descriptions
+   * are the only wrapping content in the table, and in a 979px column split
+   * between the diagram and the table they ran a row to eight lines — every
+   * row is sized by the longest one. The pool's composition, which is the fact
+   * worth keeping, is stated in the diagram's own caption beside it.
+   */
+  .shell
+    :global(main.royco-v3)
+    [data-model-group="day-v3-capital-models"]
+    li
+    [class~="text-[11px]"][class~="leading-snug"] {
     display: none;
   }
 }
