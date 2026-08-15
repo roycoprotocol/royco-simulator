@@ -137,6 +137,7 @@ const query = buildDayV3Query({
   quoteAssetYieldPct: 4.5,
   poolTurnoverPerYear: 8,
   swapFeeBps: 30,
+  poolPremiumBps: null,
   marketMakerCostOfCapitalPct: 12,
   redemptionDays: 7,
   protectedDrawdownPct: 18,

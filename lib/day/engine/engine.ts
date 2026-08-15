@@ -145,6 +145,19 @@ let eclpCache: { key: string; params: EclpParams } | null = null;
  * `x / (x + y)`. This is the same quantity the deployment interface calls the
  * resting split.
  */
+/**
+ * The curve this config actually prices on.
+ *
+ * Either the one the market declared, or the fallback solved for
+ * `DAY_FALLBACK_POOL_SENIOR_WEIGHT` at the configured band. Exported because a
+ * page that wants to state the pool's composition or the premium behind it
+ * cannot get either from `cfg.eclpParams` alone — that field is empty whenever
+ * the band is the issuer's rather than the market's, which in V3 is always.
+ */
+export function poolCurveFor(cfg: MarketConfig): EclpParams {
+  return eclpParamsFor(cfg);
+}
+
 export function poolSeniorWeightAtPeg(cfg: MarketConfig): number {
   // A market that supplies no curve gets the fallback, which is *solved for*
   // this weight — so the weight is known exactly and re-deriving it by

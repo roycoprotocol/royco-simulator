@@ -275,6 +275,9 @@ const goalsProps = {
   recoveryDays: 7,
   recoveryMode: "window",
   swapFeeBps: null,
+  onPoolPremiumBps: () => undefined,
+  poolPremiumBps: null,
+  restingSeniorWeight: 0.1,
 } satisfies Omit<ComponentProps<typeof DayV3Goals>, "exit">;
 
 const goalsMarkup = renderToStaticMarkup(

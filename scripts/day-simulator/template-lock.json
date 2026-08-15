@@ -42,7 +42,7 @@
   "lib/day-simulator-template/source-parser.mjs": "1b8b84544388e9b59b15db199b170e0e53f70acae53210970783f1dc18f63350",
   "lib/day/engine/eclp.ts": "579241688bb6d6f23e7649c4289a3744b2c778fcf10bf336f6407edd9858e74a",
   "lib/day/engine/engine.test.ts": "f15a8c5af000c3780a95dc7bd9750c3ee7919cd80d3b600117ba22de2de33769",
-  "lib/day/engine/engine.ts": "b21a57c2585bd388e7e615364900c54c5024bf55e804845e7e1895b6fd3735f4",
+  "lib/day/engine/engine.ts": "b2db6ae68f37b064a4dd6677fdfa0aad15a2ed97ea18b6668dc0874b85d85e1c",
   "lib/day/engine/harness/DayVectorGen.t.sol": "89934cfbb6d9b162636127c261cd507509b0f7b046e1a7d429cab14d9975f6e7",
   "lib/day/engine/parity.ts": "fae87e6f36bb65c1158754f5af283e094758d942fbc13663f99c6846faca9280",
   "lib/day/engine/runner.ts": "a66f034d968daebac9b67f8c8405130e078b2b45ef7899f520cfd70f92b422be",
@@ -64,7 +64,7 @@
   "scripts/day-simulator/verify-runtime.ts": "2d797bcd7cf976c71889d74c5ece3dc84d5bce94d6ea3766b272f08f5b1610c4",
   "scripts/day-simulator/verify.mjs": "d85b10098723c21787af0e8739f1f9d73eaec1fde60932a4a1b615971392117e",
   "docs/NEW_DAY_SIMULATOR.md": "3ea014ee0839f715c1a5469ee4a0ce4161f4e2cc20ab622f1cd7605b4b0048d5",
-  "package.json": "4323d91873d8e8be5981e3849ce18de070c9b3db737de79471810156fb0e4b78",
+  "package.json": "71f7c7175e3fc23e5b118c73c78ad026ce2d6dc1c34a483335186dbdf7440760",
   "lib/day-simulator-template/backtest.test.ts": "d978f6fe8755d22778a51ac3699d5ae1de36dcfa8690ba65ffcc481afc93cb6f",
   "lib/day-simulator-template/backtest.ts": "d2495ef2256bb3b529df60bb6e13dfb28fa774476661a3573b2c896e8137c8e6"
 }

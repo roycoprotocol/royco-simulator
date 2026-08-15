@@ -39,6 +39,15 @@ import DayV3YieldModels from "@/components/day-v3/DayV3YieldModels";
 import { useDayV3SimulationPoolDesign } from "@/components/day-v3/useDayV3SimulationPoolDesign";
 import { dayV3RealizedReturns } from "@/lib/day-v3/historical-returns";
 import {
+  dayV3PremiumBpsOf,
+  dayV3RestingSeniorWeight,
+} from "@/lib/day-v3/pool-curve";
+import { poolCurveFor } from "@/lib/day/engine/engine";
+import {
+  DAY_V3_POOL_LAMBDA,
+  dayV3PoolCurveFromPremium,
+} from "@/lib/day-v3/pool-curve";
+import {
   Card,
   CardContent,
   CardNote,
@@ -228,6 +237,13 @@ export default function DayV3Summary({
     linked?.swapFeeBps ?? null,
   );
   const feeOverridden = swapFeeBps !== null;
+  // The pool's balance point, set the way deployment sets it: by the maximum
+  // premium. Empty leaves the curve solved for the simulator's own resting
+  // weight, which is the behaviour every existing link describes.
+  const [poolPremiumBps, setPoolPremiumBps] = useState<number | null>(
+    linked?.poolPremiumBps ?? null,
+  );
+  const premiumOverridden = poolPremiumBps !== null;
   // An outside desk's terms. These describe who might arbitrage the pool back
   // to NAV; they price nothing in the market itself and never gate a result.
   const [marketMakerCostOfCapitalPct, setMarketMakerCostOfCapitalPct] =
@@ -410,7 +426,7 @@ export default function DayV3Summary({
       activeManualOverrides.depthAtNav,
       activeManualOverrides.maximumPremiumPct,
       activeManualOverrides.poolCapitalPer100,
-    ].some((value) => value !== null) || feeOverridden;
+    ].some((value) => value !== null) || feeOverridden || premiumOverridden;
   const rawCanonicalPoolDesign =
     activePoolDesign.status === "resolved" ||
     activePoolDesign.status === "resolving"
@@ -483,11 +499,32 @@ export default function DayV3Summary({
   // the spread below and silently discard it — the reader would drag "maximum
   // discount" from 1% to 20% and watch every quote on the page stay put.
   const hasCurveOverride =
+    premiumOverridden ||
     activeManualOverrides.maximumDiscountPct !== null ||
     activeManualOverrides.depthAtNav !== null ||
     activeManualOverrides.maximumPremiumPct !== null;
+  const floorBandPct =
+    exitEnabled && minimumProceedsPer100 !== null
+      ? Math.min(99, Math.max(0.01, 100 - minimumProceedsPer100))
+      : defaults.eclpBandWidth * 100;
+  // The curve an issuer-set premium implies. Same construction the deployment
+  // interface uses: alpha from the band, beta from the premium, the shipped
+  // 45-degree rotation, and the configured concentration.
+  const premiumCurve = useMemo(
+    () =>
+      premiumOverridden
+        ? dayV3PoolCurveFromPremium({
+            bandPct: floorBandPct,
+            premiumBps: poolPremiumBps as number,
+            lambda: DAY_V3_POOL_LAMBDA,
+          })
+        : null,
+    [floorBandPct, poolPremiumBps, premiumOverridden],
+  );
   const engineOverrides = useMemo<DayV3EngineOverrides | null>(() => {
-    if (!canonicalEngineOverrides && !feeOverridden) return null;
+    if (!canonicalEngineOverrides && !feeOverridden && !premiumCurve) {
+      return null;
+    }
     const canonical = canonicalEngineOverrides ?? {};
     const canonicalPolicy = Object.fromEntries(
       Object.entries(canonical).filter(([key]) => key !== "eclpParams"),
@@ -495,8 +532,15 @@ export default function DayV3Summary({
     return {
       ...(hasCurveOverride ? canonicalPolicy : canonical),
       ...(feeOverridden ? { swapFeeBps: swapFeeBps as number } : {}),
+      ...(premiumCurve ? { eclpParams: premiumCurve } : {}),
     } as DayV3EngineOverrides;
-  }, [canonicalEngineOverrides, feeOverridden, hasCurveOverride, swapFeeBps]);
+  }, [
+    canonicalEngineOverrides,
+    feeOverridden,
+    hasCurveOverride,
+    premiumCurve,
+    swapFeeBps,
+  ]);
   const canonicalPoolRecommendation =
     canonicalPoolDesign?.recommendation ?? null;
   const liquidityRecommendation = useMemo(
@@ -526,10 +570,6 @@ export default function DayV3Summary({
   // shared engine, the band moves the deepest fill exactly as you would expect
   // — 1% band gives 0.60% discount, 5% gives 2.63%, 20% gives 10.59% — so the
   // floor the issuer set is the honest local band.
-  const floorBandPct =
-    exitEnabled && minimumProceedsPer100 !== null
-      ? Math.min(99, Math.max(0.01, 100 - minimumProceedsPer100))
-      : defaults.eclpBandWidth * 100;
   const effectiveBandPct = canonicalPoolRecommendation
     ? canonicalPoolRecommendation.fields.maximumDiscountBps.value / 100
     : floorBandPct;
@@ -760,6 +800,11 @@ export default function DayV3Summary({
         swapFeeBps: cfg.swapFeeBps,
         turnoverPerYear: cfg.poolTurnoverPerYear,
         seniorWeight: dayPoolSeniorWeight(cfg),
+        // Where the curve rests, and the premium that put it there. The engine
+        // now seeds the pool at this composition, so the two agree; reading
+        // both keeps the page honest if they ever stop agreeing again.
+        restingSeniorWeight: dayV3RestingSeniorWeight(poolCurveFor(cfg)),
+        premiumBps: dayV3PremiumBpsOf(poolCurveFor(cfg)),
       },
       illustrativeExit: {
         openingSeniorNAV,
@@ -1057,6 +1102,7 @@ export default function DayV3Summary({
     quoteAssetYieldPct,
     poolTurnoverPerYear,
     swapFeeBps,
+    poolPremiumBps,
     marketMakerCostOfCapitalPct,
     redemptionDays,
     // Legacy links still parse these fields, but the simulator no longer asks
@@ -1623,6 +1669,9 @@ export default function DayV3Summary({
           <DayV3Goals
             drawdownPct={protectedDrawdownPct}
             exit={exitView}
+            onPoolPremiumBps={setPoolPremiumBps}
+            poolPremiumBps={poolPremiumBps}
+            restingSeniorWeight={model.pool.restingSeniorWeight}
             exitSharePct={immediateExitSharePct}
             indexOffset={1}
             inputOrigins={{
@@ -1975,6 +2024,7 @@ export default function DayV3Summary({
                   <DayV3CapitalStack
                     defaults={defaults}
                     exitAssetLabel={quoteAssetLabel}
+                    poolPremiumBps={model.pool.premiumBps}
                     poolSeniorWeight={model.pool.seniorWeight}
                     balances={model.balances}
                     coverage={resolved.coverage}

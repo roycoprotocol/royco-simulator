@@ -407,7 +407,7 @@ assert.match(
 );
 assert.match(
   summary,
-  /\]\.some\(\(value\) => value !== null\) \|\| feeOverridden;/,
+  /\]\.some\(\(value\) => value !== null\) \|\| feeOverridden \|\| premiumOverridden;/,
   "A hand-set fee must suppress the canonical pool design like any other pool override",
 );
 assert.match(
@@ -537,7 +537,7 @@ assert.match(
 // "maximum discount" from 1% to 20% left every quote on the page unchanged.
 assert.match(
   summary,
-  /const hasCurveOverride\s*=\s*\n?\s*activeManualOverrides\.maximumDiscountPct !== null/,
+  /const hasCurveOverride\s*=\s*\n?\s*premiumOverridden \|\|\s*\n?\s*activeManualOverrides\.maximumDiscountPct !== null/,
   "a reader-set curve must be detected before the canonical one is applied",
 );
 assert.match(

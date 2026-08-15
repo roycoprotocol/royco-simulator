@@ -4,6 +4,7 @@ import { memo } from "react";
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import DayV3DocsLink from "@/components/day-v3/DayV3DocsLink";
+import DayV3PoolComposition from "@/components/day-v3/DayV3PoolComposition";
 import DayV3StackDiagram from "@/components/day-v3/DayV3StackDiagram";
 import { pct, unitRatio, type DayV3Unit } from "@/components/day-v3/format";
 import {
@@ -34,6 +35,7 @@ function DayV3CapitalStack({
   coverage,
   defaults,
   exitAssetLabel,
+  poolPremiumBps,
   liquidityPending = false,
   minLiquidity,
   poolSeniorWeight,
@@ -47,6 +49,8 @@ function DayV3CapitalStack({
   defaults: DaySimulatorDefaults;
   /** What the pool's non-Senior side is held in, named by the issuer. */
   exitAssetLabel: string;
+  /** The maximum premium the pool's curve encodes, in bps. */
+  poolPremiumBps: number | null;
   liquidityPending?: boolean;
   minLiquidity: number;
   /** How much of the pool sits in Senior shares, so the in-source figure counts
@@ -246,6 +250,17 @@ function DayV3CapitalStack({
               st={100}
               unit={unit}
             />
+              {minLiquidity > 0 ? (
+                <div className="mt-3">
+                  <DayV3PoolComposition
+                    exitAssetLabel={exitAssetLabel}
+                    poolPer100={per100(lt)}
+                    premiumBps={poolPremiumBps}
+                    seniorWeight={poolSeniorWeight}
+                    unit={unit}
+                  />
+                </div>
+              ) : null}
             <p className="mt-2 max-w-[46ch] text-[10.5px] leading-snug text-[var(--tertiary)]">
               Dashed markers show the 100%-utilized minimum; lighter caps show
               opening headroom.

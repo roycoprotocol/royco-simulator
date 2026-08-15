@@ -39,6 +39,9 @@ const QUOTE_ASSET_SUGGESTIONS = [
 export default function DayV3QuoteAsset({
   label,
   onLabel,
+  onPoolPremiumBps,
+  poolPremiumBps,
+  restingSeniorWeight,
   onSwapFeeBps,
   onTurnoverPerYear,
   onYieldPct,
@@ -49,6 +52,11 @@ export default function DayV3QuoteAsset({
 }: {
   label: string;
   onLabel: (value: string) => void;
+  onPoolPremiumBps: (value: number | null) => void;
+  /** The maximum premium the issuer will accept, in bps. Null uses the market's. */
+  poolPremiumBps: number | null;
+  /** Where the resulting curve rests, 0..1, for the field's own readout. */
+  restingSeniorWeight: number | null;
   onSwapFeeBps: (value: number | null) => void;
   onTurnoverPerYear: (value: number | null) => void;
   onYieldPct: (value: number | null) => void;
@@ -166,6 +174,28 @@ export default function DayV3QuoteAsset({
         step={0.5}
         suffix="x pool value"
         value={turnoverPerYear}
+      />
+
+      <DayV3NumberField
+        label="What premium will you let Senior trade at, at most?"
+        max={300}
+        min={0.1}
+        note={
+          restingSeniorWeight === null
+            ? "Sets the pool's balance point: beta is 1 + this premium, and the resting composition follows from the curve. Empty leaves the market's own."
+            : `Sets the pool's balance point. At this premium the pool rests on ${(restingSeniorWeight * 100).toFixed(restingSeniorWeight < 0.1 ? 2 : 1)}% Senior shares and ${((1 - restingSeniorWeight) * 100).toFixed(2)}% ${label}. Wider means more Senior inventory and less depth for a seller. Empty leaves the market's own.`
+        }
+        onChange={onPoolPremiumBps}
+        origin={poolPremiumBps === null ? "model-assumption" : "manual-override"}
+        placeholder="Use the market's own"
+        presets={[
+          { label: "3 bps", value: 3 },
+          { label: "10 bps", value: 10 },
+          { label: "30 bps", value: 30 },
+        ]}
+        step={0.5}
+        suffix="bps"
+        value={poolPremiumBps}
       />
 
       <div className="flex min-w-0 flex-col gap-2">
