@@ -191,23 +191,6 @@ export default function DayV3QuoteAsset({
           suffix="bps"
           value={swapFeeBps}
         />
-        {/* Outside the field: it clears the reader's answer rather than
-            choosing another one, so it does not belong among the presets. */}
-        <div className="flex flex-wrap gap-2">
-          <DayV3Button
-            aria-pressed={swapFeeBps === null}
-            className={
-              swapFeeBps === null
-                ? undefined
-                : "border-[var(--border-subtle)] bg-[var(--foundation)]"
-            }
-            onClick={() => onSwapFeeBps(null)}
-            size="chip"
-            variant={swapFeeBps === null ? "primary" : "quiet"}
-          >
-            Use the live fee
-          </DayV3Button>
-        </div>
       </div>
     </>
   );

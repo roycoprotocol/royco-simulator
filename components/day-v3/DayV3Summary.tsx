@@ -1452,8 +1452,6 @@ export default function DayV3Summary({
         })}
         slpModeledApy={scenario.liquidityApy}
         slpEnabled={exitEnabled}
-        slpCapitalPer100={model.balances.lt}
-        slpMinimumLiquidityPct={liquidityPct}
         targetUtilization={DAY_TARGET_UTILIZATION}
         validationIssues={startingCurveIssues}
       />

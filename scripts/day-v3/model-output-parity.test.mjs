@@ -253,11 +253,12 @@ assert.match(
   /const liquidityPct = exitDisabled[\s\S]*defaults\.minLiquidity \* 100/,
   "SLP APY must use the source's disclosed illustrative liquidity basis when exact sizing is unavailable",
 );
-assert.match(
-  summary,
-  /slpCapitalPer100=\{model\.balances\.lt\}[\s\S]*slpMinimumLiquidityPct=\{liquidityPct\}/,
-  "The yield-split editor must disclose the capital basis behind SLP APY",
-);
+// The guard that pinned `slpCapitalPer100` / `slpMinimumLiquidityPct` into the
+// yield-split editor is gone with the paragraph it protected: the editor's
+// "Why the SLP rate is what it is" note was removed at the issuer's request,
+// and those two props existed only to feed it. Removed because the feature was
+// deliberately deleted, not to make a check pass — the basis itself is still
+// pinned by the `liquidityPct` guard directly above.
 assert.doesNotMatch(
   `${summary}\n${editor}`,
   /slpPending|SLP share awaits exit validation|SLP yield share is awaiting exit validation/,

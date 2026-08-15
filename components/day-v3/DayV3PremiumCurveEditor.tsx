@@ -28,8 +28,6 @@ export type DayV3PremiumCurveEditorProps = {
   riskYtPct: number;
   slpModeledApy: number;
   slpEnabled?: boolean;
-  slpCapitalPer100: number;
-  slpMinimumLiquidityPct: number;
   targetUtilization: number;
 };
 
@@ -144,8 +142,6 @@ function DayV3PremiumCurveEditor({
   riskYtPct,
   slpModeledApy,
   slpEnabled = true,
-  slpCapitalPer100,
-  slpMinimumLiquidityPct,
   targetUtilization,
 }: DayV3PremiumCurveEditorProps) {
   const [riskEditor, setRiskEditor] = useState({
@@ -266,26 +262,6 @@ function DayV3PremiumCurveEditor({
         >
           {validationIssues.join(" ")}
         </div>
-      ) : null}
-
-      {slpEnabled ? (
-        // The old wording here was three pieces of jargon in a row and never
-        // said what the reader was supposed to do with it. What matters is that
-        // the SLP rate is a premium divided by pool size, and the pool size in
-        // front of them is a placeholder.
-        <p className="rounded-xl border border-[var(--border-subtle)] bg-[var(--foundation)] px-3 py-3 text-[10.5px] leading-relaxed text-[var(--secondary)]">
-          <strong className="font-semibold text-[var(--foreground)]">
-            Why the SLP rate is what it is:
-          </strong>{" "}
-          the premium below comes out of Senior&apos;s yield, then spreads
-          across however much SLP capital the pool holds — here{" "}
-          <strong className="font-mono font-semibold tabular-nums">
-            ${slpCapitalPer100.toFixed(1)}
-          </strong>{" "}
-          for every $100 of Senior, a{" "}
-          {slpMinimumLiquidityPct.toFixed(1)}% minimum liquidity requirement. A
-          larger pool spreads the same premium thinner, so the SLP rate falls.
-        </p>
       ) : null}
 
       <div

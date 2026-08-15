@@ -19,8 +19,6 @@ const markup = renderToStaticMarkup(
     riskY0Pct={2}
     riskY100Pct={16}
     riskYtPct={13}
-    slpCapitalPer100={11.1}
-    slpMinimumLiquidityPct={10}
     slpModeledApy={0.024}
     targetUtilization={0.9}
   />,
@@ -37,16 +35,12 @@ assert.match(markup, /Jr share at 90% utilization/);
 assert.match(markup, /SLP share at 90% utilization/);
 assert.match(markup, /Projected Jr APY/);
 assert.match(markup, /Projected SLP APY/);
-assert.match(markup, /Why the SLP rate is what it is:/);
-assert.match(markup, /10\.0% minimum liquidity requirement/);
 assert.doesNotMatch(markup, /Exact E-CLP sizing/);
-assert.match(markup, /\$11\.1/);
-assert.match(markup, /for every \$100 of Senior/);
-assert.match(
-  markup,
-  /larger pool spreads the same premium thinner/,
-  "the basis note has to say why the number moves, not just state it",
-);
+// The "Why the SLP rate is what it is" note and its three assertions are gone
+// with the paragraph, removed at the issuer's request. Nothing replaced it: the
+// SLP rate's basis is still disclosed by the exit model, and the editor is now
+// the two curves and their projected APYs.
+assert.doesNotMatch(markup, /Why the SLP rate is what it is/);
 assert.match(markup, /8\.5%/);
 assert.match(markup, /2\.4%/);
 assert.match(markup, /Updates from the shared accountant/);
@@ -83,8 +77,6 @@ const invalidMarkup = renderToStaticMarkup(
     riskY0Pct={2}
     riskY100Pct={16}
     riskYtPct={13}
-    slpCapitalPer100={11.1}
-    slpMinimumLiquidityPct={10}
     slpModeledApy={0.024}
     targetUtilization={0.9}
     validationIssues={["Junior and SLP target shares must total 100% or less."]}
@@ -110,8 +102,6 @@ const slpOnlyMarkup = renderToStaticMarkup(
     riskY0Pct={0}
     riskY100Pct={0}
     riskYtPct={0}
-    slpCapitalPer100={11.1}
-    slpMinimumLiquidityPct={10}
     slpModeledApy={0.024}
     targetUtilization={0.9}
   />,
@@ -136,8 +126,6 @@ const juniorOnlyMarkup = renderToStaticMarkup(
     riskY0Pct={2}
     riskY100Pct={16}
     riskYtPct={13}
-    slpCapitalPer100={0}
-    slpMinimumLiquidityPct={0}
     slpEnabled={false}
     slpModeledApy={0}
     targetUtilization={0.9}
@@ -164,8 +152,6 @@ const bothOffMarkup = renderToStaticMarkup(
     riskY0Pct={0}
     riskY100Pct={0}
     riskYtPct={0}
-    slpCapitalPer100={0}
-    slpMinimumLiquidityPct={0}
     slpEnabled={false}
     slpModeledApy={0}
     targetUtilization={0.9}
@@ -188,15 +174,12 @@ const unresolvedPoolSlpMarkup = renderToStaticMarkup(
     riskY0Pct={2}
     riskY100Pct={16}
     riskYtPct={13}
-    slpCapitalPer100={11.1}
-    slpMinimumLiquidityPct={10}
     slpModeledApy={0.024}
     targetUtilization={0.9}
   />,
 );
 assert.match(unresolvedPoolSlpMarkup, /Jr 13\.0% · SLP 5\.0%/);
 assert.match(unresolvedPoolSlpMarkup, /Section status: Set/);
-assert.match(unresolvedPoolSlpMarkup, /Why the SLP rate is what it is:/);
 assert.doesNotMatch(unresolvedPoolSlpMarkup, /awaiting exit validation/);
 assert.equal(unresolvedPoolSlpMarkup.match(/type="range"/g)?.length, 2);
 
