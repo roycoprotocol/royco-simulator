@@ -59,8 +59,60 @@ export const formatDayV3MonthlyReturn = (value: number) =>
     ? `${value < 0 ? "-" : "+"}${Math.abs(value * 100).toFixed(2)}%`
     : "N/A";
 
+export type DayV3BacktestWindowPreset = {
+  id: string;
+  label: string;
+  from: string;
+  to: string;
+};
+
+type DayV3BacktestWindow = {
+  id: string;
+  label: string;
+  from: number;
+  to: number;
+};
+
+/** Resolve display windows against dated source observations only. */
+export function buildDayV3BacktestWindows(
+  series: readonly { date: string }[],
+  preset?: DayV3BacktestWindowPreset | null,
+): DayV3BacktestWindow[] {
+  if (series.length < 3) return [];
+  const lastTime = Date.parse(series[series.length - 1].date);
+  const rolling = [
+    { id: "full", label: "Full history", months: 0 },
+    { id: "24m", label: "Last 24 months", months: 24 },
+    { id: "12m", label: "Last 12 months", months: 12 },
+    { id: "6m", label: "Last 6 months", months: 6 },
+    { id: "3m", label: "Last 3 months", months: 3 },
+  ]
+    .map((span) => {
+      if (span.months === 0) {
+        return { id: span.id, label: span.label, from: 0, to: series.length };
+      }
+      const cutoff = lastTime - span.months * 30.44 * 86_400_000;
+      const from = series.findIndex(
+        (point) => Date.parse(point.date) >= cutoff,
+      );
+      return { id: span.id, label: span.label, from, to: series.length };
+    })
+    // A window needs enough points to be a run rather than a line between two
+    // dots, and one that covers the whole series is just "full history" twice.
+    .filter((span) => span.from >= 0 && span.to - span.from >= 3)
+    .filter((span, index, all) => index === 0 || span.from !== all[0].from);
+
+  if (!preset) return rolling;
+  const from = series.findIndex((point) => point.date >= preset.from);
+  const firstAfter = series.findIndex((point) => point.date > preset.to);
+  const to = firstAfter < 0 ? series.length : firstAfter;
+  if (from < 0 || to - from < 3) return rolling;
+  return [{ id: preset.id, label: preset.label, from, to }, ...rolling];
+}
+
 function DayV3Backtest({
   bandPct: bandInput,
+  windowOption,
   coveragePct: coverageInput,
   customSource,
   liqY0Pct: liqY0Input,
@@ -80,6 +132,7 @@ function DayV3Backtest({
   sourceApyPct: sourceInput,
 }: {
   bandPct: number;
+  windowOption?: DayV3BacktestWindowPreset | null;
   coveragePct: number;
   customSource: boolean;
   liqY0Pct: number;
@@ -159,37 +212,14 @@ function DayV3Backtest({
     [market.series, sourceApyPct],
   );
 
-  const windows = useMemo(() => {
-    if (series.length < 3) return [];
-    const last = series[series.length - 1];
-    const lastTime = Date.parse(last.date);
-    const spans: { id: string; label: string; months: number }[] = [
-      { id: "full", label: "Full history", months: 0 },
-      { id: "24m", label: "Last 24 months", months: 24 },
-      { id: "12m", label: "Last 12 months", months: 12 },
-      { id: "6m", label: "Last 6 months", months: 6 },
-      { id: "3m", label: "Last 3 months", months: 3 },
-    ];
-    return (
-      spans
-        .map((span) => {
-          if (span.months === 0) return { ...span, from: 0 };
-          const cutoff = lastTime - span.months * 30.44 * 86_400_000;
-          const from = series.findIndex(
-            (point) => Date.parse(point.date) >= cutoff,
-          );
-          return { ...span, from: from < 0 ? -1 : from };
-        })
-        // A window needs enough points to be a run rather than a line between two
-        // dots, and one that covers the whole series is just "full history" twice.
-        .filter((span) => span.from >= 0 && series.length - span.from >= 3)
-        .filter((span, index, all) => index === 0 || span.from !== all[0].from)
-    );
-  }, [series]);
+  const windows = useMemo(
+    () => buildDayV3BacktestWindows(series, windowOption),
+    [series, windowOption],
+  );
 
   const active = windows.find((span) => span.id === windowId) ?? windows[0];
   const view = useMemo(
-    () => (active ? series.slice(active.from) : series),
+    () => (active ? series.slice(active.from, active.to) : series),
     [active, series],
   );
 
@@ -555,7 +585,7 @@ function DayV3Backtest({
                 {windows.map((span) => (
                   <option key={span.id} value={span.id}>
                     {span.label} ({series[span.from].date} to{" "}
-                    {series[series.length - 1].date})
+                    {series[span.to - 1].date})
                   </option>
                 ))}
               </select>

@@ -61,6 +61,7 @@ import {
   buildDayV3Query,
   boundDayV3YieldShareAtTarget,
   DAY_V3_STARTER_DEFAULTS,
+  dayV3MarketDefaults,
   dayV3MinimumLiquidityForPoolFunding,
   deriveDayV3StartingYieldCurvePolicy,
   normalizeDayV3Defaults,
@@ -169,8 +170,9 @@ export default function DayV3Summary({
     });
   };
   const clearStarterFields = () => setStarterFields(new Set());
-  // Only operating-target yield shares remain active. Legacy hidden overrides
-  // still parse, but cannot change a displayed result.
+  // Only the six contract YDM anchors remain active from the legacy override
+  // surface. Pool/deployment-only overrides stay parseable without changing a
+  // displayed result.
   const activeManualOverrides = useMemo(
     () => dayV3ActiveOverrides(manualOverrides),
     [manualOverrides],
@@ -271,8 +273,9 @@ export default function DayV3Summary({
   const [maintainCoverage, setMaintainCoverage] = useState(
     initialMarket.defaults.maintainCoverage,
   );
-  // The merged simulator exposes only target yield shares. Legacy curve-shape
-  // anchors stay inactive even when an old link contains them.
+  // The shared yield editor exposes Y0 and Y100 while retaining the configured
+  // YT kink used by each Day contract YDM. All three values flow into the
+  // accountant snapshot below; the UI never evaluates either curve itself.
   const riskShareOverride = activeManualOverrides.jrYieldShareAtTargetPct;
   const liqShareOverride = activeManualOverrides.slpYieldShareAtTargetPct;
   const y0Override = activeManualOverrides.jrYieldShareAtZeroPct;
@@ -314,22 +317,42 @@ export default function DayV3Summary({
   // Switching market adopts that market's own terms, so the sliders describe the
   // market on screen rather than carrying the previous one's numbers over.
   const adoptTerms = (next: DayMarket) => {
+    const marketDefaults = dayV3MarketDefaults(next.id);
     setSourceApyPct(next.defaults.sourceApy * 100);
-    setProtectedDrawdownPct(null);
-    setRecoveryDaysInput(null);
-    setRecoveryMode(null);
-    setImmediateExitSharePct(null);
-    setMinimumProceedsPer100(null);
+    setProtectedDrawdownPct(marketDefaults?.protectedDrawdownPct ?? null);
+    setRecoveryDaysInput(marketDefaults?.recoveryDays ?? null);
+    setRecoveryMode(
+      marketDefaults
+        ? marketDefaults.recoveryDays === 0
+          ? "none"
+          : "window"
+        : null,
+    );
+    setImmediateExitSharePct(marketDefaults?.immediateExitSharePct ?? null);
+    setMinimumProceedsPer100(marketDefaults?.minimumProceedsPer100 ?? null);
     // The quote asset belongs to the exit design, not to the source, so it is
     // cleared with the rest of the exit rather than carried across markets.
-    setQuoteAssetLabel(DAY_V3_DEFAULT_QUOTE_ASSET);
-    setQuoteAssetYieldPct(DAY_V3_DEFAULT_QUOTE_ASSET_YIELD_PCT);
-    setPoolTurnoverPerYear(DAY_V3_DEFAULT_POOL_TURNOVER);
+    setQuoteAssetLabel(
+      marketDefaults?.quoteAssetLabel ?? DAY_V3_DEFAULT_QUOTE_ASSET,
+    );
+    setQuoteAssetYieldPct(
+      marketDefaults?.quoteAssetYieldPct ?? DAY_V3_DEFAULT_QUOTE_ASSET_YIELD_PCT,
+    );
+    setPoolTurnoverPerYear(
+      marketDefaults?.poolTurnoverPerYear ?? DAY_V3_DEFAULT_POOL_TURNOVER,
+    );
     // A fee is a property of the pool being designed, so it is released with
     // the rest of the exit rather than carried onto the next market.
-    setSwapFeeBps(null);
+    setSwapFeeBps(marketDefaults?.swapFeeBps ?? null);
+    setMarketMakerCostOfCapitalPct(
+      marketDefaults?.marketMakerCostOfCapitalPct ?? 12,
+    );
+    setRedemptionDays(marketDefaults?.redemptionDays ?? 7);
     setImportedMarket(null);
-    setManualOverrides(EMPTY_DAY_V3_OVERRIDES);
+    setManualOverrides({
+      ...EMPTY_DAY_V3_OVERRIDES,
+      ...(marketDefaults?.overrides ?? {}),
+    });
     // Adopted with the rest of the market's terms, for the same reason: the
     // toggle must describe the market on screen, not the previous one.
     setMaintainCoverage(next.defaults.maintainCoverage);
@@ -360,14 +383,21 @@ export default function DayV3Summary({
   };
 
   const resetYieldCurveOverrides = () => {
+    const marketDefaults = dayV3MarketDefaults(market.id);
     setManualOverrides((current) => ({
       ...current,
-      jrYieldShareAtZeroPct: null,
-      jrYieldShareAtFullPct: null,
-      slpYieldShareAtZeroPct: null,
-      slpYieldShareAtFullPct: null,
-      jrYieldShareAtTargetPct: null,
-      slpYieldShareAtTargetPct: null,
+      jrYieldShareAtZeroPct:
+        marketDefaults?.overrides.jrYieldShareAtZeroPct ?? null,
+      jrYieldShareAtFullPct:
+        marketDefaults?.overrides.jrYieldShareAtFullPct ?? null,
+      slpYieldShareAtZeroPct:
+        marketDefaults?.overrides.slpYieldShareAtZeroPct ?? null,
+      slpYieldShareAtFullPct:
+        marketDefaults?.overrides.slpYieldShareAtFullPct ?? null,
+      jrYieldShareAtTargetPct:
+        marketDefaults?.overrides.jrYieldShareAtTargetPct ?? null,
+      slpYieldShareAtTargetPct:
+        marketDefaults?.overrides.slpYieldShareAtTargetPct ?? null,
     }));
   };
 
@@ -1275,6 +1305,23 @@ export default function DayV3Summary({
   ) => {
     setManualOverrides((current) => ({
       ...current,
+      // Endpoint edits must travel as one complete six-anchor policy. Preserve
+      // any anchor already edited; otherwise materialize the accountant's
+      // currently resolved curve. This keeps URL reloads and the live model on
+      // the same valid contract configuration without deriving curve math here.
+      jrYieldShareAtZeroPct:
+        current.jrYieldShareAtZeroPct ?? resolved.y0 * 100,
+      jrYieldShareAtTargetPct:
+        current.jrYieldShareAtTargetPct ?? resolved.riskYieldShare * 100,
+      jrYieldShareAtFullPct:
+        current.jrYieldShareAtFullPct ?? resolved.y100 * 100,
+      slpYieldShareAtZeroPct:
+        current.slpYieldShareAtZeroPct ?? resolved.liqY0 * 100,
+      slpYieldShareAtTargetPct:
+        current.slpYieldShareAtTargetPct ??
+        resolved.liquidityYieldShare * 100,
+      slpYieldShareAtFullPct:
+        current.slpYieldShareAtFullPct ?? resolved.liqY100 * 100,
       [field]: value,
     }));
   };
@@ -1575,12 +1622,18 @@ export default function DayV3Summary({
           y0Pct: resolved.liqY0 * 100,
           y100Pct: resolved.liqY100 * 100,
         })}
-        onLiqYtPct={(value) =>
-          updateYieldCurveOverride("slpYieldShareAtTargetPct", value)
+        onLiqY0Pct={(value) =>
+          updateYieldCurveOverride("slpYieldShareAtZeroPct", value)
+        }
+        onLiqY100Pct={(value) =>
+          updateYieldCurveOverride("slpYieldShareAtFullPct", value)
         }
         onResetCurve={resetYieldCurveOverrides}
-        onRiskYtPct={(value) =>
-          updateYieldCurveOverride("jrYieldShareAtTargetPct", value)
+        onRiskY0Pct={(value) =>
+          updateYieldCurveOverride("jrYieldShareAtZeroPct", value)
+        }
+        onRiskY100Pct={(value) =>
+          updateYieldCurveOverride("jrYieldShareAtFullPct", value)
         }
         riskCapPct={resolved.riskCeiling * 100}
         riskY0Pct={resolved.y0 * 100}
@@ -2387,6 +2440,9 @@ export default function DayV3Summary({
                 bandPct={inputs.bandPct}
                 coveragePct={inputs.coveragePct}
                 customSource={customSource}
+                windowOption={
+                  dayV3MarketDefaults(market.id)?.backtestWindowOption
+                }
                 liqSharePct={resolved.liquidityYieldShare * 100}
                 liqY0Pct={resolved.liqY0 * 100}
                 liqY100Pct={resolved.liqY100 * 100}

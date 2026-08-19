@@ -125,18 +125,18 @@ assert.match(
 );
 assert.doesNotMatch(
   `${summary}\n${editor}`,
-  /presentation=|showCurveShapeAnchors|deployOnly|\bsimple\b|\bAdvanced\b|six YDM anchors|deployment handoff|suggestedCurve/,
-  "The sole yield-split editor must not retain mode-specific or full-curve controls",
+  /presentation=|showCurveShapeAnchors|deployOnly|\bsimple\b|\bAdvanced\b|deployment handoff|suggestedCurve/,
+  "The sole yield-split editor must not retain mode-specific controls",
 );
-assert.doesNotMatch(
+assert.match(
   editor,
-  /onRiskY0Pct|onRiskY100Pct|onLiqY0Pct|onLiqY100Pct|No coverage used \(Y0\)|Full coverage used \(Y100\)/,
-  "The unified editor must expose only operating-target yield shares",
+  /onRiskY0Pct[\s\S]*onRiskY100Pct[\s\S]*onLiqY0Pct[\s\S]*onLiqY100Pct/,
+  "The unified editor must expose both contract curves' Y0 and Y100 anchors",
 );
 assert.match(
   modeModel,
-  /jrYieldShareAtTargetPct:\s*overrides\.jrYieldShareAtTargetPct[\s\S]*slpYieldShareAtTargetPct:\s*overrides\.slpYieldShareAtTargetPct/,
-  "Only the two visible target yield shares may remain active",
+  /jrYieldShareAtZeroPct:\s*overrides\.jrYieldShareAtZeroPct[\s\S]*jrYieldShareAtTargetPct:\s*overrides\.jrYieldShareAtTargetPct[\s\S]*jrYieldShareAtFullPct:\s*overrides\.jrYieldShareAtFullPct[\s\S]*slpYieldShareAtZeroPct:\s*overrides\.slpYieldShareAtZeroPct[\s\S]*slpYieldShareAtTargetPct:\s*overrides\.slpYieldShareAtTargetPct[\s\S]*slpYieldShareAtFullPct:\s*overrides\.slpYieldShareAtFullPct/,
+  "All six visible contract yield anchors must remain active",
 );
 
 const protectionGroupStart = goals.indexOf(
@@ -326,16 +326,17 @@ for (const marker of [
   assert.ok(backtest.includes(marker), `Historical model lost: ${marker}`);
 }
 
-// Hidden legacy curve anchors remain derived and cannot affect the unified UI.
+// One reusable curve card renders the two configurable endpoints for each YDM;
+// the fixed YT contract kink remains routed through the parent accountant state.
 assert.equal(
   editor.match(/<DayV3Slider/g)?.length,
-  1,
-  "One target-share slider must be reused by the Junior and SLP cards",
+  2,
+  "Y0 and Y100 sliders must be reused by the Junior and SLP cards",
 );
 assert.match(
   summary,
   /deriveDayV3StartingYieldCurvePolicy/,
-  "V3 must derive one complete starting policy behind the two visible shares",
+  "V3 must derive one complete starting policy behind the four visible endpoints",
 );
 assert.doesNotMatch(
   summary,

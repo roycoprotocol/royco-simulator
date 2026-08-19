@@ -119,6 +119,8 @@ const expectedCanonicalKeys = [
   "convertCost",
   "exit",
   "fee",
+  "jr0",
+  "jr100",
   "jr90",
   "m",
   "mmCost",
@@ -129,6 +131,8 @@ const expectedCanonicalKeys = [
   "receive",
   "recover",
   "settle",
+  "slp0",
+  "slp100",
   "slp90",
   "turnover",
 ];
@@ -170,10 +174,6 @@ for (const removedKey of [
   "pexit",
   "bonus",
   "pool",
-  "jr0",
-  "jr100",
-  "slp0",
-  "slp100",
   "starter",
 ]) {
   assert.equal(
@@ -223,12 +223,16 @@ for (const field of [
   );
 }
 
-// The unified simulator exposes only the two operating-target yield shares.
-// Legacy endpoint and pool overrides may parse, but cannot affect any result.
+// The unified simulator exposes the six contract curve anchors. Pool and
+// deployment overrides may parse, but cannot affect any result.
 const expectedActiveOverrides = {
   ...EMPTY_DAY_V3_OVERRIDES,
+  jrYieldShareAtZeroPct: 2,
   jrYieldShareAtTargetPct: 12,
+  jrYieldShareAtFullPct: 18,
+  slpYieldShareAtZeroPct: 1,
   slpYieldShareAtTargetPct: 5,
+  slpYieldShareAtFullPct: 14,
 };
 assert.deepEqual(
   dayV3ActiveOverrides(canonicalState.overrides),
@@ -237,7 +241,7 @@ assert.deepEqual(
 assert.deepEqual(
   dayV3ActiveOverrides(legacyState.overrides),
   expectedActiveOverrides,
-  "legacy hidden overrides must never reactivate in the unified simulator",
+  "all six visible contract anchors must remain active after canonicalization",
 );
 
 // Every visible market-design input feeds one exact deployment-service request.
@@ -326,7 +330,7 @@ const editedState = readDayV3UrlState(
     sourceApyPct: 7,
     overrides: {
       ...canonicalState.overrides,
-      jrYieldShareAtTargetPct: 20,
+      jrYieldShareAtTargetPct: 15,
       slpYieldShareAtTargetPct: 10,
     },
   }),
@@ -339,7 +343,7 @@ assert.equal(editedState.minimumProceedsPer100, 95);
 assert.equal(editedState.entryPointSettlementDays, 90);
 assert.equal(editedState.collateralToExitDays, 0);
 assert.equal(editedState.collateralToExitCostBps, 50);
-assert.equal(editedState.overrides.jrYieldShareAtTargetPct, 20);
+assert.equal(editedState.overrides.jrYieldShareAtTargetPct, 15);
 assert.equal(editedState.overrides.slpYieldShareAtTargetPct, 10);
 assert.equal(editedState.mode, null);
 

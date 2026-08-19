@@ -1,5 +1,6 @@
 export * from "@/lib/day-v3/types";
 export * from "@/lib/day-v3/url-state";
+export * from "@/lib/day-v3/market-defaults";
 export * from "@/lib/day-v3/yield-curves";
 export * from "@/lib/day-v3/normalization";
 export * from "@/lib/day-v3/protection";

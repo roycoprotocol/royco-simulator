@@ -12,9 +12,11 @@ const markup = renderToStaticMarkup(
     liqY100Pct={15}
     liqYtPct={5}
     juniorModeledApy={0.085}
-    onLiqYtPct={ignore}
+    onLiqY0Pct={ignore}
+    onLiqY100Pct={ignore}
     onResetCurve={ignore}
-    onRiskYtPct={ignore}
+    onRiskY0Pct={ignore}
+    onRiskY100Pct={ignore}
     riskCapPct={80}
     riskY0Pct={2}
     riskY100Pct={16}
@@ -26,13 +28,22 @@ const markup = renderToStaticMarkup(
 
 assert.match(markup, /Yield split/);
 assert.match(markup, /aria-expanded="false"/);
-assert.match(markup, /Jr 13\.0% · SLP 5\.0% at 90\.0% utilization/);
+assert.match(
+  markup,
+  /Jr 2\.0% \/ 16\.0% · SLP 1\.0% \/ 15\.0% · Y0 \/ Y100/,
+);
 assert.match(markup, /Section status: Set/);
 assert.doesNotMatch(markup, /See .*impact/i);
-assert.match(markup, /Junior yield share/);
-assert.match(markup, /SLP yield share/);
-assert.match(markup, /Jr share at 90% utilization/);
-assert.match(markup, /SLP share at 90% utilization/);
+assert.match(markup, /Junior risk yield curve/);
+assert.match(markup, /SLP liquidity yield curve/);
+for (const label of [
+  "Jr Y0 · 0% utilization",
+  "Jr Y100 · 100% utilization",
+  "SLP Y0 · 0% utilization",
+  "SLP Y100 · 100% utilization",
+]) {
+  assert.match(markup, new RegExp(label));
+}
 assert.match(markup, /Projected Jr APY/);
 assert.match(markup, /Projected SLP APY/);
 assert.doesNotMatch(markup, /Exact E-CLP sizing/);
@@ -45,18 +56,16 @@ assert.match(markup, /8\.5%/);
 assert.match(markup, /2\.4%/);
 assert.match(markup, /Updates from the shared accountant/);
 assert.match(markup, /Reset yield split/);
-assert.equal(markup.match(/type="range"/g)?.length, 2);
-assert.equal(markup.match(/aria-valuetext=/g)?.length, 2);
-assert.equal(markup.match(/step="0.1"/g)?.length, 2);
+assert.equal(markup.match(/type="range"/g)?.length, 4);
+assert.equal(markup.match(/aria-valuetext=/g)?.length, 4);
+assert.equal(markup.match(/step="0.1"/g)?.length, 4);
+assert.doesNotMatch(markup, / YT /);
 
-// The unified editor exposes only the operating-target shares. The parent
-// still supplies the derived zero/full anchors so they can bound each target
-// slider without moving any curve or accountant math into this component.
+// The unified editor exposes only the two endpoints for each curve. The parent
+// retains the fixed YT contract anchors and accountant routing.
 assert.doesNotMatch(markup, /Simple/);
 assert.doesNotMatch(markup, /Advanced/);
 assert.doesNotMatch(markup, /Curve shape anchors/);
-assert.doesNotMatch(markup, /No coverage used \(Y0\)/);
-assert.doesNotMatch(markup, /All liquidity used \(Y100\)/);
 assert.doesNotMatch(markup, /Confirm suggested curves/);
 assert.doesNotMatch(markup, /Reset to suggested curves/);
 assert.doesNotMatch(markup, /Live pool validation/);
@@ -70,9 +79,11 @@ const invalidMarkup = renderToStaticMarkup(
     liqY100Pct={15}
     liqYtPct={5}
     juniorModeledApy={0.085}
-    onLiqYtPct={ignore}
+    onLiqY0Pct={ignore}
+    onLiqY100Pct={ignore}
     onResetCurve={ignore}
-    onRiskYtPct={ignore}
+    onRiskY0Pct={ignore}
+    onRiskY100Pct={ignore}
     riskCapPct={80}
     riskY0Pct={2}
     riskY100Pct={16}
@@ -95,9 +106,11 @@ const slpOnlyMarkup = renderToStaticMarkup(
     liqY100Pct={15}
     liqYtPct={5}
     juniorModeledApy={0}
-    onLiqYtPct={ignore}
+    onLiqY0Pct={ignore}
+    onLiqY100Pct={ignore}
     onResetCurve={ignore}
-    onRiskYtPct={ignore}
+    onRiskY0Pct={ignore}
+    onRiskY100Pct={ignore}
     riskCapPct={0}
     riskY0Pct={0}
     riskY100Pct={0}
@@ -107,9 +120,9 @@ const slpOnlyMarkup = renderToStaticMarkup(
   />,
 );
 assert.match(slpOnlyMarkup, /Compare how source yield is shared with SLP/);
-assert.match(slpOnlyMarkup, /SLP yield share/);
-assert.doesNotMatch(slpOnlyMarkup, /Junior yield share/);
-assert.equal(slpOnlyMarkup.match(/type="range"/g)?.length, 1);
+assert.match(slpOnlyMarkup, /SLP liquidity yield curve/);
+assert.doesNotMatch(slpOnlyMarkup, /Junior risk yield curve/);
+assert.equal(slpOnlyMarkup.match(/type="range"/g)?.length, 2);
 
 const juniorOnlyMarkup = renderToStaticMarkup(
   <DayV3PremiumCurveEditor
@@ -119,9 +132,11 @@ const juniorOnlyMarkup = renderToStaticMarkup(
     liqY100Pct={0}
     liqYtPct={0}
     juniorModeledApy={0.085}
-    onLiqYtPct={ignore}
+    onLiqY0Pct={ignore}
+    onLiqY100Pct={ignore}
     onResetCurve={ignore}
-    onRiskYtPct={ignore}
+    onRiskY0Pct={ignore}
+    onRiskY100Pct={ignore}
     riskCapPct={80}
     riskY0Pct={2}
     riskY100Pct={16}
@@ -132,9 +147,9 @@ const juniorOnlyMarkup = renderToStaticMarkup(
   />,
 );
 assert.match(juniorOnlyMarkup, /Compare how source yield is shared with Junior/);
-assert.match(juniorOnlyMarkup, /Junior yield share/);
-assert.doesNotMatch(juniorOnlyMarkup, /SLP yield share/);
-assert.equal(juniorOnlyMarkup.match(/type="range"/g)?.length, 1);
+assert.match(juniorOnlyMarkup, /Junior risk yield curve/);
+assert.doesNotMatch(juniorOnlyMarkup, /SLP liquidity yield curve/);
+assert.equal(juniorOnlyMarkup.match(/type="range"/g)?.length, 2);
 
 const bothOffMarkup = renderToStaticMarkup(
   <DayV3PremiumCurveEditor
@@ -145,9 +160,11 @@ const bothOffMarkup = renderToStaticMarkup(
     liqY100Pct={0}
     liqYtPct={0}
     juniorModeledApy={0}
-    onLiqYtPct={ignore}
+    onLiqY0Pct={ignore}
+    onLiqY100Pct={ignore}
     onResetCurve={ignore}
-    onRiskYtPct={ignore}
+    onRiskY0Pct={ignore}
+    onRiskY100Pct={ignore}
     riskCapPct={0}
     riskY0Pct={0}
     riskY100Pct={0}
@@ -167,9 +184,11 @@ const unresolvedPoolSlpMarkup = renderToStaticMarkup(
     liqY100Pct={15}
     liqYtPct={5}
     juniorModeledApy={0.085}
-    onLiqYtPct={ignore}
+    onLiqY0Pct={ignore}
+    onLiqY100Pct={ignore}
     onResetCurve={ignore}
-    onRiskYtPct={ignore}
+    onRiskY0Pct={ignore}
+    onRiskY100Pct={ignore}
     riskCapPct={80}
     riskY0Pct={2}
     riskY100Pct={16}
@@ -178,9 +197,12 @@ const unresolvedPoolSlpMarkup = renderToStaticMarkup(
     targetUtilization={0.9}
   />,
 );
-assert.match(unresolvedPoolSlpMarkup, /Jr 13\.0% · SLP 5\.0%/);
+assert.match(
+  unresolvedPoolSlpMarkup,
+  /Jr 2\.0% \/ 16\.0% · SLP 1\.0% \/ 15\.0%/,
+);
 assert.match(unresolvedPoolSlpMarkup, /Section status: Set/);
 assert.doesNotMatch(unresolvedPoolSlpMarkup, /awaiting exit validation/);
-assert.equal(unresolvedPoolSlpMarkup.match(/type="range"/g)?.length, 2);
+assert.equal(unresolvedPoolSlpMarkup.match(/type="range"/g)?.length, 4);
 
 console.log("Day V3 unified premium-curve editor: PASS");
