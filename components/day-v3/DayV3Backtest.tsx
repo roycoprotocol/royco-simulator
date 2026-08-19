@@ -31,7 +31,7 @@ import {
 } from "@/lib/day-simulator-template/backtest";
 import type { MarketConfig } from "@/lib/day/engine/types";
 import type { DayMarket } from "@/lib/day-simulator-template/market";
-import { calibrateSeriesApy } from "@/lib/day-simulator-template/series";
+import { dayV3BacktestSeries } from "@/lib/day-v3/backtest-series";
 
 // The run is `runDayHistoricalBacktest`, the same shared module the root route
 // steps its history through. This file chooses a window and lays the result
@@ -204,12 +204,11 @@ function DayV3Backtest({
     sourceApyPct,
   } = deferred;
 
-  // The market's real price path, rescaled so its annualized yield matches the
-  // source-yield control. This is what the root route models too: the shape of
-  // the history is real, the level is the one being tested.
+  // A separately published forward APY must not rewrite realized history.
+  // Imported what-if series retain the existing rescaling behavior.
   const series = useMemo(
-    () => calibrateSeriesApy(market.series, sourceApyPct / 100),
-    [market.series, sourceApyPct],
+    () => dayV3BacktestSeries(market, sourceApyPct),
+    [market, sourceApyPct],
   );
 
   const windows = useMemo(
@@ -714,9 +713,11 @@ function DayV3Backtest({
         ) : null}
 
         <p className="text-[10.5px] leading-relaxed text-[var(--tertiary)]">
-          The dated path is rescaled to the{" "}
-          {customSource ? "custom" : "selected"} source yield; that yield is an
-          input, not a historical estimate. Past behavior is not a forecast.
+          {market.provenance.dataMode ===
+          "historical-series-with-published-apy"
+            ? "The forward scenario uses the published source yield; the historical backtest preserves the dated path and realized return without rescaling."
+            : `The dated path is rescaled to the ${customSource ? "custom" : "selected"} source yield; that yield is an input, not a historical estimate.`}{" "}
+          Past behavior is not a forecast.
           {returnUnit === "USD" ? null : (
             <>
               {" "}

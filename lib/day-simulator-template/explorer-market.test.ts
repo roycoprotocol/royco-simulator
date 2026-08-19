@@ -66,6 +66,12 @@ assert.equal(JBBB_SAMPLE_MARKET.provenance.priceType, "total-return-index");
 assert.equal(JBBB_SAMPLE_MARKET.provenance.observationCount, 1144);
 assert.equal(JBBB_SAMPLE_MARKET.provenance.firstDate, "2022-01-12");
 assert.equal(JBBB_SAMPLE_MARKET.provenance.lastDate, "2026-08-05");
+assert.equal(
+  JBBB_SAMPLE_MARKET.provenance.dataMode,
+  "historical-series-with-published-apy",
+);
+assert.equal(JBBB_SAMPLE_MARKET.provenance.publishedApy, 0.0597);
+assert.equal(JBBB_SAMPLE_MARKET.defaults.sourceApy, 0.0597);
 assert.equal(JBBB_SAMPLE_MARKET.series[0].price, 100);
 assert.equal(
   JBBB_SAMPLE_MARKET.defaults.jtYieldShareProtocolFee,
@@ -76,6 +82,31 @@ assert.equal(
   YIELD_PREMIUM_PROTOCOL_FEE,
 );
 assert.ok(Math.abs(annualizedSeriesApy(JBBB_SAMPLE_MARKET.series) - 0.05825) < 0.00001);
+
+const publishedForwardWithHistory = buildDayDraftMarket({
+  label: "Published forward with observed history",
+  provider: "Official publisher",
+  sourceUrl: "https://example.com/official",
+  publishedApy: 0.0597,
+  series: [
+    { date: "2024-01-01", price: 100 },
+    { date: "2024-02-01", price: 101 },
+    { date: "2024-03-01", price: 102 },
+  ],
+  cadence: "monthly",
+  priceType: "total-return-index",
+});
+assert.equal(
+  publishedForwardWithHistory.provenance.dataMode,
+  "historical-series-with-published-apy",
+);
+assert.equal(publishedForwardWithHistory.provenance.publishedApy, 0.0597);
+assert.equal(publishedForwardWithHistory.defaults.sourceApy, 0.0597);
+assert.deepEqual(publishedForwardWithHistory.series, [
+  { date: "2024-01-01", price: 100 },
+  { date: "2024-02-01", price: 101 },
+  { date: "2024-03-01", price: 102 },
+]);
 
 const yieldDraft = buildDayYieldDraftMarket({
   label: "Expected yield source",

@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 
 import { DAY_MARKETS } from "@/lib/day-markets/registry";
 import { runDayHistoricalBacktest } from "@/lib/day-simulator-template/backtest";
-import { calibrateSeriesApy } from "@/lib/day-simulator-template/series";
+import { dayV3BacktestSeries } from "@/lib/day-v3/backtest-series";
 import {
   dayV3RealizedReturns,
   type DayV3HistoricalTerms,
@@ -61,7 +61,7 @@ for (const id of ["jbbb", "susdai", "acred", "makina-dbit"]) {
       poolTurnoverPerYear: terms.poolTurnoverPerYear,
       stableYield: terms.quoteAssetYieldPct / 100,
     },
-    series: calibrateSeriesApy(mk.series, terms.sourceApyPct / 100),
+    series: dayV3BacktestSeries(mk, terms.sourceApyPct),
     terms: {
       coveragePct: terms.coveragePct,
       minLiquidityPct: terms.liquidityPct,
@@ -77,10 +77,7 @@ for (const id of ["jbbb", "susdai", "acred", "makina-dbit"]) {
     maintainCoverage: terms.maintainCoverage,
     omitInitialZeroReturnPeriod:
       mk.customization.forwardTest?.omitInitialZeroReturnPeriod === true,
-    monthlyBaselineDate: calibrateSeriesApy(
-      mk.series,
-      terms.sourceApyPct / 100,
-    )[0]?.date,
+    monthlyBaselineDate: dayV3BacktestSeries(mk, terms.sourceApyPct)[0]?.date,
   });
   for (const key of ["seniorApy", "juniorApy", "liquidityApy"] as const) {
     assert.equal(
@@ -89,6 +86,18 @@ for (const id of ["jbbb", "susdai", "acred", "makina-dbit"]) {
       `${id} ${key} must be the backtest's own figure, not a re-derivation`,
     );
   }
+}
+
+// JBBB carries a published forward SEC yield and an independent realized
+// total-return history. Editing the former must never rewrite the latter.
+{
+  const jbbb = market("jbbb");
+  assert.equal(
+    jbbb.provenance.dataMode,
+    "historical-series-with-published-apy",
+  );
+  assert.strictEqual(dayV3BacktestSeries(jbbb, 5.97), jbbb.series);
+  assert.strictEqual(dayV3BacktestSeries(jbbb, 12), jbbb.series);
 }
 
 // The reason this exists: on a market with a real drawdown the projection and

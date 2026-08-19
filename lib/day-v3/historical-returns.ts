@@ -1,7 +1,7 @@
-import { calibrateSeriesApy } from "@/lib/day-simulator-template/series";
 import { runDayHistoricalBacktest } from "@/lib/day-simulator-template/backtest";
 import type { DayMarket } from "@/lib/day-simulator-template/market";
 import type { MarketConfig } from "@/lib/day/engine/types";
+import { dayV3BacktestSeries } from "@/lib/day-v3/backtest-series";
 
 /**
  * What each tranche actually did, over this market's own dated history.
@@ -15,12 +15,9 @@ import type { MarketConfig } from "@/lib/day/engine/types";
  * but showing only the first beside a section that says "Junior claim resets:
  * 364" asks the reader to notice the contradiction themselves.
  *
- * The source APY is deliberately NOT reported. `calibrateSeriesApy` rescales
- * the path so its annualized yield matches the source-yield control, so over a
- * full window the realized source return is just that control read back.
- * Printing it as a finding restates the input. What history carries is the
- * shape — the drawdowns, and who absorbed them — which is exactly what the
- * three tranche returns and the loss counts below describe.
+ * Markets with a separately published forward APY preserve their uncalibrated
+ * realized series here. Imported what-if histories retain the source-yield
+ * rescaling behavior used by the Explorer.
  *
  * This is the shared runner, called the way the backtest section calls it. No
  * return is derived here.
@@ -68,7 +65,7 @@ export function dayV3RealizedReturns(
   configOverrides?: Partial<Pick<MarketConfig, "swapFeeBps" | "eclpParams">>,
 ): DayV3RealizedReturns | null {
   if (market.series.length < 3) return null;
-  const series = calibrateSeriesApy(market.series, terms.sourceApyPct / 100);
+  const series = dayV3BacktestSeries(market, terms.sourceApyPct);
   if (series.length < 3) return null;
   try {
     const result = runDayHistoricalBacktest({

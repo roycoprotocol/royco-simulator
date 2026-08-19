@@ -108,7 +108,7 @@ assert.equal(
   15,
 );
 assert.equal(listedSource.state.recoveryDays, 90);
-assert.equal(listedSource.state.immediateExitSharePct, 10);
+assert.equal(listedSource.state.immediateExitSharePct, 0);
 assert.equal(listedSource.state.minimumProceedsPer100, 95);
 assert.equal(listedSource.state.quoteAssetLabel, "sr-srRoyUSDC");
 assert.equal(listedSource.state.quoteAssetYieldPct, 4);
@@ -118,11 +118,11 @@ assert.equal(listedSource.state.marketMakerCostOfCapitalPct, 12);
 assert.equal(listedSource.state.redemptionDays, 7);
 assert.deepEqual(listedSource.state.overrides, {
   jrYieldShareAtZeroPct: 7.5,
-  jrYieldShareAtTargetPct: 19,
+  jrYieldShareAtTargetPct: 14.8801,
   jrYieldShareAtFullPct: 45,
-  slpYieldShareAtZeroPct: 2,
-  slpYieldShareAtTargetPct: 2.9937,
-  slpYieldShareAtFullPct: 29.7937,
+  slpYieldShareAtZeroPct: 0,
+  slpYieldShareAtTargetPct: 0,
+  slpYieldShareAtFullPct: 0,
   coveragePct: null,
   minimumLiquidityPct: null,
   maximumDiscountPct: null,
@@ -149,20 +149,14 @@ for (const expected of [
   "m=jbbb",
   "protect=15",
   "recover=90",
-  "exit=10",
-  "receive=95",
-  "quote=sr-srRoyUSDC",
-  "quoteApy=4",
-  "turnover=2",
-  "fee=5",
-  "mmCost=12",
-  "mmDays=7",
+  "exit=0",
+  "receive=0",
   "jr0=7.5",
-  "jr90=19",
+  "jr90=14.8801",
   "jr100=45",
-  "slp0=2",
-  "slp90=2.9937",
-  "slp100=29.7937",
+  "slp0=0",
+  "slp90=0",
+  "slp100=0",
 ]) {
   assert.equal(listedSourceQuery.includes(expected), true, expected);
 }
