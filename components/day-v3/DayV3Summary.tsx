@@ -1625,12 +1625,18 @@ export default function DayV3Summary({
         onLiqY0Pct={(value) =>
           updateYieldCurveOverride("slpYieldShareAtZeroPct", value)
         }
+        onLiqYtPct={(value) =>
+          updateYieldCurveOverride("slpYieldShareAtTargetPct", value)
+        }
         onLiqY100Pct={(value) =>
           updateYieldCurveOverride("slpYieldShareAtFullPct", value)
         }
         onResetCurve={resetYieldCurveOverrides}
         onRiskY0Pct={(value) =>
           updateYieldCurveOverride("jrYieldShareAtZeroPct", value)
+        }
+        onRiskYtPct={(value) =>
+          updateYieldCurveOverride("jrYieldShareAtTargetPct", value)
         }
         onRiskY100Pct={(value) =>
           updateYieldCurveOverride("jrYieldShareAtFullPct", value)

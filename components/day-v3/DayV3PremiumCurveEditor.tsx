@@ -20,9 +20,11 @@ export type DayV3PremiumCurveEditorProps = {
   liqYtPct: number;
   juniorModeledApy: number;
   onLiqY0Pct: (value: number) => void;
+  onLiqYtPct: (value: number) => void;
   onLiqY100Pct: (value: number) => void;
   onResetCurve: () => void;
   onRiskY0Pct: (value: number) => void;
+  onRiskYtPct: (value: number) => void;
   onRiskY100Pct: (value: number) => void;
   riskCapPct: number;
   riskY0Pct: number;
@@ -38,6 +40,7 @@ type CurveCardProps = {
   description: string;
   docs: "coverage" | "slpTranche";
   onY0Pct: (value: number) => void;
+  onYtPct: (value: number) => void;
   onY100Pct: (value: number) => void;
   paidTo: "Jr" | "SLP";
   modeledApy: number;
@@ -55,6 +58,7 @@ function CurveCard({
   description,
   docs,
   onY0Pct,
+  onYtPct,
   onY100Pct,
   paidTo,
   modeledApy,
@@ -64,11 +68,11 @@ function CurveCard({
   ytPct,
 }: CurveCardProps) {
   const simulationBudgetPct = Math.max(0, capPct);
-  // These are input bounds, not another curve evaluator. The contract requires
-  // Y0 <= YT <= Y100. YT remains the contract-configured fixed kink anchor;
-  // this streamlined editor exposes only the two endpoint controls. Curve
-  // evaluation stays in the shared Day accountant.
+  // These are input bounds, not another curve evaluator. Curve evaluation stays
+  // in the shared Day accountant.
   const y0Max = Math.min(simulationBudgetPct, Math.max(0, ytPct));
+  const ytMin = Math.min(simulationBudgetPct, Math.max(0, y0Pct));
+  const ytMax = Math.max(ytMin, Math.min(simulationBudgetPct, y100Pct));
   const y100Min = Math.min(simulationBudgetPct, Math.max(0, ytPct));
 
   return (
@@ -102,6 +106,19 @@ function CurveCard({
             value={bounded(y0Pct, 0, y0Max)}
           />
           <DayV3Slider
+            display={pct(ytPct / 100)}
+            hint={`The share of Senior yield paid to ${paidTo} at the contract's fixed utilization kink.`}
+            label={`${paidTo} YT · 90% utilization`}
+            max={ytMax}
+            maxLabel={pct(ytMax / 100)}
+            min={ytMin}
+            minLabel={pct(ytMin / 100)}
+            onChange={onYtPct}
+            size="sm"
+            step={0.1}
+            value={bounded(ytPct, ytMin, ytMax)}
+          />
+          <DayV3Slider
             display={pct(y100Pct / 100)}
             hint={`The share of Senior yield paid to ${paidTo} when its utilization reaches 100%.`}
             label={`${paidTo} Y100 · 100% utilization`}
@@ -133,13 +150,12 @@ function CurveCard({
 }
 
 /**
- * V3's endpoint editor for the two static premium curves.
+ * V3's three-anchor editor for the two static premium curves.
  *
  * The parent owns every value, bound, callback, and reset decision. This
- * component displays the contract's configurable Y0 and Y100 endpoints plus
- * accountant-derived returns. The configured YT kink stays in the parent and
- * is still passed to the accountant; this component does not evaluate either
- * curve or derive a return.
+ * component displays the contract's Y0, YT, and Y100 anchors plus
+ * accountant-derived returns; it does not evaluate either curve or derive a
+ * return.
  */
 function DayV3PremiumCurveEditor({
   curveOverridden,
@@ -152,9 +168,11 @@ function DayV3PremiumCurveEditor({
   liqYtPct,
   juniorModeledApy,
   onLiqY0Pct,
+  onLiqYtPct,
   onLiqY100Pct,
   onResetCurve,
   onRiskY0Pct,
+  onRiskYtPct,
   onRiskY100Pct,
   riskCapPct,
   riskY0Pct,
@@ -173,18 +191,26 @@ function DayV3PremiumCurveEditor({
     source: { y0: liqY0Pct, yt: liqYtPct, y100: liqY100Pct },
   });
   const onRiskY0PctRef = useRef(onRiskY0Pct);
+  const onRiskYtPctRef = useRef(onRiskYtPct);
   const onRiskY100PctRef = useRef(onRiskY100Pct);
   const onLiqY0PctRef = useRef(onLiqY0Pct);
+  const onLiqYtPctRef = useRef(onLiqYtPct);
   const onLiqY100PctRef = useRef(onLiqY100Pct);
   useEffect(() => {
     onRiskY0PctRef.current = onRiskY0Pct;
   }, [onRiskY0Pct]);
+  useEffect(() => {
+    onRiskYtPctRef.current = onRiskYtPct;
+  }, [onRiskYtPct]);
   useEffect(() => {
     onRiskY100PctRef.current = onRiskY100Pct;
   }, [onRiskY100Pct]);
   useEffect(() => {
     onLiqY0PctRef.current = onLiqY0Pct;
   }, [onLiqY0Pct]);
+  useEffect(() => {
+    onLiqYtPctRef.current = onLiqYtPct;
+  }, [onLiqYtPct]);
   useEffect(() => {
     onLiqY100PctRef.current = onLiqY100Pct;
   }, [onLiqY100Pct]);
@@ -217,6 +243,12 @@ function DayV3PremiumCurveEditor({
   }, [juniorEnabled, riskDraft.y0, riskY0Pct]);
 
   useEffect(() => {
+    if (!juniorEnabled || Object.is(riskDraft.yt, riskYtPct)) return;
+    const timeout = window.setTimeout(() => onRiskYtPctRef.current(riskDraft.yt), 120);
+    return () => window.clearTimeout(timeout);
+  }, [juniorEnabled, riskDraft.yt, riskYtPct]);
+
+  useEffect(() => {
     if (!juniorEnabled || Object.is(riskDraft.y100, riskY100Pct)) return;
     const timeout = window.setTimeout(() => onRiskY100PctRef.current(riskDraft.y100), 120);
     return () => window.clearTimeout(timeout);
@@ -227,6 +259,12 @@ function DayV3PremiumCurveEditor({
     const timeout = window.setTimeout(() => onLiqY0PctRef.current(liqDraft.y0), 120);
     return () => window.clearTimeout(timeout);
   }, [liqDraft.y0, liqY0Pct, slpEnabled]);
+
+  useEffect(() => {
+    if (!slpEnabled || Object.is(liqDraft.yt, liqYtPct)) return;
+    const timeout = window.setTimeout(() => onLiqYtPctRef.current(liqDraft.yt), 120);
+    return () => window.clearTimeout(timeout);
+  }, [liqDraft.yt, liqYtPct, slpEnabled]);
 
   useEffect(() => {
     if (!slpEnabled || Object.is(liqDraft.y100, liqY100Pct)) return;
@@ -244,10 +282,10 @@ function DayV3PremiumCurveEditor({
   ];
   const activeCurveSummary = [
     ...(juniorEnabled
-      ? [`Jr ${pct(riskDraft.y0 / 100)} / ${pct(riskDraft.y100 / 100)}`]
+      ? [`Jr ${pct(riskDraft.y0 / 100)} / ${pct(riskDraft.yt / 100)} / ${pct(riskDraft.y100 / 100)}`]
       : []),
     ...(slpEnabled
-      ? [`SLP ${pct(liqDraft.y0 / 100)} / ${pct(liqDraft.y100 / 100)}`]
+      ? [`SLP ${pct(liqDraft.y0 / 100)} / ${pct(liqDraft.yt / 100)} / ${pct(liqDraft.y100 / 100)}`]
       : []),
   ].join(" · ");
   return (
@@ -285,15 +323,14 @@ function DayV3PremiumCurveEditor({
       subtitle={`Compare how source yield is shared with ${activeCurveLabels.join(" and ")}`}
       summary={
         validationIssues.length === 0
-          ? `${activeCurveSummary} · Y0 / Y100`
+          ? `${activeCurveSummary} · Y0 / YT / Y100`
           : "Adjust the highlighted yield shares"
       }
       title="Yield split"
     >
       <p className="text-[10px] leading-snug text-[var(--tertiary)]">
-        Set the yield-share endpoints at 0% and 100% utilization. The
-        contract&apos;s fixed {pct(targetUtilization)} kink remains configured in
-        the market, and each position&apos;s modeled APY updates beside the controls.
+        Set the contract&apos;s yield-share anchors at 0%, {pct(targetUtilization)},
+        and 100% utilization. Each position&apos;s modeled APY updates beside it.
       </p>
 
       {validationIssues.length > 0 ? (
@@ -333,6 +370,12 @@ function DayV3PremiumCurveEditor({
                 draft: { ...current.draft, y100: value },
               }))
             }
+            onYtPct={(value) =>
+              setRiskEditor((current) => ({
+                ...current,
+                draft: { ...current.draft, yt: value },
+              }))
+            }
             paidTo="Jr"
             modeledApy={juniorModeledApy}
             title="Junior risk yield curve"
@@ -356,6 +399,12 @@ function DayV3PremiumCurveEditor({
               setLiqEditor((current) => ({
                 ...current,
                 draft: { ...current.draft, y100: value },
+              }))
+            }
+            onYtPct={(value) =>
+              setLiqEditor((current) => ({
+                ...current,
+                draft: { ...current.draft, yt: value },
               }))
             }
             paidTo="SLP"

@@ -326,17 +326,16 @@ for (const marker of [
   assert.ok(backtest.includes(marker), `Historical model lost: ${marker}`);
 }
 
-// One reusable curve card renders the two configurable endpoints for each YDM;
-// the fixed YT contract kink remains routed through the parent accountant state.
+// One reusable curve card renders all three contract anchors for each YDM.
 assert.equal(
   editor.match(/<DayV3Slider/g)?.length,
-  2,
-  "Y0 and Y100 sliders must be reused by the Junior and SLP cards",
+  3,
+  "Y0, YT, and Y100 sliders must be reused by the Junior and SLP cards",
 );
 assert.match(
   summary,
   /deriveDayV3StartingYieldCurvePolicy/,
-  "V3 must derive one complete starting policy behind the four visible endpoints",
+  "V3 must derive one complete starting policy behind the six visible anchors",
 );
 assert.doesNotMatch(
   summary,
