@@ -41,8 +41,9 @@ const actual = {
 };
 
 // Captured after the authorized shared-engine correction that applies the
-// exact-input pool fee before E-CLP pricing. The route/components remain frozen;
-// this baseline intentionally records the corrected all-in exit quote.
+// exact-input pool fee before E-CLP pricing and the uniform 5% protocol fee on
+// Junior and SLP yield premiums. The route/components remain frozen; this
+// baseline intentionally records the corrected all-in returns and exit quote.
 assert.deepEqual(actual, {
   market: "jbbb",
   terms: {
@@ -59,9 +60,9 @@ assert.deepEqual(actual, {
     lt: 4444444.444444445,
   },
   scenario: {
-    seniorApy: 0.043539092406083446,
-    juniorApy: 0.0995122311478902,
-    liquidityApy: 0.07104533931079726,
+    seniorApy: 0.04353777871863951,
+    juniorApy: 0.09741459113398454,
+    liquidityApy: 0.06973721931312293,
   },
   capitalStack: {
     coverageLossLimit: 0.22222222222299992,
