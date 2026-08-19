@@ -100,6 +100,11 @@ export type DayDraftSource = {
   feesIncluded?: DayMarketManifest["provenance"]["feesIncluded"];
   retrievedAt?: string;
   supportingSources?: DayMarketManifest["provenance"]["supportingSources"];
+  /**
+   * A separately published forward yield. When present, the dated series
+   * remains the historical record while this value drives forward scenarios.
+   */
+  publishedApy?: number;
 };
 
 export type DayYieldDraftSource = {
@@ -111,10 +116,17 @@ export function buildDayDraftMarket(source: DayDraftSource): DayMarket {
   if (source.series.length < 3) {
     throw new Error("A draft source needs at least three dated observations.");
   }
-  const sourceApy = annualizedSeriesApy(source.series);
-  if (!Number.isFinite(sourceApy) || sourceApy <= -1) {
+  const historicalApy = annualizedSeriesApy(source.series);
+  if (!Number.isFinite(historicalApy) || historicalApy <= -1) {
     throw new Error("The imported history does not produce a valid annualized return.");
   }
+  if (
+    source.publishedApy !== undefined &&
+    (!Number.isFinite(source.publishedApy) || source.publishedApy <= -1)
+  ) {
+    throw new Error("Published source APY must be a finite percentage greater than -100%.");
+  }
+  const sourceApy = source.publishedApy ?? historicalApy;
   const first = source.series[0];
   const last = source.series.at(-1);
   const manifest: DayMarketManifest = {
@@ -137,13 +149,19 @@ export function buildDayDraftMarket(source: DayDraftSource): DayMarket {
       source: source.source ?? source.label,
       sourceUrl: source.sourceUrl,
       sourceProvider: source.provider,
-      dataMode: "historical-series",
+      dataMode:
+        source.publishedApy === undefined
+          ? "historical-series"
+          : "historical-series-with-published-apy",
       dataCadence: source.cadence,
       priceType: source.priceType,
       feesIncluded: source.feesIncluded ?? true,
       observationCount: source.series.length,
       firstDate: first?.date ?? "unknown",
       lastDate: last?.date ?? "unknown",
+      ...(source.publishedApy === undefined
+        ? {}
+        : { publishedApy: source.publishedApy }),
       ...(source.retrievedAt ? { retrievedAt: source.retrievedAt } : {}),
       ...(source.supportingSources ? { supportingSources: source.supportingSources } : {}),
     },

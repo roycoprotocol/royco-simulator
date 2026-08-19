@@ -292,7 +292,7 @@ const historicalPublishedApyMarket = {
 };
 assert.equal(
   buildDayMarketCopy(historicalPublishedApyMarket).disclosure,
-  "The chart preserves the path of 26 fee-inclusive irregular NAV observations supplied by Makina onchain Machine accounting, with its trend calibrated to the published 9.96% APY input. Simulator outputs are mechanism simulations, not historical backtests, forecasts, or an announced product.",
+  "The forward model uses the published 9.96% APY supplied by Makina onchain Machine accounting. The historical backtest preserves the uncalibrated path and realized return of 26 fee-inclusive irregular NAV observations from the same source set. Simulator outputs are mechanism simulations, not forecasts or an announced product.",
 );
 
 const initial = buildDayInitialBalances(market.defaults, terms);

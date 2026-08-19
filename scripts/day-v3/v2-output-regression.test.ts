@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 
 import { JBBB_SAMPLE_MARKET } from "@/lib/day-sample-sources/jbbb/market";
+import { JBBB_V3_DEFAULTS } from "@/lib/day-sample-sources/jbbb/v3-defaults";
+import { recommendDayV3Coverage } from "@/lib/day-v3/protection";
 import { buildDayExplainerMetrics } from "@/lib/day-simulator-template/explainer";
 import {
   buildDayInitialBalances,
@@ -60,9 +62,9 @@ assert.deepEqual(actual, {
     lt: 4444444.444444445,
   },
   scenario: {
-    seniorApy: 0.04353777871863951,
-    juniorApy: 0.09741459113398454,
-    liquidityApy: 0.06973721931312293,
+    seniorApy: 0.04461662188292803,
+    juniorApy: 0.09985058019648951,
+    liquidityApy: 0.07048239010733948,
   },
   capitalStack: {
     coverageLossLimit: 0.22222222222299992,
@@ -71,5 +73,39 @@ assert.deepEqual(actual, {
     onePercentExecutionPrice: 0.9939925127357162,
   },
 });
+
+// The JBBB Explorer default keeps its published forward SEC yield independent
+// from the raw historical path. Its explicitly selected no-SLP design targets
+// 30 bps over the 4.77% JAAA reference under the live 5% premium-fee policy.
+const jbbbCoverage = recommendDayV3Coverage(defaults, {
+  protectedDrawdownPct: JBBB_V3_DEFAULTS.protectedDrawdownPct,
+});
+assert.equal(jbbbCoverage.status, "recommended");
+assert.equal(jbbbCoverage.coverage.value, 15);
+assert.equal(JBBB_V3_DEFAULTS.immediateExitSharePct, 0);
+const noSlp = { mode: "static" as const, y0: 0, yTarget: 0, y100: 0 };
+const jbbbDefaultScenario = runDayTargetScenario({
+  ...defaults,
+  coverage: 0.15,
+  minLiquidity: 0,
+  observationDays: JBBB_V3_DEFAULTS.recoveryDays,
+  riskYDM: {
+    ...defaults.riskYDM,
+    y0: JBBB_V3_DEFAULTS.overrides.jrYieldShareAtZeroPct / 100,
+    yTarget: JBBB_V3_DEFAULTS.overrides.jrYieldShareAtTargetPct / 100,
+    y100: JBBB_V3_DEFAULTS.overrides.jrYieldShareAtFullPct / 100,
+  },
+  liqYDM: noSlp,
+});
+assert.ok(
+  Math.abs(jbbbDefaultScenario.seniorApy - 0.0507) < 1e-7,
+  `JBBB Senior must remain at the 5.07% target (got ${jbbbDefaultScenario.seniorApy})`,
+);
+assert.equal(jbbbDefaultScenario.liquidityApy, 0);
+assert.ok(
+  jbbbDefaultScenario.juniorApy > 0.102 &&
+    jbbbDefaultScenario.juniorApy < 0.103,
+  `JBBB Junior should be about 10.2% under the verified 5.97% input (got ${jbbbDefaultScenario.juniorApy})`,
+);
 
 console.log("Day V2 key-output regression: PASS (fee-inclusive shared-engine baseline)");

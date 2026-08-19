@@ -10,7 +10,7 @@ import type { DayV3Overrides } from "@/lib/day-v3/types";
 export const JBBB_V3_DEFAULTS = {
   protectedDrawdownPct: 15,
   recoveryDays: 90,
-  immediateExitSharePct: 10,
+  immediateExitSharePct: 0,
   minimumProceedsPer100: 95,
   quoteAssetLabel: "sr-srRoyUSDC",
   quoteAssetYieldPct: 4,
@@ -26,11 +26,11 @@ export const JBBB_V3_DEFAULTS = {
   },
   overrides: {
     jrYieldShareAtZeroPct: 7.5,
-    jrYieldShareAtTargetPct: 19,
+    jrYieldShareAtTargetPct: 14.8801,
     jrYieldShareAtFullPct: 45,
-    slpYieldShareAtZeroPct: 2,
-    slpYieldShareAtTargetPct: 2.9937,
-    slpYieldShareAtFullPct: 29.7937,
+    slpYieldShareAtZeroPct: 0,
+    slpYieldShareAtTargetPct: 0,
+    slpYieldShareAtFullPct: 0,
   } satisfies Pick<
     DayV3Overrides,
     | "jrYieldShareAtZeroPct"

@@ -5,18 +5,23 @@ import { buildDayDraftMarket } from "@/lib/day-simulator-template/explorer-marke
 export const JBBB_SAMPLE_MARKET = buildDayDraftMarket({
   id: "jbbb",
   label: "JBBB · Janus Henderson B-BBB CLO ETF",
-  source: "JBBB total-return index reconstructed from Nasdaq daily closing prices and Janus Henderson's official cash distribution history. The result was cross-checked against Janus Henderson's reported NAV return.",
-  provider: "Nasdaq + Janus Henderson",
-  sourceUrl: "https://api.nasdaq.com/api/quote/JBBB/historical?assetclass=etf&fromdate=2022-01-12&todate=2026-08-05&limit=5000",
+  source: "JBBB forward yield uses Janus Henderson's published 30-day SEC yield. Its historical backtest uses a total-return index reconstructed from Nasdaq daily closing prices and Janus Henderson's official cash distributions.",
+  provider: "Janus Henderson + Nasdaq",
+  sourceUrl: "https://www.janushenderson.com/en-us/advisor/product/jbbb-b-bbb-clo-etf/",
+  publishedApy: 0.0597,
   series,
   cadence: "daily",
   priceType: "total-return-index",
   feesIncluded: true,
-  retrievedAt: "2026-08-06",
+  retrievedAt: "2026-08-19",
   supportingSources: [
     {
-      label: "Janus Henderson JBBB product and NAV reporting",
-      url: "https://www.janushenderson.com/en-us/investor/product/jbbb-b-bbb-clo-etf/?identifier=US47103U7533",
+      label: "Janus Henderson JBBB 30-day SEC yield (5.97% as of 2026-07-31)",
+      url: "https://www.janushenderson.com/en-us/advisor/product/jbbb-b-bbb-clo-etf/",
+    },
+    {
+      label: "Nasdaq JBBB historical closing prices",
+      url: "https://api.nasdaq.com/api/quote/JBBB/historical?assetclass=etf&fromdate=2022-01-12&todate=2026-08-05&limit=5000",
     },
     {
       label: "Janus Henderson official ETF distribution history",
