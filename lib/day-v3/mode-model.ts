@@ -18,17 +18,20 @@ export const EMPTY_DAY_V3_OVERRIDES: Readonly<DayV3Overrides> = Object.freeze({
 });
 
 /**
- * The simulator exposes only the two yield shares paid at the operating
- * target. Legacy curve-shape and deployment overrides stay parseable so old
- * links do not break, but invisible fields must never change a displayed
- * result.
+ * The simulator exposes the contract's Y0, YT, and Y100 anchors for both Day
+ * YDMs. Deployment and pool overrides stay parseable so old links do not
+ * break, but invisible fields must never change a displayed result.
  */
 export function dayV3ActiveOverrides(
   overrides: DayV3Overrides,
 ): Readonly<DayV3Overrides> {
   return {
     ...EMPTY_DAY_V3_OVERRIDES,
+    jrYieldShareAtZeroPct: overrides.jrYieldShareAtZeroPct,
     jrYieldShareAtTargetPct: overrides.jrYieldShareAtTargetPct,
+    jrYieldShareAtFullPct: overrides.jrYieldShareAtFullPct,
+    slpYieldShareAtZeroPct: overrides.slpYieldShareAtZeroPct,
     slpYieldShareAtTargetPct: overrides.slpYieldShareAtTargetPct,
+    slpYieldShareAtFullPct: overrides.slpYieldShareAtFullPct,
   };
 }

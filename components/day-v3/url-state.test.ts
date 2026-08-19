@@ -105,20 +105,33 @@ assert.equal(listedSource.applied, true);
 assert.equal(listedSource.state.sourceApyPct, null);
 assert.equal(
   listedSource.state.protectedDrawdownPct,
-  DAY_V3_STARTER_DEFAULTS.protectedDrawdownPct,
+  15,
 );
-assert.equal(
-  listedSource.state.recoveryDays,
-  DAY_V3_STARTER_DEFAULTS.recoveryDays,
-);
-assert.equal(
-  listedSource.state.immediateExitSharePct,
-  DAY_V3_STARTER_DEFAULTS.immediateExitSharePct,
-);
-assert.equal(
-  listedSource.state.minimumProceedsPer100,
-  DAY_V3_STARTER_DEFAULTS.minimumProceedsPer100,
-);
+assert.equal(listedSource.state.recoveryDays, 90);
+assert.equal(listedSource.state.immediateExitSharePct, 10);
+assert.equal(listedSource.state.minimumProceedsPer100, 95);
+assert.equal(listedSource.state.quoteAssetLabel, "sr-srRoyUSDC");
+assert.equal(listedSource.state.quoteAssetYieldPct, 4);
+assert.equal(listedSource.state.poolTurnoverPerYear, 2);
+assert.equal(listedSource.state.swapFeeBps, 5);
+assert.equal(listedSource.state.marketMakerCostOfCapitalPct, 12);
+assert.equal(listedSource.state.redemptionDays, 7);
+assert.deepEqual(listedSource.state.overrides, {
+  jrYieldShareAtZeroPct: 7.5,
+  jrYieldShareAtTargetPct: 19,
+  jrYieldShareAtFullPct: 45,
+  slpYieldShareAtZeroPct: 2,
+  slpYieldShareAtTargetPct: 2.9937,
+  slpYieldShareAtFullPct: 29.7937,
+  coveragePct: null,
+  minimumLiquidityPct: null,
+  maximumDiscountPct: null,
+  depthAtNav: null,
+  maximumPremiumPct: null,
+  protectedExitThresholdPct: null,
+  protectedExitBonusPct: null,
+  poolCapitalPer100: null,
+});
 assert.equal(listedSource.state.entryPointSettlementDays, null);
 assert.deepEqual(listedSource.state.target, DAY_V3_STARTER_DEFAULTS.target);
 assert.deepEqual(listedSource.appliedFields, [
@@ -128,6 +141,41 @@ assert.deepEqual(listedSource.appliedFields, [
   "payout",
   "target",
 ]);
+const listedSourceQuery = buildDayV3Query({
+  ...listedSource.state,
+  starterFields: listedSource.appliedFields,
+});
+for (const expected of [
+  "m=jbbb",
+  "protect=15",
+  "recover=90",
+  "exit=10",
+  "receive=95",
+  "quote=sr-srRoyUSDC",
+  "quoteApy=4",
+  "turnover=2",
+  "fee=5",
+  "mmCost=12",
+  "mmDays=7",
+  "jr0=7.5",
+  "jr90=19",
+  "jr100=45",
+  "slp0=2",
+  "slp90=2.9937",
+  "slp100=29.7937",
+]) {
+  assert.equal(listedSourceQuery.includes(expected), true, expected);
+}
+
+const explicitJbbbTerms = applyDayV3StarterDefaults(
+  readDayV3UrlState("m=jbbb&recover=30&fee=7&jr90=18"),
+  "m=jbbb&recover=30&fee=7&jr90=18",
+);
+assert.equal(explicitJbbbTerms.state.recoveryDays, 30);
+assert.equal(explicitJbbbTerms.state.swapFeeBps, 7);
+assert.equal(explicitJbbbTerms.state.overrides.jrYieldShareAtTargetPct, 18);
+assert.equal(explicitJbbbTerms.state.overrides.jrYieldShareAtZeroPct, null);
+assert.equal(explicitJbbbTerms.state.overrides.slpYieldShareAtFullPct, null);
 
 const query = buildDayV3Query({
   market: "custom",
@@ -194,6 +242,8 @@ assert.deepEqual(
     "convertCost",
     "exit",
     "fee",
+    "jr0",
+    "jr100",
     "jr90",
     "m",
     "mmCost",
@@ -204,10 +254,12 @@ assert.deepEqual(
     "receive",
     "recover",
     "settle",
+    "slp0",
+    "slp100",
     "slp90",
     "turnover",
   ],
-  "the canonical writer strips hidden state while retaining visible target shares",
+  "the canonical writer strips hidden state while retaining all visible curve anchors",
 );
 for (const hidden of [
   "mode",
@@ -228,10 +280,6 @@ for (const hidden of [
   "pexit",
   "bonus",
   "pool",
-  "jr0",
-  "jr100",
-  "slp0",
-  "slp100",
   "starter",
 ]) {
   assert.equal(new URLSearchParams(query).has(hidden), false, hidden);
@@ -323,11 +371,15 @@ assert.deepEqual(overridden.overrides, {
   slpYieldShareAtFullPct: 14,
 });
 const curveRoundTrip = buildDayV3Query(overridden);
-for (const field of ["jr90=12", "slp90=5"]) {
+for (const field of [
+  "jr0=2",
+  "jr90=12",
+  "jr100=18",
+  "slp0=1",
+  "slp90=5",
+  "slp100=14",
+]) {
   assert.equal(curveRoundTrip.includes(field), true);
-}
-for (const field of ["jr0=", "jr100=", "slp0=", "slp100="]) {
-  assert.equal(curveRoundTrip.includes(field), false);
 }
 const simpleYieldSplit = readDayV3UrlState("m=custom&apy=8&jr90=20&slp90=10");
 assert.deepEqual(

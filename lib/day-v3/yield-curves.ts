@@ -53,13 +53,13 @@ const zeroCurve = (): DayV3YieldCurveAnchors => ({
 const formatPct = (value: number) => `${value.toFixed(2)}%`;
 
 /**
- * Bound the one issuer-editable curve point to the derived curve endpoints.
+ * Bound a target-only override from an older link to the derived endpoints.
  *
- * V3 intentionally hides Y0 and Y100. Older links can still contain a YT that
- * predates those derived bounds, so the visible slider and the accountant must
- * agree on the same valid value instead of showing one number and modeling
- * another. This only constrains an input; curve evaluation remains in the
- * shared Day engine.
+ * The current editor writes all six anchors as one validated policy. Older
+ * links can still contain only YT, so the displayed slider and the accountant
+ * must agree on the same valid value instead of showing one number and
+ * modeling another. This only constrains an input; curve evaluation remains
+ * in the shared Day engine.
  */
 export function boundDayV3YieldShareAtTarget({
   targetPct,

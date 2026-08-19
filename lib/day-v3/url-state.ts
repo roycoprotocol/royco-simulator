@@ -4,6 +4,7 @@ import type {
   DayV3GoalDraft,
   DayV3Overrides,
 } from "@/lib/day-v3/types";
+import { dayV3MarketDefaults } from "@/lib/day-v3/market-defaults";
 import { validateDayV3YieldCurveDesign } from "@/lib/day-v3/yield-curves";
 
 export type DayV3Mode = "simulate" | "deploy";
@@ -123,6 +124,7 @@ export function applyDayV3StarterDefaults(
 } {
   const params = new URLSearchParams(search);
   const customSource = !params.has("m") || state.market === "custom";
+  const marketDefaults = dayV3MarketDefaults(state.market);
 
   // Legacy links may carry a `starter` marker. Continue honoring it when links
   // are read, even though the canonical writer no longer serializes UI-only
@@ -139,6 +141,19 @@ export function applyDayV3StarterDefaults(
     if (!appliedFields.includes(field)) appliedFields.push(field);
     return fallback;
   };
+  const marketValueWhenAbsent = <T>(
+    keys: string[],
+    current: T | null,
+    fallback: T | undefined,
+  ): T | null => {
+    if (keys.some((key) => params.has(key)) || fallback === undefined) {
+      return current;
+    }
+    return current ?? fallback;
+  };
+  const hasCurveParameter = ["jr0", "jr90", "jr100", "slp0", "slp90", "slp100"].some(
+    (key) => params.has(key),
+  );
 
   const nextState: DayV3UrlState = {
     ...state,
@@ -153,29 +168,62 @@ export function applyDayV3StarterDefaults(
           DAY_V3_STARTER_DEFAULTS.sourceApyPct,
         )
       : state.sourceApyPct,
+    quoteAssetLabel: marketValueWhenAbsent(
+      ["quote"],
+      state.quoteAssetLabel,
+      marketDefaults?.quoteAssetLabel,
+    ),
+    quoteAssetYieldPct: marketValueWhenAbsent(
+      ["quoteApy"],
+      state.quoteAssetYieldPct,
+      marketDefaults?.quoteAssetYieldPct,
+    ),
+    poolTurnoverPerYear: marketValueWhenAbsent(
+      ["turnover"],
+      state.poolTurnoverPerYear,
+      marketDefaults?.poolTurnoverPerYear,
+    ),
+    swapFeeBps: marketValueWhenAbsent(
+      ["fee"],
+      state.swapFeeBps,
+      marketDefaults?.swapFeeBps,
+    ),
+    marketMakerCostOfCapitalPct: marketValueWhenAbsent(
+      ["mmCost"],
+      state.marketMakerCostOfCapitalPct,
+      marketDefaults?.marketMakerCostOfCapitalPct,
+    ),
+    redemptionDays: marketValueWhenAbsent(
+      ["mmDays"],
+      state.redemptionDays,
+      marketDefaults?.redemptionDays,
+    ),
     protectedDrawdownPct: whenAbsent(
       "drawdown",
       ["protect"],
       state.protectedDrawdownPct,
-      DAY_V3_STARTER_DEFAULTS.protectedDrawdownPct,
+      marketDefaults?.protectedDrawdownPct ??
+        DAY_V3_STARTER_DEFAULTS.protectedDrawdownPct,
     ),
     recoveryDays: whenAbsent(
       "recovery",
       ["recover"],
       state.recoveryDays,
-      DAY_V3_STARTER_DEFAULTS.recoveryDays,
+      marketDefaults?.recoveryDays ?? DAY_V3_STARTER_DEFAULTS.recoveryDays,
     ),
     immediateExitSharePct: whenAbsent(
       "exit-amount",
       ["exit"],
       state.immediateExitSharePct,
-      DAY_V3_STARTER_DEFAULTS.immediateExitSharePct,
+      marketDefaults?.immediateExitSharePct ??
+        DAY_V3_STARTER_DEFAULTS.immediateExitSharePct,
     ),
     minimumProceedsPer100: whenAbsent(
       "payout",
       ["receive"],
       state.minimumProceedsPer100,
-      DAY_V3_STARTER_DEFAULTS.minimumProceedsPer100,
+      marketDefaults?.minimumProceedsPer100 ??
+        DAY_V3_STARTER_DEFAULTS.minimumProceedsPer100,
     ),
     entryPointSettlementDays: customSource
       ? whenAbsent(
@@ -249,6 +297,10 @@ export function applyDayV3StarterDefaults(
       state.target,
       DAY_V3_STARTER_DEFAULTS.target,
     ),
+    overrides:
+      marketDefaults && !hasCurveParameter
+        ? { ...state.overrides, ...marketDefaults.overrides }
+        : state.overrides,
   };
   return {
     applied: appliedFields.length > 0,
@@ -360,10 +412,10 @@ export function readDayV3UrlState(search: string): DayV3UrlState {
         y100Pct: curveOverrides.slpYieldShareAtFullPct as number,
       },
     }).valid;
-  // The unified editor may carry the two visible target shares alone; its
-  // hidden endpoints are re-derived from the disclosed fixed basis. A legacy
-  // six-anchor curve is accepted only when the full shape is valid. Every
-  // other partial, inverted, or over-budget curve is rejected as a unit.
+  // Older links may carry only the two target shares. The six-anchor editor
+  // writes a complete curve, which is accepted only when its ordering and
+  // shared Senior-yield budget are valid. Every other partial, inverted, or
+  // over-budget curve is rejected as a unit.
   const acceptedCurveOverrides =
     !hasAnyCurveOverride ||
     (!validCurveOverride && !hasTargetOnlyCurveOverride)
@@ -520,11 +572,32 @@ export function buildDayV3Query(state: DayV3UrlWriteState): string {
     params.set("recover", "0");
   }
 
-  if (state.protectedDrawdownPct !== 0) {
+  const hasCurveShapeOverride = [
+    state.overrides.jrYieldShareAtZeroPct,
+    state.overrides.jrYieldShareAtFullPct,
+    state.overrides.slpYieldShareAtZeroPct,
+    state.overrides.slpYieldShareAtFullPct,
+  ].some((value) => value !== null);
+  const hasActiveYieldCurve =
+    state.protectedDrawdownPct !== 0 || state.immediateExitSharePct !== 0;
+  if (hasCurveShapeOverride && hasActiveYieldCurve) {
+    // A shaped curve is one atomic contract policy. Serialize all six anchors,
+    // including zeros for a disabled tranche, so the strict reader can reject
+    // malformed partial curves instead of silently modeling a different one.
+    setNumber("jr0", state.overrides.jrYieldShareAtZeroPct);
     setNumber("jr90", state.overrides.jrYieldShareAtTargetPct);
-  }
-  if (state.immediateExitSharePct !== 0) {
+    setNumber("jr100", state.overrides.jrYieldShareAtFullPct);
+    setNumber("slp0", state.overrides.slpYieldShareAtZeroPct);
     setNumber("slp90", state.overrides.slpYieldShareAtTargetPct);
+    setNumber("slp100", state.overrides.slpYieldShareAtFullPct);
+  } else {
+    // Preserve compact target-only links produced by older versions.
+    if (state.protectedDrawdownPct !== 0) {
+      setNumber("jr90", state.overrides.jrYieldShareAtTargetPct);
+    }
+    if (state.immediateExitSharePct !== 0) {
+      setNumber("slp90", state.overrides.slpYieldShareAtTargetPct);
+    }
   }
   return params.toString();
 }
