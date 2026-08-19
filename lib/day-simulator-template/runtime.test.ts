@@ -343,15 +343,13 @@ assert.equal(tighterBandConfig.eclpBandWidth, 0.05);
 assert.equal(tighterBandConfig.eclpParams, undefined);
 
 const yields = runDayTargetScenario(market.defaults);
-// Senior and SLP moved when the pool stopped being seeded at a flat 10% Senior
-// and started opening at its own curve's resting split — 3.884% on every market
-// that declares a curve, Pareto included. Junior is untouched by the pool's
-// composition and is byte-identical, which is the check that the change did
-// what it says and nothing more. Senior 8.879% -> 8.797%, still inside this
-// market's [8.66, 9.16] certification band.
-assert.ok(Math.abs(yields.seniorApy - 0.08797192293801026) < 1e-12);
-assert.ok(Math.abs(yields.juniorApy - 0.12948094983927905) < 1e-12);
-assert.ok(Math.abs(yields.liquidityApy - 0.09327491357897322) < 1e-12);
+// Pareto's accountant-backed calibration preserves its declared Senior and
+// Junior return bands after the uniform 5% Junior/SLP yield-premium protocol
+// fee is applied. These exact outputs also pin the manifest decimal through the
+// runtime adapter and the contract-mirrored fee-share minting path.
+assert.ok(Math.abs(yields.seniorApy - 0.0913920169096325) < 1e-12);
+assert.ok(Math.abs(yields.juniorApy - 0.13924177159090334) < 1e-12);
+assert.ok(Math.abs(yields.liquidityApy - 0.10248258285545275) < 1e-12);
 
 const forwardSeries = buildDayForwardSeries(
   0.114,

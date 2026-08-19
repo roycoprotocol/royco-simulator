@@ -8,6 +8,22 @@ import {
 import { runDayTargetScenario } from "@/lib/day-simulator-template/runtime";
 import { annualizedSeriesApy } from "@/lib/day-simulator-template/series";
 import { JBBB_SAMPLE_MARKET } from "@/lib/day-sample-sources/jbbb/market";
+import { DAY_MARKETS } from "@/lib/day-markets/registry";
+
+const YIELD_PREMIUM_PROTOCOL_FEE = 0.05;
+
+for (const market of DAY_MARKETS) {
+  assert.equal(
+    market.defaults.jtYieldShareProtocolFee,
+    YIELD_PREMIUM_PROTOCOL_FEE,
+    `${market.id} Junior yield-premium protocol fee`,
+  );
+  assert.equal(
+    market.defaults.ltYieldShareProtocolFee,
+    YIELD_PREMIUM_PROTOCOL_FEE,
+    `${market.id} SLP yield-premium protocol fee`,
+  );
+}
 
 assert.equal(DAY_EXPLORER_TEMPLATE_MARKET.route, "/day-sim");
 assert.equal(DAY_EXPLORER_TEMPLATE_MARKET.series.length, 13);
@@ -30,6 +46,14 @@ assert.equal(draft.certification.intakeConfirmed, false);
 assert.equal(draft.provenance.observationCount, 3);
 assert.equal(draft.provenance.priceType, "unknown");
 assert.ok(draft.defaults.sourceApy > 0);
+assert.equal(
+  draft.defaults.jtYieldShareProtocolFee,
+  YIELD_PREMIUM_PROTOCOL_FEE,
+);
+assert.equal(
+  draft.defaults.ltYieldShareProtocolFee,
+  YIELD_PREMIUM_PROTOCOL_FEE,
+);
 
 const outputs = runDayTargetScenario(draft.defaults);
 assert.ok(Number.isFinite(outputs.seniorApy));
@@ -43,6 +67,14 @@ assert.equal(JBBB_SAMPLE_MARKET.provenance.observationCount, 1144);
 assert.equal(JBBB_SAMPLE_MARKET.provenance.firstDate, "2022-01-12");
 assert.equal(JBBB_SAMPLE_MARKET.provenance.lastDate, "2026-08-05");
 assert.equal(JBBB_SAMPLE_MARKET.series[0].price, 100);
+assert.equal(
+  JBBB_SAMPLE_MARKET.defaults.jtYieldShareProtocolFee,
+  YIELD_PREMIUM_PROTOCOL_FEE,
+);
+assert.equal(
+  JBBB_SAMPLE_MARKET.defaults.ltYieldShareProtocolFee,
+  YIELD_PREMIUM_PROTOCOL_FEE,
+);
 assert.ok(Math.abs(annualizedSeriesApy(JBBB_SAMPLE_MARKET.series) - 0.05825) < 0.00001);
 
 const yieldDraft = buildDayYieldDraftMarket({
@@ -57,6 +89,14 @@ assert.equal(yieldDraft.provenance.observationCount, 0);
 assert.equal(yieldDraft.provenance.feesIncluded, true);
 assert.equal(yieldDraft.customization.hiddenSections.includes("backtest"), true);
 assert.equal(yieldDraft.series.length, 0);
+assert.equal(
+  yieldDraft.defaults.jtYieldShareProtocolFee,
+  YIELD_PREMIUM_PROTOCOL_FEE,
+);
+assert.equal(
+  yieldDraft.defaults.ltYieldShareProtocolFee,
+  YIELD_PREMIUM_PROTOCOL_FEE,
+);
 
 const yieldOutputs = runDayTargetScenario(yieldDraft.defaults);
 assert.ok(Number.isFinite(yieldOutputs.seniorApy));
