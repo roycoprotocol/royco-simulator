@@ -107,7 +107,7 @@ assert.equal(
   listedSource.state.protectedDrawdownPct,
   15,
 );
-assert.equal(listedSource.state.recoveryDays, 90);
+assert.equal(listedSource.state.recoveryDays, 23);
 assert.equal(listedSource.state.immediateExitSharePct, 0);
 assert.equal(listedSource.state.minimumProceedsPer100, 95);
 assert.equal(listedSource.state.quoteAssetLabel, "sr-srRoyUSDC");
@@ -118,8 +118,8 @@ assert.equal(listedSource.state.marketMakerCostOfCapitalPct, 12);
 assert.equal(listedSource.state.redemptionDays, 7);
 assert.deepEqual(listedSource.state.overrides, {
   jrYieldShareAtZeroPct: 7.5,
-  jrYieldShareAtTargetPct: 14.8801,
-  jrYieldShareAtFullPct: 45,
+  jrYieldShareAtTargetPct: 14.4,
+  jrYieldShareAtFullPct: 67,
   slpYieldShareAtZeroPct: 0,
   slpYieldShareAtTargetPct: 0,
   slpYieldShareAtFullPct: 0,
@@ -148,12 +148,12 @@ const listedSourceQuery = buildDayV3Query({
 for (const expected of [
   "m=jbbb",
   "protect=15",
-  "recover=90",
+  "recover=23",
   "exit=0",
   "receive=0",
   "jr0=7.5",
-  "jr90=14.8801",
-  "jr100=45",
+  "jr90=14.4",
+  "jr100=67",
   "slp0=0",
   "slp90=0",
   "slp100=0",

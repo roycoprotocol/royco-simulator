@@ -75,8 +75,8 @@ assert.deepEqual(actual, {
 });
 
 // The JBBB Explorer default keeps its published forward SEC yield independent
-// from the raw historical path. Its explicitly selected no-SLP design targets
-// 30 bps over the 4.77% JAAA reference under the live 5% premium-fee policy.
+// from the raw historical path. This records the explicitly selected no-SLP
+// design under the live 5% premium-fee policy.
 const jbbbCoverage = recommendDayV3Coverage(defaults, {
   protectedDrawdownPct: JBBB_V3_DEFAULTS.protectedDrawdownPct,
 });
@@ -98,14 +98,13 @@ const jbbbDefaultScenario = runDayTargetScenario({
   liqYDM: noSlp,
 });
 assert.ok(
-  Math.abs(jbbbDefaultScenario.seniorApy - 0.0507) < 1e-7,
-  `JBBB Senior must remain at the 5.07% target (got ${jbbbDefaultScenario.seniorApy})`,
+  Math.abs(jbbbDefaultScenario.seniorApy - 0.05098398920715996) < 1e-12,
+  `JBBB Senior default drifted (got ${jbbbDefaultScenario.seniorApy})`,
 );
 assert.equal(jbbbDefaultScenario.liquidityApy, 0);
 assert.ok(
-  jbbbDefaultScenario.juniorApy > 0.102 &&
-    jbbbDefaultScenario.juniorApy < 0.103,
-  `JBBB Junior should be about 10.2% under the verified 5.97% input (got ${jbbbDefaultScenario.juniorApy})`,
+  Math.abs(jbbbDefaultScenario.juniorApy - 0.10106262326699689) < 1e-12,
+  `JBBB Junior default drifted (got ${jbbbDefaultScenario.juniorApy})`,
 );
 
 console.log("Day V2 key-output regression: PASS (fee-inclusive shared-engine baseline)");

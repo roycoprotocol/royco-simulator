@@ -9,7 +9,7 @@ import type { DayV3Overrides } from "@/lib/day-v3/types";
  */
 export const JBBB_V3_DEFAULTS = {
   protectedDrawdownPct: 15,
-  recoveryDays: 90,
+  recoveryDays: 23,
   immediateExitSharePct: 0,
   minimumProceedsPer100: 95,
   quoteAssetLabel: "sr-srRoyUSDC",
@@ -26,8 +26,8 @@ export const JBBB_V3_DEFAULTS = {
   },
   overrides: {
     jrYieldShareAtZeroPct: 7.5,
-    jrYieldShareAtTargetPct: 14.8801,
-    jrYieldShareAtFullPct: 45,
+    jrYieldShareAtTargetPct: 14.4,
+    jrYieldShareAtFullPct: 67,
     slpYieldShareAtZeroPct: 0,
     slpYieldShareAtTargetPct: 0,
     slpYieldShareAtFullPct: 0,
