@@ -25,11 +25,10 @@ const hasDistinctAssetName = (market: DayMarket) =>
   sourceName(market).toLocaleLowerCase() !==
   assetName(market).toLocaleLowerCase();
 
-const historyLabel = (market: DayMarket) => {
-  const observations = market.series.length;
-  return observations >= 3
-    ? `${observations.toLocaleString("en-US")} observations`
-    : "Yield only";
+const sourceDetail = (market: DayMarket) => {
+  const asset = hasDistinctAssetName(market) ? assetName(market) : null;
+  if (market.series.length >= 3) return asset;
+  return asset ? `${asset} · Yield only` : "Yield only";
 };
 
 const searchableLabel = (market: DayMarket) =>
@@ -40,7 +39,7 @@ const searchableLabel = (market: DayMarket) =>
  *
  * A native select left the open state entirely to the operating system, so it
  * could show only one undifferentiated line per source. This listbox keeps the
- * market name, asset, yield and history visible while someone compares options,
+ * market name, asset, and yield visible while someone compares options,
  * without bringing a menu dependency into the simulator.
  */
 export default function DayV3MarketSelect({
@@ -57,6 +56,9 @@ export default function DayV3MarketSelect({
     markets.findIndex((market) => market.id === value),
   );
   const selectedMarket = markets[selectedIndex];
+  const selectedDetail = selectedMarket
+    ? sourceDetail(selectedMarket)
+    : null;
   const [open, setOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(selectedIndex);
   const rootRef = useRef<HTMLDivElement>(null);
@@ -204,12 +206,11 @@ export default function DayV3MarketSelect({
           <span className="truncate text-[15px] font-semibold leading-tight">
             {sourceName(selectedMarket)}
           </span>
-          <span className="truncate text-[10.5px] leading-snug text-[var(--tertiary)]">
-            {hasDistinctAssetName(selectedMarket)
-              ? `${assetName(selectedMarket)} · `
-              : ""}
-            {historyLabel(selectedMarket)}
-          </span>
+          {selectedDetail ? (
+            <span className="truncate text-[10.5px] leading-snug text-[var(--tertiary)]">
+              {selectedDetail}
+            </span>
+          ) : null}
         </span>
         <span className="flex shrink-0 items-center gap-3">
           <span className="flex flex-col items-end gap-1">
@@ -263,6 +264,7 @@ export default function DayV3MarketSelect({
             {markets.map((market, index) => {
               const selected = market.id === selectedMarket.id;
               const active = index === activeIndex;
+              const detail = sourceDetail(market);
               return (
                 <button
                   aria-selected={selected}
@@ -309,12 +311,11 @@ export default function DayV3MarketSelect({
                     <span className="truncate text-[12.5px] font-semibold leading-tight">
                       {sourceName(market)}
                     </span>
-                    <span className="truncate text-[10px] leading-snug text-[var(--tertiary)]">
-                      {hasDistinctAssetName(market)
-                        ? `${assetName(market)} · `
-                        : ""}
-                      {historyLabel(market)}
-                    </span>
+                    {detail ? (
+                      <span className="truncate text-[10px] leading-snug text-[var(--tertiary)]">
+                        {detail}
+                      </span>
+                    ) : null}
                   </span>
                   <span className="flex flex-col items-end gap-1 pl-2">
                     <span className="font-mono text-[12px] font-bold leading-none tabular-nums">
