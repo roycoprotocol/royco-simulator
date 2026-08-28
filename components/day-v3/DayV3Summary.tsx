@@ -1,6 +1,6 @@
 "use client";
 
-import { useDeferredValue, useEffect, useMemo, useState } from "react";
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import DayV3Backtest from "@/components/day-v3/DayV3Backtest";
@@ -75,6 +75,7 @@ import {
   normalizeDayV3Defaults,
   recommendDayV3Coverage,
   validateDayV3YieldCurveDesign,
+  type DayV3YieldCurveDesign,
   type DayV3StarterDefaultField,
   type DayV3UrlState,
 } from "@/lib/day-v3";
@@ -134,6 +135,46 @@ const CUSTOM_SOURCE_MARKET = buildDayYieldDraftMarket({
   label: "Custom yield source",
   sourceApy: 0.12,
 });
+
+type DayV3YieldCurveOverrideFields = Pick<
+  DayV3Overrides,
+  | "jrYieldShareAtZeroPct"
+  | "jrYieldShareAtTargetPct"
+  | "jrYieldShareAtFullPct"
+  | "slpYieldShareAtZeroPct"
+  | "slpYieldShareAtTargetPct"
+  | "slpYieldShareAtFullPct"
+>;
+
+const DAY_V3_YIELD_CURVE_FIELDS = [
+  "jrYieldShareAtZeroPct",
+  "jrYieldShareAtTargetPct",
+  "jrYieldShareAtFullPct",
+  "slpYieldShareAtZeroPct",
+  "slpYieldShareAtTargetPct",
+  "slpYieldShareAtFullPct",
+] as const satisfies readonly (keyof DayV3YieldCurveOverrideFields)[];
+
+function hasAnyDayV3YieldCurveOverride(
+  overrides: Partial<DayV3YieldCurveOverrideFields>,
+): boolean {
+  return DAY_V3_YIELD_CURVE_FIELDS.some(
+    (field) => overrides[field] !== null && overrides[field] !== undefined,
+  );
+}
+
+function dayV3YieldCurveDesignToOverrides(
+  design: DayV3YieldCurveDesign,
+): DayV3YieldCurveOverrideFields {
+  return {
+    jrYieldShareAtZeroPct: design.junior.y0Pct,
+    jrYieldShareAtTargetPct: design.junior.yTargetPct,
+    jrYieldShareAtFullPct: design.junior.y100Pct,
+    slpYieldShareAtZeroPct: design.slp.y0Pct,
+    slpYieldShareAtTargetPct: design.slp.yTargetPct,
+    slpYieldShareAtFullPct: design.slp.y100Pct,
+  };
+}
 /**
  * Everything the shared accountant runs with instead of the market's own
  * config. Every key is optional because this object is spread over that
@@ -173,6 +214,16 @@ export default function DayV3Summary({
     ...EMPTY_DAY_V3_OVERRIDES,
     ...linked?.overrides,
   });
+  // The starting yield curves are a loaded design, not a live formula tied to
+  // the latest exit sizing. We hydrate them once per explicit design load and
+  // then keep them stable until the user edits the curve itself.
+  const [yieldCurveLoadVersion, setYieldCurveLoadVersion] = useState(0);
+  const [loadedYieldCurve, setLoadedYieldCurve] =
+    useState<DayV3YieldCurveDesign | null>(null);
+  const yieldCurveHydratedVersion = useRef(-1);
+  const [yieldCurveEdited, setYieldCurveEdited] = useState(() =>
+    hasAnyDayV3YieldCurveOverride(linked?.overrides ?? EMPTY_DAY_V3_OVERRIDES),
+  );
   const [starterFields, setStarterFields] = useState<
     Set<DayV3StarterDefaultField>
   >(() => new Set(starterDefaultFields));
@@ -258,11 +309,17 @@ export default function DayV3Summary({
   );
   const feeOverridden = swapFeeBps !== null;
   // The pool's balance point, set the way deployment sets it: by the maximum
-  // premium. Empty leaves the curve solved for the simulator's own resting
-  // weight, which is the behaviour every existing link describes.
+  // premium. Empty starts with the model's loaded premium; a value here means
+  // the issuer explicitly changed this field. Keeping those states separate
+  // lets the loaded default stay stable without mislabeling it as a manual
+  // override or suppressing a live pool recommendation.
   const [poolPremiumBps, setPoolPremiumBps] = useState<number | null>(
     linked?.poolPremiumBps ?? null,
   );
+  const [loadedPoolPremiumBps, setLoadedPoolPremiumBps] = useState<
+    number | null
+  >(null);
+  const poolPremiumHydratedVersion = useRef(-1);
   const premiumOverridden = poolPremiumBps !== null;
   // An outside desk's annual restock hurdle rate. It describes the minimum
   // return required to arbitrage the pool back to NAV; it prices nothing in
@@ -360,6 +417,8 @@ export default function DayV3Summary({
     // A fee is a property of the pool being designed, so it is released with
     // the rest of the exit rather than carried onto the next market.
     setSwapFeeBps(marketDefaults?.swapFeeBps ?? null);
+    setPoolPremiumBps(null);
+    setLoadedPoolPremiumBps(null);
     setMarketMakerCostOfCapitalPct(
       marketDefaults?.marketMakerCostOfCapitalPct ?? 12,
     );
@@ -369,6 +428,9 @@ export default function DayV3Summary({
       ...EMPTY_DAY_V3_OVERRIDES,
       ...(marketDefaults?.overrides ?? {}),
     });
+    setLoadedYieldCurve(null);
+    setYieldCurveEdited(false);
+    setYieldCurveLoadVersion((current) => current + 1);
     // Adopted with the rest of the market's terms, for the same reason: the
     // toggle must describe the market on screen, not the previous one.
     setMaintainCoverage(next.defaults.maintainCoverage);
@@ -399,22 +461,12 @@ export default function DayV3Summary({
   };
 
   const resetYieldCurveOverrides = () => {
-    const marketDefaults = dayV3MarketDefaults(market.id);
+    if (!loadedYieldCurve) return;
     setManualOverrides((current) => ({
       ...current,
-      jrYieldShareAtZeroPct:
-        marketDefaults?.overrides.jrYieldShareAtZeroPct ?? null,
-      jrYieldShareAtFullPct:
-        marketDefaults?.overrides.jrYieldShareAtFullPct ?? null,
-      slpYieldShareAtZeroPct:
-        marketDefaults?.overrides.slpYieldShareAtZeroPct ?? null,
-      slpYieldShareAtFullPct:
-        marketDefaults?.overrides.slpYieldShareAtFullPct ?? null,
-      jrYieldShareAtTargetPct:
-        marketDefaults?.overrides.jrYieldShareAtTargetPct ?? null,
-      slpYieldShareAtTargetPct:
-        marketDefaults?.overrides.slpYieldShareAtTargetPct ?? null,
+      ...dayV3YieldCurveDesignToOverrides(loadedYieldCurve),
     }));
+    setYieldCurveEdited(false);
   };
 
   const protectionRecommendation = useMemo(
@@ -586,6 +638,13 @@ export default function DayV3Summary({
       defaults.eclpParams !== undefined &&
       Math.abs(floorBandPct / 100 - defaults.eclpBandWidth) < 1e-12;
     if (declaredCurveSurvives) return null;
+    if (loadedPoolPremiumBps !== null) {
+      return dayV3PoolCurveFromPremium({
+        bandPct: floorBandPct,
+        premiumBps: loadedPoolPremiumBps,
+        lambda,
+      });
+    }
     // Otherwise build the pool the deploy step would build for this band at its
     // own 90/10 default, rather than leaving the engine's fallback.
     //
@@ -613,6 +672,7 @@ export default function DayV3Summary({
     defaults.eclpBandWidth,
     defaults.eclpParams,
     floorBandPct,
+    loadedPoolPremiumBps,
     poolPremiumBps,
     premiumOverridden,
   ]);
@@ -854,9 +914,9 @@ export default function DayV3Summary({
         }
       : targetShareDesign;
     // A zero capital requirement always pays zero. This also prevents a stale
-    // manual curve from charging Senior after the corresponding tranche is
-    // removed. Every non-zero automatic anchor comes from the one complete
-    // starting policy above; endpoints are no longer frozen template values.
+    // saved curve from charging Senior after the corresponding tranche is
+    // removed. The parent materializes the initial design after this snapshot
+    // is ready, so later exit/protection edits do not replace its anchors.
     const junior = coverage > 0 ? design.junior : zero;
     const slp = minLiquidity > 0 ? design.slp : zero;
     const maxLiquidityCurve = Math.max(slp.y0Pct, slp.yTargetPct, slp.y100Pct);
@@ -879,6 +939,39 @@ export default function DayV3Summary({
       liquidityCeiling: Math.max(0, 1 - maxJuniorCurve / 100),
     };
   }, [inputs, simulationDefaults]);
+
+  // Defaults are loaded once for each explicit source/market design. Before
+  // this hydration, `resolved` may use the capital-parity policy to produce the
+  // first complete curve. After hydration, the six anchors live in
+  // `manualOverrides` and therefore remain stable while exit and protection
+  // inputs recalculate their own derived capital requirements.
+  useEffect(() => {
+    if (
+      yieldCurveHydratedVersion.current === yieldCurveLoadVersion ||
+      inputs !== immediateModelInput
+    ) {
+      return;
+    }
+    if (resolved.startingPolicy.design === null) return;
+    const snapshot = {
+      junior: {
+        y0Pct: resolved.y0 * 100,
+        yTargetPct: resolved.riskYieldShare * 100,
+        y100Pct: resolved.y100 * 100,
+      },
+      slp: {
+        y0Pct: resolved.liqY0 * 100,
+        yTargetPct: resolved.liquidityYieldShare * 100,
+        y100Pct: resolved.liqY100 * 100,
+      },
+    } satisfies DayV3YieldCurveDesign;
+    yieldCurveHydratedVersion.current = yieldCurveLoadVersion;
+    setLoadedYieldCurve(snapshot);
+    setManualOverrides((current) => ({
+      ...current,
+      ...dayV3YieldCurveDesignToOverrides(snapshot),
+    }));
+  }, [immediateModelInput, inputs, resolved, yieldCurveLoadVersion]);
 
   // Capital sizing, loss absorption, and pool depth do not depend on how yield
   // is split. Keeping them in a separate shared-engine run prevents a yield
@@ -1147,6 +1240,27 @@ export default function DayV3Summary({
     }),
     [baseReturns, riskOnly, scenario, structuralModel],
   );
+  // Materialize the first modelled premium once per explicit source/market
+  // design. The visible field can then show the loaded default and the local
+  // curve keeps the same beta when payout, depth, or protection inputs move.
+  // A live canonical curve still wins unless the issuer explicitly enters a
+  // premium, so this snapshot does not turn an inherited value into a manual
+  // override.
+  useEffect(() => {
+    if (
+      poolPremiumHydratedVersion.current === yieldCurveLoadVersion ||
+      inputs !== immediateModelInput
+    ) {
+      return;
+    }
+    const premium = model.pool.premiumBps;
+    if (premium === null || !Number.isFinite(premium)) return;
+    poolPremiumHydratedVersion.current = yieldCurveLoadVersion;
+    // The field's placeholder already showed two decimal places. Keep the
+    // materialized value equally readable instead of exposing bisection noise
+    // such as 7.3727794094802235 bps as if it were an issuer input.
+    setLoadedPoolPremiumBps(Number(premium.toFixed(2)));
+  }, [immediateModelInput, inputs, model, yieldCurveLoadVersion]);
   // Nothing in the contract refills the exit pool. It comes back only when an
   // outside desk is paid enough to buy the discounted Senior and redeem it, so
   // the issuer's own exit terms decide whether capacity ever returns.
@@ -1284,13 +1398,7 @@ export default function DayV3Summary({
     );
   }, [query]);
 
-  const curveOverridden =
-    riskShareOverride !== null ||
-    liqShareOverride !== null ||
-    y0Override !== null ||
-    y100Override !== null ||
-    liqY0Override !== null ||
-    liqY100Override !== null;
+  const curveOverridden = yieldCurveEdited;
   const yieldCurveValidation = validateDayV3YieldCurveDesign({
     junior: {
       y0Pct: resolved.y0 * 100,
@@ -1321,6 +1429,7 @@ export default function DayV3Summary({
     >,
     value: number,
   ) => {
+    setYieldCurveEdited(true);
     setManualOverrides((current) => ({
       ...current,
       // Endpoint edits must travel as one complete six-anchor policy. Preserve
@@ -1842,7 +1951,8 @@ export default function DayV3Summary({
             exit={exitView}
             defaultPremiumBps={model.pool.premiumBps}
             onPoolPremiumBps={setPoolPremiumBps}
-            poolPremiumBps={poolPremiumBps}
+            poolPremiumEdited={premiumOverridden}
+            poolPremiumBps={poolPremiumBps ?? loadedPoolPremiumBps}
             restingSeniorWeight={model.pool.restingSeniorWeight}
             exitSharePct={immediateExitSharePct}
             indexOffset={1}
