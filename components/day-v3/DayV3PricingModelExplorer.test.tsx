@@ -65,5 +65,8 @@ assert.match(markup, /move by the same amount/);
 assert.match(markup, /slopes stay parallel/);
 assert.match(markup, /Whole curve moves up/);
 assert.doesNotMatch(markup, /same shift/);
+assert.match(markup, /bg-\[var\(--foreground\)\] text-\[var\(--card\)\]/);
+assert.match(markup, /border-\[var\(--secondary\)\] bg-\[var\(--card\)\] text-\[var\(--foreground\)\]/);
+assert.match(markup, /hover:border-\[var\(--foreground\)\]/);
 assert.equal(markup.match(/aria-pressed=/g)?.length, 8);
 assert.doesNotMatch(markup, /type="range"/);

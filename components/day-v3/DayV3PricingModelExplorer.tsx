@@ -277,15 +277,15 @@ export default function DayV3PricingModelExplorer({
           </p>
         </div>
 
-        <div className="grid grid-cols-2 gap-1 rounded-lg bg-[var(--foundation)] p-1" role="group" aria-label="Premium to inspect">
+        <div className="grid grid-cols-2 gap-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--foundation)] p-1" role="group" aria-label="Premium to inspect">
           {(["risk", "liquidity"] as const).map((value) => (
             <button
               aria-pressed={premium === value}
               className={cn(
-                "rounded-md px-2 py-2 text-[10.5px] font-semibold transition-colors",
+                "rounded-md border px-2 py-2 text-[10.5px] font-semibold transition-colors",
                 premium === value
-                  ? "bg-[var(--card)] text-[var(--foreground)] shadow-sm"
-                  : "text-[var(--secondary)] hover:text-[var(--foreground)]",
+                  ? "border-[var(--foreground)] bg-[var(--foreground)] text-[var(--card)] shadow-sm"
+                  : "border-[var(--secondary)] bg-[var(--card)] text-[var(--foreground)] hover:border-[var(--foreground)]",
               )}
               key={value}
               onClick={() => setPremium(value)}
@@ -343,15 +343,15 @@ export default function DayV3PricingModelExplorer({
               {MODEL_SUMMARY[model]}
             </p>
           </div>
-          <div className="flex gap-1 rounded-lg bg-[var(--foundation)] p-1" role="group" aria-label="Utilization pressure">
+          <div className="flex gap-1 rounded-lg border border-[var(--border-subtle)] bg-[var(--foundation)] p-1" role="group" aria-label="Utilization pressure">
             {(["below", "above"] as const).map((value) => (
               <button
                 aria-pressed={pressure === value}
                 className={cn(
-                  "rounded-md px-2 py-1.5 text-[9.5px] font-semibold",
+                  "rounded-md border px-2 py-1.5 text-[9.5px] font-semibold transition-colors",
                   pressure === value
-                    ? "bg-[var(--card)] shadow-sm"
-                    : "text-[var(--secondary)]",
+                    ? "border-[var(--foreground)] bg-[var(--foreground)] text-[var(--card)] shadow-sm"
+                    : "border-[var(--secondary)] bg-[var(--card)] text-[var(--foreground)] hover:border-[var(--foreground)]",
                 )}
                 key={value}
                 onClick={() => setPressure(value)}
