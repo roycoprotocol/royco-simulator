@@ -337,6 +337,63 @@ assert.match(
   /deriveDayV3StartingYieldCurvePolicy/,
   "V3 must derive one complete starting policy behind the six visible anchors",
 );
+// The starting policy is a page-load snapshot. It must not be recomputed from
+// the latest exit sizing after an issuer changes a different visible field.
+assert.match(
+  summary,
+  /const \[yieldCurveLoadVersion, setYieldCurveLoadVersion\]/,
+  "yield-share defaults need an explicit design-load version",
+);
+assert.match(
+  summary,
+  /yieldCurveHydratedVersion\.current === yieldCurveLoadVersion[\s\S]*inputs !== immediateModelInput/,
+  "yield-share hydration must wait for the current model snapshot and run once",
+);
+assert.match(
+  summary,
+  /setLoadedYieldCurve\(snapshot\)[\s\S]*dayV3YieldCurveDesignToOverrides\(snapshot\)/,
+  "the initial six yield anchors must be materialized into the editable state",
+);
+assert.match(
+  summary,
+  /junior:\s*\{\s*y0Pct: resolved\.y0 \* 100,[\s\S]*yTargetPct: resolved\.riskYieldShare \* 100,[\s\S]*y100Pct: resolved\.y100 \* 100,[\s\S]*slp:\s*\{\s*y0Pct: resolved\.liqY0 \* 100,[\s\S]*yTargetPct: resolved\.liquidityYieldShare \* 100,[\s\S]*y100Pct: resolved\.liqY100 \* 100,/,
+  "an explicit linked curve must be snapshotted as displayed, not overwritten by the capital-parity fallback",
+);
+assert.match(
+  summary,
+  /const curveOverridden = yieldCurveEdited;/,
+  "loaded yield defaults must not be mislabeled as issuer-edited until a slider moves",
+);
+assert.match(
+  summary,
+  /const \[loadedPoolPremiumBps, setLoadedPoolPremiumBps\]/,
+  "the initial pool premium must have its own loaded-default state",
+);
+assert.match(
+  summary,
+  /setLoadedPoolPremiumBps\(Number\(premium\.toFixed\(2\)\)\)/,
+  "the initial modelled premium must be captured once per design load",
+);
+assert.match(
+  summary,
+  /poolPremiumBps=\{poolPremiumBps \?\? loadedPoolPremiumBps\}/,
+  "the premium field must show the loaded default without making it a manual override",
+);
+assert.match(
+  goals,
+  /poolPremiumEdited=\{poolPremiumEdited\}/,
+  "the premium field must distinguish a loaded default from an issuer edit",
+);
+assert.match(
+  quoteAsset,
+  /origin=\{poolPremiumEdited \? "manual-override" : "model-assumption"\}/,
+  "a loaded premium must retain model-assumption provenance in the visible field",
+);
+assert.match(
+  summary,
+  /setPoolPremiumBps\(null\);[\s\S]*setLoadedPoolPremiumBps\(null\);[\s\S]*setYieldCurveLoadVersion\(\(current\) => current \+ 1\)/,
+  "switching source or market must start a fresh default snapshot",
+);
 assert.doesNotMatch(
   summary,
   /dayV3EffectiveShares/,

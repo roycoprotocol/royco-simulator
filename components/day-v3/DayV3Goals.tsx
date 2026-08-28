@@ -121,6 +121,7 @@ export default function DayV3Goals({
   onRecoveryMode,
   onResetExit,
   onResetProtection,
+  poolPremiumEdited = false,
   poolTurnoverPerYear,
   defaultPremiumBps,
   onPoolPremiumBps,
@@ -166,6 +167,7 @@ export default function DayV3Goals({
   swapFeeBps: MaybeNumber;
   defaultPremiumBps: MaybeNumber;
   onPoolPremiumBps: (value: number | null) => void;
+  poolPremiumEdited?: boolean;
   poolPremiumBps: MaybeNumber;
   restingSeniorWeight: MaybeNumber;
 }) {
@@ -487,6 +489,7 @@ export default function DayV3Goals({
               onLabel={onQuoteAssetLabel}
               defaultPremiumBps={defaultPremiumBps}
               onPoolPremiumBps={onPoolPremiumBps}
+              poolPremiumEdited={poolPremiumEdited}
               poolPremiumBps={poolPremiumBps}
               restingSeniorWeight={restingSeniorWeight}
               onSwapFeeBps={onSwapFeeBps}

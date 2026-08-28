@@ -42,6 +42,7 @@ export default function DayV3QuoteAsset({
   onLabel,
   defaultPremiumBps,
   onPoolPremiumBps,
+  poolPremiumEdited,
   poolPremiumBps,
   restingSeniorWeight,
   onSwapFeeBps,
@@ -57,6 +58,8 @@ export default function DayV3QuoteAsset({
   /** What the pool rests on today, in bps, so an empty field can say so. */
   defaultPremiumBps: number | null;
   onPoolPremiumBps: (value: number | null) => void;
+  /** Whether the displayed premium is an issuer edit or a loaded default. */
+  poolPremiumEdited: boolean;
   /** The maximum premium the issuer will accept, in bps. Null uses the market's. */
   poolPremiumBps: number | null;
   /** Where the resulting curve rests, 0..1, for the field's own readout. */
@@ -190,7 +193,7 @@ export default function DayV3QuoteAsset({
             : `Sets the pool's balance point. The pool currently rests on ${(restingSeniorWeight * 100).toFixed(restingSeniorWeight < 0.1 ? 2 : 1)}% Senior shares and ${((1 - restingSeniorWeight) * 100).toFixed(2)}% ${label}. Wider means more Senior inventory and less depth for a seller. Empty models the pool at the premium shown.`
         }
         onChange={onPoolPremiumBps}
-        origin={poolPremiumBps === null ? "model-assumption" : "manual-override"}
+        origin={poolPremiumEdited ? "manual-override" : "model-assumption"}
         // The premium actually in force, whatever set it — the market's own
         // declared curve, a live template, or the modeled default. Calling it
         // "the market's own" was false whenever it was not.
