@@ -235,14 +235,14 @@ function DayV3Parameters({
             value={observationDays}
           />
           <DayV3Slider
-            display={pct(bandPct / 100)}
+            display={`${Math.round(bandPct * 100)} bps`}
             docs="slpTranche"
             hint="A simulation control only. Deployment derives premium and depth, then separately resolves reinvestment slippage and genesis liquidity."
             label="Maximum discount"
             max={5}
-            maxLabel="5%"
+            maxLabel="500 bps"
             min={0.5}
-            minLabel="0.5%"
+            minLabel="50 bps"
             onChange={onBandPct}
             step={0.25}
             value={Math.min(5, Math.max(0.5, bandPct))}

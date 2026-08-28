@@ -261,13 +261,13 @@ function ArbitrageWaterfall({
  * Nothing in the contract refills the exit pool. After a sale it sits below NAV
  * until an outside desk buys the discounted Senior, redeems it for the
  * underlying at NAV, and keeps the difference. That only happens when the
- * discount is worth more than the desk's money over the redemption wait, plus
+ * discount clears the desk's required return over the redemption wait, plus
  * the fee it pays to trade back in.
  *
  * This is a result, not an input: the discounts come from the exit design
- * above. The cost of capital and the wait describe an outside party, so they
- * are stated on screen rather than assumed, and they change nothing about the
- * market being designed.
+ * above. The annual restock hurdle rate and the wait describe an outside
+ * party, so they are stated on screen rather than assumed, and they change
+ * nothing about the market being designed.
  */
 export default function DayV3RestockCheck({
   costOfCapitalPct,
@@ -333,7 +333,7 @@ export default function DayV3RestockCheck({
       <CardHeader>
         <span className="flex flex-wrap items-center justify-between gap-2">
           <CardTitle className="text-[13.5px]">
-            Test whether this works for arbitrageurs
+            Set the arbitrageur&apos;s restock hurdle rate
           </CardTitle>
           {policyBasis === "live" ? null : (
             <Badge tone="neutral">
@@ -342,10 +342,10 @@ export default function DayV3RestockCheck({
           )}
         </span>
         <CardNote>
-          A sale leaves the pool below NAV, and it stays there until an
-          arbitrageur buys that discounted Senior and redeems it at NAV.
-          Describe one, and this checks whether the trade is worth their while.
-          It changes nothing above.
+          A sale leaves the pool below NAV until an arbitrageur buys the
+          discounted Senior and redeems it at NAV. Set the minimum annual
+          return they require, then check whether the restock trade clears it.
+          This assumption changes nothing above.
         </CardNote>
       </CardHeader>
 
@@ -353,10 +353,10 @@ export default function DayV3RestockCheck({
         <div className="grid grid-cols-1 items-start gap-3 sm:grid-cols-2">
           <DayV3NumberField
             className="bg-[var(--foundation)]"
-            label="What does an arbitrageur's capital cost, a year?"
+            label="What annual restock hurdle rate do they require?"
             max={100}
             min={0}
-            note="What they need on money tied up in the trade. Higher cost, deeper discount before they bother."
+            note="The minimum annualized return an arbitrageur needs for the restock trade to be worth doing. A higher hurdle requires a deeper discount."
             onChange={onCostOfCapitalPct}
             placeholder="Enter a rate"
             presets={[
@@ -391,12 +391,13 @@ export default function DayV3RestockCheck({
 
         {missingInputs ? (
           <p className="rounded-lg border border-dashed border-[var(--border-subtle)] px-3 py-3 text-[11px] leading-relaxed text-[var(--secondary)]">
-            Enter a cost of capital and a redemption wait to check whether the
-            discount this design creates is enough to attract a refill.
+            Enter an annual restock hurdle rate and redemption wait to check
+            whether the discount this design creates is enough to attract a
+            restock trade.
           </p>
         ) : !resolved ? (
           <p className="rounded-lg border border-dashed border-[var(--border-subtle)] px-3 py-3 text-[11px] leading-relaxed text-[var(--secondary)]">
-            Set the exit amount and payout floor above. The worst-case discount
+            Set the depth at NAV and maximum discount above. The worst-case discount
             they define is what an arbitrageur would be buying.
           </p>
         ) : (
@@ -430,18 +431,18 @@ export default function DayV3RestockCheck({
                 }}
               >
                 {!worstCasePays
-                  ? "No discount this design creates is worth an arbitrageur's time"
-                  : `Arbitrage is worth doing${(check.worstCaseMarginBps ?? 0) < 0.5 ? ", but only just" : `, by ${bps(check.worstCaseMarginBps)}`}`}
+                  ? "This design does not clear the restock hurdle"
+                  : `Restock hurdle cleared${(check.worstCaseMarginBps ?? 0) < 0.5 ? ", but only just" : ` by ${bps(check.worstCaseMarginBps)}`}`}
               </strong>
               <p className="mt-1 text-[11px] leading-relaxed text-[var(--secondary)]">
                 {!worstCasePays
-                  ? `Even fully drawn down this design only lets Senior trade ${bps(check.worstCaseDiscountBps)} below NAV, and an arbitrageur needs ${bps(hurdle.hurdleBps)} to break even. Nothing brings one in at any depth. Shorten the redemption wait, allow a deeper payout floor, or expect the SLP to carry the position rather than see it arbitraged back.`
-                  : `At its deepest this design lets Senior trade ${bps(check.worstCaseDiscountBps)} below NAV, against ${hurdle.hurdleBps < 0 ? `a break-even of ${bps(hurdle.hurdleBps)} — Senior pays an arbitrageur more to wait than their money costs them, so any discount at all is worth taking` : `the ${bps(hurdle.hurdleBps)} an arbitrageur needs to break even`}. They are paid to buy that Senior and redeem it, which is what puts the pool back and restores capacity for the next seller.${
+                  ? `Even fully drawn down this design only lets Senior trade ${bps(check.worstCaseDiscountBps)} below NAV, while the restock hurdle for this ${redemptionDays}-day trade is ${bps(hurdle.hurdleBps)}. Nothing brings an arbitrageur in at any depth. Lower the annual restock hurdle rate, shorten the redemption wait, allow a larger maximum discount, or expect the SLP to carry the position.`
+                  : `At its deepest this design lets Senior trade ${bps(check.worstCaseDiscountBps)} below NAV, against ${hurdle.hurdleBps < 0 ? `a ${bps(hurdle.hurdleBps)} restock hurdle — Senior's yield over the wait already exceeds the arbitrageur's required return and pool fee, so any discount clears the hurdle` : `a ${bps(hurdle.hurdleBps)} restock hurdle for this ${redemptionDays}-day trade`}. Clearing that hurdle makes buying and redeeming the discounted Senior worthwhile, which puts the pool back and restores capacity for the next seller.${
                       unpriced
                         ? " The selected sale has not been priced yet, so it is not yet known whether it reaches that depth on its own."
                         : selectedPays
                           ? ` The ${partialFill ? `${amount(selectedFilledPer100, unit)} of the ${amount(selectedSalePer100, unit)} exit the pool can actually take` : `${amount(selectedSalePer100, unit)} exit you promised`} ${(check.selectedMarginBps ?? 0) < 0.5 ? "only just covers that" : `beats it by ${bps(check.selectedMarginBps)}`}, so the pool resets without waiting for a deeper seller.${partialFill ? ` The other ${amount(selectedUnfilledPer100, unit)} does not fill at any price, so nothing about it is priced here.` : ""}`
-                          : ` The ${partialFill ? `${amount(selectedFilledPer100, unit)} of the ${amount(selectedSalePer100, unit)} exit the pool can actually take` : `${amount(selectedSalePer100, unit)} exit you promised`} only reaches ${bps(check.selectedDiscountBps)}, short of break-even, so one exit of that size does not attract a refill on its own.${partialFill ? ` The other ${amount(selectedUnfilledPer100, unit)} does not fill at any price.` : ""}`
+                          : ` The ${partialFill ? `${amount(selectedFilledPer100, unit)} of the ${amount(selectedSalePer100, unit)} exit the pool can actually take` : `${amount(selectedSalePer100, unit)} exit you promised`} only reaches ${bps(check.selectedDiscountBps)}, short of the restock hurdle, so one exit of that size does not attract a refill on its own.${partialFill ? ` The other ${amount(selectedUnfilledPer100, unit)} does not fill at any price.` : ""}`
                     }`}
               </p>
             </div>
@@ -451,8 +452,7 @@ export default function DayV3RestockCheck({
                 before the answer existed anywhere on screen. */}
             <section className="rounded-lg border border-[var(--border-subtle)] bg-[var(--background)] px-3 py-3">
               <h4 className="mb-3 border-b border-[var(--border-subtle)] pb-2 text-[9.5px] font-semibold uppercase tracking-[0.11em] text-[var(--tertiary)]">
-                One arbitrageur&apos;s trade, per {stake100(unit)} of Senior
-                they buy
+                One restock trade, per {stake100(unit)} of Senior bought
               </h4>
               <ArbitrageWaterfall
                 steps={[
@@ -467,8 +467,8 @@ export default function DayV3RestockCheck({
                   },
                   {
                     deltaBps: -hurdle.financingBps,
-                    label: `Funds the ${redemptionDays}-day wait`,
-                    note: `${costOfCapitalPct.toFixed(1)}% a year on the money tied up until NAV comes back`,
+                    label: `Required return over the ${redemptionDays}-day wait`,
+                    note: `${costOfCapitalPct.toFixed(1)}% annual restock hurdle rate, prorated until NAV comes back`,
                   },
                   {
                     deltaBps: hurdle.seniorCarryBps,
@@ -488,14 +488,18 @@ export default function DayV3RestockCheck({
                 ]}
                 totalBps={check.selectedMarginBps}
                 totalLabel={
-                  unpriced ? "They keep" : selectedPays ? "They keep" : "They lose"
+                  unpriced
+                    ? "Margin to restock hurdle"
+                    : selectedPays
+                      ? "Margin above restock hurdle"
+                      : "Shortfall to restock hurdle"
                 }
                 totalNote={
                   unpriced
                     ? "priced once this exit can be quoted against the pool"
                     : selectedPays
-                      ? "above zero, so the trade happens and the pool refills"
-                      : "below zero, so nobody buys and the pool stays where the seller left it"
+                      ? "positive, so the trade clears the required return and the pool refills"
+                      : "negative, so the trade does not earn the required return and the pool stays where the seller left it"
                 }
               />
               <p className="mt-3 border-t border-[var(--border-subtle)] pt-3 text-[9.5px] leading-snug text-[var(--tertiary)]">
@@ -505,7 +509,7 @@ export default function DayV3RestockCheck({
                     {bps(check.worstCaseDiscountBps)} below NAV, leaving{" "}
                     {bps(check.worstCaseMarginBps)} on the same trade. That is
                     the best it ever gets, so if that is negative no sale
-                    attracts an arbitrageur at any depth.{" "}
+                    clears the restock hurdle at any depth.{" "}
                   </>
                 ) : (
                   <>
@@ -519,9 +523,9 @@ Both discounts are quotes from{" "}
                   : policyBasis === "issuer-fee"
                     ? "a pool priced at the swap fee you set"
                     : "the disclosed illustrative pool"}
-                , whose {maximumDiscountPct.toFixed(2)}% maximum discount{" "}
+                , whose {(maximumDiscountPct * 100).toFixed(0)} bps maximum discount{" "}
                 {maximumDiscountSource === "payout-floor"
-                  ? "is set by your payout floor"
+                  ? "is set by your maximum discount"
                   : maximumDiscountSource === "your-answer"
                     ? "you set yourself"
                     : "the live template solved for"}

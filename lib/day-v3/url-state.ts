@@ -6,12 +6,19 @@ import type {
 } from "@/lib/day-v3/types";
 import { dayV3MarketDefaults } from "@/lib/day-v3/market-defaults";
 import { validateDayV3YieldCurveDesign } from "@/lib/day-v3/yield-curves";
+import {
+  DAY_CURVE_MODELS,
+  type DayCurveModel,
+} from "@/lib/day-simulator-template/deploy-fields";
 
 export type DayV3Mode = "simulate" | "deploy";
 
 export interface DayV3UrlState extends DayV3GoalDraft {
   market: string | null;
   mode: DayV3Mode | null;
+  /** The registered yield-model shape selected for each independent premium. */
+  jrCurveModel?: DayCurveModel;
+  slpCurveModel?: DayCurveModel;
   sourceApyPct: number | null;
   /** What Senior is sold for. A label for the reader, not a token address. */
   quoteAssetLabel: string | null;
@@ -343,6 +350,11 @@ const label = (raw: string | null): string | null => {
   return value ? value.slice(0, 24) : null;
 };
 
+const curveModel = (raw: string | null): DayCurveModel | null =>
+  DAY_CURVE_MODELS.includes(raw as DayCurveModel)
+    ? (raw as DayCurveModel)
+    : null;
+
 const expiry = (raw: string | null): DayV3ExpiryPolicy | null => {
   if (raw === "none") return "no-expiry";
   // UINT32_MAX is reserved for the explicit no-expiry sentinel. Numeric
@@ -368,6 +380,8 @@ function readTarget(raw: string | null): DayV3DeploymentTarget | null {
 export function readDayV3UrlState(search: string): DayV3UrlState {
   const params = new URLSearchParams(search);
   const rawMode = params.get("mode");
+  const jrCurveModel = curveModel(params.get("jrModel"));
+  const slpCurveModel = curveModel(params.get("slpModel"));
   const curveOverrides = {
     jrYieldShareAtZeroPct: finite(params.get("jr0"), 0, 100),
     jrYieldShareAtTargetPct: finite(params.get("jr90"), 0, 100),
@@ -442,6 +456,8 @@ export function readDayV3UrlState(search: string): DayV3UrlState {
   return {
     market: text(params.get("m")),
     mode: rawMode === "simulate" || rawMode === "deploy" ? rawMode : null,
+    ...(jrCurveModel ? { jrCurveModel } : {}),
+    ...(slpCurveModel ? { slpCurveModel } : {}),
     sourceApyPct: finite(params.get("apy"), 0, 30),
     quoteAssetLabel: label(params.get("quote")),
     quoteAssetYieldPct: finite(params.get("quoteApy"), 0, 30),
@@ -514,11 +530,15 @@ export const roundDayV3WholeDays = (value: number): number => Math.round(value);
  * Write the smallest shareable model contract. Hidden operational facts,
  * deployment policy, historical state, Protected Exit settings, derived pool
  * fields, full curve anchors, and starter provenance remain readable from old
- * links but are never added to a new canonical URL.
+ * links but are never added to a new canonical URL. The selected registered
+ * yield-model shapes are visible design choices, so they travel with a link
+ * when present and remain available to a future deployment export.
  */
 export function buildDayV3Query(state: DayV3UrlWriteState): string {
   const params = new URLSearchParams();
   if (state.market) params.set("m", state.market);
+  if (state.jrCurveModel) params.set("jrModel", state.jrCurveModel);
+  if (state.slpCurveModel) params.set("slpModel", state.slpCurveModel);
 
   const setNumber = (key: string, value: number | null) => {
     if (value !== null && Number.isFinite(value))

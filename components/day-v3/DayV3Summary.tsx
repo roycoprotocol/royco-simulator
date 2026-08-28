@@ -30,6 +30,10 @@ import DayV3ModelGroup, {
 } from "@/components/day-v3/DayV3ModelGroup";
 import DayV3NumberField from "@/components/day-v3/DayV3NumberField";
 import DayV3PremiumCurveEditor from "@/components/day-v3/DayV3PremiumCurveEditor";
+import DayV3PricingModelExplorer, {
+  DAY_V3_PRICING_MODEL_DEFAULTS,
+  type DayV3PricingModelSelections,
+} from "@/components/day-v3/DayV3PricingModelExplorer";
 import DayV3RestockCheck, {
   type DayV3RestockView,
 } from "@/components/day-v3/DayV3RestockCheck";
@@ -39,6 +43,10 @@ import DayV3YieldModels from "@/components/day-v3/DayV3YieldModels";
 import { useDayV3SimulationPoolDesign } from "@/components/day-v3/useDayV3SimulationPoolDesign";
 import { dayV3RealizedReturns } from "@/lib/day-v3/historical-returns";
 import { dayV3MinimumLiquidityForExitGoal } from "@/lib/day-v3/exit-goal-sizing";
+import {
+  dayV3DepthAtNavBps,
+  dayV3MaximumDiscountBps,
+} from "@/lib/day-v3/exit-units";
 import {
   dayV3PremiumBpsOf,
   dayV3RestingSeniorWeight,
@@ -154,6 +162,13 @@ export default function DayV3Summary({
   // Anything the link did not carry falls back to the market's own default, so
   // a partial or hand-edited link still describes a real market.
   const linked = initialState;
+  const [pricingModelSelections, setPricingModelSelections] =
+    useState<DayV3PricingModelSelections>(() => ({
+      ...DAY_V3_PRICING_MODEL_DEFAULTS,
+      risk: linked?.jrCurveModel ?? DAY_V3_PRICING_MODEL_DEFAULTS.risk,
+      liquidity:
+        linked?.slpCurveModel ?? DAY_V3_PRICING_MODEL_DEFAULTS.liquidity,
+    }));
   const [manualOverrides, setManualOverrides] = useState<DayV3Overrides>({
     ...EMPTY_DAY_V3_OVERRIDES,
     ...linked?.overrides,
@@ -249,8 +264,9 @@ export default function DayV3Summary({
     linked?.poolPremiumBps ?? null,
   );
   const premiumOverridden = poolPremiumBps !== null;
-  // An outside desk's terms. These describe who might arbitrage the pool back
-  // to NAV; they price nothing in the market itself and never gate a result.
+  // An outside desk's annual restock hurdle rate. It describes the minimum
+  // return required to arbitrage the pool back to NAV; it prices nothing in
+  // the market itself and never gates a result.
   const [marketMakerCostOfCapitalPct, setMarketMakerCostOfCapitalPct] =
     useState<number | null>(linked?.marketMakerCostOfCapitalPct ?? 12);
   const [redemptionDays, setRedemptionDays] = useState<number | null>(
@@ -1211,6 +1227,8 @@ export default function DayV3Summary({
   const query = buildDayV3Query({
     market: customSource ? CUSTOM_SOURCE_ID : marketId,
     mode: null,
+    jrCurveModel: pricingModelSelections.risk,
+    slpCurveModel: pricingModelSelections.liquidity,
     sourceApyPct,
     protectedDrawdownPct,
     recoveryDays: recoveryDaysInput,
@@ -1686,7 +1704,7 @@ export default function DayV3Summary({
     },
     {
       complete: advancedExitComplete,
-      detail: "Choose the immediate exit amount and minimum payout.",
+      detail: "Choose the depth at NAV and maximum discount.",
       id: "day-v3-exit-inputs",
       label: "Set the Senior exit",
     },
@@ -2171,7 +2189,7 @@ export default function DayV3Summary({
                     protectionView.status === "missing-goal" &&
                     exitView.status === "missing-goal"
                       ? "Complete Senior protection and the exit terms above to size Junior and SLP capital."
-                      : `${protectedDrawdownPct === null ? "Protection pending" : `${protectedDrawdownPct.toFixed(1)}% source drawdown`} + ${immediateExitSharePct === null ? "exit pending" : `$${immediateExitSharePct.toFixed(1)} exit`} → ${!protectionEnabled ? "$0 Junior" : `$${model.balances.jt.toFixed(1)} Junior`} + ${!exitEnabled ? "$0 SLP" : exitView.slpPer100 === null ? "SLP basis unavailable" : `$${exitView.slpPer100.toFixed(1)} SLP`}`
+                      : `${protectedDrawdownPct === null ? "Protection pending" : `${protectedDrawdownPct.toFixed(1)}% source drawdown`} + ${immediateExitSharePct === null ? "depth pending" : `${dayV3DepthAtNavBps(immediateExitSharePct).toFixed(0)} bps depth`} → ${!protectionEnabled ? "$0 Junior" : `$${model.balances.jt.toFixed(1)} Junior`} + ${!exitEnabled ? "$0 SLP" : exitView.slpPer100 === null ? "SLP basis unavailable" : `$${exitView.slpPer100.toFixed(1)} SLP`}`
                   }
                   title="Capital stack"
                 >
@@ -2205,7 +2223,7 @@ export default function DayV3Summary({
                         // 13 markets build at every floor from $100 to $50. The
                         // guard stays as a backstop, but a backstop that has no
                         // known trigger cannot name a remedy.
-                        ? "No protection model exists at these terms. The loss path is drawn at the 100%-utilized boundary, and this stack cannot be built there. Every other result on this page is unaffected; change the coverage or the payout floor to move off it."
+                        ? "No protection model exists at these terms. The loss path is drawn at the 100%-utilized boundary, and this stack cannot be built there. Every other result on this page is unaffected; change the coverage or maximum discount to move off it."
                         : null
                   }
                   id="day-v3-risk-models"
@@ -2237,11 +2255,11 @@ export default function DayV3Summary({
                     exitView.status === "missing-goal"
                         ? "Complete the required input highlighted above to model capacity, proceeds, and pool depth."
                         : exitView.status === "infeasible"
-                          ? "No feasible pool at the current exit size, payout floor, timing, and external spread assumption."
+                          ? "No feasible pool at the current depth at NAV, maximum discount, timing, and external spread assumption."
                             : exitView.status === "unresolved" ||
                                 exitView.status === "resolving"
-                              ? `${immediateExitSharePct === null ? "Exit pending" : `$${immediateExitSharePct.toFixed(2)} selected sale`} → ${exitView.slpPer100 === null ? "illustrative SLP unavailable" : `$${exitView.slpPer100.toFixed(2)} illustrative SLP`}`
-                              : `${immediateExitSharePct === null ? "Exit pending" : `$${immediateExitSharePct.toFixed(2)} selected sale`} → ${exitView.proceeds === null ? "proceeds unavailable" : `$${exitView.proceeds.toFixed(2)} proceeds`} → ${exitView.slpPer100 === null ? "SLP basis unavailable" : `$${exitView.slpPer100.toFixed(2)} SLP`}`
+                              ? `${immediateExitSharePct === null ? "Depth pending" : `${dayV3DepthAtNavBps(immediateExitSharePct).toFixed(0)} bps depth`} → ${exitView.slpPer100 === null ? "illustrative SLP unavailable" : `$${exitView.slpPer100.toFixed(2)} illustrative SLP`}`
+                              : `${immediateExitSharePct === null ? "Depth pending" : `${dayV3DepthAtNavBps(immediateExitSharePct).toFixed(0)} bps depth`} + ${minimumProceedsPer100 === null ? "discount pending" : `${dayV3MaximumDiscountBps(minimumProceedsPer100).toFixed(0)} bps maximum discount`} → ${exitView.proceeds === null ? "proceeds unavailable" : `$${exitView.proceeds.toFixed(2)} proceeds`} → ${exitView.slpPer100 === null ? "SLP basis unavailable" : `$${exitView.slpPer100.toFixed(2)} SLP`}`
                   }
                   title="Senior exit and pool depth"
                 >
@@ -2298,7 +2316,7 @@ export default function DayV3Summary({
                 <DayV3ModelGroup
                   disabledReason={
                     exitDisabled
-                      ? "Immediate exit is off. With no pool there is no discount for anyone to arbitrage."
+                      ? "Immediate exit is off. With no pool there is no restock trade or hurdle to test."
                       : null
                   }
                   id="day-v3-restock-models"
@@ -2306,8 +2324,8 @@ export default function DayV3Summary({
                   preview={
                     restockView.check === null ||
                     restockView.check.status === "unavailable"
-                      ? "Describe an arbitrageur's cost of capital and redemption wait to test whether a refill pays."
-                      : `${(restockView.check.worstCaseMarginBps ?? 0) >= 0 ? "Worth doing" : "Not worth doing"} · up to ${(restockView.check.worstCaseDiscountBps ?? 0).toFixed(0)} bps on offer against a ${(restockView.hurdle?.hurdleBps ?? 0).toFixed(0)} bps break-even`
+                      ? "Set the arbitrageur's annual restock hurdle rate and redemption wait."
+                      : `${(restockView.check.worstCaseMarginBps ?? 0) >= 0 ? "Restock hurdle cleared" : "Restock hurdle not cleared"} · up to ${(restockView.check.worstCaseDiscountBps ?? 0).toFixed(0)} bps discount against a ${(restockView.hurdle?.hurdleBps ?? 0).toFixed(0)} bps trade hurdle`
                   }
                   title="Will arbitrage refill the pool?"
                 >
@@ -2433,8 +2451,30 @@ export default function DayV3Summary({
             </DayV3ModelGroup>
 
             <DayV3ModelGroup
-              id="day-v3-history-models"
+              id="day-v3-pricing-models"
               index={6}
+              preview="Compare Static, Scaling, Shifting, and Fixed yield-share behavior using the Step 4 anchors."
+              title="Risk and liquidity pricing models"
+            >
+              <DayV3PricingModelExplorer
+                liquidity={{
+                  y0: resolved.liqY0,
+                  y100: resolved.liqY100,
+                  yTarget: resolved.liquidityYieldShare,
+                }}
+                modelSelections={pricingModelSelections}
+                onModelSelectionsChange={setPricingModelSelections}
+                risk={{
+                  y0: resolved.y0,
+                  y100: resolved.y100,
+                  yTarget: resolved.riskYieldShare,
+                }}
+              />
+            </DayV3ModelGroup>
+
+            <DayV3ModelGroup
+              id="day-v3-history-models"
+              index={7}
               preview={
                 market.series.length >= 3
                   ? `${market.series.length.toLocaleString()} dated observations · ${market.series[0]?.date} to ${market.series[market.series.length - 1]?.date}`

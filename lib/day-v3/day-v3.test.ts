@@ -3,6 +3,12 @@ import assert from "node:assert/strict";
 import { DEFAULT_DAY_EXPLORER_MARKET } from "@/lib/day-markets/registry";
 import { runDayHistoricalBacktest } from "@/lib/day-simulator-template/backtest";
 import {
+  dayV3DepthAtNavBps,
+  dayV3ExitSharePctFromDepthBps,
+  dayV3MaximumDiscountBps,
+  dayV3MinimumProceedsPer100FromDiscountBps,
+} from "@/lib/day-v3/exit-units";
+import {
   buildDayV3DeploymentUrl,
   buildDayV3HandoffV3,
   dayV3DeploymentCta,
@@ -39,6 +45,13 @@ const defaults = DEFAULT_DAY_EXPLORER_MARKET.defaults;
 const DAY_MS = 86_400_000;
 
 console.log("Day V3 goal-state and recommendations");
+
+check("exit goal units round-trip between bps and engine values", () => {
+  assert.equal(dayV3DepthAtNavBps(10), 1_000);
+  assert.equal(dayV3ExitSharePctFromDepthBps(1_000), 10);
+  assert.equal(dayV3MaximumDiscountBps(95), 500);
+  assert.equal(dayV3MinimumProceedsPer100FromDiscountBps(500), 95);
+});
 
 check("custom source handoffs use the accountant's custom registry key", () => {
   assert.equal(

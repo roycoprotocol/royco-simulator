@@ -646,4 +646,26 @@ assert.equal(readDayV3UrlState("m=custom&apy=8").poolPremiumBps, null);
   );
 }
 
+// The pricing-model explorer's two contract-shape selections are shareable
+// design state. The presentation-only premium and pressure toggles stay local.
+{
+  const modelState = readDayV3UrlState(
+    "m=custom&jrModel=ADAPTIVE_CURVE_V1&slpModel=FIXED",
+  );
+  assert.equal(modelState.jrCurveModel, "ADAPTIVE_CURVE_V1");
+  assert.equal(modelState.slpCurveModel, "FIXED");
+
+  const modelQuery = buildDayV3Query({
+    ...modelState,
+    jrCurveModel: "ADAPTIVE_CURVE_V2",
+    slpCurveModel: "STATIC_CURVE",
+  });
+  const modelParams = new URLSearchParams(modelQuery);
+  assert.equal(modelParams.get("jrModel"), "ADAPTIVE_CURVE_V2");
+  assert.equal(modelParams.get("slpModel"), "STATIC_CURVE");
+  assert.equal(readDayV3UrlState(modelQuery).jrCurveModel, "ADAPTIVE_CURVE_V2");
+  assert.equal(readDayV3UrlState(modelQuery).slpCurveModel, "STATIC_CURVE");
+  assert.equal(readDayV3UrlState("jrModel=not-a-model").jrCurveModel, undefined);
+}
+
 console.log("Day V3 independent goal URL state: PASS");

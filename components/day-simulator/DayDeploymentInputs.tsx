@@ -253,7 +253,7 @@ export default function DayDeploymentInputs({
             { inputId: "restockHurdle", label: "Restock hurdle", unit: "bps", value: "", state: entered("restockHurdle") },
             { inputId: "maximumDiscount", label: "Maximum discount", unit: "bps", value: "", state: entered("maximumDiscount") },
             { inputId: "maximumPremium", label: "Maximum premium", unit: "bps", value: "", state: entered("maximumPremium") },
-            { inputId: "depthAtNav", label: "Depth at NAV", value: "", state: entered("depthAtNav") },
+            { inputId: "depthAtNav", label: "Depth at NAV", unit: "bps", value: "", state: entered("depthAtNav") },
             { inputId: "reinvestmentSlippageTolerance", label: "Reinvestment slippage tolerance", unit: "bps", value: "", state: entered("reinvestmentSlippageTolerance") },
           ]}
           onInputChange={onDeploymentInputChange}

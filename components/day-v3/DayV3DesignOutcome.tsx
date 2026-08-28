@@ -107,7 +107,7 @@ export default function DayV3DesignOutcome({
             className="text-[10.5px] font-semibold underline underline-offset-4"
             href="#day-v3-exit-inputs"
           >
-            reducing exit size
+            reducing depth at NAV
           </a>
           <span aria-hidden="true" className="text-[var(--tertiary)]">
             ·
@@ -116,7 +116,7 @@ export default function DayV3DesignOutcome({
             className="text-[10.5px] font-semibold underline underline-offset-4"
             href="#day-v3-exit-inputs"
           >
-            lowering the payout floor
+            allowing a larger maximum discount
           </a>
           <span aria-hidden="true" className="text-[var(--tertiary)]">
             ·

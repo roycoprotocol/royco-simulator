@@ -43,13 +43,14 @@ const resolvedMarkup = renderToStaticMarkup(
 
 assert.match(resolvedMarkup, /data-model-state="recommended"/);
 assert.match(resolvedMarkup, /data-model-source="canonical-rwa-eclp-service"/);
-// The four labels the comparison is made of. The "/ $100" each one carried is
-// gone — the card's own note already says "per $100 Senior", so every label
-// restated the basis a fourth time.
-assert.match(resolvedMarkup, /Sale you selected/);
-assert.match(resolvedMarkup, /Capacity the pool has/);
-assert.match(resolvedMarkup, /Payout floor you set/);
-assert.match(resolvedMarkup, /Lowest the pool pays/);
+// Issuer goals and modeled results use the same bps units on both comparisons.
+assert.match(resolvedMarkup, /Depth at NAV you set/);
+assert.match(resolvedMarkup, /Depth the pool has/);
+assert.match(resolvedMarkup, /Maximum discount you set/);
+assert.match(resolvedMarkup, /Maximum discount the pool has/);
+assert.match(resolvedMarkup, /1000 bps/);
+assert.match(resolvedMarkup, /500 bps/);
+assert.match(resolvedMarkup, /380 bps/);
 assert.match(resolvedMarkup, /Proceeds: \$9\.62 after the live swap fee/);
 // The swap fee, minimum liquidity and maximum discount are pool terms, not
 // results of this comparison, and the cards that depend on them state them.
@@ -85,9 +86,9 @@ assert.match(
 );
 assert.match(
   illustrativeMarkup,
-  /Shows how the selected exit size and payout affect one trade/,
+  /Shows how the selected depth and maximum discount affect one trade/,
 );
-assert.match(illustrativeMarkup, /Capacity the pool has/);
+assert.match(illustrativeMarkup, /Depth the pool has/);
 assert.match(illustrativeMarkup, /Proceeds: \$9\.62 after the modeled swap fee/);
 assert.doesNotMatch(illustrativeMarkup, />—</);
 
@@ -141,7 +142,8 @@ assert.match(
   /data-model-source="issuer-goal-no-immediate-exit"/,
 );
 assert.match(disabledMarkup, /no SLP or pool execution/);
-assert.match(disabledMarkup, /Immediate exit/);
+assert.match(disabledMarkup, /Depth at NAV/);
+assert.match(disabledMarkup, />0 bps</);
 assert.match(disabledMarkup, />\$0\.00</);
 assert.match(disabledMarkup, />0\.00%?</);
 assert.doesNotMatch(disabledMarkup, /Swap fee:/);
@@ -308,7 +310,7 @@ assert.match(
 assert.doesNotMatch(goalsMarkup, /drop → .*coverage/i);
 assert.match(
   goalsMarkup,
-  /\$10\.0 immediate exit → \$12\.4 SLP · \$9\.6 proceeds · \$95\.0 floor/,
+  /1000 bps depth at NAV → \$12\.4 SLP · \$9\.6 proceeds · 500 bps maximum discount/,
 );
 assert.equal(
   (goalsMarkup.match(/Section status: Set/g) ?? []).length,
@@ -337,8 +339,10 @@ assert.doesNotMatch(goalsMarkup, /Restock hurdle/);
 assert.doesNotMatch(goalsMarkup, /day-v3-deployment-setup-inputs/);
 assert.doesNotMatch(goalsMarkup, /day-v3-premium-inputs/);
 assert.doesNotMatch(goalsMarkup, /day-v3-protected-exit-inputs/);
-assert.match(goalsMarkup, /Out of every \$100 Senior, how much should be sellable/);
-assert.match(goalsMarkup, /least a seller should receive for \$100 Senior/);
+assert.match(goalsMarkup, /How much Senior depth should be available at NAV/);
+assert.match(goalsMarkup, /What is the maximum discount to NAV/);
+assert.match(goalsMarkup, /value="1000"/);
+assert.match(goalsMarkup, /value="500"/);
 // The input sections no longer restate results. SLP funding and Minimum
 // Liquidity belong to the capital stack, the payout floor and proceeds to the
 // exit model; repeating them beside the controls made a reader check two
@@ -358,9 +362,9 @@ for (const moved of [
 // numbers have not simply vanished from this surface.
 assert.match(
   goalsMarkup,
-  /\$10\.0 immediate exit → \$12\.4 SLP · \$9\.6 proceeds · \$95\.0 floor/,
+  /1000 bps depth at NAV → \$12\.4 SLP · \$9\.6 proceeds · 500 bps maximum discount/,
 );
-assert.doesNotMatch(goalsMarkup, /Maximum discount/);
+assert.doesNotMatch(goalsMarkup, /of \$100/);
 assert.doesNotMatch(goalsMarkup, /See .*impact/i);
 
 // The pool's swap fee is the issuer's to set, with an inherited default. An
@@ -501,10 +505,14 @@ assert.match(restockMarkup, /data-model-source="shared-day-engine-illustrative-d
 assert.match(restockMarkup, /illustrative pool/);
 // The band the payout floor set is named, because it is the reason the
 // discount is what it is.
-assert.match(restockMarkup, /5\.00% maximum discount/);
-assert.match(restockMarkup, /is set by your payout floor/);
+assert.match(restockMarkup, /500 bps maximum discount/);
+assert.match(restockMarkup, /is set by your maximum discount/);
 assert.match(restockMarkup, /Buys Senior below NAV/);
-assert.match(restockMarkup, /They keep/);
+assert.match(restockMarkup, /annual restock hurdle rate/);
+assert.match(restockMarkup, /Restock hurdle cleared/);
+assert.match(restockMarkup, /Margin above restock hurdle/);
+assert.doesNotMatch(restockMarkup, /cost of capital/i);
+assert.doesNotMatch(restockMarkup, /break[- ]even/i);
 
 // A live template solved its own band; saying the payout floor set it named the
 // wrong pool, and it was named beside quotes taken off the template's curve.

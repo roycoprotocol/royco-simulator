@@ -37,12 +37,12 @@ export function dayV3ExitInputReadiness({
   return dayV3InputReadiness([
     {
       id: "exit-amount",
-      label: "Immediate exit amount",
+      label: "Depth at NAV",
       ready: exitSharePct !== null && exitSharePct > 0,
     },
     {
       id: "payout-floor",
-      label: "Minimum payout",
+      label: "Maximum discount",
       ready: minimumProceedsPer100 !== null,
     },
   ]);
