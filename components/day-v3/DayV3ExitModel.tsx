@@ -1,6 +1,10 @@
 import type { DayV3ExitView } from "@/components/day-v3/DayV3Goals";
 import DayV3DocsLink from "@/components/day-v3/DayV3DocsLink";
 import {
+  dayV3DepthAtNavBps,
+  dayV3MaximumDiscountBps,
+} from "@/lib/day-v3/exit-units";
+import {
   Card,
   CardContent,
   CardNote,
@@ -13,19 +17,26 @@ type MaybeNumber = number | null;
 const dollars = (value: MaybeNumber, digits = 1) =>
   value === null ? "—" : `$${value.toFixed(digits)}`;
 
-const width = (value: MaybeNumber) =>
-  value === null ? "0%" : `${Math.max(0, Math.min(100, value))}%`;
+const width = (value: MaybeNumber, max: number) =>
+  value === null
+    ? "0%"
+    : `${Math.max(0, Math.min(100, (value / max) * 100))}%`;
+
+const basisPoints = (value: MaybeNumber) =>
+  value === null ? "—" : `${value.toFixed(0)} bps`;
 
 function ComparisonBar({
   requested,
   requestedLabel,
   modeled,
   modeledLabel,
+  max,
 }: {
   requested: MaybeNumber;
   requestedLabel: string;
   modeled: MaybeNumber;
   modeledLabel: string;
+  max: number;
 }) {
   return (
     <div className="flex flex-col gap-2">
@@ -34,7 +45,7 @@ function ComparisonBar({
           {requestedLabel}
         </span>
         <span className="font-mono tabular-nums text-[var(--tertiary)]">
-          {dollars(requested)}
+          {basisPoints(requested)}
         </span>
       </div>
       <div
@@ -43,11 +54,11 @@ function ComparisonBar({
       >
         <span
           className="absolute inset-y-0 left-0 rounded-full bg-[color-mix(in_srgb,var(--theme-navy)_32%,transparent)]"
-          style={{ width: width(requested) }}
+          style={{ width: width(requested, max) }}
         />
         <span
           className="absolute inset-y-[3px] left-0 rounded-full bg-[var(--theme-green)]"
-          style={{ width: width(modeled) }}
+          style={{ width: width(modeled, max) }}
         />
       </div>
       <div className="flex items-baseline justify-between gap-3 text-[10.5px]">
@@ -55,7 +66,7 @@ function ComparisonBar({
           {modeledLabel}
         </span>
         <span className="font-mono font-semibold tabular-nums">
-          {dollars(modeled)}
+          {basisPoints(modeled)}
         </span>
       </div>
     </div>
@@ -126,7 +137,7 @@ export default function DayV3ExitModel({
           {disabled
             ? "Immediate Senior exit is off, so this design has no SLP or pool execution."
             : illustrative
-              ? "Shows how the selected exit size and payout affect one trade, per $100 Senior."
+              ? "Shows how the selected depth and maximum discount affect one trade."
               : "What you asked for against what the pool delivers, per $100 Senior."}
         </CardNote>
       </CardHeader>
@@ -135,16 +146,34 @@ export default function DayV3ExitModel({
         {!disabled ? (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <ComparisonBar
-              requested={promisedExitSharePct}
-              requestedLabel="Sale you selected"
-              modeled={modeled ? exit.sellablePer100 : null}
-              modeledLabel="Capacity the pool has"
+              requested={
+                promisedExitSharePct === null
+                  ? null
+                  : dayV3DepthAtNavBps(promisedExitSharePct)
+              }
+              requestedLabel="Depth at NAV you set"
+              modeled={
+                modeled && exit.sellablePer100 !== null
+                  ? dayV3DepthAtNavBps(exit.sellablePer100)
+                  : null
+              }
+              modeledLabel="Depth the pool has"
+              max={10_000}
             />
             <ComparisonBar
-              requested={minimumProceedsPer100}
-              requestedLabel="Payout floor you set"
-              modeled={modeled ? exit.lowestPayoutPer100 : null}
-              modeledLabel="Lowest the pool pays"
+              requested={
+                minimumProceedsPer100 === null
+                  ? null
+                  : dayV3MaximumDiscountBps(minimumProceedsPer100)
+              }
+              requestedLabel="Maximum discount you set"
+              modeled={
+                modeled && exit.lowestPayoutPer100 !== null
+                  ? dayV3MaximumDiscountBps(exit.lowestPayoutPer100)
+                  : null
+              }
+              modeledLabel="Maximum discount the pool has"
+              max={10_000}
             />
           </div>
         ) : null}
@@ -152,9 +181,9 @@ export default function DayV3ExitModel({
         {disabled ? (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <Outcome
-              label="Immediate exit"
+              label="Depth at NAV"
               note="no immediate pool exit"
-              value="$0.00"
+              value="0 bps"
             />
             <Outcome
               label="SLP required"
@@ -173,7 +202,7 @@ export default function DayV3ExitModel({
               Complete the exit terms above
             </strong>
             <p className="mx-auto mt-1 max-w-[58ch] text-[11px] leading-snug text-[var(--secondary)]">
-              Choose the amount Senior can sell and the minimum payout, and this
+              Choose the depth at NAV and maximum discount, and this
               model shows capacity, proceeds and the pool curve rather than a
               row of empty values.
             </p>

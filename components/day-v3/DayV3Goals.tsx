@@ -10,6 +10,12 @@ import {
   dayV3ExitInputReadiness,
   dayV3MissingPreview,
 } from "@/lib/day-v3/input-readiness";
+import {
+  dayV3DepthAtNavBps,
+  dayV3ExitSharePctFromDepthBps,
+  dayV3MaximumDiscountBps,
+  dayV3MinimumProceedsPer100FromDiscountBps,
+} from "@/lib/day-v3/exit-units";
 
 type MaybeNumber = number | null;
 
@@ -184,6 +190,12 @@ export default function DayV3Goals({
     exitSharePct,
     minimumProceedsPer100,
   });
+  const depthAtNavBps =
+    exitSharePct === null ? null : dayV3DepthAtNavBps(exitSharePct);
+  const maximumDiscountBps =
+    minimumProceedsPer100 === null
+      ? null
+      : dayV3MaximumDiscountBps(minimumProceedsPer100);
   const exitStatus = !exitInputReadiness.complete
     ? ({
         label: "Missing",
@@ -387,8 +399,8 @@ export default function DayV3Goals({
             ? "Immediate exit off · no SLP"
             : `${
                 exitSharePct === null
-                  ? "Exit amount missing"
-                  : `${dollars(exitSharePct)} immediate exit`
+                  ? "Depth at NAV missing"
+                  : `${fixed(depthAtNavBps, 0)} bps depth at NAV`
               } → ${
                 exit.slpPer100 === null
                   ? "SLP basis unavailable"
@@ -399,8 +411,8 @@ export default function DayV3Goals({
                   : ` · ${dollars(exit.proceeds)} proceeds`
               } · ${
                 minimumProceedsPer100 === null
-                  ? "payout floor missing"
-                  : `${dollars(minimumProceedsPer100)} floor`
+                  ? "maximum discount missing"
+                  : `${fixed(maximumDiscountBps, 0)} bps maximum discount`
               }${
                 !exitInputReadiness.complete
                   ? ` · missing ${dayV3MissingPreview(exitInputReadiness.missing)}`
@@ -447,41 +459,51 @@ export default function DayV3Goals({
         {!exitDisabled ? (
           <div className="grid grid-cols-1 items-start gap-3 lg:grid-cols-2">
               <DayV3NumberField
-                label="Out of every $100 Senior, how much should be sellable right away?"
-                max={100}
-                min={0.01}
-                note="One sale, not a lifetime cap: what the pool absorbs in a single trade from rest, which sets the SLP capital. Arbitrage pushes it back to rest afterwards — model 4 tests whether that pays."
-                onChange={onExitSharePct}
+                label="How much Senior depth should be available at NAV?"
+                max={10_000}
+                min={1}
+                note="Basis points of the Senior position sellable in one trade from rest, not a lifetime cap. This sets the SLP capital; arbitrage can push the pool back to rest afterwards."
+                onChange={(value) =>
+                  onExitSharePct(
+                    value === null
+                      ? null
+                      : dayV3ExitSharePctFromDepthBps(value),
+                  )
+                }
                 origin={inputOrigin(inputOrigins.exitAmount)}
-                placeholder="Choose an amount"
-                prefix="$"
+                placeholder="Choose depth"
                 presets={[
-                  { label: "$5", value: 5 },
-                  { label: "$10", value: 10 },
-                  { label: "$20", value: 20 },
+                  { label: "500 bps", value: 500 },
+                  { label: "1,000 bps", value: 1_000 },
+                  { label: "2,000 bps", value: 2_000 },
                 ]}
-                step={0.5}
-                suffix="of $100"
-                value={exitSharePct}
+                step={50}
+                suffix="bps"
+                value={depthAtNavBps}
                 required
               />
               <DayV3NumberField
-                label="What is the least a seller should receive for $100 Senior?"
-                max={100}
+                label="What is the maximum discount to NAV?"
+                max={10_000}
                 min={0}
-                note="Worst case, not expected: the fee-inclusive floor for a seller taking the whole amount above in one trade. Smaller sales price nearer NAV. A tighter floor costs more SLP capital."
-                onChange={onMinimumProceedsPer100}
+                note="Worst case, not expected: the fee-inclusive discount for a seller taking the full depth above in one trade. Smaller sales price nearer NAV. A tighter maximum costs more SLP capital."
+                onChange={(value) =>
+                  onMinimumProceedsPer100(
+                    value === null
+                      ? null
+                      : dayV3MinimumProceedsPer100FromDiscountBps(value),
+                  )
+                }
                 origin={inputOrigin(inputOrigins.payout)}
-                placeholder="Choose a payout floor"
-                prefix="$"
+                placeholder="Choose a maximum discount"
                 presets={[
-                  { label: "$99", value: 99 },
-                  { label: "$95", value: 95 },
-                  { label: "$90", value: 90 },
+                  { label: "100 bps", value: 100 },
+                  { label: "500 bps", value: 500 },
+                  { label: "1,000 bps", value: 1_000 },
                 ]}
-                step={0.1}
-                suffix="of $100"
-                value={minimumProceedsPer100}
+                step={10}
+                suffix="bps"
+                value={maximumDiscountBps}
                 required
               />
             <DayV3QuoteAsset
@@ -522,7 +544,8 @@ export default function DayV3Goals({
             className="rounded-lg border border-[color-mix(in_srgb,var(--theme-gold)_45%,transparent)] bg-[color-mix(in_srgb,var(--theme-gold)_10%,transparent)] px-3 py-3 text-[10.5px] font-medium leading-relaxed text-[var(--gold-emphasis)]"
           >
             These inputs do not produce a viable immediate exit. Reduce the
-            exit size, lower the payout floor, or turn off the immediate exit.
+            depth at NAV, allow a larger maximum discount, or turn off the
+            immediate exit.
           </p>
         ) : null}
       </DayV3Group>

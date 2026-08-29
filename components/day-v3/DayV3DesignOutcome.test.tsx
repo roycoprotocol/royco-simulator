@@ -31,8 +31,8 @@ assert.match(markup, /\$5\.0 at once/);
 assert.match(markup, /Payout floor/);
 assert.match(markup, /\$99/);
 assert.match(markup, /Needs changes/);
-assert.match(markup, /reducing exit size/);
-assert.match(markup, /lowering the payout floor/);
+assert.match(markup, /reducing depth at NAV/);
+assert.match(markup, /allowing a larger maximum discount/);
 assert.match(
   markup,
   /shortening conversion time or lowering the external spread assumption/,

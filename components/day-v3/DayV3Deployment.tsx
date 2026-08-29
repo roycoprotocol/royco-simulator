@@ -30,6 +30,10 @@ import type {
 } from "@/lib/day-v3/pool-design";
 import type { DayV3ExpiryPolicy, DayV3Goals } from "@/lib/day-v3/types";
 import type { DayV3YieldCurveDesign } from "@/lib/day-v3/yield-curves";
+import {
+  dayV3DepthAtNavBps,
+  dayV3MaximumDiscountBps,
+} from "@/lib/day-v3/exit-units";
 import { cn } from "@/lib/utils";
 
 const DEPLOY_URL = "https://www.royco.org/deploy-market";
@@ -75,8 +79,8 @@ function Row({ label, value }: { label: string; value: string }) {
 const shown = (value: number | null, suffix = "") =>
   value === null ? "Unresolved" : `${value.toFixed(2)}${suffix}`;
 
-const shownDollars = (value: number | null, suffix = "") =>
-  value === null ? "Unresolved" : `$${value.toFixed(2)}${suffix}`;
+const shownBps = (value: number | null) =>
+  value === null ? "Unresolved" : `${value.toFixed(0)} bps`;
 
 function DayV3Deployment({
   exit,
@@ -169,16 +173,16 @@ function DayV3Deployment({
       missing: "Enter how often Senior’s value is published.",
     },
     {
-      label: "Immediate exit amount",
+      label: "Depth at NAV",
       ready: goals.immediateExitSharePct !== null,
       scope: "v3-handoff" as const,
-      missing: "Choose how much of every $100 Senior can sell at once.",
+      missing: "Choose the Senior depth available at NAV in basis points.",
     },
     {
-      label: "Minimum exit payout",
+      label: "Maximum discount",
       ready: goals.minimumProceedsPer100 !== null,
       scope: "v3-handoff" as const,
-      missing: "Choose the lowest acceptable payout per $100 sold.",
+      missing: "Choose the maximum discount to NAV in basis points.",
     },
     {
       label: "Deployment target",
@@ -281,8 +285,8 @@ function DayV3Deployment({
       "External spread assumption",
       "Fixed-Term Grace Period",
       "NAV refresh cadence",
-      "Immediate exit amount",
-      "Minimum exit payout",
+      "Depth at NAV",
+      "Maximum discount",
       "Deployment target",
       "Protected Exit trigger",
       "Protected Exit bonus",
@@ -333,8 +337,8 @@ function DayV3Deployment({
       return "#day-v3-protection-inputs";
     if (
       [
-        "Immediate exit amount",
-        "Minimum exit payout",
+        "Depth at NAV",
+        "Maximum discount",
         "Canonical pool design",
         "Minimum Liquidity",
       ].includes(label)
@@ -637,12 +641,20 @@ function DayV3Deployment({
                 value={shown(goals.recoveryDays, " days")}
               />
               <Row
-                label="Immediate exit"
-                value={shownDollars(goals.immediateExitSharePct, " / $100")}
+                label="Depth at NAV"
+                value={shownBps(
+                  goals.immediateExitSharePct === null
+                    ? null
+                    : dayV3DepthAtNavBps(goals.immediateExitSharePct),
+                )}
               />
               <Row
-                label="Minimum payout"
-                value={shownDollars(goals.minimumProceedsPer100, " / $100")}
+                label="Maximum discount"
+                value={shownBps(
+                  goals.minimumProceedsPer100 === null
+                    ? null
+                    : dayV3MaximumDiscountBps(goals.minimumProceedsPer100),
+                )}
               />
             </section>
 
@@ -662,9 +674,16 @@ function DayV3Deployment({
               />
               <Row
                 label="Maximum Discount"
-                value={shown(exit.maximumDiscountPct, "%")}
+                value={shownBps(
+                  exit.maximumDiscountPct === null
+                    ? null
+                    : exit.maximumDiscountPct * 100,
+                )}
               />
-              <Row label="Depth at NAV" value={shown(exit.lambda, " λ")} />
+              <Row
+                label="E-CLP concentration"
+                value={shown(exit.lambda, " λ")}
+              />
               <Row
                 label="Maximum Premium"
                 value={shown(exit.maximumPremiumBps, " bps")}

@@ -84,7 +84,7 @@ assert.deepEqual(
   }),
   {
     complete: false,
-    missing: ["Immediate exit amount", "Minimum payout"],
+    missing: ["Depth at NAV", "Maximum discount"],
   },
 );
 assert.deepEqual(
