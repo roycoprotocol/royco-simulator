@@ -89,7 +89,7 @@ export interface DayV3RestockHurdleInputs {
   redemptionDays: number;
   /** Senior's modeled annual return, earned by whoever holds it while waiting. */
   seniorApyPct: number;
-  /** The live pool fee the desk pays to trade back in. */
+  /** The selected market pool fee the desk pays to trade back in. */
   swapFeeBps: number;
 }
 

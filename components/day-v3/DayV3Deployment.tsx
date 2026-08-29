@@ -621,7 +621,7 @@ function DayV3Deployment({
           </div>
           <CardNote>
             One relative design, normalized to $100 Senior. Deployment must
-            revalidate it against the live template; absolute funding stays open
+            revalidate it against the selected market pool; absolute funding stays open
             until deployment has a notional and initialization policy.
           </CardNote>
         </CardHeader>

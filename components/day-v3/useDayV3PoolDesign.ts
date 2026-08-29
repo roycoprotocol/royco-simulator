@@ -85,7 +85,7 @@ export function useDayV3PoolDesign(
           throw new Error(
             dayV3PoolDesignIssueMessage(
               issues,
-              "Live deployment targets could not be loaded.",
+              "Canonical deployment targets could not be loaded.",
             ),
           );
         }
@@ -94,10 +94,10 @@ export function useDayV3PoolDesign(
           targets: body.targets,
           message:
             body.targets.length > 0
-              ? "Choose the chain and template whose live fee should be used."
+              ? "Choose the chain and template whose canonical pool policy should be used."
               : dayV3PoolDesignIssueMessage(
                   body.issues,
-                  "No live deployment template is currently available.",
+                  "No canonical deployment template is currently available.",
                 ),
         });
       })
@@ -109,7 +109,7 @@ export function useDayV3PoolDesign(
           message:
             error instanceof Error
               ? error.message
-              : "Live deployment targets could not be loaded.",
+              : "Canonical deployment targets could not be loaded.",
         });
       });
     return () => controller.abort();
@@ -163,7 +163,7 @@ export function useDayV3PoolDesign(
               body.issues,
               response.ok
                 ? "The exit terms could not be resolved."
-                : "The live template policy could not be refreshed.",
+                : "The canonical pool policy could not be refreshed.",
             ),
           },
         });
@@ -178,7 +178,7 @@ export function useDayV3PoolDesign(
             message:
               error instanceof Error
                 ? error.message
-                : "The live template policy could not be refreshed.",
+                : "The canonical pool policy could not be refreshed.",
           },
         });
       });
@@ -199,7 +199,7 @@ export function useDayV3PoolDesign(
             status: "resolving",
             result: null,
             message:
-              "Refreshing the template fee and solving the exact E-CLP design…",
+              "Refreshing the market pool fee and solving the exact E-CLP design…",
           };
 
   return { design, inventory, retry };

@@ -51,7 +51,7 @@ assert.match(resolvedMarkup, /Maximum discount the pool has/);
 assert.match(resolvedMarkup, /1000 bps/);
 assert.match(resolvedMarkup, /500 bps/);
 assert.match(resolvedMarkup, /380 bps/);
-assert.match(resolvedMarkup, /Proceeds: \$9\.62 after the live swap fee/);
+assert.match(resolvedMarkup, /Proceeds: \$9\.62 after the canonical pool swap fee/);
 // The swap fee, minimum liquidity and maximum discount are pool terms, not
 // results of this comparison, and the cards that depend on them state them.
 assert.doesNotMatch(resolvedMarkup, /Swap fee: /);
@@ -108,7 +108,7 @@ const unresolvedMarkup = renderToStaticMarkup(
 assert.match(unresolvedMarkup, /data-model-state="resolving"/);
 assert.match(
   unresolvedMarkup,
-  /Refreshing the live template and recalculating this model/,
+  /Refreshing the canonical pool and recalculating this model/,
 );
 assert.doesNotMatch(unresolvedMarkup, /Proceeds:/);
 
@@ -367,14 +367,14 @@ assert.match(
 assert.doesNotMatch(goalsMarkup, /of \$100/);
 assert.doesNotMatch(goalsMarkup, /See .*impact/i);
 
-// The pool's swap fee is the issuer's to set, with an inherited default. An
+// The pool's swap fee is the issuer's to set, with a market-declared default. An
 // empty field is labelled for what it is — the fee the model is assuming — and
 // a typed one is never presented as the template's own policy.
 assert.match(
   goalsMarkup,
   /What swap fee should the pool charge on a sale\?/,
 );
-assert.match(goalsMarkup, /Use the live fee/);
+assert.match(goalsMarkup, /Use the market fee/);
 assert.match(goalsMarkup, /Model assumption/);
 assert.doesNotMatch(goalsMarkup, /Manual override/);
 
@@ -383,13 +383,10 @@ const handSetFeeMarkup = renderToStaticMarkup(
 );
 assert.match(handSetFeeMarkup, /Manual override/);
 assert.doesNotMatch(handSetFeeMarkup, /Live template|Product policy/);
-// These two bounds are the only guard against `previewSecondarySell` throwing
-// INVALID_SWAP_FEE inside a render-time memo with no error boundary above it.
+// The field mirrors Gyro's inclusive contract bounds; render-time engine errors
+// remain surfaced by the model/backtest error paths.
 assert.match(handSetFeeMarkup, /min="0\.01"/);
-// 10% is an order of magnitude above any pool anyone runs, and well clear of
-// the corner where turnover x fee compounds modeled income past what the engine
-// can hold — measured: JBBB threw at 100x turnover and a 100% fee.
-assert.match(handSetFeeMarkup, /max="1000"/);
+assert.match(handSetFeeMarkup, /max="10000"/);
 
 const protectionStart = goalsMarkup.indexOf('id="day-v3-protection-inputs"');
 const observationMode = goalsMarkup.indexOf('aria-label="Observation mode"');
@@ -514,8 +511,8 @@ assert.match(restockMarkup, /Margin above restock hurdle/);
 assert.doesNotMatch(restockMarkup, /cost of capital/i);
 assert.doesNotMatch(restockMarkup, /break[- ]even/i);
 
-// A live template solved its own band; saying the payout floor set it named the
-// wrong pool, and it was named beside quotes taken off the template's curve.
+// A canonical pool solved its own band; saying the payout floor set it named the
+// wrong pool, and it was named beside quotes taken off the canonical curve.
 assert.match(
   renderToStaticMarkup(
     <DayV3RestockCheck
@@ -526,11 +523,11 @@ assert.match(
       view={{ ...restockView, maximumDiscountSource: "live-template" }}
     />,
   ),
-  /the live template solved for/,
+  /the canonical pool solved for/,
 );
 
-// A sale the pool cannot absorb is priced for the slice that fills, so it is
-// described as that slice rather than as the exit the issuer promised.
+// A sale the pool cannot absorb is shown at its capacity boundary, while the
+// copy makes clear that the requested exact-input trade would revert atomically.
 const partialMarkup = renderToStaticMarkup(
   <DayV3RestockCheck
     costOfCapitalPct={20}
@@ -544,8 +541,10 @@ const partialMarkup = renderToStaticMarkup(
     }}
   />,
 );
-assert.match(partialMarkup, /the part that fills/);
-assert.match(partialMarkup, /only \$4\.00 fits in the pool/);
+assert.match(partialMarkup, /maximum atomic order below NAV/);
+assert.match(partialMarkup, /requested \$10\.00 exit is too large/);
+assert.match(partialMarkup, /largest order this pool can accept is \$4\.00/);
+assert.match(partialMarkup, /not partially filled/);
 
 // A market quoted in ETH never gets a dollar sign in front of a number of ETH.
 const ethMarkup = renderToStaticMarkup(

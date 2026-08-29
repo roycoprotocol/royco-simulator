@@ -237,6 +237,7 @@ const poolGoals = {
 check("target and operational facts invalidate canonical pool results", () => {
   const context = {
     sourceApyPct: 12,
+    swapFeeBps: 10,
     exitAsset: null,
     exitAssetRateProvider: null,
     exitAssetYieldBearing: null,
@@ -274,11 +275,12 @@ check("target and operational facts invalidate canonical pool results", () => {
 });
 const canonicalPoolSnapshot = {
   schemaVersion: DAY_V3_POOL_DESIGN_SCHEMA,
-  modelVersion: "day-v3-eclp-goal-solver-1.1.0",
+  modelVersion: "day-v3-eclp-goal-solver-1.2.0",
   status: "resolved",
   goals: poolGoals,
   context: {
     sourceApyPct: 12,
+    swapFeeBps: 10,
     exitAsset: null,
     exitAssetRateProvider: null,
     exitAssetYieldBearing: null,
@@ -335,7 +337,7 @@ const canonicalPoolSnapshot = {
           unit: "test",
           origin:
             key === "swapFeeBps"
-              ? "template-policy"
+              ? "market-policy"
               : key === "maximumPremiumBps"
                 ? "derived"
                 : "recommended",
@@ -402,7 +404,7 @@ check("canonical inventory and result guards reject shape drift", () => {
   assert.equal(
     isDayV3PoolDesignInventory({
       schemaVersion: DAY_V3_POOL_DESIGN_SCHEMA,
-      modelVersion: "day-v3-eclp-goal-solver-1.1.0",
+      modelVersion: "day-v3-eclp-goal-solver-1.2.0",
       status: "resolved",
       targets: [canonicalPoolSnapshot.policy],
       issues: [],
@@ -412,7 +414,7 @@ check("canonical inventory and result guards reject shape drift", () => {
   assert.equal(
     isDayV3PoolDesignInventory({
       schemaVersion: "0.9",
-      modelVersion: "day-v3-eclp-goal-solver-1.1.0",
+      modelVersion: "day-v3-eclp-goal-solver-1.2.0",
       status: "resolved",
       targets: [],
       issues: [],
@@ -487,10 +489,10 @@ check("canonical inventory and result guards reject shape drift", () => {
   assert.equal(
     isDayV3PoolDesignResult({
       schemaVersion: DAY_V3_POOL_DESIGN_SCHEMA,
-      modelVersion: "day-v3-eclp-goal-solver-1.1.0",
+      modelVersion: "day-v3-eclp-goal-solver-1.2.0",
       status: "unresolved",
       recommendation: null,
-      issues: [{ code: "POLICY_UNRESOLVED", message: "Live fee unavailable." }],
+      issues: [{ code: "POLICY_UNRESOLVED", message: "Market pool fee unavailable." }],
     }),
     true,
   );
@@ -500,13 +502,13 @@ check("canonical inventory and result guards reject shape drift", () => {
       modelVersion: "wrong-model",
       status: "unresolved",
       recommendation: null,
-      issues: [{ code: "POLICY_UNRESOLVED", message: "Live fee unavailable." }],
+      issues: [{ code: "POLICY_UNRESOLVED", message: "Market pool fee unavailable." }],
     }),
     false,
   );
 });
 
-check("live fee policy mirrors the contract's inclusive endpoints", () => {
+check("market pool fee mirrors the contract's inclusive endpoints", () => {
   const policy = canonicalPoolSnapshot.policy;
   assert.equal(isDayV3ResolvedPolicy({ ...policy, swapFeeBps: 0 }), false);
   assert.equal(isDayV3ResolvedPolicy({ ...policy, swapFeeBps: 0.0099 }), false);

@@ -260,6 +260,7 @@ const canonicalGoals: DayV3Goals = {
 };
 const canonicalContext = {
   sourceApyPct: canonicalState.sourceApyPct as number,
+  swapFeeBps: canonicalState.swapFeeBps as number,
   exitAsset: null,
   exitAssetRateProvider: null,
   exitAssetYieldBearing: null,

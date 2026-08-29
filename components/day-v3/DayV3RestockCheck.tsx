@@ -28,14 +28,13 @@ export type DayV3RestockView = {
    *  the fee and does not match the bar. */
   selectedCurveInputPer100: number | null;
   selectedProceedsPer100: number | null;
-  /** Which pool priced these quotes. `issuer-fee` is not a lesser answer than
-   *  `unresolved` — it is the reader's own fee, which is exactly what they
-   *  asked to model — but it is not the live template's pool either. */
+  /** Which pool priced these quotes. `issuer-fee` is the reader's own fee,
+   *  while `live` is the canonical market-pool policy. */
   policyBasis: "live" | "unresolved" | "issuer-fee";
   selectedSalePer100: number | null;
-  /** How much of that sale the pool could actually take in one trade. */
+  /** The largest atomic order the pool can accept at the displayed terms. */
   selectedFilledPer100: number | null;
-  /** The rest, which was never priced and never traded. */
+  /** Excess above that atomic capacity; a larger request reverts, it does not partially fill. */
   selectedUnfilledPer100: number | null;
   unit: DayV3Unit;
 };
@@ -304,10 +303,10 @@ export default function DayV3RestockCheck({
   const worstCasePays = resolved && (check.worstCaseMarginBps ?? -1) >= 0;
   const selectedPays = resolved && check.status === "profitable";
   const unpriced = resolved && check.status === "no-selected-sale";
-  // The live template sizes the pool to the promised sale, so the deepest point
-  // and the selected sale usually coincide.
-  // A quote for less than the sale is a quote for a different trade.
-  const partialFill =
+  // The engine exposes the largest quoteable slice so the reader can see the
+  // capacity boundary. Balancer exact-input swaps are atomic: a request larger
+  // than that slice reverts rather than partially filling.
+  const atomicOrderTooLarge =
     resolved &&
     selectedUnfilledPer100 !== null &&
     selectedUnfilledPer100 > 0.005 &&
@@ -441,8 +440,12 @@ export default function DayV3RestockCheck({
                       unpriced
                         ? " The selected sale has not been priced yet, so it is not yet known whether it reaches that depth on its own."
                         : selectedPays
-                          ? ` The ${partialFill ? `${amount(selectedFilledPer100, unit)} of the ${amount(selectedSalePer100, unit)} exit the pool can actually take` : `${amount(selectedSalePer100, unit)} exit you promised`} ${(check.selectedMarginBps ?? 0) < 0.5 ? "only just covers that" : `beats it by ${bps(check.selectedMarginBps)}`}, so the pool resets without waiting for a deeper seller.${partialFill ? ` The other ${amount(selectedUnfilledPer100, unit)} does not fill at any price, so nothing about it is priced here.` : ""}`
-                          : ` The ${partialFill ? `${amount(selectedFilledPer100, unit)} of the ${amount(selectedSalePer100, unit)} exit the pool can actually take` : `${amount(selectedSalePer100, unit)} exit you promised`} only reaches ${bps(check.selectedDiscountBps)}, short of the restock hurdle, so one exit of that size does not attract a refill on its own.${partialFill ? ` The other ${amount(selectedUnfilledPer100, unit)} does not fill at any price.` : ""}`
+                          ? atomicOrderTooLarge
+                            ? ` The requested ${amount(selectedSalePer100, unit)} exit is too large for one atomic Balancer trade and would revert. The largest order this pool can accept is ${amount(selectedFilledPer100, unit)}; that smaller order ${(check.selectedMarginBps ?? 0) < 0.5 ? "only just covers the hurdle" : `clears it by ${bps(check.selectedMarginBps)}`}, so a max-size restock trade resets the pool. The excess ${amount(selectedUnfilledPer100, unit)} is not partially filled.`
+                            : ` The ${amount(selectedSalePer100, unit)} exit you promised ${(check.selectedMarginBps ?? 0) < 0.5 ? "only just covers that" : `beats it by ${bps(check.selectedMarginBps)}`}, so the pool resets without waiting for a deeper seller.`
+                          : atomicOrderTooLarge
+                            ? ` The requested ${amount(selectedSalePer100, unit)} exit would revert because one Balancer trade is atomic. The largest order this pool can accept is ${amount(selectedFilledPer100, unit)}, and it only reaches ${bps(check.selectedDiscountBps)}, short of the restock hurdle. The excess ${amount(selectedUnfilledPer100, unit)} is not partially filled.`
+                            : ` The ${amount(selectedSalePer100, unit)} exit you promised only reaches ${bps(check.selectedDiscountBps)}, short of the restock hurdle, so one exit of that size does not attract a refill on its own.`
                     }`}
               </p>
             </div>
@@ -452,18 +455,20 @@ export default function DayV3RestockCheck({
                 before the answer existed anywhere on screen. */}
             <section className="rounded-lg border border-[var(--border-subtle)] bg-[var(--background)] px-3 py-3">
               <h4 className="mb-3 border-b border-[var(--border-subtle)] pb-2 text-[9.5px] font-semibold uppercase tracking-[0.11em] text-[var(--tertiary)]">
-                One restock trade, per {stake100(unit)} of Senior bought
+                {atomicOrderTooLarge ? "One maximum atomic restock trade" : "One restock trade"}, per {stake100(unit)} of Senior bought
               </h4>
               <ArbitrageWaterfall
                 steps={[
                   {
                     deltaBps: check.selectedDiscountBps ?? 0,
-                    label: partialFill
-                      ? "Buys Senior below NAV (the part that fills)"
+                    label: atomicOrderTooLarge
+                      ? "Buys the maximum atomic order below NAV"
                       : "Buys Senior below NAV",
                     note: unpriced
-                      ? "priced once the live template sizes the pool"
-                      : `of the ${amount(selectedSalePer100, unit)} sold at once${partialFill ? `, only ${amount(selectedFilledPer100, unit)} fits in the pool;` : ","} ${amount(selectedCurveInputPer100, unit, 4)} reaches the curve after the pool's fee and comes back as ${amount(selectedProceedsPer100, unit, 4)} — a gap of 1 − ${amount(selectedProceedsPer100, unit, 4)}/${amount(selectedCurveInputPer100, unit, 4)}, which is what an arbitrageur buys`,
+                      ? "priced once the canonical pool is resolved"
+                      : atomicOrderTooLarge
+                        ? `The requested ${amount(selectedSalePer100, unit)} order would revert; this is the largest atomic order the pool can accept. ${amount(selectedCurveInputPer100, unit, 4)} reaches the curve after the pool's fee and comes back as ${amount(selectedProceedsPer100, unit, 4)} — a gap of 1 − ${amount(selectedProceedsPer100, unit, 4)}/${amount(selectedCurveInputPer100, unit, 4)}, which is what an arbitrageur buys`
+                        : `of the ${amount(selectedSalePer100, unit)} sold at once, ${amount(selectedCurveInputPer100, unit, 4)} reaches the curve after the pool's fee and comes back as ${amount(selectedProceedsPer100, unit, 4)} — a gap of 1 − ${amount(selectedProceedsPer100, unit, 4)}/${amount(selectedCurveInputPer100, unit, 4)}, which is what an arbitrageur buys`,
                   },
                   {
                     deltaBps: -hurdle.financingBps,
@@ -482,7 +487,7 @@ export default function DayV3RestockCheck({
                       policyBasis === "issuer-fee"
                         ? "the swap fee you set, charged on the way in"
                         : policyBasis === "live"
-                          ? "the live template's swap fee, charged on the way in"
+                          ? "the selected market pool's swap fee, charged on the way in"
                           : "the disclosed simulation swap fee, charged on the way in",
                   },
                 ]}
@@ -519,7 +524,7 @@ export default function DayV3RestockCheck({
                 )}
 Both discounts are quotes from{" "}
                 {policyBasis === "live"
-                  ? "the live template's pool"
+                  ? "the selected market pool"
                   : policyBasis === "issuer-fee"
                     ? "a pool priced at the swap fee you set"
                     : "the disclosed illustrative pool"}
@@ -528,7 +533,7 @@ Both discounts are quotes from{" "}
                   ? "is set by your maximum discount"
                   : maximumDiscountSource === "your-answer"
                     ? "you set yourself"
-                    : "the live template solved for"}
+                    : "the canonical pool solved for"}
                 . The Senior offset assumes the source
                 performs at its modeled rate. Royco Deploy revalidates against
                 the real settlement schedule.

@@ -205,7 +205,7 @@ const terms = {
   liquidityYieldShare: market.defaults.liqYDM.yTarget,
 };
 
-// V3 supplies exact canonical E-CLP parameters and the live template fee. The
+// V3 supplies exact canonical E-CLP parameters and the market pool fee. The
 // shared runtime must consume both rather than regenerating either one.
 const canonicalEclp = {
   alpha: 0.99,
@@ -347,9 +347,9 @@ const yields = runDayTargetScenario(market.defaults);
 // Junior return bands after the uniform 5% Junior/SLP yield-premium protocol
 // fee is applied. These exact outputs also pin the manifest decimal through the
 // runtime adapter and the contract-mirrored fee-share minting path.
-assert.ok(Math.abs(yields.seniorApy - 0.0913920169096325) < 1e-12);
+assert.ok(Math.abs(yields.seniorApy - 0.0913920160458408) < 1e-12);
 assert.ok(Math.abs(yields.juniorApy - 0.13924177159090334) < 1e-12);
-assert.ok(Math.abs(yields.liquidityApy - 0.10248258285545275) < 1e-12);
+assert.ok(Math.abs(yields.liquidityApy - 0.1024825578810733) < 1e-12);
 
 const forwardSeries = buildDayForwardSeries(
   0.114,

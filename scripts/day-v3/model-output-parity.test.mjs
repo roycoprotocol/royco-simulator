@@ -235,8 +235,8 @@ for (const gate of [
 // remain the responsibility of Royco Deploy and cannot gate scenario APYs.
 assert.match(
   summary,
-  /useDayV3SimulationPoolDesign\(\s*poolDesignGoals,\s*sourceApyPct,?\s*\)/,
-  "The unified simulator must use the four-goal simulation pool-design request",
+  /useDayV3SimulationPoolDesign\(\s*poolDesignGoals,\s*sourceApyPct,\s*requestedSwapFeeBps,?\s*\)/,
+  "The unified simulator must use the four goals plus selected market fee in the simulation request",
 );
 assert.doesNotMatch(
   summary,
@@ -447,44 +447,47 @@ assert.match(
   "Annual volume is the issuer's forecast, not a pinned zero",
 );
 
-// The pool's swap fee is settable per market. It is the one issuer answer the
-// canonical service cannot be asked to honour — its request body is
-// key-restricted and its parser asserts the returned fee equals the live
-// template policy — so the whole feature turns on the fee winning locally and
-// the canonical outcomes standing down when it does.
+// The pool's swap fee is a per-market Gyro pool-creation parameter. It is part
+// of the canonical solver context, so the response must echo the exact fee
+// requested by the simulator instead of inheriting a TemplatePolicy value.
 assert.match(
   summary,
-  /swapFeeBps: swapFeeBps \?\? defaults\.swapFeeBps/,
-  "A hand-set pool fee must reach the shared accountant, not just the display",
+  /swapFeeBps: requestedSwapFeeBps/,
+  "The selected market fee must reach the shared accountant, not just the display",
 );
 assert.match(
   summary,
   /\.\.\.\(hasCurveOverride \? canonicalPolicy : canonical\),\s*\.\.\.\(feeOverridden \? \{ swapFeeBps: swapFeeBps as number \} : \{\}\),/,
-  "The engine override must keep the live E-CLP and protocol fees while replacing only the fee — except when the reader drew the curve themselves",
+  "An explicit market-fee edit must keep the canonical E-CLP and protocol fees while replacing only the fee",
 );
 assert.match(
   summary,
-  /\]\.some\(\(value\) => value !== null\) \|\| feeOverridden \|\| premiumOverridden;/,
-  "A hand-set fee must suppress the canonical pool design like any other pool override",
+  /\]\.some\(\(value\) => value !== null\) \|\| premiumOverridden;/,
+  "Only curve edits must suppress the canonical pool design",
 );
 assert.match(
   summary,
   /const canonicalPoolDesign =\s*rawCanonicalPoolDesign && !hasPoolOverride/,
-  "Canonical outcomes solved at another fee must not survive the override gate",
+  "Canonical outcomes must survive when the per-market fee is part of the solve",
 );
 const poolDesignRequest = summary.slice(
   summary.indexOf("const poolDesignGoals ="),
   summary.indexOf("const activePoolDesign ="),
 );
+assert.match(
+  summary,
+  /useDayV3SimulationPoolDesign\(\s*poolDesignGoals,\s*sourceApyPct,\s*requestedSwapFeeBps,?\s*\)/,
+  "The selected market fee must enter the canonical simulation request",
+);
 assert.doesNotMatch(
   poolDesignRequest,
   /swapFeeBps|feeOverridden/,
-  "A hand-set fee must never enter the canonical pool-design request",
+  "The selected market fee belongs in simulation context, not in the four-goal payload",
 );
-assert.doesNotMatch(
+assert.match(
   simulationPoolDesign,
   /swapFeeBps/,
-  "The simulation pool-design contract must stay the four goals and the source APY",
+  "The simulation pool-design contract must carry the selected market fee",
 );
 // The projection and the history have to run the same pool. Both merge these
 // overrides by spread, so a key present and `undefined` erases a real value.
@@ -503,33 +506,33 @@ assert.match(
   /poolConfigOverrides=\{backtestConfigOverrides\}/,
   "The historical backtest must receive the same override object",
 );
-// Honesty: a fee the issuer typed is never presented as the market's own, and
-// the swap-fee line in the position comparison stays a two-run engine
+// Honesty: the fee's source names the selected market's Gyro pool parameters,
+// and the swap-fee line in the position comparison stays a two-run engine
 // differential rather than fee x turnover arithmetic written into the UI.
 assert.match(
   summary,
   /policyBasis: feeOverridden\s*\?\s*\("issuer-fee" as const\)/,
-  "The live-models eyebrow must not claim to be live while a hand-set fee is in force",
+  "An explicit fee edit must be labeled as an issuer fee in the local model",
 );
 assert.match(
   summary,
-  /feeSource: feeOverridden\s*\?\s*`Issuer-set pool swap fee/,
-  "The fee's provenance must name the issuer, never a template or product policy",
+  /feeSource: feeOverridden\s*\?\s*`Issuer-set market pool swap fee/,
+  "The fee's provenance must name the market pool parameter",
 );
 assert.doesNotMatch(
   quoteAsset,
   /"live-template"|"product-policy"|"source-fact"/,
-  "The fee field must not label a hand-set fee as a template or policy fact",
+  "The fee field must not label a market fee as a template or product-policy fact",
 );
 assert.match(
   quoteAsset,
-  /swapFeeBps === null \? "model-assumption" : "manual-override"/,
-  "A fee the reader typed reads as a manual override",
+  /swapFeeBps === null \|\|[\s\S]{0,160}defaultSwapFeeBps !== undefined[\s\S]{0,80}swapFeeBps === defaultSwapFeeBps/,
+  "An omitted or declared market fee reads as a model assumption",
 );
 assert.match(
   quoteAsset,
-  /max=\{1000\}\s*min=\{0\.01\}/,
-  "The fee field's bounds are what keep previewSecondarySell from throwing",
+  /max=\{DAY_V3_POOL_SWAP_FEE_BPS_RANGE\.max\}\s*min=\{DAY_V3_POOL_SWAP_FEE_BPS_RANGE\.min\}/,
+  "The fee field must mirror Gyro's inclusive contract bounds",
 );
 assert.doesNotMatch(
   `${summary}\n${goals}\n${quoteAsset}`,

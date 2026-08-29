@@ -5,6 +5,7 @@ import { useState } from "react";
 import DayV3Button from "@/components/day-v3/DayV3Button";
 import DayV3NumberField from "@/components/day-v3/DayV3NumberField";
 import { DAY_V3_POOL_PREMIUM_BPS_RANGE } from "@/lib/day-v3/pool-curve";
+import { DAY_V3_POOL_SWAP_FEE_BPS_RANGE } from "@/lib/day-v3/pool-design";
 import DayV3Origin, {
   type DayV3VisibleOrigin,
 } from "@/components/day-v3/DayV3Origin";
@@ -41,6 +42,7 @@ export default function DayV3QuoteAsset({
   label,
   onLabel,
   defaultPremiumBps,
+  defaultSwapFeeBps,
   onPoolPremiumBps,
   poolPremiumEdited,
   poolPremiumBps,
@@ -57,6 +59,8 @@ export default function DayV3QuoteAsset({
   onLabel: (value: string) => void;
   /** What the pool rests on today, in bps, so an empty field can say so. */
   defaultPremiumBps: number | null;
+  /** The selected market's declared fee, used to distinguish a default from an edit. */
+  defaultSwapFeeBps?: number;
   onPoolPremiumBps: (value: number | null) => void;
   /** Whether the displayed premium is an issuer edit or a loaded default. */
   poolPremiumEdited: boolean;
@@ -77,7 +81,10 @@ export default function DayV3QuoteAsset({
   // either until one resolves, so it is labelled for what it is: the fee the
   // model is assuming. A hand-set fee is always the issuer's own override.
   const feeOrigin: DayV3VisibleOrigin =
-    swapFeeBps === null ? "model-assumption" : "manual-override";
+    swapFeeBps === null ||
+    (defaultSwapFeeBps !== undefined && swapFeeBps === defaultSwapFeeBps)
+      ? "model-assumption"
+      : "manual-override";
   // A parent reset (switching source, clearing the exit) replaces the label.
   // React's adjusted-state pattern re-seeds the draft without a second render.
   if (!Object.is(draft.source, label)) {
@@ -195,8 +202,7 @@ export default function DayV3QuoteAsset({
         onChange={onPoolPremiumBps}
         origin={poolPremiumEdited ? "manual-override" : "model-assumption"}
         // The premium actually in force, whatever set it — the market's own
-        // declared curve, a live template, or the modeled default. Calling it
-        // "the market's own" was false whenever it was not.
+        // declared curve, a canonical pool, or the modeled default.
         placeholder={
           defaultPremiumBps === null
             ? "Use the modeled premium"
@@ -216,15 +222,12 @@ export default function DayV3QuoteAsset({
       <div className="flex min-w-0 flex-col gap-2">
         <DayV3NumberField
           label="What swap fee should the pool charge on a sale?"
-          // 1000 bps is 10%, an order of magnitude above any pool anyone runs
-          // and well clear of the corner where modeled fee income compounds
-          // past what the engine can hold.
-          max={1000}
-          min={0.01}
-          note="Empty uses the live template's fee. A fee set here prices every quote and withholds the canonical pool result, which was solved at the template's own fee. From 100 bps no positive trade can clear it."
+          max={DAY_V3_POOL_SWAP_FEE_BPS_RANGE.max}
+          min={DAY_V3_POOL_SWAP_FEE_BPS_RANGE.min}
+          note="Empty uses the selected market's declared fee. A value here is the per-market Gyro pool fee used in every quote; the contract accepts 0.01–10,000 bps. Higher fees reduce proceeds but do not make every trade impossible."
           onChange={onSwapFeeBps}
           origin={feeOrigin}
-          placeholder="Use the live fee"
+          placeholder="Use the market fee"
           presets={[
             { label: "1 bps", value: 1 },
             { label: "5 bps", value: 5 },

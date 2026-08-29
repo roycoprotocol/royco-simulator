@@ -556,7 +556,8 @@ assert.equal(readDayV3UrlState("fee=30").swapFeeBps, 30);
 assert.equal(readDayV3UrlState("fee=0").swapFeeBps, null);
 assert.equal(readDayV3UrlState("fee=0.01").swapFeeBps, 0.01);
 assert.equal(readDayV3UrlState("fee=1000").swapFeeBps, 1_000);
-assert.equal(readDayV3UrlState("fee=1001").swapFeeBps, null);
+assert.equal(readDayV3UrlState("fee=10000").swapFeeBps, 10_000);
+assert.equal(readDayV3UrlState("fee=10001").swapFeeBps, null);
 assert.equal(readDayV3UrlState("fee=-5").swapFeeBps, null);
 assert.equal(readDayV3UrlState("fee=abc").swapFeeBps, null);
 assert.equal(readDayV3UrlState("").swapFeeBps, null);
@@ -621,7 +622,10 @@ for (const dropped of ["quote", "quoteApy", "fee", "mmCost", "mmDays"]) {
 // A swap fee arriving by link is bounded exactly like the field, because a link
 // is a way into the app and not a way around it. 10000 bps compounded modeled
 // fee income past what the engine can hold and took the backtest down.
-assert.equal(readDayV3UrlState("m=custom&apy=8&fee=10000").swapFeeBps, null);
+assert.equal(
+  readDayV3UrlState("m=custom&apy=8&fee=10000").swapFeeBps,
+  10_000,
+);
 
 // The pool's balance point, carried as the premium that sets it. Bounded to the
 // range the deploy step accepts, so a link cannot describe a market that cannot

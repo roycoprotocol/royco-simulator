@@ -8,14 +8,14 @@ import {
 import { resetDayV3SimulationProxyForTests } from "@/lib/day-v3/pool-proxy-cache";
 
 const requestBody = JSON.stringify({
-  schemaVersion: "1.0",
+  schemaVersion: "1.1",
   goals: {
     protectedDrawdownPct: 15,
     recoveryDays: 20,
     immediateExitSharePct: 10,
     minimumProceedsPer100: 95,
   },
-  context: { sourceApyPct: 6 },
+  context: { sourceApyPct: 6, swapFeeBps: 10 },
 });
 
 function request(body = requestBody, declaredLength?: number) {
@@ -99,8 +99,8 @@ async function main() {
       );
       return new Response(
         JSON.stringify({
-          schemaVersion: "1.0",
-          modelVersion: "day-v3-eclp-goal-solver-1.1.0",
+          schemaVersion: "1.1",
+          modelVersion: "day-v3-eclp-goal-solver-1.2.0",
           mode: "simulation",
           status: "infeasible",
           recommendation: null,
@@ -131,8 +131,8 @@ async function main() {
       await heldUpstream;
       return new Response(
         JSON.stringify({
-          schemaVersion: "1.0",
-          modelVersion: "day-v3-eclp-goal-solver-1.1.0",
+          schemaVersion: "1.1",
+          modelVersion: "day-v3-eclp-goal-solver-1.2.0",
           mode: "simulation",
           status: "infeasible",
           recommendation: null,

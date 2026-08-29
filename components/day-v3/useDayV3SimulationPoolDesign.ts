@@ -88,14 +88,20 @@ async function fetchSimulationDesign(
 }
 
 /**
- * Resolves a simulation design from only the four issuer goals and source APY.
- * Deployment facts and target selection are intentionally not accepted here.
+ * Resolves a simulation design from the four issuer goals, source APY, and the
+ * selected market's pool fee. Deployment facts and target selection are
+ * intentionally not accepted here.
  */
 export function useDayV3SimulationPoolDesign(
   goals: DayV3SimulationPoolDesignGoals | null,
   sourceApyPct: number | null,
+  swapFeeBps: number | null,
 ): DayV3SimulationDesignState {
-  const requestKey = dayV3SimulationPoolDesignRequestKey(goals, sourceApyPct);
+  const requestKey = dayV3SimulationPoolDesignRequestKey(
+    goals,
+    sourceApyPct,
+    swapFeeBps,
+  );
   const [resolved, setResolved] = useState<{
     key: string;
     state: DayV3SimulationDesignState;
@@ -108,7 +114,7 @@ export function useDayV3SimulationPoolDesign(
     const currentKey = requestKey;
     const request = JSON.parse(currentKey) as {
       goals: DayV3SimulationPoolDesignGoals;
-      context: { sourceApyPct: number };
+      context: { sourceApyPct: number; swapFeeBps: number };
     };
 
     const timeout = window.setTimeout(() => {
@@ -125,6 +131,7 @@ export function useDayV3SimulationPoolDesign(
               body,
               request.goals,
               request.context.sourceApyPct,
+              request.context.swapFeeBps,
             )
           ) {
             throw new Error(
@@ -153,8 +160,8 @@ export function useDayV3SimulationPoolDesign(
               message: dayV3PoolDesignIssueMessage(
                 body.issues,
                 body.status === "infeasible"
-                  ? "The exit terms are not feasible under the live simulation policy."
-                  : "The live simulation policy could not be resolved.",
+                  ? "The exit terms are not feasible under the canonical simulation policy."
+                  : "The canonical simulation policy could not be resolved.",
               ),
             },
           });
@@ -169,7 +176,7 @@ export function useDayV3SimulationPoolDesign(
               message:
                 error instanceof Error
                   ? error.message
-                  : "The live simulation policy could not be resolved.",
+                  : "The canonical simulation policy could not be resolved.",
             },
           });
         });
@@ -201,6 +208,6 @@ export function useDayV3SimulationPoolDesign(
         status: "resolving",
         result: previous,
         message:
-          "Updating the live fee and pool design. The last valid result stays visible until this finishes.",
+          "Updating the market pool fee and design. The last valid result stays visible until this finishes.",
       };
 }

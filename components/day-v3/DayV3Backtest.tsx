@@ -223,12 +223,10 @@ function DayV3Backtest({
   );
 
   // The engine is template code under the byte lock, so a pool assumption it
-  // cannot integrate is caught here rather than fixed there. Modeled fee income
-  // is `turnover x fee`, compounded every step: JBBB at 100x turnover and a
-  // 100% swap fee runs `pool.stable` to Infinity and the run throws
-  // `cannot convert non-finite number to WAD`, which took the page down. The
-  // fee bound below keeps real inputs well clear of that; this makes it
-  // impossible to reach by any route at all.
+  // cannot integrate is caught here rather than fixed there. Contract-valid
+  // fees can still be economically extreme when combined with high turnover;
+  // surface a bounded backtest error instead of letting the history take down
+  // the page.
   const [result, resultError] = useMemo<
     [DayBacktestResult | null, string | null]
   >(() => {
