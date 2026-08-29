@@ -286,7 +286,7 @@ export function buildDayV3HandoffV3(input: {
     warnings: [
       "This handoff is untrusted input to deployment.",
       "Deployment must validate every goal, refresh template policy, and recompute E-CLP fields. Absolute genesis funding remains unresolved until deployment has a notional and initialization policy.",
-      "Senior redemption returns the underlying asset. The external underlying-to-exit spread is an issuer-selected stress assumption; the pool-state discount and live SLP fee are modeled separately, and none is a protocol guarantee.",
+      "Senior redemption returns the underlying asset. The external underlying-to-exit spread is an issuer-selected stress assumption; the pool-state discount and selected market pool fee are modeled separately, and none is a protocol guarantee.",
       "Settlement is a market-level product decision applied identically to Senior, Junior, and Senior LP, even though the contracts store three separate queue configs.",
       "Finite execution windows must be revalidated against the selected oracle recipe's freshness limits. NAV cadence is a modeling fact, not an EntryPoint contract field.",
       "Reinvestment slippage is an on-chain ceiling. Deployment must revalidate it against the final exit asset, rate provider, and canonical E-CLP.",

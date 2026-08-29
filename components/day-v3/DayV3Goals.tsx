@@ -47,7 +47,7 @@ export type DayV3ExitView = {
   lowestPayoutPer100: MaybeNumber;
   slpPer100: MaybeNumber;
   restockPoint: MaybeNumber;
-  /** Time/carry and external-conversion hurdle before the live pool fee. */
+  /** Time/carry and external-conversion hurdle before the market pool fee. */
   restockOperationalHurdleBps: MaybeNumber;
   /** All-in hurdle used by the canonical pool-design calculation. */
   restockHurdleBps: MaybeNumber;
@@ -130,6 +130,7 @@ export default function DayV3Goals({
   poolPremiumEdited = false,
   poolTurnoverPerYear,
   defaultPremiumBps,
+  defaultSwapFeeBps,
   onPoolPremiumBps,
   poolPremiumBps,
   restingSeniorWeight,
@@ -169,9 +170,10 @@ export default function DayV3Goals({
   quoteAssetYieldPct: MaybeNumber;
   recoveryDays: MaybeNumber;
   recoveryMode: "none" | "window" | null;
-  /** The issuer's own pool fee. `null` inherits the live template's. */
+  /** The issuer's per-market pool fee. `null` uses the market declaration. */
   swapFeeBps: MaybeNumber;
   defaultPremiumBps: MaybeNumber;
+  defaultSwapFeeBps?: number;
   onPoolPremiumBps: (value: number | null) => void;
   poolPremiumEdited?: boolean;
   poolPremiumBps: MaybeNumber;
@@ -510,6 +512,7 @@ export default function DayV3Goals({
               label={quoteAssetLabel}
               onLabel={onQuoteAssetLabel}
               defaultPremiumBps={defaultPremiumBps}
+              defaultSwapFeeBps={defaultSwapFeeBps}
               onPoolPremiumBps={onPoolPremiumBps}
               poolPremiumEdited={poolPremiumEdited}
               poolPremiumBps={poolPremiumBps}

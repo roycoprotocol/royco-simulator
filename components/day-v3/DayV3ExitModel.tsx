@@ -210,7 +210,7 @@ export default function DayV3ExitModel({
         ) : exit.status === "resolving" || exit.message ? (
           <p className="rounded-lg border border-dashed border-[var(--border-subtle)] px-3 py-3 text-[11.5px] leading-relaxed text-[var(--secondary)]">
             {exit.status === "resolving"
-              ? "Refreshing the live template and recalculating this model…"
+              ? "Refreshing the canonical pool and recalculating this model…"
               : exit.message}
           </p>
         ) : null}
@@ -222,7 +222,7 @@ export default function DayV3ExitModel({
                 Proceeds: {dollars(exit.proceeds, 2)}{" "}
                 {illustrative
                   ? "after the modeled swap fee"
-                  : "after the live swap fee"}
+                  : "after the canonical pool swap fee"}
               </span>
             ) : null}
             {/*

@@ -258,6 +258,12 @@ export default function DayV3Summary({
     () => normalizeDayV3Defaults(market.defaults),
     [market.defaults],
   );
+  // Some sample sources have a separate V3 issuer-design manifest (for
+  // example JBBB). Its fee is the selected market's declared pool fee even
+  // when the generic explorer market carries the shared starter value.
+  const marketDesignDefaults = dayV3MarketDefaults(market.id);
+  const declaredSwapFeeBps =
+    marketDesignDefaults?.swapFeeBps ?? defaults.swapFeeBps;
   // The custom design is normalized in dollars because every capital and exit
   // amount is quoted per $100 Senior.
   const returnUnit = customSource
@@ -300,14 +306,18 @@ export default function DayV3Summary({
   const [poolTurnoverPerYear, setPoolTurnoverPerYear] = useState<number | null>(
     linked?.poolTurnoverPerYear ?? DAY_V3_DEFAULT_POOL_TURNOVER,
   );
-  // What the pool charges to trade. Null is the only honest default: it means
-  // the live template's own fee decides, with the market's declared fee
-  // standing in until that template resolves. Naming a number here would
-  // invent a fee policy the issuer never chose.
+  // What the market's Gyro pool charges to trade. Null means the selected
+  // market's declared default; a number means the issuer explicitly supplied
+  // the per-market pool creation fee. Royco Day no longer inherits this value
+  // from TemplatePolicy.
   const [swapFeeBps, setSwapFeeBps] = useState<number | null>(
     linked?.swapFeeBps ?? null,
   );
-  const feeOverridden = swapFeeBps !== null;
+  // A value materialized from a listed market's manifest is still the market
+  // default, not an issuer override. Only a fee different from that declaration
+  // is sent as an explicit override in the local engine metadata.
+  const feeOverridden =
+    swapFeeBps !== null && swapFeeBps !== declaredSwapFeeBps;
   // The pool's balance point, set the way deployment sets it: by the maximum
   // premium. Empty starts with the model's loaded premium; a value here means
   // the issuer explicitly changed this field. Keeping those states separate
@@ -358,6 +368,7 @@ export default function DayV3Summary({
   const modeledSourceApyPct = sourceApyPct ?? 0;
   const modeledQuoteAssetYieldPct = quoteAssetYieldPct ?? 0;
   const modeledPoolTurnover = poolTurnoverPerYear ?? 0;
+  const requestedSwapFeeBps = swapFeeBps ?? declaredSwapFeeBps;
   const simulationDefaults = useMemo(
     () => ({
       ...defaults,
@@ -367,23 +378,21 @@ export default function DayV3Summary({
       // at zero here, which is right for a plain stablecoin and silently wrong
       // for anything that accrues.
       stableYield: modeledQuoteAssetYieldPct / 100,
-      // Annual swap volume is the issuer's forecast too. At zero the live
-      // template fee still prices canonical execution quotes but contributes
+      // Annual swap volume is the issuer's forecast too. At zero the selected
+      // market pool fee still prices canonical execution quotes but contributes
       // no speculative fee income to SLP APY.
       poolTurnoverPerYear: modeledPoolTurnover,
-      // The shared template's disclosed simulation assumption, unless the
-      // issuer stated their own fee. A live RWA response replaces the
-      // assumption atomically when the exit design resolves; it cannot replace
-      // the issuer's answer, which is why that answer is applied here as well
-      // as through `engineOverrides`.
-      swapFeeBps: swapFeeBps ?? defaults.swapFeeBps,
+      // The simulation solver receives the same market-specific fee that the
+      // engine uses. An omitted field uses the selected market's declared
+      // default; it is never silently replaced by a template policy fee.
+      swapFeeBps: requestedSwapFeeBps,
     }),
     [
       defaults,
       modeledPoolTurnover,
       modeledQuoteAssetYieldPct,
       modeledSourceApyPct,
-      swapFeeBps,
+      requestedSwapFeeBps,
     ],
   );
 
@@ -513,13 +522,11 @@ export default function DayV3Summary({
   const activePoolDesign = useDayV3SimulationPoolDesign(
     poolDesignGoals,
     sourceApyPct,
+    requestedSwapFeeBps,
   );
-  // A hand-set fee belongs in this gate. The canonical service solves the pool
-  // at the template's own fee and cannot be asked to solve it at another one:
-  // its request body is key-restricted, and its parser asserts that the
-  // returned fee, its `template-policy` origin, and the restock fee all equal
-  // the live policy. Reporting those outcomes beside a different fee would
-  // attribute a result to a pool that was never priced.
+  // Curve overrides still withhold the canonical recommendation because the
+  // service must re-solve geometry. A fee override does not: it is a first-class
+  // per-market input sent to the solver and echoed by its resolved policy.
   const hasPoolOverride =
     [
       activeManualOverrides.minimumLiquidityPct,
@@ -527,7 +534,7 @@ export default function DayV3Summary({
       activeManualOverrides.depthAtNav,
       activeManualOverrides.maximumPremiumPct,
       activeManualOverrides.poolCapitalPer100,
-    ].some((value) => value !== null) || feeOverridden || premiumOverridden;
+    ].some((value) => value !== null) || premiumOverridden;
   const rawCanonicalPoolDesign =
     activePoolDesign.status === "resolved" ||
     activePoolDesign.status === "resolving"
@@ -550,9 +557,21 @@ export default function DayV3Summary({
       c: fromWad(raw.c),
       s: fromWad(raw.s),
       lambda: fromWad(raw.lambda),
+      // Preserve the exact constructor/derived values returned by the pool
+      // design service. The engine uses these fixed-point fields to match
+      // Balancer's EclpLPOracle instead of re-deriving geometry from rounded
+      // display numbers.
+      fixedParams: raw,
+      derivedParams: rawCanonicalPoolDesign.recommendation.eclp.derivedParams,
     };
     if (
-      !Object.values(params).every(Number.isFinite) ||
+      ![
+        params.alpha,
+        params.beta,
+        params.c,
+        params.s,
+        params.lambda,
+      ].every(Number.isFinite) ||
       params.alpha <= 0 ||
       params.beta <= params.alpha ||
       params.lambda <= 0
@@ -584,17 +603,15 @@ export default function DayV3Summary({
     rawCanonicalPoolDesign && !hasPoolOverride && canonicalEngineOverrides
       ? rawCanonicalPoolDesign
       : null;
-  // What the pool is actually priced at, in the order that wins: the issuer's
-  // own fee, then the live template's, then the market's declared assumption.
+  // What the pool is actually priced at. The resolved policy must echo the
+  // requested per-market fee; while it is pending, use the same request value.
   const modeledSwapFeeBps =
-    swapFeeBps ??
-    rawCanonicalPoolDesign?.policy.swapFeeBps ??
-    defaults.swapFeeBps;
+    rawCanonicalPoolDesign?.policy.swapFeeBps ?? requestedSwapFeeBps;
   // Built by OMITTING keys rather than setting them `undefined`. Both the
   // structural run and the backtest merge this by spread, so an `undefined`
   // `eclpParams` would erase the market's own curve instead of leaving it be.
   // Overrides that redraw the curve itself, as opposed to policy sitting on top
-  // of it. A hand-set fee is policy: the template's geometry is still the right
+  // of it. A hand-set fee is policy: the canonical geometry is still the right
   // geometry, it is just being charged differently. A hand-set maximum discount,
   // depth or premium IS the geometry, and the canonical `eclpParams` would win
   // the spread below and silently discard it — the reader would drag "maximum
@@ -622,7 +639,7 @@ export default function DayV3Summary({
         lambda,
       });
     }
-    // A live template's own curve is the real pool and always wins.
+    // A canonical pool's own curve is the real pool and always wins.
     if (canonicalEngineOverrides) return null;
     // So does the market's own declared curve, whenever it survives.
     // `buildDayMarketConfig` keeps `defaults.eclpParams` while the requested
@@ -735,7 +752,7 @@ export default function DayV3Summary({
             exitSharePct: modeledImmediateExitSharePct,
             minimumProceedsPer100,
             ...(premiumCurve ? { eclpParams: premiumCurve } : {}),
-            ...(swapFeeBps === null ? {} : { swapFeeBps }),
+            swapFeeBps: requestedSwapFeeBps,
           }),
     [
       coveragePct,
@@ -745,7 +762,7 @@ export default function DayV3Summary({
       minimumProceedsPer100,
       modeledImmediateExitSharePct,
       premiumCurve,
-      swapFeeBps,
+      requestedSwapFeeBps,
     ],
   );
   // The canonical service's own sizing wins when it has resolved — it prices
@@ -756,9 +773,9 @@ export default function DayV3Summary({
     : (liquidityRecommendation?.minimumLiquidity.value ??
       exitGoalSizing?.minimumLiquidityPct ??
       defaults.minLiquidity * 100);
-  // The band IS the pool's maximum discount — when the template resolves this
+  // The band IS the pool's maximum discount — when the canonical pool resolves this
   // reads its `maximumDiscountBps` directly. The fallback used the market's own
-  // fixed `eclpBandWidth`, so with no live template the payout floor shaped
+  // fixed `eclpBandWidth`, so with no canonical pool the payout floor shaped
   // nothing: an issuer could drag it from $99 to $50 and the pool, the exit
   // curve and the arbitrage economics would not move at all. Measured on the
   // shared engine, the band moves the deepest fill exactly as you would expect
@@ -768,10 +785,10 @@ export default function DayV3Summary({
     ? canonicalPoolRecommendation.fields.maximumDiscountBps.value / 100
     : floorBandPct;
   // The maximum discount the engine ACTUALLY priced, which is not always the one
-  // above. `canonicalPoolRecommendation` is withheld by any pool override
-  // including a hand-set fee, but the canonical `eclpParams` keep pricing unless
+  // above. `canonicalPoolRecommendation` is withheld by a curve override, but
+  // the canonical `eclpParams` keep pricing unless
   // the override was to the curve — so a page that read `effectiveBandPct` there
-  // named the payout floor's band beside quotes taken off the template's curve.
+  // named the payout floor's band beside quotes taken off the canonical pool's curve.
   const pricedBand: {
     pct: number;
     source: "live-template" | "payout-floor" | "your-answer";
@@ -788,7 +805,7 @@ export default function DayV3Summary({
         : { pct: floorBandPct, source: "payout-floor" };
 
   // Defer one stable, complete accountant input rather than an inline object.
-  // The former version deferred the terms but read the live E-CLP and fee
+  // The former version deferred the terms but read the canonical E-CLP and fee
   // policy outside this snapshot. A newly resolved pool could therefore run
   // briefly with the previous 0% liquidity requirement (or a new goal with the
   // previous pool policy), producing combinations such as a funded SLP showing
@@ -1569,7 +1586,7 @@ export default function DayV3Summary({
                   ? model.scenario.juniorApy * 100
                   : null,
               status: "recommended",
-            message: `${protectionRecommendation.reason}${feeOverridden ? ` The displayed return is priced at the ${swapFeeBps} bps pool fee set above, not the live market's.` : canonicalEngineOverrides ? " Current market fees are included in the displayed return." : " The forward return remains visible while exact pool terms are being checked."}`,
+            message: `${protectionRecommendation.reason}${feeOverridden ? ` The displayed return is priced at the ${swapFeeBps} bps market pool fee set above.` : canonicalEngineOverrides ? " Current market pool fees are included in the displayed return." : " The forward return remains visible while exact pool terms are being checked."}`,
             }
           : {
               coveragePct: null,
@@ -1614,9 +1631,7 @@ export default function DayV3Summary({
       : !exitGoalsComplete
         ? "Choose an exit amount and payout to check the exact pool design. Forward APYs remain available in the meantime."
         : hasPoolOverride
-          ? feeOverridden
-            ? `This design charges a hand-set ${swapFeeBps} bps swap fee. The canonical pool outcomes are withheld because they were solved at the live template's own fee, which this page cannot ask it to change. Every model below is priced at ${swapFeeBps} bps.`
-            : premiumOverridden
+          ? premiumOverridden
               ? // Not "this link": the premium is a field on this page, and the
                 // canonical service takes no premium input — it reports one as a
                 // derived, scenario-only output — so there is nothing for it to
@@ -1674,18 +1689,12 @@ export default function DayV3Summary({
     restingSeniorPct:
       canonicalOutcomes?.seniorShareAtNavPct ?? null,
     swapFeeBps: canonicalExit?.policy.swapFeeBps ?? model.pool.swapFeeBps,
-    // A hand-set fee is never attributed to a template or to product policy,
-    // and the template's own fee is named beside it whenever it is known, so
-    // the reader can see exactly what was replaced and by how much.
+    // A hand-set fee is a per-market pool setting, not a template-policy value.
     feeSource: feeOverridden
-      ? `Issuer-set pool swap fee: ${modeledSwapFeeBps} bps. ${
-          rawCanonicalPoolDesign
-            ? `The live ${rawCanonicalPoolDesign.policy.templateName} template on ${rawCanonicalPoolDesign.policy.chainName} charges ${rawCanonicalPoolDesign.policy.swapFeeBps} bps at block ${rawCanonicalPoolDesign.policy.blockNumber}.`
-            : `The live template has not resolved, so its own fee is unknown; without this answer the market's declared ${defaults.swapFeeBps} bps would apply.`
-        }`
+      ? `Issuer-set market pool swap fee: ${modeledSwapFeeBps} bps. The fee is carried in the selected market's Gyro pool creation parameters.`
       : canonicalExit
-        ? `${canonicalExit.policy.templateName} on ${canonicalExit.policy.chainName}, block ${canonicalExit.policy.blockNumber}. Protocol fees: ST ${(Number(BigInt(canonicalExit.policy.protocolFees.stProtocolFeeWad)) / 1e16).toFixed(1)}%, JT ${(Number(BigInt(canonicalExit.policy.protocolFees.jtProtocolFeeWad)) / 1e16).toFixed(1)}%, JT premium ${(Number(BigInt(canonicalExit.policy.protocolFees.jtYieldShareProtocolFeeWad)) / 1e16).toFixed(1)}%, SLP premium ${(Number(BigInt(canonicalExit.policy.protocolFees.lptYieldShareProtocolFeeWad)) / 1e16).toFixed(1)}%. Resolved ${canonicalExit.policy.resolvedAt}`
-        : null,
+        ? `${canonicalExit.policy.templateName} on ${canonicalExit.policy.chainName}, block ${canonicalExit.policy.blockNumber}. Pool swap fee: ${canonicalExit.policy.swapFeeBps} bps. Protocol fees: ST ${(Number(BigInt(canonicalExit.policy.protocolFees.stProtocolFeeWad)) / 1e16).toFixed(1)}%, JT ${(Number(BigInt(canonicalExit.policy.protocolFees.jtProtocolFeeWad)) / 1e16).toFixed(1)}%, JT premium ${(Number(BigInt(canonicalExit.policy.protocolFees.jtYieldShareProtocolFeeWad)) / 1e16).toFixed(1)}%, SLP premium ${(Number(BigInt(canonicalExit.policy.protocolFees.lptYieldShareProtocolFeeWad)) / 1e16).toFixed(1)}%. Resolved ${canonicalExit.policy.resolvedAt}`
+        : `Selected market declares a ${declaredSwapFeeBps} bps Gyro pool fee until a canonical pool design resolves.`,
   };
   // Both discounts come from one engine run against one pool: the deepest fill
   // it can do, and the fill the promised exit takes. That is what an
@@ -1950,6 +1959,7 @@ export default function DayV3Summary({
             drawdownPct={protectedDrawdownPct}
             exit={exitView}
             defaultPremiumBps={model.pool.premiumBps}
+            defaultSwapFeeBps={declaredSwapFeeBps}
             onPoolPremiumBps={setPoolPremiumBps}
             poolPremiumEdited={premiumOverridden}
             poolPremiumBps={poolPremiumBps ?? loadedPoolPremiumBps}
@@ -2411,7 +2421,7 @@ export default function DayV3Summary({
                           <CardNote>
                             {exitView.status === "infeasible"
                               ? "These exit terms do not produce a deployable pool. Change the inputs identified in the Senior exit section to redraw the curve."
-                              : "Finish the Senior exit section and resolve its live template. The one-trade curve will appear here; V3 does not fill this space with dashes or a fallback pool."}
+                              : "Finish the Senior exit section and resolve its canonical pool. The one-trade curve will appear here; V3 does not fill this space with dashes or a fallback pool."}
                           </CardNote>
                         </CardHeader>
                       </Card>

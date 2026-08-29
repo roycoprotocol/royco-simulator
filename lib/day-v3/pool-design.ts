@@ -1,8 +1,14 @@
 import type { DayV3Goals } from "@/lib/day-v3/types";
 
-export const DAY_V3_POOL_DESIGN_SCHEMA = "1.2" as const;
+export const DAY_V3_POOL_DESIGN_SCHEMA = "1.3" as const;
 export const DAY_V3_POOL_DESIGN_MODEL =
-  "day-v3-eclp-goal-solver-1.1.0" as const;
+  "day-v3-eclp-goal-solver-1.2.0" as const;
+
+/** Royco Day's current Gyro E-CLP pool-fee bounds, expressed in bps. */
+export const DAY_V3_POOL_SWAP_FEE_BPS_RANGE = {
+  min: 0.01,
+  max: 10_000,
+} as const;
 
 export const DAY_V3_DERIVED_ECLP_KEYS = [
   "tauAlphaX",
@@ -54,6 +60,8 @@ export interface DayV3PoolDesignTarget {
 
 export interface DayV3PoolDesignContext {
   sourceApyPct: number;
+  /** Market-specific Gyro pool creation fee, not a template policy value. */
+  swapFeeBps: number;
   exitAsset: `0x${string}` | null;
   exitAssetRateProvider: `0x${string}` | null;
   exitAssetYieldBearing: boolean | null;
@@ -67,6 +75,7 @@ export interface DayV3PoolDesignIssue {
 
 export interface DayV3ResolvedPolicy extends DayV3PoolDesignTarget {
   status: "resolved";
+  /** `poolCreationParams.swapFeePercentage` in Royco Day deployment params. */
   swapFeeBps: number;
   chargeYieldFeeOnSeniorTrancheShares: boolean;
   chargeYieldFeeOnQuoteAsset: boolean;
@@ -87,7 +96,7 @@ export interface DayV3PoolDesignField {
     | "issuer-goal"
     | "recommended"
     | "derived"
-    | "template-policy"
+    | "market-policy"
     | "manual-override"
     | "unresolved";
   deployPath: string | null;
@@ -178,7 +187,7 @@ const FIELD_ORIGINS = new Set([
   "issuer-goal",
   "recommended",
   "derived",
-  "template-policy",
+  "market-policy",
   "manual-override",
   "unresolved",
 ]);
@@ -332,12 +341,8 @@ function isResolvedPolicy(value: unknown): value is DayV3ResolvedPolicy {
     isRecord(value) &&
     value.status === "resolved" &&
     isFiniteNumber(value.swapFeeBps) &&
-    // Template validation accepts swap fees from 1e12 through 1e18 WAD,
-    // inclusive. In basis points that is 0.01 through 10,000. Mirror those
-    // contract endpoints exactly: zero is not deployable, while the upper
-    // endpoint is.
-    value.swapFeeBps >= 0.01 &&
-    value.swapFeeBps <= 10_000 &&
+    value.swapFeeBps >= DAY_V3_POOL_SWAP_FEE_BPS_RANGE.min &&
+    value.swapFeeBps <= DAY_V3_POOL_SWAP_FEE_BPS_RANGE.max &&
     typeof value.chargeYieldFeeOnSeniorTrancheShares === "boolean" &&
     typeof value.chargeYieldFeeOnQuoteAsset === "boolean" &&
     validProtocolFees &&
@@ -406,6 +411,9 @@ function isContext(value: unknown): value is DayV3PoolDesignContext {
     isFiniteNumber(value.sourceApyPct) &&
     value.sourceApyPct >= 0 &&
     value.sourceApyPct <= 100 &&
+    isFiniteNumber(value.swapFeeBps) &&
+    value.swapFeeBps >= DAY_V3_POOL_SWAP_FEE_BPS_RANGE.min &&
+    value.swapFeeBps <= DAY_V3_POOL_SWAP_FEE_BPS_RANGE.max &&
     optionalAddress(value.exitAsset) &&
     optionalAddress(value.exitAssetRateProvider) &&
     (value.exitAssetYieldBearing === null ||
@@ -490,11 +498,12 @@ export function isDayV3PoolDesignResult(
       !isDesignField(fields.swapFeeBps) ||
       !isDesignField(fields.poolFundingPer100Senior) ||
       fields.swapFeeBps.value !== value.policy.swapFeeBps ||
+      value.context.swapFeeBps !== value.policy.swapFeeBps ||
       fields.maximumDiscountBps.origin !== "recommended" ||
       fields.depthAtNavLambda.origin !== "recommended" ||
       fields.maximumPremiumBps.origin !== "derived" ||
       fields.maximumPremiumBps.modelUsage !== "scenario-only" ||
-      fields.swapFeeBps.origin !== "template-policy" ||
+      fields.swapFeeBps.origin !== "market-policy" ||
       fields.poolFundingPer100Senior.origin !== "recommended"
     ) {
       return false;
@@ -615,6 +624,7 @@ export function dayV3PoolDesignMatchesGoals(
     result.goals.target.templateId === goals.target.templateId &&
     (context === undefined ||
       (result.context.sourceApyPct === context.sourceApyPct &&
+        result.context.swapFeeBps === context.swapFeeBps &&
         result.context.exitAsset === context.exitAsset &&
         result.context.exitAssetRateProvider ===
           context.exitAssetRateProvider &&

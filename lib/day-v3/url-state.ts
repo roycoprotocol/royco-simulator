@@ -10,6 +10,7 @@ import {
   DAY_CURVE_MODELS,
   type DayCurveModel,
 } from "@/lib/day-simulator-template/deploy-fields";
+import { DAY_V3_POOL_SWAP_FEE_BPS_RANGE } from "@/lib/day-v3/pool-design";
 
 export type DayV3Mode = "simulate" | "deploy";
 
@@ -26,11 +27,7 @@ export interface DayV3UrlState extends DayV3GoalDraft {
   quoteAssetYieldPct: number | null;
   /** Annual swap volume as a multiple of pool value. Zero means no forecast. */
   poolTurnoverPerYear: number | null;
-  /**
-   * The pool's trading fee. `null` is the honest default: it means the live
-   * template's own fee decides, and the market's declared fee stands in until
-   * that template resolves. A number here is the issuer's own fee policy.
-   */
+  /** The selected market's Gyro pool trading fee, in bps. */
   swapFeeBps: number | null;
   /**
    * The pool's balance point, carried as the maximum premium in bps that sets
@@ -462,13 +459,13 @@ export function readDayV3UrlState(search: string): DayV3UrlState {
     quoteAssetLabel: label(params.get("quote")),
     quoteAssetYieldPct: finite(params.get("quoteApy"), 0, 30),
     poolTurnoverPerYear: finite(params.get("turnover"), 0, 100),
-    // `previewSecondarySell` throws outside 0–10000 bps, inside a render-time
-    // memo with no error boundary above it, so this bound is what keeps a
-    // hand-edited link from crashing the page rather than a cosmetic range.
-    // Matches the field's own bound. A link is a way into the app, not a way
-    // around it: 10000 bps arrived here and compounded modeled fee income past
-    // what the engine can hold, taking the backtest down.
-    swapFeeBps: finite(params.get("fee"), 0.01, 1_000),
+    // Match Gyro's contract range. The engine/backtest still validates whether
+    // a particular high-fee scenario has finite modeled outcomes.
+    swapFeeBps: finite(
+      params.get("fee"),
+      DAY_V3_POOL_SWAP_FEE_BPS_RANGE.min,
+      DAY_V3_POOL_SWAP_FEE_BPS_RANGE.max,
+    ),
     // The pool's balance point, carried as the premium that sets it — the same
     // quantity the deployment interface takes, in the range it accepts
     // (`PREMIUM_BP = { min: 0, max: 50 }`). A link that carried a premium the
@@ -563,9 +560,9 @@ export function buildDayV3Query(state: DayV3UrlWriteState): string {
     if (state.quoteAssetLabel) params.set("quote", state.quoteAssetLabel);
     setNumber("quoteApy", state.quoteAssetYieldPct);
     setNumber("turnover", state.poolTurnoverPerYear);
-    // Only a hand-set fee is written. A null fee means the live template's own
-    // fee decides, and serializing a placeholder for it would turn an inherited
-    // policy into a stated one the moment a link was shared.
+    // Only a hand-set fee is written. A null fee means the selected market's
+    // declared fee; serializing a placeholder would turn that declaration into
+    // an explicit issuer override the moment a link was shared.
     setNumber("fee", state.swapFeeBps);
     setNumber("premiumBps", state.poolPremiumBps);
     setNumber("mmCost", state.marketMakerCostOfCapitalPct);

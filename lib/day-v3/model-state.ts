@@ -1,7 +1,7 @@
 /**
  * Keep every input to one displayed accountant run in the same value. React may
  * defer this snapshot, but it must never defer the goals separately from the
- * live template policy that prices them.
+ * canonical market-pool policy that prices them.
  */
 export function createDayV3ModelSnapshot<
   TTerms extends Record<string, unknown>,

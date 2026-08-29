@@ -5,7 +5,7 @@ export type DayV3FieldOrigin =
   | "issuer-goal"
   | "recommended"
   | "derived"
-  | "template-policy"
+  | "market-policy"
   | "manual-override"
   | "unresolved";
 
@@ -71,7 +71,7 @@ export interface DayV3DeploymentPolicy {
  * Issuer goals accepted by the canonical pool-design service.
  *
  * The nullable deployment facts are deliberate. They are forwarded so a
- * response can still resolve live template policy and price the immediate
+ * response can still resolve canonical pool policy and price the immediate
  * pool exit, but a deployment handoff may not be marked ready until the
  * issuer has supplied them.
  */

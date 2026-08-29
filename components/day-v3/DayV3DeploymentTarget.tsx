@@ -110,8 +110,8 @@ export default function DayV3DeploymentTarget({
           className="text-[10.5px] leading-relaxed text-[var(--tertiary)]"
           id="day-v3-deployment-target-message"
         >
-          {message} Selecting a target resolves its live swap fee and validates
-          the pool design. No fallback fee is used.
+          {message} Selecting a target resolves the canonical market-pool fee
+          and validates the pool design. No fallback fee is used.
         </span>
       </label>
     </section>

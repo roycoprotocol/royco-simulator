@@ -1,9 +1,9 @@
 # Day V3 deployment parity audit
 
-Audited 2026-08-13 against:
+Audited 2026-08-28 against:
 
 - the current `royco-rwa-frontend` deployment flow;
-- `royco-day` commit `9764c9e20c8e8af7df1358f228c4be83b78be97f`;
+- `royco-day` commit `107a5dd8b1e069ca23855c7f7e89de523678269b`;
 - the canonical E-CLP implementation and differential vectors used by Royco Deploy.
 
 This audit distinguishes issuer design decisions from deployment plumbing. V3
@@ -23,8 +23,8 @@ the final transaction.
 | Reinvestment protection | Issuer supplies the maximum value SLP reinvestment may give up | `maxReinvestmentSlippageWAD` |
 
 The handoff is versioned, normalized to $100 Senior, and includes chain,
-template, block, resolution time, exact registered YDM instances, live fee
-provenance, exact E-CLP parameters, and field origins. Illustrative starter
+template, block, resolution time, exact registered YDM instances, market
+pool-fee provenance, exact E-CLP parameters, and field origins. Illustrative starter
 values cannot become deployment-approved merely by surviving a URL reload.
 
 ## Fail-closed handoff behavior
@@ -84,7 +84,10 @@ requirements:
    off-chain derivation. Royco Deploy therefore performs stricter canonical
    E-CLP and quote validation before deployment.
 6. The pool swap-fee interval is a contract rule and is inclusive:
-   `0.01–10,000 bps`. Dawn and Royco Deploy now use those exact endpoints.
+   `0.01–10,000 bps`. It is the selected market's
+   `poolCreationParams.swapFeePercentage` for the Gyro E-CLP pool, not a
+   `TemplatePolicy` value; Dawn and Royco Deploy should carry that per-market
+   field through unchanged.
 
 Minimum Coverage, Minimum Liquidity, yield caps, fixed-term settings, oracle
 configuration, and reinvestment slippage can also be changed later by authorized
@@ -95,7 +98,7 @@ does not imply that every parameter is forever immutable.
 
 - Dawn full regression suite: pass.
 - Royco Day parity: 78/78 pinned Solidity vectors pass at commit
-  `9764c9e20c8e8af7df1358f228c4be83b78be97f`.
+  `107a5dd8b1e069ca23855c7f7e89de523678269b`.
 - Dawn lint, TypeScript, and production build: pass.
 - RWA TypeScript and production build: pass.
 - RWA runnable tests: 474 pass, 3 skip.

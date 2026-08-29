@@ -84,7 +84,7 @@ const fields = Object.fromEntries(
       unit: "test",
       origin:
         key === "swapFeeBps"
-          ? "template-policy"
+          ? "market-policy"
           : key === "maximumPremiumBps"
             ? "derived"
             : "recommended",
@@ -98,11 +98,11 @@ const fields = Object.fromEntries(
 
 const resolved = {
   schemaVersion: DAY_V3_SIMULATION_POOL_DESIGN_SCHEMA,
-  modelVersion: "day-v3-eclp-goal-solver-1.1.0",
+  modelVersion: "day-v3-eclp-goal-solver-1.2.0",
   mode: "simulation",
   status: "resolved",
   goals,
-  context: { sourceApyPct: 6 },
+  context: { sourceApyPct: 6, swapFeeBps: 10 },
   policy,
   deployment,
   recommendation: {
@@ -164,29 +164,37 @@ const resolved = {
 >;
 
 assert.equal(isDayV3SimulationPoolDesignResult(resolved), true);
-assert.equal(dayV3SimulationPoolDesignMatchesRequest(resolved, goals, 6), true);
 assert.equal(
-  dayV3SimulationPoolDesignMatchesRequest(resolved, goals, 7),
+  dayV3SimulationPoolDesignMatchesRequest(resolved, goals, 6, 10),
+  true,
+);
+assert.equal(
+  dayV3SimulationPoolDesignMatchesRequest(resolved, goals, 7, 10),
   false,
 );
 
-const key = dayV3SimulationPoolDesignRequestKey(goals, 6);
+const key = dayV3SimulationPoolDesignRequestKey(goals, 6, 10);
 assert.notEqual(key, null);
 assert.deepEqual(JSON.parse(key as string), {
-  schemaVersion: "1.0",
+  schemaVersion: "1.1",
   goals,
-  context: { sourceApyPct: 6 },
+  context: { sourceApyPct: 6, swapFeeBps: 10 },
 });
-assert.notEqual(dayV3SimulationPoolDesignRequestKey(goals, 0), null);
-assert.equal(dayV3SimulationPoolDesignRequestKey(goals, null), null);
+assert.notEqual(dayV3SimulationPoolDesignRequestKey(goals, 0, 10), null);
+assert.equal(dayV3SimulationPoolDesignRequestKey(goals, null, 10), null);
 assert.equal(
-  dayV3SimulationPoolDesignRequestKey({ ...goals, recoveryDays: 20.5 }, 6),
+  dayV3SimulationPoolDesignRequestKey(
+    { ...goals, recoveryDays: 20.5 },
+    6,
+    10,
+  ),
   null,
 );
 assert.equal(
   dayV3SimulationPoolDesignRequestKey(
     { ...goals, navUpdateDays: 1 } as typeof goals,
     6,
+    10,
   ),
   null,
   "deployment fields must not enter the simulation request",
@@ -221,8 +229,8 @@ assert.equal(isDayV3SimulationPoolDesignResult(infeasible), true);
 
 assert.equal(
   isDayV3SimulationPoolDesignResult({
-    schemaVersion: "1.0",
-    modelVersion: "day-v3-eclp-goal-solver-1.1.0",
+    schemaVersion: "1.1",
+    modelVersion: "day-v3-eclp-goal-solver-1.2.0",
     mode: "simulation",
     status: "unresolved",
     policy: null,

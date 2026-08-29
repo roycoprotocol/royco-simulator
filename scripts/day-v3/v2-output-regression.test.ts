@@ -43,7 +43,8 @@ const actual = {
 };
 
 // Captured after the authorized shared-engine correction that applies the
-// exact-input pool fee before E-CLP pricing and the uniform 5% protocol fee on
+// exact-input pool fee before E-CLP pricing, values the SLP BPT with Balancer's
+// fixed-point EclpLPOracle path, and applies the uniform 5% protocol fee on
 // Junior and SLP yield premiums. The route/components remain frozen; this
 // baseline intentionally records the corrected all-in returns and exit quote.
 assert.deepEqual(actual, {
@@ -62,9 +63,9 @@ assert.deepEqual(actual, {
     lt: 4444444.444444445,
   },
   scenario: {
-    seniorApy: 0.04461662188292803,
+    seniorApy: 0.044616621878814655,
     juniorApy: 0.09985058019648951,
-    liquidityApy: 0.07048239010733948,
+    liquidityApy: 0.07048238362780723,
   },
   capitalStack: {
     coverageLossLimit: 0.22222222222299992,

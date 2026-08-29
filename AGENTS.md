@@ -27,7 +27,7 @@ Changes to `lib/try/engine.ts`, `lib/try/backtest.ts`, `components/simulator/`, 
 5. Pareto FalconX v3 is the grounded default. Fonts, colors, borders, spacing, charts, diagrams, and behavior remain shared and byte-locked; an authorized market may use supported section-visibility or copy overrides without forking the component.
 6. Never guess provenance, price type, fee treatment, desired yield ranges, hidden parameters, or customization authority. Incomplete intake must remain `unknown` and fail verification.
 7. Calibrate with `npm run day-sim:calibrate -- <market-id>`; never calculate tranche outputs independently.
-8. Run `npm run day-sim:verify -- <market-id>` and `npm run day-sim:certify -- <market-id>` before requesting publication. Certification must pass all 74 Solidity vectors, tests, lint, and build.
+8. Run `npm run day-sim:verify -- <market-id>` and `npm run day-sim:certify -- <market-id>` before requesting publication. Certification must pass all 78 Solidity vectors, tests, lint, and build.
 9. If an explicitly authorized customization is not yet supported, extend the shared manifest-driven customization schema with tests; do not create a one-off market component. Updating the template lock is a maintainer action after full certification.
 10. Do not create or merge a PR until verification and certification pass and the user approves the browser preview.
 11. Erasure annotations consume the accountant's structured erased amount and pre-refill Junior valuation. Never parse event copy or size erasure against a same-timestamp refill.

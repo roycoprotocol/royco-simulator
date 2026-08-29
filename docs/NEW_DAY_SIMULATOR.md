@@ -139,7 +139,7 @@ Certification runs data verification, accountant runtime checks, every checked-i
 
 ```text
 Data integrity: PASS
-Accountant parity: PASS (78/78 replayed vectors from royco-day @9764c9e20c)
+Accountant parity: PASS (78/78 replayed vectors from royco-day @107a5dd8b1)
 Calibration guardrails: PASS
 Locked copy: PASS
 Design contract: PASS

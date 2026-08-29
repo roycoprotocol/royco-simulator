@@ -3,8 +3,9 @@
 // -----------------------------------------------------------------------------
 // Senior/Junior accounting, utilization, premiums, fees, share conversion, and
 // kernel operation gates use 18-decimal bigint arithmetic with explicit
-// Solidity rounding. The ECLP invariant is an off-chain venue model; its
-// floating-point result is quantized to WAD before it enters accountant state.
+// Solidity rounding. The ECLP venue mark follows Balancer's EclpLPOracle when
+// the deployment response includes the pool's stored fixed/derived parameters;
+// legacy/local curves use the deterministic geometric fallback in eclp.ts.
 // =============================================================================
 
 import {
@@ -32,10 +33,9 @@ import {
 } from './wad';
 import {
   type EclpParams,
-  eclpInvariant,
+  eclpOracleTvlWad,
   eclpParamsForWeight,
   eclpSellValue,
-  eclpTVL,
   reservesPerL,
 } from './eclp';
 
@@ -175,7 +175,7 @@ export function poolSeniorWeightAtPeg(cfg: MarketConfig): number {
 function eclpParamsFor(cfg: MarketConfig): EclpParams {
   const supplied = cfg.eclpParams;
   const key = supplied
-    ? `${supplied.alpha}|${supplied.beta}|${supplied.c}|${supplied.s}|${supplied.lambda}`
+    ? `${supplied.alpha}|${supplied.beta}|${supplied.c}|${supplied.s}|${supplied.lambda}|${supplied.fixedParams ? JSON.stringify(supplied.fixedParams) : ''}|${supplied.derivedParams ? JSON.stringify(supplied.derivedParams) : ''}`
     : `${DAY_ECLP_SIMULATION_LAMBDA}|${cfg.eclpBandWidth}`;
   if (!eclpCache || eclpCache.key !== key) {
     eclpCache = {
@@ -203,11 +203,16 @@ export const poolValueWad = (state: LiveState): bigint =>
   mulDiv(state.pool.stShares, stPriceWad(state), WAD) + state.pool.stable;
 
 export function ltRawNAVWad(state: LiveState, cfg: MarketConfig): bigint {
-  const seniorLeg = fromWad(mulDiv(state.pool.stShares, stPriceWad(state), WAD));
-  const stableLeg = fromWad(state.pool.stable);
-  if (seniorLeg <= 0 && stableLeg <= 0) return 0n;
   const params = eclpParamsFor(cfg);
-  return toWad(eclpTVL(params, eclpInvariant(params, seniorLeg, stableLeg), 1, 1));
+  // The Balancer oracle consumes the Vault's live scaled balances, not a
+  // Number approximation of the pool composition. Keep both legs in WAD and
+  // let eclpOracleTvlWad reproduce GyroECLPPool.computeInvariant(ROUND_DOWN)
+  // followed by EclpLPOracle._computeEclpTvl.
+  const seniorLegWad = mulDiv(state.pool.stShares, stPriceWad(state), WAD);
+  return eclpOracleTvlWad(params, {
+    x: seniorLegWad,
+    y: state.pool.stable,
+  });
 }
 
 export const ltOwnedSTValueWad = (state: LiveState): bigint =>
@@ -1245,7 +1250,10 @@ export function accruePoolCarry(state: LiveState, cfg: MarketConfig, dtSec: numb
   if (dt <= 0n) return;
   const swapAPY = toWad((cfg.poolTurnoverPerYear * cfg.swapFeeBps) / 10_000);
   const stableAPY = toWad(cfg.stableYield);
-  const swapIncome = mulDiv(mulDiv(poolValueWad(state), swapAPY, WAD), dt, BigInt(YEAR_SEC));
+  // Swap fees accrue on the oracle-valued BPT, not the naive spot sum of its
+  // reserves. The latter changes when a trader moves the E-CLP off peg and
+  // would make the simulator's SLP APY depend on a manipulable composition.
+  const swapIncome = mulDiv(mulDiv(ltRawNAVWad(state, cfg), swapAPY, WAD), dt, BigInt(YEAR_SEC));
   const stableIncome = mulDiv(mulDiv(state.pool.stable, stableAPY, WAD), dt, BigInt(YEAR_SEC));
   state.pool.stable += swapIncome + stableIncome;
 }

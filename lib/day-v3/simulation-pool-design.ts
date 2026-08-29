@@ -3,12 +3,13 @@ import {
   DAY_V3_POOL_DESIGN_SCHEMA,
   isDayV3PoolDesignResult,
   isDayV3ResolvedPolicy,
+  DAY_V3_POOL_SWAP_FEE_BPS_RANGE,
   type DayV3PoolDesignIssue,
   type DayV3PoolDesignRecommendation,
   type DayV3ResolvedPolicy,
 } from "@/lib/day-v3/pool-design";
 
-export const DAY_V3_SIMULATION_POOL_DESIGN_SCHEMA = "1.0" as const;
+export const DAY_V3_SIMULATION_POOL_DESIGN_SCHEMA = "1.1" as const;
 
 export interface DayV3SimulationPoolDesignGoals {
   protectedDrawdownPct: number;
@@ -19,6 +20,8 @@ export interface DayV3SimulationPoolDesignGoals {
 
 export interface DayV3SimulationPoolDesignContext {
   sourceApyPct: number;
+  /** Market-specific pool creation fee supplied to the simulation solver. */
+  swapFeeBps: number;
 }
 
 export interface DayV3SimulationPoolDesignRequest {
@@ -124,10 +127,13 @@ export function isDayV3SimulationPoolDesignContext(
 ): value is DayV3SimulationPoolDesignContext {
   return (
     isRecord(value) &&
-    hasOnlyKeys(value, ["sourceApyPct"]) &&
+    hasOnlyKeys(value, ["sourceApyPct", "swapFeeBps"]) &&
     isFiniteNumber(value.sourceApyPct) &&
     value.sourceApyPct >= 0 &&
-    value.sourceApyPct <= 100
+    value.sourceApyPct <= 100 &&
+    isFiniteNumber(value.swapFeeBps) &&
+    value.swapFeeBps >= DAY_V3_POOL_SWAP_FEE_BPS_RANGE.min &&
+    value.swapFeeBps <= DAY_V3_POOL_SWAP_FEE_BPS_RANGE.max
   );
 }
 
@@ -217,6 +223,7 @@ function isSimulationRecommendation(
     },
     context: {
       sourceApyPct: context.sourceApyPct,
+      swapFeeBps: context.swapFeeBps,
       exitAsset: null,
       exitAssetRateProvider: null,
       exitAssetYieldBearing: null,
@@ -284,6 +291,7 @@ export function dayV3SimulationPoolDesignMatchesRequest(
   result: DayV3SimulationPoolDesignResult,
   goals: DayV3SimulationPoolDesignGoals,
   sourceApyPct: number,
+  swapFeeBps: number,
 ): boolean {
   return (
     result.goals !== undefined &&
@@ -292,7 +300,8 @@ export function dayV3SimulationPoolDesignMatchesRequest(
     result.goals.recoveryDays === goals.recoveryDays &&
     result.goals.immediateExitSharePct === goals.immediateExitSharePct &&
     result.goals.minimumProceedsPer100 === goals.minimumProceedsPer100 &&
-    result.context.sourceApyPct === sourceApyPct
+    result.context.sourceApyPct === sourceApyPct &&
+    result.context.swapFeeBps === swapFeeBps
   );
 }
 
@@ -300,8 +309,9 @@ export function dayV3SimulationPoolDesignMatchesRequest(
 export function dayV3SimulationPoolDesignRequestKey(
   goals: DayV3SimulationPoolDesignGoals | null,
   sourceApyPct: number | null,
+  swapFeeBps: number | null,
 ): string | null {
-  const context = { sourceApyPct };
+  const context = { sourceApyPct, swapFeeBps };
   if (
     !isDayV3SimulationPoolDesignGoals(goals) ||
     !isDayV3SimulationPoolDesignContext(context)

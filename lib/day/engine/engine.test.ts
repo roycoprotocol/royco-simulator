@@ -5,10 +5,10 @@
 
 import { MarketState } from "./types";
 import { Sim, defaultConfig, steadyYear, type StepInput } from "./runner";
-import { adaptYTargetWadWithAverage, jtRedeem, newMarket, postOpAccountingWad, sharesForValueWad, valueForSharesWad, ydmShareWad } from "./engine";
-import { toWad } from "./wad";
+import { accruePoolCarry, adaptYTargetWadWithAverage, jtRedeem, ltRawNAVWad, newMarket, poolValueWad, postOpAccountingWad, secondarySell, sharesForValueWad, valueForSharesWad, ydmShareWad } from "./engine";
+import { WAD, mulDiv, toWad } from "./wad";
 import { YEAR_SEC, ydmShare } from "./ydm";
-import { eclpParamsForWeight, eclpSellValue, eclpInvariant, eclpTVL, reservesPerL } from "./eclp";
+import { eclpOracleTvlWad, eclpParamsForWeight, eclpSellValue, eclpInvariant, eclpTVL, reservesPerL, type EclpParams } from "./eclp";
 import "./secondary-exit-fee.test";
 
 let passed = 0;
@@ -496,7 +496,109 @@ console.log("\n25. Share mint and redemption pricing carry the one-wei virtual o
 }
 
 // ---------------------------------------------------------------------------
-console.log("\n26. Adaptive YDM evolution matches Solady expWad below the clamp");
+console.log("\n26. SLP BPT valuation follows Balancer's EclpLPOracle fixed-point path");
+{
+  // Production Royco Day E-CLP params/derived values from the deployment
+  // registry. The expected mark is the result of
+  // GyroECLPPool.computeInvariant(ROUND_DOWN) + EclpLPOracle._computeEclpTvl
+  // for 100 ST and 900 quote units at 1:1 oracle prices.
+  const productionEclp: EclpParams = {
+    alpha: 0.98,
+    beta: 1.0003,
+    c: 0.7071067811865475,
+    s: 0.7071067811865475,
+    lambda: 250,
+    fixedParams: {
+      alpha: "980000000000000000",
+      beta: "1000300000000000000",
+      c: "707106781186547524",
+      s: "707106781186547524",
+      lambda: "250000000000000000000",
+    },
+    derivedParams: {
+      tauAlphaX: "-92975357432315416605491271255356493443",
+      tauAlphaY: "36818241543196904975774583017121171403",
+      tauBetaX: "3746804827358009532998249894673148143",
+      tauBetaY: "99929782615523019584751990190862643080",
+      u: "48361081129836713014414996374502815654",
+      v: "68374012079359962202743630490639666742",
+      w: "31555770536163057268712062638611327323",
+      z: "-44614276302478703485664720423548546517",
+      dSq: "99999999999999999886624093342106115200",
+    },
+  };
+  const oracleTvl = eclpOracleTvlWad(productionEclp, {
+    x: 100n * WAD,
+    y: 900n * WAD,
+  });
+  check(
+    "canonical production E-CLP mark matches Balancer's Solidity oracle",
+    oracleTvl === 999985554810015442264n,
+    `tvl=${oracleTvl}`,
+  );
+  check(
+    "E-CLP lower-bound price branch matches Balancer's Solidity oracle",
+    eclpOracleTvlWad(
+      productionEclp,
+      { x: 100n * WAD, y: 900n * WAD },
+      { x: 980_000_000_000_000_000n, y: WAD },
+    ) === 985120519499604236300n,
+  );
+  check(
+    "E-CLP interior price branch preserves Balancer LogExpMath rounding",
+    eclpOracleTvlWad(
+      productionEclp,
+      { x: 100n * WAD, y: 900n * WAD },
+      { x: WAD, y: 1_010_000_000_000_000_000n },
+    ) === 1004630484111324783237n,
+  );
+  let smallPriceRejected = false;
+  try {
+    eclpOracleTvlWad(
+      productionEclp,
+      { x: 100n * WAD, y: 900n * WAD },
+      { x: 99_999_999_999n, y: WAD },
+    );
+  } catch (error) {
+    smallPriceRejected = error instanceof Error && error.message === 'ECLP_TOKEN_PRICE_TOO_SMALL';
+  }
+  check('E-CLP rejects prices below Balancer\'s oracle floor', smallPriceRejected);
+
+  const cfg = defaultConfig({
+    eclpParams: productionEclp,
+    stableYield: 0,
+    poolTurnoverPerYear: 1,
+    swapFeeBps: 100,
+    riskYDM: { mode: "static", y0: 0, yTarget: 0, y100: 0 },
+    liqYDM: { mode: "static", y0: 0, yTarget: 0, y100: 0 },
+  });
+  const state = newMarket(cfg, { st: 1000, jt: 250, lt: 150 });
+  const sale = secondarySell(state, cfg, 10);
+  check("secondary sale used to create an off-peg pool", sale.ok);
+  const oracleBase = ltRawNAVWad(state, cfg);
+  const spotBase = poolValueWad(state);
+  check(
+    "off-peg SLP mark is distinct from manipulable spot reserve sum",
+    oracleBase !== spotBase,
+    `oracle=${oracleBase} spot=${spotBase}`,
+  );
+  const stableBefore = state.pool.stable;
+  accruePoolCarry(state, cfg, YEAR_SEC);
+  const swapIncome = state.pool.stable - stableBefore;
+  const expectedSwapIncome = mulDiv(
+    mulDiv(oracleBase, toWad(0.01), WAD),
+    BigInt(YEAR_SEC),
+    BigInt(YEAR_SEC),
+  );
+  check(
+    "swap-fee carry/APY uses the oracle-valued BPT base",
+    swapIncome === expectedSwapIncome,
+    `income=${swapIncome} expected=${expectedSwapIncome}`,
+  );
+}
+
+// ---------------------------------------------------------------------------
+console.log("\n27. Adaptive YDM evolution matches Solady expWad below the clamp");
 {
   const cfg = {
     mode: "adaptive" as const,
@@ -522,7 +624,7 @@ console.log("\n26. Adaptive YDM evolution matches Solady expWad below the clamp"
 }
 
 // ---------------------------------------------------------------------------
-console.log("\n27. Junior redemption preserves the accountant recovery ledger");
+console.log("\n28. Junior redemption preserves the accountant recovery ledger");
 {
   const result = postOpAccountingWad(
     {
