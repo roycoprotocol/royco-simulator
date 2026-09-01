@@ -12,6 +12,10 @@ import DayV3Comparison, {
 } from "@/components/day-v3/DayV3Comparison";
 import DayV3CapitalStack from "@/components/day-v3/DayV3CapitalStack";
 import { dayV3ButtonVariants } from "@/components/day-v3/DayV3Button";
+import {
+  buildDayV3DeployConfig,
+  dayV3DeployConfigFilename,
+} from "@/lib/day-v3/deploy-config";
 import DayV3DocsLink from "@/components/day-v3/DayV3DocsLink";
 import DayV3ExitCost from "@/components/day-v3/DayV3ExitCost";
 import DayV3ExitModel from "@/components/day-v3/DayV3ExitModel";
@@ -1841,6 +1845,54 @@ export default function DayV3Summary({
   const nextInputStep = inputSteps.find((step) => !step.complete) ?? null;
   const defaultOpenInputId = nextInputStep?.id ?? null;
 
+  // The design as the deploy flow's own draft. Only modeled terms travel;
+  // whatever this page does not decide stays blank for Royco Deploy to ask.
+  const downloadDeployConfig = () => {
+    const config = buildDayV3DeployConfig({
+      exportedAt: new Date().toISOString(),
+      marketName: customSource ? "" : market.identity.marketName,
+      chainId: canonicalPoolDesign?.policy.chainId ?? null,
+      sourceApyPct: inputs.sourceApyPct,
+      exitAssetYieldPct: quoteAssetYieldPct,
+      coveragePct: protectionView.coveragePct,
+      minimumLiquidityPct: exitView.minimumLiquidityPct,
+      observationDays: inputs.observationDays,
+      curveModels: {
+        junior: pricingModelSelections.risk,
+        slp: pricingModelSelections.liquidity,
+      },
+      curves: {
+        junior: {
+          y0Pct: resolved.y0 * 100,
+          yTargetPct: resolved.riskYieldShare * 100,
+          y100Pct: resolved.y100 * 100,
+        },
+        slp: {
+          y0Pct: resolved.liqY0 * 100,
+          yTargetPct: resolved.liquidityYieldShare * 100,
+          y100Pct: resolved.liqY100 * 100,
+        },
+      },
+      maximumDiscountBps:
+        exitView.maximumDiscountPct === null
+          ? null
+          : exitView.maximumDiscountPct * 100,
+      maximumPremiumBps: exitView.maximumPremiumBps,
+      lambda: exitView.lambda,
+      swapFeeBps: exitView.swapFeeBps,
+      redemptionDelayDays: redemptionDays,
+    });
+    const blob = new Blob([JSON.stringify(config, null, 2)], {
+      type: "application/json",
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = dayV3DeployConfigFilename(config.draft.identity.marketName);
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     // Capped well inside a laptop viewport. At 1440px a two-column input row
     // gave each control a 644px cell to hold three characters, so every field
@@ -2636,18 +2688,28 @@ export default function DayV3Summary({
               Finish in Royco Deploy
             </strong>
             <p className="mt-1 text-[10.5px] leading-relaxed text-[var(--secondary)]">
-              Royco Deploy collects final contract settings and revalidates the
-              live market before deployment.
+              Download this design as a market config, then Import it in Royco
+              Deploy. The asset, its price feed, the observation grace period,
+              and the Protected Exit terms are set there.
             </p>
           </div>
-          <a
-            className={dayV3ButtonVariants({ size: "lg", variant: "primary" })}
-            href="https://www.royco.org/deploy-market"
-            rel="noreferrer"
-            target="_blank"
-          >
-            Open Royco Deploy
-          </a>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              className={dayV3ButtonVariants({ size: "lg", variant: "secondary" })}
+              onClick={downloadDeployConfig}
+              type="button"
+            >
+              Download config <span aria-hidden="true">↓</span>
+            </button>
+            <a
+              className={dayV3ButtonVariants({ size: "lg", variant: "primary" })}
+              href="https://www.royco.org/deploy-market"
+              rel="noreferrer"
+              target="_blank"
+            >
+              Open Royco Deploy
+            </a>
+          </div>
       </div>
 
       <p className="max-w-[70ch] text-[10.5px] leading-relaxed text-[var(--tertiary)]">

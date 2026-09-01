@@ -172,7 +172,7 @@ function assertFeatureInvariants(input: {
   }
 }
 
-const percentToWad = (value: number): string => {
+export const percentToWad = (value: number): string => {
   if (!Number.isFinite(value) || value < 0 || value >= 100) {
     throw new Error("INVALID_DAY_V3_YIELD_SHARE");
   }
